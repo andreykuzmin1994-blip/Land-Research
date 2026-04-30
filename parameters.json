@@ -1,0 +1,76 @@
+{
+  "_comment": "Scoring weights and filter thresholds for the Land Site Selector agent. Per AUTORESEARCH_MECHANICS.md, this file is IMMUTABLE during a run. The human tunes between runs; the agent reads but never modifies. Editing this file mid-run corrupts the metric and invalidates the experiment log going forward.",
+  "_immutable_during_run": true,
+  "_version": "1.1",
+  "_last_updated": "2026-04-30",
+
+  "hard_filters": {
+    "acreage_min": 5,
+    "acreage_max": 50,
+    "flood_zones_blocked": ["A", "AE"],
+    "flood_zones_flag_for_review": ["AE_with_LOMR"],
+    "wetlands_max_pct_of_parcel": 20,
+    "max_grade_differential_ft": 15,
+    "min_road_classification": "county_collector",
+    "max_utility_extension_ft": 1500
+  },
+
+  "scoring_weights": {
+    "S1_interstate_proximity": 15,
+    "S2_parcel_geometry": 10,
+    "S3_topography": 10,
+    "S4_submarket_vacancy": 10,
+    "S5_submarket_absorption": 10,
+    "S6_competing_pipeline": 8,
+    "S7_labor_pool": 8,
+    "S8_land_basis": 7,
+    "S9_entitlement_complexity": 7,
+    "S10_incentives": 5,
+    "S11_rail_adjacency": 5,
+    "S12_demand_generators": 5
+  },
+
+  "composite_threshold": 70,
+
+  "actionability_thresholds": {
+    "_comment": "Actionability is binary PASS/FAIL per the four gates in program.md. No numeric threshold here.",
+    "rezoning_precedent_radius_miles": 2,
+    "rezoning_precedent_lookback_years": 5
+  },
+
+  "discovery": {
+    "min_actionable_pipeline_per_tier1_market": 10,
+    "min_actionable_pipeline_per_tier2_market": 5,
+    "discovery_cycle_interval_hours": 6,
+    "off_market_discovery_pct_minimum": 30,
+    "max_minutes_per_parcel_scoring": 10,
+    "max_minutes_per_parcel_discovery": 5
+  },
+
+  "strategy_fit_calibration": {
+    "_comment": "Tuning thresholds for strategy fit assessment. See program.md Strategy Fit Assessment Engine for the full criteria.",
+    "spec_dev_min_yield_on_cost_spread_bps": 100,
+    "land_bank_max_basis_pct_of_mature_market": 50,
+    "flip_min_off_market_discount_pct": 25,
+    "bts_min_buildable_sf": 150000
+  },
+
+  "owner_classification": {
+    "_comment": "How to infer owner_type_inferred from owner_name string.",
+    "trust_keywords": ["TRUST", "TRUSTEE", "TR "],
+    "estate_keywords": ["ESTATE", "ESTATE OF", "DECD"],
+    "llc_keywords": ["LLC", "L L C", "LP", "LTD"],
+    "corporate_keywords": ["INC", "CORP", "CO ", "GROUP"],
+    "government_keywords": ["COUNTY", "CITY OF", "STATE OF", "UNITED STATES", "BOARD OF"]
+  },
+
+  "absentee_detection": {
+    "out_of_state_threshold_state_code": "GA",
+    "absentee_distance_threshold_miles": 50
+  },
+
+  "logging": {
+    "results_log_table": "research_log",
+    "harness_report_retention_days": 90
+  }
+}

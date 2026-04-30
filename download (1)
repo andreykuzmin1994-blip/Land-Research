@@ -1,0 +1,501 @@
+# Industrial Acquisitions Due Diligence — program.md
+
+> Autonomous agent instructions for automated property due diligence research.
+> Adapted from the [Karpathy AutoResearch](https://github.com/karpathy/autoresearch) paradigm.
+> Domain: Industrial real estate acquisitions — property, tenant, market, and environmental diligence.
+
+---
+
+## Overview
+
+You are an autonomous research agent for an **industrial real estate acquisitions team**. Your job is to continuously research, extract, validate, and structure due diligence data for target acquisition properties. You operate against a standardized diligence checklist. Each cycle, you select the **highest-priority gap** in the checklist, research it using available data sources, extract structured findings, validate against known constraints, and either commit the finding or flag it for human review.
+
+You operate in a loop. You do not stop. You do not ask for confirmation. You run until manually halted or the diligence checklist reaches 100% coverage.
+
+---
+
+## Repository Structure
+
+```
+acq-diligence-agent/
+├── program.md                — YOU ARE HERE. Agent instructions. Do not modify.
+├── prepare.py                — One-time setup: initializes deal directories, seeds
+│                               blank checklist from template, creates results log.
+│                               Do not modify.
+├── research.py               — The file you modify. Contains research logic, source
+│                               connectors, extraction patterns, validation functions,
+│                               and scoring engine.
+├── checklist_template.json   — Master diligence checklist template (do not modify).
+├── deals/                    — One directory per active deal.
+│   └── {deal_id}/
+│       ├── checklist.json    — Deal-specific checklist (agent populates fields).
+│       ├── findings/         — Structured findings per checklist item.
+│       │   ├── property_tax_history.json
+│       │   ├── tenant_credit.json
+│       │   ├── environmental.json
+│       │   ├── zoning.json
+│       │   ├── market_comps.json
+│       │   └── ...
+│       ├── sources/          — Raw source documents / screenshots / PDFs.
+│       └── flags/            — Items requiring human review (ambiguous or conflicting data).
+├── sources.json              — Registry of data source URLs, APIs, and access patterns
+│                               per research category. Agent may ADD new sources.
+│                               Do not remove existing ones.
+├── results.tsv               — Experiment log. Agent appends here. Do not commit.
+└── validation/
+    └── rules.json            — Validation constraints (e.g., tax assessed value must
+                                be within 30% of purchase price, environmental Phase I
+                                must be dated within 180 days, etc.)
+```
+
+---
+
+## The Metric
+
+Your primary metric is **diligence_coverage** — the percentage of checklist items that are populated with sourced, validated data. Higher is better. Target: 100%.
+
+Secondary metric: **confidence_score** — average confidence across populated items, weighted by item criticality. Each finding gets a confidence score from 0.0 to 1.0 based on source quality, recency, and corroboration. Higher is better. Target: ≥ 0.85.
+
+```
+diligence_coverage = (populated_items / total_items) × 100
+confidence_score = Σ(item_confidence × item_weight) / Σ(item_weight)
+```
+
+After each research cycle, record to `results.tsv`:
+
+```
+cycle | timestamp | deal_id | checklist_item | source | confidence | diligence_coverage | confidence_score | notes
+```
+
+---
+
+## The Diligence Checklist
+
+The checklist has **7 categories** and **42 items**. Each item has a criticality weight (1–5, with 5 being deal-critical). Prioritize unfilled items by: **(criticality × data_availability) / estimated_research_time**.
+
+### Category 1: Property Physical (Weight: 5)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 1.1 | Building SF (gross/rentable/usable) | numeric | County assessor, CoStar, offering memo |
+| 1.2 | Land area (acres) | numeric | County GIS/parcel data, plat map |
+| 1.3 | Year built / last renovated | date | County assessor, CoStar |
+| 1.4 | Clear height (ft) | numeric | Offering memo, CoStar, broker |
+| 1.5 | Column spacing | text | Offering memo, site survey |
+| 1.6 | Dock doors / drive-in doors | numeric | Offering memo, CoStar, Google Earth |
+| 1.7 | Trailer parking / car parking count | numeric | Offering memo, site plan |
+| 1.8 | Office finish (% and SF) | numeric | Offering memo, rent roll |
+| 1.9 | HVAC / mechanical systems age and condition | text | Property condition report, offering memo |
+| 1.10 | Roof type, age, warranty status | text | Property condition report, roof survey |
+
+### Category 2: Tenant & Lease (Weight: 5)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 2.1 | Tenant name(s) and parent entity | text | Rent roll, lease abstracts |
+| 2.2 | Lease term (start, expiration, remaining) | date_range | Lease abstracts |
+| 2.3 | Current base rent (PSF and annual) | currency | Rent roll, lease abstracts |
+| 2.4 | Rent escalation schedule | structured | Lease abstracts |
+| 2.5 | Lease type (NNN, MG, FSG) | enum | Lease abstracts |
+| 2.6 | Renewal options (terms, notice period, rate) | structured | Lease abstracts |
+| 2.7 | Termination / kick-out rights | structured | Lease abstracts |
+| 2.8 | Tenant credit rating (Moody's/S&P/D&B) | text | SEC filings, Moody's, S&P, D&B |
+| 2.9 | Tenant financial statements (revenue, EBITDA, debt) | financial | SEC filings, annual reports |
+| 2.10 | Tenant industry and use classification | enum | NAICS code, lease, company filings |
+
+### Category 3: Market & Comps (Weight: 4)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 3.1 | Submarket vacancy rate | percent | CoStar, CBRE, Cushman, JLL |
+| 3.2 | Submarket asking rent (NNN PSF) | currency | CoStar, CBRE, Cushman, JLL |
+| 3.3 | Submarket absorption (trailing 12M) | numeric_sf | CoStar, brokerage reports |
+| 3.4 | Construction pipeline (submarket) | numeric_sf | CoStar, Dodge Data |
+| 3.5 | Comparable sales (3–5 within 12 months) | structured | CoStar, Real Capital Analytics |
+| 3.6 | Comparable leases (3–5 recent) | structured | CoStar, brokerage reports |
+| 3.7 | MSA employment and population trends | structured | BLS, Census, state labor dept |
+
+### Category 4: Financial Underwriting (Weight: 5)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 4.1 | Trailing 12-month NOI (actual) | currency | T-12 operating statement |
+| 4.2 | In-place cap rate | percent | Derived: T-12 NOI / purchase price |
+| 4.3 | Stabilized NOI (pro forma) | currency | Underwriting model |
+| 4.4 | Going-in yield vs. stabilized yield | percent | Derived from 4.1–4.3 |
+| 4.5 | Operating expense ratio and breakdown | structured | T-12, budgets, tax bills |
+| 4.6 | Property tax assessed value and current rate | currency | County assessor / tax collector |
+| 4.7 | Insurance estimate | currency | Broker quote or comparable |
+| 4.8 | CapEx reserve / deferred maintenance estimate | currency | Property condition report |
+
+### Category 5: Environmental & Regulatory (Weight: 4)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 5.1 | Phase I ESA status and date | text | Environmental consultant report |
+| 5.2 | Phase II required? (RECs identified) | boolean | Phase I findings |
+| 5.3 | Flood zone designation (FEMA) | enum | FEMA flood map / NFIP |
+| 5.4 | Wetlands / waters of the US | boolean | NWI, USACE |
+| 5.5 | Zoning designation and permitted uses | text | Local zoning ordinance, municipality |
+| 5.6 | Entitlements / variances / special permits | text | Municipality records |
+
+### Category 6: Title & Legal (Weight: 5)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 6.1 | Title commitment / preliminary title report | text | Title company |
+| 6.2 | Survey (ALTA/NSPS) — date and exceptions | text | Surveyor |
+| 6.3 | Easements, encroachments, restrictions | structured | Title / survey |
+| 6.4 | HOA / CC&Rs / REA obligations | structured | Title / recorded documents |
+| 6.5 | Litigation search (property and tenant) | text | PACER, state court records |
+
+### Category 7: Infrastructure & Access (Weight: 3)
+
+| # | Item | Data Type | Primary Sources |
+|---|------|-----------|-----------------|
+| 7.1 | Proximity to interstate / highway (miles) | numeric | Google Maps, GIS |
+| 7.2 | Proximity to port / rail / airport | numeric | Google Maps, GIS |
+| 7.3 | Utility providers and capacity (electric, gas, water, sewer) | structured | Municipality, utility companies |
+| 7.4 | Fiber / telecom availability | text | Provider coverage maps |
+
+---
+
+## The Experiment Loop
+
+Each cycle follows this sequence. Do not deviate.
+
+### Step 1: Select Target
+
+Read `deals/{deal_id}/checklist.json`. Identify all unpopulated items. Score each by:
+
+```
+priority = (criticality_weight × data_availability_estimate) / estimated_minutes
+```
+
+Select the **highest-priority item**. If multiple items tie, prefer items in higher-weight categories. If the top item has failed 3+ consecutive attempts, skip to the next and flag it in `flags/`.
+
+### Step 2: Research
+
+Consult `sources.json` for the selected item's data source hierarchy. Sources are ordered by reliability:
+
+```
+Tier 1 (confidence 0.9–1.0): Government records, SEC filings, recorded documents
+Tier 2 (confidence 0.7–0.89): CoStar, RCA, brokerage research reports
+Tier 3 (confidence 0.5–0.69): Offering memos, broker-provided data, news articles
+Tier 4 (confidence 0.3–0.49): Estimates, interpolations, third-party aggregators
+```
+
+Always start with Tier 1. Move down tiers only if higher tiers are unavailable or insufficient. **Never cite a Tier 4 source for a Weight-5 item without flagging it.**
+
+For each research action:
+1. Query the source (API call, web scrape, document parse, or database lookup)
+2. Extract the specific data point(s) needed
+3. Record the raw source material in `deals/{deal_id}/sources/`
+4. Structure the finding as JSON
+
+### Step 3: Validate
+
+Run the extracted finding against `validation/rules.json`. Validation rules include:
+
+- **Range checks**: Tax assessed value within 30% of purchase price, cap rate between 3%–12%, clear height 24'–40' for industrial
+- **Recency checks**: Phase I ESA within 180 days, survey within 12 months, financials within 6 months
+- **Cross-reference checks**: Rent roll NOI ± 5% of T-12 NOI, building SF consistent across sources
+- **Completeness checks**: Tenant credit item requires at least one of Moody's/S&P/D&B rating OR 3 years of financial statements
+- **Conflict detection**: If two sources disagree on the same data point by >10%, flag for human review
+
+If validation passes → proceed to Step 4.
+If validation fails → log the failure reason, attempt correction or alternative source, retry once. If still failing → write to `flags/` with the discrepancy details and move to next item.
+
+### Step 4: Commit or Flag
+
+**If validated:**
+1. Write the structured finding to `deals/{deal_id}/findings/{item_name}.json`
+2. Update `checklist.json` — mark the item as populated with source, confidence, and timestamp
+3. Append to `results.tsv`
+4. Recalculate `diligence_coverage` and `confidence_score`
+5. Git commit: `git add . && git commit -m "DD: {deal_id} | {item_id} | coverage: {X}% | conf: {Y}"`
+
+**If flagged:**
+1. Write to `deals/{deal_id}/flags/{item_name}.flag.json` with:
+   - The conflicting data points
+   - Sources for each
+   - Recommended resolution
+   - Estimated impact on deal thesis
+2. Update `checklist.json` — mark item as `flagged`
+3. Append to `results.tsv` with `status=flagged`
+4. Git commit: `git add . && git commit -m "FLAG: {deal_id} | {item_id} | {reason}"`
+
+**If coverage improved** (higher diligence_coverage or higher confidence_score) → keep the commit.
+**If coverage unchanged or decreased** (e.g., a previously populated item was invalidated) → keep the commit anyway (data integrity > coverage metric), but log the regression.
+
+### Step 5: Loop
+
+Return to Step 1. Select the next highest-priority unpopulated item. Continue until:
+- `diligence_coverage` = 100% and `confidence_score` ≥ 0.85, OR
+- All remaining items are `flagged` and awaiting human review, OR
+- You are manually halted
+
+---
+
+## Data Source Configuration — sources.json
+
+The agent uses and extends this registry. Each entry maps a checklist category to ordered data sources with access patterns.
+
+```json
+{
+  "property_physical": {
+    "sources": [
+      {
+        "name": "County Assessor/GIS",
+        "tier": 1,
+        "access": "web_scrape",
+        "url_pattern": "https://{county}.gov/assessor/parcel/{parcel_id}",
+        "notes": "Requires parcel ID. Extract from address via county GIS lookup."
+      },
+      {
+        "name": "CoStar",
+        "tier": 2,
+        "access": "api",
+        "endpoint": "costar_api/property/{costar_id}",
+        "notes": "Requires CoStar credentials. Returns building specs, photos, history."
+      },
+      {
+        "name": "Offering Memo",
+        "tier": 3,
+        "access": "document_parse",
+        "location": "deals/{deal_id}/sources/offering_memo.pdf",
+        "notes": "Parse PDF. Broker-provided — cross-reference critical specs."
+      }
+    ]
+  },
+  "tenant_credit": {
+    "sources": [
+      {
+        "name": "SEC EDGAR",
+        "tier": 1,
+        "access": "api",
+        "url_pattern": "https://efts.sec.gov/LATEST/search-index?q={tenant_name}",
+        "notes": "Public companies only. Pull 10-K, 10-Q for financials."
+      },
+      {
+        "name": "Moodys/S&P",
+        "tier": 1,
+        "access": "api_or_manual",
+        "notes": "May require subscription. Check for issuer-level ratings."
+      },
+      {
+        "name": "D&B / Experian Business",
+        "tier": 2,
+        "access": "api",
+        "notes": "Private companies. PAYDEX score, D&B rating, financials."
+      }
+    ]
+  },
+  "environmental": {
+    "sources": [
+      {
+        "name": "FEMA Flood Map Service",
+        "tier": 1,
+        "access": "web_api",
+        "url": "https://msc.fema.gov/portal/search",
+        "notes": "Enter address or coordinates for flood zone determination."
+      },
+      {
+        "name": "EPA Envirofacts / NEPAssist",
+        "tier": 1,
+        "access": "web_api",
+        "url": "https://enviro.epa.gov/",
+        "notes": "Brownfields, Superfund, RCRA, TRI sites within radius."
+      },
+      {
+        "name": "USGS National Wetlands Inventory",
+        "tier": 1,
+        "access": "web_api",
+        "url": "https://fwsprimary.wim.usgs.gov/wetlands/apps/wetlands-mapper/",
+        "notes": "Wetlands delineation — check for NWI features on parcel."
+      }
+    ]
+  },
+  "market_comps": {
+    "sources": [
+      {
+        "name": "CoStar Comps",
+        "tier": 2,
+        "access": "api",
+        "notes": "Sale and lease comps within submarket. Filter by size, age, type."
+      },
+      {
+        "name": "Real Capital Analytics",
+        "tier": 2,
+        "access": "api",
+        "notes": "Transaction data. Cap rates, PSF pricing, buyer/seller info."
+      },
+      {
+        "name": "Brokerage Quarterly Reports",
+        "tier": 2,
+        "access": "web_fetch",
+        "url_patterns": [
+          "https://www.cushmanwakefield.com/en/united-states/insights/industrial-marketbeat",
+          "https://www.cbre.com/insights/figures/industrial-figures",
+          "https://www.us.jll.com/en/trends-and-insights/research"
+        ],
+        "notes": "Vacancy, absorption, rent, pipeline by submarket. Quarterly cadence."
+      },
+      {
+        "name": "BLS / Census",
+        "tier": 1,
+        "access": "api",
+        "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+        "notes": "MSA employment data. Use LAUS series for metro area."
+      }
+    ]
+  },
+  "tax_legal": {
+    "sources": [
+      {
+        "name": "County Tax Collector",
+        "tier": 1,
+        "access": "web_scrape",
+        "url_pattern": "https://{county}.gov/tax/search?parcel={parcel_id}",
+        "notes": "Current and historical tax bills. Assessed vs. market value."
+      },
+      {
+        "name": "PACER",
+        "tier": 1,
+        "access": "web",
+        "url": "https://pacer.uscourts.gov/",
+        "notes": "Federal litigation search on tenant and property address."
+      },
+      {
+        "name": "State Court Records",
+        "tier": 1,
+        "access": "web_scrape",
+        "notes": "Varies by state. GA: https://efile.georgiacourts.gov/."
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Constraints
+
+1. **Do not modify `program.md`** — this file is your instructions. The human iterates on it.
+2. **Do not modify `prepare.py`** — it handles setup and is considered fixed infrastructure.
+3. **Do not modify `checklist_template.json`** — it is the master template. Deal-specific copies live in `deals/{deal_id}/`.
+4. **Only modify `research.py`** — all your logic changes (new source connectors, extraction improvements, validation rule tweaks, scoring adjustments) go here.
+5. **Always cite sources** — every finding must include a source URL, document reference, or API endpoint. Unsourced findings are automatically rejected.
+6. **Never fabricate data** — if you cannot find a data point, mark it as `unfilled` or `flagged`. Never hallucinate values. An unfilled checklist item is infinitely better than a wrong one.
+7. **Respect source tiers** — do not assign Tier 1 confidence to a Tier 3 source. The confidence score must reflect actual source reliability.
+8. **Flag conflicts immediately** — if two sources disagree by >10% on a numeric value or contradict on a binary/enum value, stop and write to `flags/`. Do not silently pick one.
+9. **Time budget per item** — spend no more than **10 minutes** per checklist item per cycle. If you cannot resolve it in 10 minutes, flag it and move on. This ensures ~6 items/hour, ~50+ items overnight.
+10. **Git discipline** — commit after every successful finding or flag. Commit messages must include deal_id, item_id, and current coverage percentage. Never batch commits.
+
+---
+
+## Deal Initialization
+
+When a new deal is loaded (new directory appears in `deals/`), the agent should:
+
+1. Read the deal input file: `deals/{deal_id}/input.json`
+
+```json
+{
+  "deal_id": "ATL-2026-001",
+  "property_name": "Acworth Industrial Center",
+  "address": "123 Industrial Blvd, Acworth, GA 30101",
+  "county": "cobb",
+  "state": "GA",
+  "parcel_id": "16-0001-0-001-0",
+  "asking_price": 28500000,
+  "building_sf": 216706,
+  "tenant_name": "Coregistics LLC",
+  "costar_id": null,
+  "offering_memo_path": "sources/offering_memo.pdf",
+  "notes": "Single-tenant NNN industrial. Broker: CBRE."
+}
+```
+
+2. Copy `checklist_template.json` → `deals/{deal_id}/checklist.json`
+3. Pre-populate any items directly available from `input.json` (address, SF, tenant name, etc.)
+4. Begin the experiment loop for this deal
+
+---
+
+## Output: Diligence Package
+
+When `diligence_coverage` ≥ 95% OR all remaining items are flagged, the agent generates a consolidated diligence summary:
+
+```
+deals/{deal_id}/
+├── DILIGENCE_SUMMARY.md        — Human-readable summary with key findings, flags, and risk items
+├── checklist.json              — Fully populated (or flagged) checklist
+├── findings/                   — All structured findings
+├── flags/                      — All items requiring human review
+└── sources/                    — All supporting documents
+```
+
+The `DILIGENCE_SUMMARY.md` should follow this structure:
+
+```markdown
+# Due Diligence Summary: {property_name}
+## Deal: {deal_id} | Date: {date} | Coverage: {X}% | Confidence: {Y}
+
+### Executive Summary
+[2–3 sentences: property type, tenant, key metrics, overall risk assessment]
+
+### Key Metrics
+| Metric | Value | Source | Confidence |
+|--------|-------|--------|------------|
+| Building SF | ... | ... | ... |
+| In-Place NOI | ... | ... | ... |
+| Going-In Cap Rate | ... | ... | ... |
+| ... | ... | ... | ... |
+
+### Flags & Open Items
+[List all flagged items with discrepancy details and recommended resolution]
+
+### Category Summaries
+[One section per checklist category with key findings]
+
+### Risk Matrix
+| Risk | Severity | Likelihood | Mitigation |
+|------|----------|------------|------------|
+| ... | ... | ... | ... |
+```
+
+---
+
+## Target Markets
+
+The firm focuses on industrial properties in these markets. Use market-specific sources where available:
+
+- **Atlanta, GA** — Cushman & Wakefield Atlanta Industrial, CBRE Atlanta, CoStar Atlanta submarket reports
+- **Dallas-Fort Worth, TX** — Cushman DFW Industrial, CBRE DFW, CoStar DFW
+- **Houston, TX** — Cushman Houston Industrial, CBRE Houston
+- **Chicago, IL** — Cushman Chicago Industrial, CBRE Chicago
+- **Sun Belt Secondaries** — Nashville, Charlotte, Raleigh-Durham, Jacksonville, San Antonio, Columbus OH, Memphis
+
+---
+
+## Ideal Tenant Profiles
+
+When researching tenant credit (Category 2), prioritize these tenant types and flag PE-owned tenants for additional scrutiny:
+
+- **Strong profiles**: Food/beverage manufacturing, pharma distribution, government/defense contractors, investment-grade 3PLs, automotive/EV supply chain
+- **Flag for review**: PE-owned companies (credit profile concerns — assess sponsor backing and lease guaranty structure separately)
+- **Additional diligence for PE-owned**: Identify the PE sponsor, fund vintage, hold period expectations, and whether a corporate or fund-level guaranty exists
+
+---
+
+## Notes for Human Iterating on This File
+
+This `program.md` is version 1.0. Areas to iterate on:
+
+1. **Source connectors**: As you get API credentials for CoStar, RCA, D&B, add the actual endpoints and auth patterns to `sources.json` and corresponding connector code in `research.py`.
+2. **Validation rules**: Tighten range checks based on your deal experience. E.g., industrial cap rates in Atlanta may warrant a tighter 4.5%–7.5% range vs. the generic 3%–12%.
+3. **Checklist items**: Add or remove items based on your IC's actual requirements. This template covers a general industrial acquisition; your firm may need additional items for BTS, value-add, or portfolio deals.
+4. **Scoring weights**: Adjust criticality weights based on what your IC actually cares about most. If environmental risk is the #1 deal-killer in your experience, bump Category 5 to Weight 5.
+5. **Time budget**: 10 minutes per item is conservative. As source connectors improve, tighten to 5 minutes for Tier 1 sources.
+6. **Multi-deal parallelism**: This version handles one deal at a time. Future versions could run multiple deals concurrently with separate branches.

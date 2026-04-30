@@ -1,0 +1,179 @@
+{
+  "_comment": "Registry of data source URLs, APIs, and access patterns. The agent may ADD new sources but should not remove existing ones. See appendix_a_county_connectors.md for full per-county specs.",
+  "_version": "1.0",
+
+  "county_parcel_data": {
+    "fulton_ga": {
+      "tier": 1,
+      "access": "arcgis_rest",
+      "service_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer",
+      "parcel_layer_id": 11,
+      "zoning_layer_id": 34,
+      "future_land_use_layer_id": 33,
+      "tax_allocation_districts_layer_id": 37,
+      "elevation_contours_layer_id": 25,
+      "max_record_count": 2000,
+      "spatial_reference_native": 102667,
+      "field_mapping": {
+        "parcel_id": "ParcelID",
+        "owner_name": "Owner",
+        "owner_mailing_address": "OwnerAddr1",
+        "owner_mailing_address_2": "OwnerAddr2",
+        "site_address": "Address",
+        "acreage": "LandAcres",
+        "land_value": "LandAssess",
+        "improvement_value": "ImprAssess",
+        "total_value": "TotAssess",
+        "land_use_code": "LUCode",
+        "class_code": "ClassCode",
+        "tax_district": "TaxDist",
+        "tax_year": "TaxYear",
+        "subdivision": "Subdiv"
+      },
+      "fallback_portal": "https://qpublic.schneidercorp.com/Application.aspx?AppID=1010",
+      "validated": true,
+      "validation_date": "2026-04-30"
+    },
+    "dekalb_ga": {
+      "tier": 1,
+      "access": "arcgis_rest",
+      "service_url": "https://dcgis.dekalbcountyga.gov/hosted/rest/services/Parcels/MapServer",
+      "alternate_service_url": "https://gis.dekalbcountyga.gov/arcgis/rest/services/Parcels/MapServer",
+      "open_data_portal": "https://dcgis-dekalbgis.hub.arcgis.com/",
+      "validated": false,
+      "_notes": "Validate field names by hitting service_url/{layer_id}?f=pjson before use"
+    },
+    "cobb_ga": {
+      "tier": 1,
+      "access": "arcgis_rest",
+      "open_data_portal": "https://geo-cobbcountyga.hub.arcgis.com/",
+      "tax_assessment_portal": "https://cobbassessor.org/",
+      "validated": false,
+      "_notes": "Discover REST endpoint via DevTools. Cross-reference with qPublic for tax data."
+    },
+    "gwinnett_ga": {
+      "tier": 1,
+      "access": "arcgis_rest",
+      "open_data_portal": "https://gcgis-gwinnettcountyga.hub.arcgis.com/",
+      "zoning_data_url": "https://gcgis-gwinnettcountyga.hub.arcgis.com/items/aca675dc82a248a0adde4b70eaad0d8d",
+      "validated": false
+    },
+    "clayton_ga": {
+      "tier": 1,
+      "access": "arcgis_rest_with_fallback",
+      "open_data_portal": "https://clayton-county-gis-data-portal-cccd-gis.hub.arcgis.com/",
+      "fallback_portal": "https://publicaccess.claytoncountyga.gov/",
+      "validated": false
+    },
+    "henry_ga": {
+      "tier": 1,
+      "access": "arcgis_rest_with_fallback",
+      "viewer_url": "https://www.arcgis.com/apps/webappviewer/index.html?id=8e3356a4e1954356a80ef35dbd1c0358",
+      "fallback_portal": "https://qpublic.schneidercorp.com/Application.aspx?App=HenryCountyGA&PageType=Search",
+      "validated": false
+    },
+    "spalding_ga": {
+      "tier": 2,
+      "access": "ai_fallback_only",
+      "fallback_portal": "https://qpublic.schneidercorp.com/",
+      "validated": false,
+      "_notes": "No public ArcGIS REST. Rely on AI fallback or Regrid subscription."
+    },
+    "fayette_ga": {
+      "tier": 2,
+      "access": "ai_fallback_only",
+      "fallback_portal": "https://beacon.schneidercorp.com/",
+      "validated": false,
+      "_notes": "Beacon platform. Different navigation pattern from qPublic."
+    }
+  },
+
+  "environmental": {
+    "fema_flood": {
+      "tier": 1,
+      "access": "web_api",
+      "url": "https://msc.fema.gov/portal/search"
+    },
+    "epa_envirofacts": {
+      "tier": 1,
+      "access": "web_api",
+      "url": "https://enviro.epa.gov/"
+    },
+    "usgs_wetlands": {
+      "tier": 1,
+      "access": "web_api",
+      "url": "https://fwsprimary.wim.usgs.gov/wetlands/apps/wetlands-mapper/"
+    },
+    "georgia_epd": {
+      "tier": 1,
+      "access": "web_scrape",
+      "_notes": "GEOS database for state-level brownfield and contamination registries"
+    }
+  },
+
+  "topography": {
+    "usgs_3dep": {
+      "tier": 1,
+      "access": "web_api",
+      "url": "https://apps.nationalmap.gov/",
+      "_notes": "LiDAR-derived elevation data, 1-meter resolution in many areas"
+    }
+  },
+
+  "market_data": {
+    "costar": {
+      "tier": 2,
+      "access": "manual_export_ingestion",
+      "_notes": "See COSTAR_INGESTION_CONTRACT.md for the full ingestion specification. Never scrape CoStar."
+    },
+    "cushman_wakefield": {
+      "tier": 2,
+      "access": "web_fetch",
+      "url": "https://www.cushmanwakefield.com/en/united-states/insights/industrial-marketbeat",
+      "_notes": "Free quarterly snapshots. Refresh every 90 days."
+    },
+    "cbre": {
+      "tier": 2,
+      "access": "web_fetch",
+      "url": "https://www.cbre.com/insights/figures/industrial-figures"
+    },
+    "jll": {
+      "tier": 2,
+      "access": "web_fetch",
+      "url": "https://www.us.jll.com/en/trends-and-insights/research"
+    },
+    "bls_qcew": {
+      "tier": 1,
+      "access": "api",
+      "url": "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+    },
+    "census_lodes": {
+      "tier": 1,
+      "access": "web_api",
+      "url": "https://onthemap.ces.census.gov/",
+      "_notes": "Worker home-work flow data for 30-minute drive time labor shed estimates"
+    }
+  },
+
+  "incentives": {
+    "opportunity_zones": {
+      "tier": 1,
+      "access": "web",
+      "url": "https://opportunityzones.hud.gov/"
+    },
+    "georgia_eda": {
+      "tier": 1,
+      "access": "web_scrape",
+      "_notes": "Georgia Department of Economic Development"
+    }
+  },
+
+  "ownership_research": {
+    "georgia_sos": {
+      "tier": 1,
+      "access": "web_scrape",
+      "url": "https://ecorp.sos.ga.gov/",
+      "_notes": "LLC/Corporation lookup for owner research"
+    }
+  }
+}

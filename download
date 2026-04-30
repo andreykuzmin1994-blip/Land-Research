@@ -1,0 +1,59 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node (if any tooling uses it)
+node_modules/
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Agent runtime artifacts (generated, not source)
+markets/*/candidates.json
+markets/*/scored/
+markets/*/rejected/
+markets/*/flagged/
+markets/*/market_context.json
+rankings/*.json
+snapshots/*.md
+harness_reports/*.json
+sources/*/
+flagged/*.json
+results.tsv
+experiment_log.tsv     # Karpathy AutoResearch experiment log — never commit
+
+# CoStar exports (not committed - contains licensed data)
+costar_exports/
+*.xlsx
+*.csv
+
+# Database backups
+*.sql
+*.dump
+backups/
+
+# Playwright browser binaries
+playwright/.local-browsers/
