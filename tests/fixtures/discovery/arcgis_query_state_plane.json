@@ -1,0 +1,29 @@
+{
+  "exceededTransferLimit": false,
+  "features": [
+    {
+      "attributes": {
+        "ParcelID": "14F-SP-001",
+        "Owner": "STATE PLANE OWNER",
+        "OwnerAddr1": "PO BOX 7",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "0 STATEPLANE RD",
+        "LandAcres": 12.0,
+        "LandAssess": 100000,
+        "ImprAssess": 0,
+        "TotAssess": 100000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [2200000.0, 1400000.0],
+          [2200500.0, 1400000.0],
+          [2200500.0, 1400500.0],
+          [2200000.0, 1400500.0],
+          [2200000.0, 1400000.0]
+        ]]
+      }
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": 11,
+  "name": "Tax Parcel",
+  "type": "Feature Layer",
+  "geometryType": "esriGeometryPolygon",
+  "fields": [
+    {"name": "ParcelID", "type": "esriFieldTypeString"},
+    {"name": "Owner", "type": "esriFieldTypeString"},
+    {"name": "OwnerAddr1", "type": "esriFieldTypeString"},
+    {"name": "OwnerAddr2", "type": "esriFieldTypeString"},
+    {"name": "Address", "type": "esriFieldTypeString"},
+    {"name": "LandAcres", "type": "esriFieldTypeDouble"},
+    {"name": "LandAssess", "type": "esriFieldTypeDouble"},
+    {"name": "ImprAssess", "type": "esriFieldTypeDouble"},
+    {"name": "TotAssess", "type": "esriFieldTypeDouble"},
+    {"name": "LUCode", "type": "esriFieldTypeString"},
+    {"name": "ClassCode", "type": "esriFieldTypeString"},
+    {"name": "TaxDist", "type": "esriFieldTypeString"},
+    {"name": "TaxYear", "type": "esriFieldTypeInteger"},
+    {"name": "Subdiv", "type": "esriFieldTypeString"}
+  ],
+  "maxRecordCount": 2000
+}

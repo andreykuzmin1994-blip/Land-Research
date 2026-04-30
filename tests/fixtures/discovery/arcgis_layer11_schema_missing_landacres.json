@@ -1,0 +1,12 @@
+{
+  "id": 11,
+  "name": "Tax Parcel",
+  "type": "Feature Layer",
+  "geometryType": "esriGeometryPolygon",
+  "fields": [
+    {"name": "ParcelID", "type": "esriFieldTypeString"},
+    {"name": "Owner", "type": "esriFieldTypeString"},
+    {"name": "OwnerAddr1", "type": "esriFieldTypeString"}
+  ],
+  "maxRecordCount": 2000
+}

@@ -1,0 +1,12 @@
+{
+  "county": "fulton",
+  "market": "atlanta",
+  "timestamp": "2026-04-30T03:14:00Z",
+  "overall_health": "failing",
+  "checks": {
+    "service_alive": {"status": "fail", "error": "503 Service Unavailable"}
+  },
+  "sample_features": [],
+  "warnings": [],
+  "errors": ["Endpoint returning 503 — switched to AI fallback"]
+}

@@ -1,0 +1,53 @@
+{
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "ParcelID": "14F-PAGE1-001",
+        "Owner": "PAGE 1 OWNER A",
+        "OwnerAddr1": "1 A ST",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "0 PAGE1 A RD",
+        "LandAcres": 10.0,
+        "LandAssess": 50000,
+        "ImprAssess": 0,
+        "TotAssess": 50000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [-84.555, 33.553],
+          [-84.553, 33.553],
+          [-84.553, 33.555],
+          [-84.555, 33.555],
+          [-84.555, 33.553]
+        ]]
+      }
+    },
+    {
+      "attributes": {
+        "ParcelID": "14F-PAGE1-002",
+        "Owner": "PAGE 1 OWNER B",
+        "OwnerAddr1": "2 B ST",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "0 PAGE1 B RD",
+        "LandAcres": 11.0,
+        "LandAssess": 60000,
+        "ImprAssess": 0,
+        "TotAssess": 60000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [-84.555, 33.553],
+          [-84.553, 33.553],
+          [-84.553, 33.555],
+          [-84.555, 33.555],
+          [-84.555, 33.553]
+        ]]
+      }
+    }
+  ]
+}
