@@ -30,6 +30,9 @@
 
     "redaction_extra_fields": [
       "_comment_for_humans: any additional API field names whose values should be replaced with [REDACTED] before serialization, beyond the logical-name-driven defaults in connector_harness.py."
-    ]
+    ],
+
+    "_optional_fields_comment": "API field names whose 0% population is informational rather than a connector failure. Phase 2 fix-forward verified live: Subdiv is genuinely sparse on raw industrial parcels in South Fulton (most don't belong to a named subdivision); the field is still reported in field_population.rates for human review.",
+    "optional_fields": ["Subdiv"]
   }
 }

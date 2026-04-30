@@ -181,6 +181,10 @@ class Connector:
     fallback_portal: Optional[str]
     notes: str = ""
     max_record_count: int = 1000
+    # Optional API field names whose 0% population is informational rather than a
+    # connector failure (e.g., Subdiv on raw industrial land). Reported in
+    # field_population.rates but excluded from low_population_fields.
+    optional_fields: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -244,6 +248,7 @@ def load_registry(
             fallback_portal=src.get("fallback_portal"),
             notes=src.get("_notes", ""),
             max_record_count=src.get("max_record_count", 1000),
+            optional_fields=tuple(ovl.get("optional_fields") or ()),
         )
 
     # Validate overlay keys exist in sources.json (risk review 9.j).
@@ -530,10 +535,16 @@ def check_known_good_query(
 
 
 def check_field_population(
-    features: List[Dict[str, Any]], field_mapping: Dict[str, str]
+    features: List[Dict[str, Any]],
+    field_mapping: Dict[str, str],
+    optional_fields: Tuple[str, ...] = (),
 ) -> CheckResult:
     """5. Per-field non-null fraction. R-14: sample size is whatever the
-    known-good query returned, threshold POPULATION_THRESHOLD."""
+    known-good query returned, threshold POPULATION_THRESHOLD.
+    Phase 2 fix-forward: fields listed in `optional_fields` (e.g., Subdiv on
+    raw industrial land) are reported in `rates` but excluded from
+    `low_population_fields` — their absence is informational, not a connector
+    failure."""
     if not features:
         return CheckResult("field_population", "skipped",
                            {"reason": "no features from known_good_query"})
@@ -546,10 +557,19 @@ def check_field_population(
             if (f.get("attributes") or {}).get(fname) not in (None, "", "Null", "<Null>")
         )
         rates[fname] = round(non_null / n, 3) if n else 0.0
-    low = [f for f, r in rates.items() if r < POPULATION_THRESHOLD]
+    optional_set = set(optional_fields or ())
+    low = [
+        fname for fname, r in rates.items()
+        if r < POPULATION_THRESHOLD and fname not in optional_set
+    ]
     return CheckResult("field_population",
                        "fail" if low else "pass",
-                       {"sample_size": n, "rates": rates, "low_population_fields": low})
+                       {
+                           "sample_size": n,
+                           "rates": rates,
+                           "low_population_fields": low,
+                           "optional_fields": sorted(optional_set & set(rates)),
+                       })
 
 
 def check_owner_data_sanity(
@@ -590,32 +610,71 @@ def check_owner_data_sanity(
 _PO_BOX_PAT = re.compile(r"\bP\.?O\.?\s*BOX\b", re.IGNORECASE)
 _STATE_ZIP_PAT = re.compile(r"\b([A-Z]{2})\s+\d{5}(?:-\d{4})?\b")
 _STREET_NUMBER_PAT = re.compile(r"^\s*\d+\s+\S")
+# Lenient site-address heuristic: county portals usually store site addresses
+# as STREET-ONLY strings (no city/state/ZIP), so the strict state+ZIP check
+# would 0% legitimate sites. Accept either a leading street number followed by
+# a road word, OR an unnumbered named road (e.g., "0 CAMPBELLTON FAIRBURN RD"
+# is a real Fulton site address for raw land parcels).
+_SITE_ROAD_WORDS = (
+    r"RD|ROAD|ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|DR|DRIVE|LN|LANE|"
+    r"CT|COURT|PL|PLACE|HWY|HIGHWAY|PKWY|PARKWAY|WAY|TRL|TRAIL|"
+    r"CIR|CIRCLE|TER|TERRACE|LOOP|RUN|RIDGE|RDG"
+)
+_SITE_STREET_PAT = re.compile(
+    rf"^\s*(\d+\s+\S+|[A-Z][A-Z0-9 \-'\.]*\s+(?:{_SITE_ROAD_WORDS})\b)",
+    re.IGNORECASE,
+)
 
 
-def _address_parses_cleanly(addr: str, allow_po_box: bool = False) -> bool:
+def _mailing_parses_cleanly(addr: str) -> bool:
+    """Mailing address: must have a US state + ZIP; PO-Box bypass on street
+    rule. Designed to run on EITHER a single combined string OR the
+    concatenation of OwnerAddr1 + OwnerAddr2 (county portals frequently split
+    mailing addresses across two fields)."""
     if not addr:
         return False
     addr = addr.strip()
-    has_state = bool(_STATE_ZIP_PAT.search(addr.upper()))
-    if not has_state:
-        return False
     state_match = _STATE_ZIP_PAT.search(addr.upper())
-    if state_match and state_match.group(1) not in US_STATE_CODES:
+    if not state_match:
         return False
-    if allow_po_box and _PO_BOX_PAT.search(addr):
+    if state_match.group(1) not in US_STATE_CODES:
+        return False
+    if _PO_BOX_PAT.search(addr):
         return True
     return bool(_STREET_NUMBER_PAT.match(addr))
+
+
+def _site_parses_cleanly(addr: str) -> bool:
+    """Site address: no state/ZIP required (most county portals store street-
+    only strings here). Accept leading street number OR named road word."""
+    if not addr:
+        return False
+    return bool(_SITE_STREET_PAT.match(addr.strip()))
+
+
+# Backwards-compatible shim — older code paths and tests call this with
+# allow_po_box=True for mailing addresses, allow_po_box=False for site.
+def _address_parses_cleanly(addr: str, allow_po_box: bool = False) -> bool:
+    if allow_po_box:
+        return _mailing_parses_cleanly(addr)
+    return _site_parses_cleanly(addr)
 
 
 def check_address_parsing(
     features: List[Dict[str, Any]], field_mapping: Dict[str, str],
 ) -> CheckResult:
-    """7. Site addresses + mailing addresses parse cleanly. R-16: PO-Box bypass
-    on the mailing-address branch (PO Boxes legitimately don't have street numbers)."""
+    """7. Site addresses + mailing addresses parse cleanly.
+    R-16: PO-Box bypass on the mailing-address branch.
+    Phase 2 fix-forward: site addresses use a street-only heuristic; mailing
+    addresses concatenate OwnerAddr1 + OwnerAddr2 (or the configured logical
+    `owner_mailing_address` and `owner_mailing_address_2` fields) when both
+    are present, because county portals typically split the mailing address
+    across two fields."""
     if not features:
         return CheckResult("address_parsing", "skipped", {"reason": "no features"})
     site_field = field_mapping.get("site_address")
     mail_field = field_mapping.get("owner_mailing_address")
+    mail_field_2 = field_mapping.get("owner_mailing_address_2")
     if not site_field and not mail_field:
         return CheckResult("address_parsing", "skipped",
                            {"reason": "no address fields configured"})
@@ -627,13 +686,23 @@ def check_address_parsing(
             v = attrs.get(site_field)
             if v:
                 site_total += 1
-                if _address_parses_cleanly(str(v), allow_po_box=False):
+                if _site_parses_cleanly(str(v)):
                     site_ok += 1
         if mail_field:
-            v = attrs.get(mail_field)
-            if v:
+            v1 = attrs.get(mail_field)
+            v2 = attrs.get(mail_field_2) if mail_field_2 else None
+            combined: Optional[str]
+            if v1 and v2:
+                combined = f"{v1} {v2}"
+            elif v1:
+                combined = str(v1)
+            elif v2:
+                combined = str(v2)
+            else:
+                combined = None
+            if combined:
                 mail_total += 1
-                if _address_parses_cleanly(str(v), allow_po_box=True):
+                if _mailing_parses_cleanly(combined):
                     mail_ok += 1
     site_rate = site_ok / site_total if site_total else 1.0
     mail_rate = mail_ok / mail_total if mail_total else 1.0
@@ -870,7 +939,9 @@ def _run_all_checks(connector: Connector, quick: bool = False) -> Dict[str, Any]
     r3 = check_field_mapping(connector, layer_schema); results.append(r3)
     r4_pair = check_known_good_query(connector, session); r4, features = r4_pair
     results.append(r4)
-    r5 = check_field_population(features, connector.field_mapping); results.append(r5)
+    r5 = check_field_population(features, connector.field_mapping,
+                                optional_fields=connector.optional_fields)
+    results.append(r5)
     r6 = check_owner_data_sanity(features, connector.owner_field
                                  or connector.field_mapping.get("owner_name")); results.append(r6)
     r7 = check_address_parsing(features, connector.field_mapping); results.append(r7)
