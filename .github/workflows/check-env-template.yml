@@ -1,0 +1,41 @@
+name: env.template lint
+
+# Catches the env.template credential-leak class of incident at the server
+# side. Pre-commit hooks at .githooks/pre-commit catch this before push for
+# anyone with hooks configured, but commits made via the GitHub web UI or
+# clones without hooksPath set bypass that check. This workflow is the
+# always-on safety net.
+
+on:
+  push:
+    paths: ['env.template', '.github/workflows/check-env-template.yml']
+  pull_request:
+    paths: ['env.template', '.github/workflows/check-env-template.yml']
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject env.template containing real credentials
+        run: |
+          line=$(grep "^DATABASE_URL=" env.template || true)
+          if [ -z "$line" ]; then
+            echo "::error ::env.template missing DATABASE_URL line"
+            exit 1
+          fi
+
+          # Extract the password slot between USER: and @HOST.
+          password=$(echo "$line" | sed -E 's|^DATABASE_URL=postgresql://[^:]+:([^@]*)@.*$|\1|')
+
+          case "$password" in
+            URL_ENCODED_PASSWORD|CHANGE_ME|PASSWORD|"")
+              echo "OK: env.template password slot is the known placeholder '$password'"
+              ;;
+            *)
+              echo "::error ::env.template DATABASE_URL appears to contain a real password slot ('$password'). Real credentials only go in .env (gitignored). See reviews/02_setup_phase/00_setup_status.md 'Incident' section."
+              exit 1
+              ;;
+          esac

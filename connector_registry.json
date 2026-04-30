@@ -1,0 +1,35 @@
+{
+  "_comment": "Harness-only configuration overlay for connector_harness.py. Adjacent file to sources.json: sources.json is the canonical connector inventory (curated by humans), and this file adds harness-only fields (test_bbox, test_acreage, expected_bbox, parcel_id_field, redaction_extra_fields) that do not belong in sources.json. The harness reads BOTH files at startup and merges by county key. Adding a county to the harness = add the sources.json entry AND add the overlay here. Phase 2 seeds Fulton only (per BUILD_PHASES.md L50-L60).",
+  "_version": "1.0",
+  "_maintainer": "Land-Research three-agent code team. See appendix_a_county_connectors.md and reviews/03_phase2_connector_harness/01_risk_review.md (Agent 1).",
+
+  "fulton_ga": {
+    "county": "fulton",
+    "state": "GA",
+    "market": "atlanta",
+
+    "test_bbox": {
+      "_comment": "South Fulton / Campbellton-Fairburn industrial corridor; appendix L266-L268. Used as the known-good-query envelope.",
+      "xmin": -84.62, "ymin": 33.52, "xmax": -84.50, "ymax": 33.58
+    },
+
+    "test_acreage": {
+      "_comment": "Standard industrial site target; matches parameters.json hard_filters.acreage_min/max (5-50). Risk review §3.6 set this as the default.",
+      "min": 5,
+      "max": 50
+    },
+
+    "expected_bbox": {
+      "_comment": "WGS84 envelope of Fulton County (approximate). Used by geometry_validation to assert returned features are within county extent (with 0.5-degree tolerance ~50km, per check_geometry_validation in connector_harness.py). Key naming uses xmin/ymin/xmax/ymax to match GIS convention and the test_bbox keys above.",
+      "xmin": -84.65, "ymin": 33.40, "xmax": -84.05, "ymax": 34.20
+    },
+
+    "parcel_id_field": "ParcelID",
+
+    "owner_field": "Owner",
+
+    "redaction_extra_fields": [
+      "_comment_for_humans: any additional API field names whose values should be replaced with [REDACTED] before serialization, beyond the logical-name-driven defaults in connector_harness.py."
+    ]
+  }
+}

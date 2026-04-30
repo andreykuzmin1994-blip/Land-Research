@@ -1,0 +1,107 @@
+name: Connector harness — Fulton
+
+# Validates the Fulton County connector against the live ArcGIS endpoint on
+# every push or PR that touches the harness, the connector registry, or
+# sources.json. No Postgres needed (the harness is DB-independent by design).
+#
+# R-12 distinguishes transport / logic failures: network or server timeouts
+# yield a "warning" annotation but do not fail the job; an actual harness
+# verdict of "failing" or a Python exception fails the job.
+#
+# R-17 concurrency group: at most one harness run at a time across all branches
+# to avoid hammering the Fulton GIS endpoint when multiple PRs land at once.
+
+on:
+  push:
+    paths:
+      - 'connector_harness.py'
+      - 'connector_registry.json'
+      - 'sources.json'
+      - 'tests/test_harness.py'
+      - 'requirements.txt'
+      - '.github/workflows/harness-fulton.yml'
+  pull_request:
+    paths:
+      - 'connector_harness.py'
+      - 'connector_registry.json'
+      - 'sources.json'
+      - 'tests/test_harness.py'
+      - 'requirements.txt'
+      - '.github/workflows/harness-fulton.yml'
+
+concurrency:
+  group: harness-fulton-live
+  cancel-in-progress: false
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Offline unit tests
+        run: python -m unittest discover -s tests -v
+
+  live-fulton:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run harness against Fulton (quick mode)
+        id: harness
+        continue-on-error: true
+        run: |
+          python connector_harness.py --county fulton --quick
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Upload JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-report-fulton
+          path: harness_reports/fulton*.json
+          if-no-files-found: warn
+
+      - name: Distinguish transport vs logic failure
+        run: |
+          # Exit codes from connector_harness.py:
+          #   0 = healthy, 2 = failing, 3 = degraded, 1 = config error.
+          # Network/transport failures produce overall_health=failing AND
+          # populated 'errors' field with transport_status. Treat those as
+          # warnings (R-12). True logic failures fail the job.
+          ec="${{ steps.harness.outputs.exit_code }}"
+          if [ "$ec" = "0" ]; then
+            echo "Harness healthy"; exit 0
+          fi
+
+          # Inspect the most recent fulton report (if any) to differentiate.
+          report=$(ls -t harness_reports/fulton*.json 2>/dev/null | head -1 || true)
+          if [ -z "$report" ]; then
+            echo "::error ::No harness report produced; harness crashed before write."
+            exit 1
+          fi
+          # If errors mention transport, treat as warning (R-12).
+          if grep -qE '"transport_status":|"connection:|"timeout:|http_5' "$report"; then
+            echo "::warning ::Transient network/transport failure against Fulton ArcGIS."
+            cat "$report" | python -c 'import json,sys; r=json.load(sys.stdin); print("Health:", r["overall_health"]); print("Errors:", r.get("errors")); print("Warnings:", r.get("warnings"))'
+            exit 0
+          fi
+          echo "::error ::Harness reports a logic-level failure against Fulton."
+          cat "$report"
+          exit 1

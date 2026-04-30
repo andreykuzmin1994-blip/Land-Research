@@ -1,0 +1,58 @@
+name: Phase 1 schema validation
+
+# Re-runs prepare.py against the live Supabase project on every push or PR
+# that touches a file Phase 1's schema apply depends on. The job fails if
+# prepare.py exits non-zero or its expected output lines are missing —
+# catching DDL regressions, parameters loader breakage, and PostGIS
+# extension drift before they reach main.
+#
+# Setup once: in the GitHub UI, Settings -> Secrets and variables -> Actions
+# -> New repository secret. Name: DATABASE_URL. Value: the full Supabase
+# Session pooler DSN with the URL-encoded password.
+
+on:
+  push:
+    paths:
+      - 'prepare.py'
+      - 'parameters.json'
+      - 'requirements.txt'
+      - 'STORAGE_ARCHITECTURE.md'
+      - '.github/workflows/validate-phase1.yml'
+  pull_request:
+    paths:
+      - 'prepare.py'
+      - 'parameters.json'
+      - 'requirements.txt'
+      - 'STORAGE_ARCHITECTURE.md'
+      - '.github/workflows/validate-phase1.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run prepare.py against Supabase
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error ::DATABASE_URL secret is not configured. Add it in Settings -> Secrets and variables -> Actions -> New repository secret. Use the Supabase Session pooler DSN with URL-encoded password."
+            exit 1
+          fi
+          python prepare.py | tee prepare.log
+          # Assert all four expected output lines are present.
+          grep -q "^schema_version:" prepare.log
+          grep -q "^postgis_version:" prepare.log
+          grep -q "^actionable_pipeline_count:" prepare.log
+          grep -q "^confidence_weighted_pipeline:" prepare.log
