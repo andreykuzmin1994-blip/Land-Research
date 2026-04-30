@@ -258,3 +258,105 @@ The orchestrator halts here. Concrete next actions for the human:
 This document will sit on the onboarding branch alongside the three-agent
 artifacts as a permanent record of where the project stood when orientation
 ended and Phase 1 shipped.
+
+---
+
+## Resolutions — 2026-04-30 follow-up
+
+The three halt-point asks were answered by the human in the same session:
+
+### Resolution 1 — Run tag convention
+
+**Adopted: option C** (phase-build dev branches now; `autoresearch/<tag>` cut
+only when the setup phase actually runs, with the tag's date matching the
+real baseline date — not today's date).
+
+Operational consequences:
+
+- The proposed `autoresearch/atl-2026-04-30` tag is **withdrawn**. No
+  autoresearch branch will be created until Phases 2–9 ship and the human
+  triggers the setup phase.
+- All Phase 2–9 development happens on dev branches (currently
+  `claude/project-onboarding-sazHe`; future phases may use new dev branches
+  cut from `main`). These dev branches are NOT autoresearch branches and
+  do NOT carry the `autoresearch/<tag>` naming convention.
+- When the setup phase eventually runs, the agent picks the tag fresh from
+  that day's date (e.g., `atl-2026-06-15` if the baseline runs on 2026-06-15).
+- Cross-run TSV history: per AUTORESEARCH_MECHANICS.md "Cross-Run Aggregation"
+  the `experiment_log.tsv` accumulates across runs/tags. Each run's first row
+  is `status=baseline`, so the file remains parseable even with multiple tags.
+
+### Resolution 2 — Branching strategy
+
+**Adopted: (i)** — the human will review and merge
+`claude/project-onboarding-sazHe` → `main` when they choose. The orchestrator
+does NOT auto-merge.
+
+Implied corollaries (also in effect):
+
+- Future Phase 2+ dev work continues on dev branches that merge back to
+  `main` after human review. Whether each phase gets its own dev branch or
+  several phases share one is the human's preference; the spec doesn't care.
+- Only the setup-phase agent ever creates an `autoresearch/<tag>` branch,
+  and only off a clean `main`. This preserves the AUTORESEARCH_MECHANICS.md
+  invariant that "main stays clean" during a run.
+
+The orchestrator has not opened a pull request. The branch is pushed at
+`origin/claude/project-onboarding-sazHe` and the human can merge via the
+GitHub UI / locally / or by asking the orchestrator to open a PR via MCP.
+
+### Resolution 3 — Next action
+
+**Adopted: Supabase provisioning before Phase 2**.
+
+The human will:
+
+1. Create a Supabase free-tier project (project name suggestion:
+   `land-site-selector` or similar).
+2. Enable the PostGIS extension via the Supabase SQL editor:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS postgis;
+   SELECT POSTGIS_VERSION();
+   ```
+3. Copy the **connection pooler** endpoint (NOT the direct DB endpoint)
+   from Supabase project settings → Database → Connection string. The
+   pooler is required per STORAGE_ARCHITECTURE.md → "Connection Pattern":
+   "the connection pooler endpoint should be used for the agent's
+   autonomous loop (avoids connection limit issues during long-running
+   cycles)".
+4. Create `.env` in the repo root from `env.template` and paste the DSN
+   into `DATABASE_URL`. Leave `ANTHROPIC_API_KEY` blank for Phase 1.
+5. Validate Phase 1 end-to-end:
+   ```bash
+   cd /home/user/Land-Research
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   python prepare.py
+   ```
+   Expected: PostGIS version line, `actionable_pipeline_count=0`,
+   `confidence_weighted_pipeline=0.0`, exit 0.
+6. Report green/red back to the next orchestrator session. Capture stdout
+   and any traceback verbatim.
+
+**If green**: Phase 1 exit criterion (BUILD_PHASES.md) is satisfied. Next
+session begins Phase 2 (`connector_harness.py` via three-agent workflow).
+
+**If red**: the next session runs a Phase-1 fix-forward via the three-agent
+workflow. Likely failure modes per Agent 1's risk review:
+
+- PostGIS extension permission denied on Supabase free tier → may require
+  Supabase Pro, OR the human may need to enable PostGIS via the Supabase
+  Dashboard UI rather than via SQL.
+- `psycopg[binary]>=3.1` install failure on the user's Python — fall back
+  to `psycopg2-binary` (Agent 2 documented the migration path).
+- Connection-string parsing edge cases (`postgresql+psycopg://` vs
+  `postgresql://`) — adjust the `_get_connection_dsn` helper.
+
+### Status of this document
+
+All three halt-point asks resolved. The orchestrator hands off to the human
+for Supabase provisioning. The next orchestrator session — invoked by the
+human after they report Phase 1 green — picks up at "Phase 2: Connector Test
+Harness" per BUILD_PHASES.md, reading the three-agent artifacts in
+`reviews/01_phase1_scaffolding/` and this status document for institutional
+context.
