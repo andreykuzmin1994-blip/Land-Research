@@ -318,6 +318,44 @@ class TestAddressParsingPhase2Fixes(unittest.TestCase):
         result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
         self.assertEqual(result.status, "pass")
 
+    def test_mailing_attn_prefix_passes(self):
+        # ATTN: prefix used to fail because the regex required the street
+        # number at the start. Now `_STREET_NUMBER_PAT.search(addr)` finds it
+        # anywhere in the string.
+        feats = [{"attributes": {
+            "OwnerAddr1": "ATTN: BOB JONES",
+            "OwnerAddr2": "123 MAIN ST ATLANTA GA 30303",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["mailing_address_parse_rate"], 1.0)
+
+    def test_mailing_co_prefix_passes(self):
+        feats = [{"attributes": {
+            "OwnerAddr1": "C/O JANE SMITH",
+            "OwnerAddr2": "456 OAK AVE NEW YORK NY 10001",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["mailing_address_parse_rate"], 1.0)
+
+    def test_mailing_comma_separated_state_zip_passes(self):
+        # "ATLANTA, GA, 30303" with comma after state — common variant.
+        feats = [{"attributes": {
+            "OwnerAddr1": "123 MAIN ST",
+            "OwnerAddr2": "ATLANTA, GA, 30303",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["mailing_address_parse_rate"], 1.0)
+
+    def test_mailing_no_state_still_fails(self):
+        # Backstop: if there's genuinely no state code, the parser correctly
+        # rejects the address even with the looser rules.
+        feats = [{"attributes": {
+            "OwnerAddr1": "123 MAIN ST",
+            "OwnerAddr2": "SOMEWHERE 99999",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["mailing_address_parse_rate"], 0.0)
+
 
 class TestOptionalFieldsExclusion(unittest.TestCase):
     """Phase 2 fix-forward — Fix B: optional_fields are reported but excluded

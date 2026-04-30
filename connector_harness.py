@@ -608,8 +608,14 @@ def check_owner_data_sanity(
 
 
 _PO_BOX_PAT = re.compile(r"\bP\.?O\.?\s*BOX\b", re.IGNORECASE)
-_STATE_ZIP_PAT = re.compile(r"\b([A-Z]{2})\s+\d{5}(?:-\d{4})?\b")
-_STREET_NUMBER_PAT = re.compile(r"^\s*\d+\s+\S")
+# Allow comma OR whitespace (or mixed) between state and ZIP — Fulton and
+# other portals store mailing addresses as "ATLANTA, GA 30303" or "ATLANTA,
+# GA, 30303" interchangeably.
+_STATE_ZIP_PAT = re.compile(r"\b([A-Z]{2})[,\s]+\d{5}(?:-\d{4})?\b")
+# Match a street-number pattern anywhere in the string (not just at start) so
+# attention-line, C/O, or "Suite NNN" prefixes don't fail an otherwise-valid
+# mailing address.
+_STREET_NUMBER_PAT = re.compile(r"\b\d+\s+\S")
 # Lenient site-address heuristic: county portals usually store site addresses
 # as STREET-ONLY strings (no city/state/ZIP), so the strict state+ZIP check
 # would 0% legitimate sites. Accept either a leading street number followed by
@@ -630,7 +636,9 @@ def _mailing_parses_cleanly(addr: str) -> bool:
     """Mailing address: must have a US state + ZIP; PO-Box bypass on street
     rule. Designed to run on EITHER a single combined string OR the
     concatenation of OwnerAddr1 + OwnerAddr2 (county portals frequently split
-    mailing addresses across two fields)."""
+    mailing addresses across two fields). The street-number probe is a
+    `search` (not `match`) so attention-line / C/O / Suite prefixes don't
+    fail an otherwise-valid mailing address."""
     if not addr:
         return False
     addr = addr.strip()
@@ -641,7 +649,7 @@ def _mailing_parses_cleanly(addr: str) -> bool:
         return False
     if _PO_BOX_PAT.search(addr):
         return True
-    return bool(_STREET_NUMBER_PAT.match(addr))
+    return bool(_STREET_NUMBER_PAT.search(addr))
 
 
 def _site_parses_cleanly(addr: str) -> bool:
