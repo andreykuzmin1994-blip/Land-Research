@@ -1,0 +1,29 @@
+{
+  "exceededTransferLimit": false,
+  "features": [
+    {
+      "attributes": {
+        "ParcelID": "14F-TINY-001",
+        "Owner": "SMALL HOLDER",
+        "OwnerAddr1": "PO BOX 1",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "0 SMALL ST",
+        "LandAcres": 4.99,
+        "LandAssess": 25000,
+        "ImprAssess": 0,
+        "TotAssess": 25000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [-84.555, 33.553],
+          [-84.553, 33.553],
+          [-84.553, 33.555],
+          [-84.555, 33.555],
+          [-84.555, 33.553]
+        ]]
+      }
+    }
+  ]
+}

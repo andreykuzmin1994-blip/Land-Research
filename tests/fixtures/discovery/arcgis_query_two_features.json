@@ -1,0 +1,53 @@
+{
+  "exceededTransferLimit": false,
+  "features": [
+    {
+      "attributes": {
+        "ParcelID": "14F-0123-LL-045-8",
+        "Owner": "SMITH FAMILY TRUST",
+        "OwnerAddr1": "PO BOX 445",
+        "OwnerAddr2": "SARASOTA FL 34230",
+        "Address": "0 CAMPBELLTON FAIRBURN RD",
+        "LandAcres": 14.7,
+        "LandAssess": 185000,
+        "ImprAssess": 0,
+        "TotAssess": 185000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [-84.555, 33.553],
+          [-84.553, 33.553],
+          [-84.553, 33.555],
+          [-84.555, 33.555],
+          [-84.555, 33.553]
+        ]]
+      }
+    },
+    {
+      "attributes": {
+        "ParcelID": "14F-0456-LL-099-1",
+        "Owner": "ACME LOGISTICS LLC",
+        "OwnerAddr1": "1234 LOGISTICS WAY",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "100 FULTON INDUSTRIAL BLVD",
+        "LandAcres": 22.4,
+        "LandAssess": 540000,
+        "ImprAssess": 0,
+        "TotAssess": 540000,
+        "LUCode": "M-1",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [-84.500, 33.760],
+          [-84.498, 33.760],
+          [-84.498, 33.762],
+          [-84.500, 33.762],
+          [-84.500, 33.760]
+        ]]
+      }
+    }
+  ]
+}

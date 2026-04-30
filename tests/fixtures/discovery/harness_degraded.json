@@ -1,0 +1,13 @@
+{
+  "county": "fulton",
+  "market": "atlanta",
+  "timestamp": "2026-04-30T03:14:00Z",
+  "overall_health": "degraded",
+  "checks": {
+    "service_alive": {"status": "pass"},
+    "field_population": {"status": "warn", "rates": {"LUCode": 0.78}}
+  },
+  "sample_features": [],
+  "warnings": ["LUCode population rate dropped to 0.78"],
+  "errors": []
+}

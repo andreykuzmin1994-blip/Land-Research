@@ -1,0 +1,14 @@
+{
+  "county": "fulton",
+  "market": "atlanta",
+  "timestamp": "2026-04-30T03:14:00Z",
+  "overall_health": "healthy",
+  "checks": {
+    "service_alive": {"status": "pass"},
+    "layer_schema": {"status": "pass"},
+    "field_mapping": {"status": "pass"}
+  },
+  "sample_features": [],
+  "warnings": [],
+  "errors": []
+}

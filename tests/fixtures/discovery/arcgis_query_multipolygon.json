@@ -1,0 +1,38 @@
+{
+  "exceededTransferLimit": false,
+  "features": [
+    {
+      "attributes": {
+        "ParcelID": "14F-SPLIT-001",
+        "Owner": "SPLIT PARCEL OWNER",
+        "OwnerAddr1": "PO BOX 99",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "0 SPLIT RD",
+        "LandAcres": 18.0,
+        "LandAssess": 200000,
+        "ImprAssess": 0,
+        "TotAssess": 200000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [
+          [
+            [-84.555, 33.553],
+            [-84.553, 33.553],
+            [-84.553, 33.555],
+            [-84.555, 33.555],
+            [-84.555, 33.553]
+          ],
+          [
+            [-84.560, 33.557],
+            [-84.558, 33.557],
+            [-84.558, 33.559],
+            [-84.560, 33.559],
+            [-84.560, 33.557]
+          ]
+        ]
+      }
+    }
+  ]
+}
