@@ -20,8 +20,8 @@
     },
 
     "expected_bbox": {
-      "_comment": "WGS84 envelope of Fulton County (approximate). Used by geometry_validation to assert returned features are within county extent (with 5km tolerance per risk review §3.4). Refinement deferred (open question 9.e); Agent 2 chose the appendix-published envelope as the Phase 2 default.",
-      "min_lng": -84.65, "min_lat": 33.40, "max_lng": -84.05, "max_lat": 34.20
+      "_comment": "WGS84 envelope of Fulton County (approximate). Used by geometry_validation to assert returned features are within county extent (with 0.5-degree tolerance ~50km, per check_geometry_validation in connector_harness.py). Key naming uses xmin/ymin/xmax/ymax to match GIS convention and the test_bbox keys above.",
+      "xmin": -84.65, "ymin": 33.40, "xmax": -84.05, "ymax": 34.20
     },
 
     "parcel_id_field": "ParcelID",
