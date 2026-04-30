@@ -256,5 +256,109 @@ class TestAFOnlyDispatch(unittest.TestCase):
         self.assertEqual(report["overall_health"], "n_a")
 
 
+class TestAddressParsingPhase2Fixes(unittest.TestCase):
+    """Phase 2 fix-forward — Fix A: site addresses use street-only heuristic;
+    mailing addresses concat OwnerAddr1 + OwnerAddr2."""
+
+    FIELD_MAP_FULTON = {
+        "site_address": "Address",
+        "owner_mailing_address": "OwnerAddr1",
+        "owner_mailing_address_2": "OwnerAddr2",
+    }
+
+    def test_site_address_numbered_street_passes(self):
+        feats = [{"attributes": {"Address": "0 CAMPBELLTON FAIRBURN RD"}}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["site_address_parse_rate"], 1.0)
+
+    def test_site_address_unnumbered_named_road_passes(self):
+        # Some Fulton parcels have just "Campbellton Fairburn Rd" with no number.
+        feats = [{"attributes": {"Address": "CAMPBELLTON FAIRBURN RD"}}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["site_address_parse_rate"], 1.0)
+
+    def test_site_address_garbage_fails(self):
+        feats = [{"attributes": {"Address": "XYZ123"}}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["site_address_parse_rate"], 0.0)
+
+    def test_mailing_address_concat_two_fields_parses(self):
+        # OwnerAddr1 = street; OwnerAddr2 = "City, State ZIP" — must be combined.
+        feats = [{"attributes": {
+            "OwnerAddr1": "PO BOX 445",
+            "OwnerAddr2": "SARASOTA FL 34230",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["mailing_address_parse_rate"], 1.0)
+
+    def test_mailing_address_owneraddr1_alone_fails_without_concat(self):
+        # OwnerAddr1 alone has no state/ZIP — would have parsed at 0% before
+        # the fix; with the fix, parse rate is 0% UNLESS OwnerAddr2 is also
+        # present in the field_mapping AND the feature carries it.
+        feats = [{"attributes": {"OwnerAddr1": "123 MAIN ST"}}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        # OwnerAddr2 is in the field_mapping but absent from the feature -> the
+        # combined string falls back to OwnerAddr1 alone, which has no state.
+        self.assertEqual(result.details["mailing_address_parse_rate"], 0.0)
+
+    def test_mailing_address_combined_with_state_passes(self):
+        feats = [{"attributes": {
+            "OwnerAddr1": "123 MAIN ST",
+            "OwnerAddr2": "ATLANTA GA 30303",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.details["mailing_address_parse_rate"], 1.0)
+
+    def test_overall_passes_when_both_branches_clean(self):
+        feats = [{"attributes": {
+            "Address": "123 INDUSTRIAL BLVD",
+            "OwnerAddr1": "PO BOX 445",
+            "OwnerAddr2": "SARASOTA FL 34230",
+        }}] * 5
+        result = ch.check_address_parsing(feats, self.FIELD_MAP_FULTON)
+        self.assertEqual(result.status, "pass")
+
+
+class TestOptionalFieldsExclusion(unittest.TestCase):
+    """Phase 2 fix-forward — Fix B: optional_fields are reported but excluded
+    from low_population_fields so their 0% doesn't fail the check."""
+
+    FIELD_MAP = {
+        "parcel_id": "ParcelID",
+        "owner_name": "Owner",
+        "subdivision": "Subdiv",
+    }
+
+    def _features_with_subdiv_null(self, n=10):
+        return [{"attributes": {"ParcelID": f"07-{i}", "Owner": f"X{i}",
+                                "Subdiv": None}} for i in range(n)]
+
+    def test_subdiv_null_fails_without_optional_marker(self):
+        feats = self._features_with_subdiv_null()
+        result = ch.check_field_population(feats, self.FIELD_MAP)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("Subdiv", result.details["low_population_fields"])
+
+    def test_subdiv_null_passes_with_optional_marker(self):
+        feats = self._features_with_subdiv_null()
+        result = ch.check_field_population(feats, self.FIELD_MAP,
+                                           optional_fields=("Subdiv",))
+        self.assertEqual(result.status, "pass")
+        self.assertNotIn("Subdiv", result.details["low_population_fields"])
+        # Rate is still reported — humans can see Subdiv at 0.0.
+        self.assertEqual(result.details["rates"]["Subdiv"], 0.0)
+        self.assertIn("Subdiv", result.details["optional_fields"])
+
+    def test_other_low_fields_still_fail_even_when_subdiv_optional(self):
+        # Owner field at 0% should still fail; only Subdiv is excluded.
+        feats = [{"attributes": {"ParcelID": f"07-{i}", "Owner": None,
+                                 "Subdiv": None}} for i in range(10)]
+        result = ch.check_field_population(feats, self.FIELD_MAP,
+                                           optional_fields=("Subdiv",))
+        self.assertEqual(result.status, "fail")
+        self.assertIn("Owner", result.details["low_population_fields"])
+        self.assertNotIn("Subdiv", result.details["low_population_fields"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
