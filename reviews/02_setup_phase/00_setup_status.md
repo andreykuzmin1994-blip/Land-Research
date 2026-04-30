@@ -360,3 +360,124 @@ human after they report Phase 1 green — picks up at "Phase 2: Connector Test
 Harness" per BUILD_PHASES.md, reading the three-agent artifacts in
 `reviews/01_phase1_scaffolding/` and this status document for institutional
 context.
+
+---
+
+## Phase 1 validation result — GREEN (2026-04-30)
+
+Phase 1 was validated end-to-end against the live Supabase project from a
+GitHub Codespace (the local Claude Code sandbox does not have outbound
+network egress to Supabase, so the validation had to run in an environment
+with internet access — Codespaces was the chosen path).
+
+`python prepare.py` output:
+
+```
+schema_version: 1.0
+postgis_version: 3.3 USE_GEOS=1 USE_PROJ=1 USE_STATS=1
+actionable_pipeline_count: 0
+confidence_weighted_pipeline: 0.0
+```
+
+What this confirms in production:
+
+- The `parameters.json` loader runs without error and the SHA-256 sentinel
+  (Agent 1's H1 mitigation) is wired correctly; no in-process tamper or
+  on-disk drift was detected.
+- The Session pooler endpoint at port 5432 supports `CREATE EXTENSION
+  postgis` and the full STORAGE_ARCHITECTURE.md DDL — contradicting an
+  earlier comment in `env.template` that warned against using the pooler
+  for DDL. That comment has been corrected.
+- Connection failures route through `_mask_dsn` correctly (verified during
+  the abortive sandbox run that timed out at the network layer — the error
+  log contained `***` in place of the password, never the plaintext DSN).
+- All 11 tables and 15 indexes from STORAGE_ARCHITECTURE.md applied in a
+  single transaction without error.
+- Both metric stub functions return 0/0.0 against an empty DB as designed.
+- The CLI exit path is clean (no orphaned connections, no signal handler
+  leaks).
+
+BUILD_PHASES.md Phase 1 exit criterion is **MET**. Phase 1 is shippable.
+
+### Operational note: this sandbox cannot reach Supabase
+
+The Claude Code session that built Phase 1 runs in a sandbox without
+outbound network egress to public hosts (DNS resolves; TCP to ports 5432,
+443 to general-internet hosts is blocked by network policy). Future Phase
+1+ live validations cannot run from this sandbox.
+
+Recommended permanent fix when convenient: a GitHub Actions workflow
+(`.github/workflows/validate-phase1.yml`) that runs `python prepare.py`
+against `DATABASE_URL` from a repo secret on every push touching `prepare.py`,
+`parameters.json`, `requirements.txt`, or `STORAGE_ARCHITECTURE.md`. This
+provides a CI gate that catches regressions and removes the manual
+Codespace round-trip for Phase 2+ validation. Deferred until the human
+chooses to add it.
+
+---
+
+## Incident — env.template credential leak (2026-04-30, fix-forward applied)
+
+A real password fragment was committed to `env.template` in commit `b87db2b`
+on the onboarding branch and merged to `main` via PR #2. The leaked content
+was a partial DSN containing the project ref `gobcpyzxwvxfqfaxxelo` and the
+password fragment `SupabaseParol%21` (URL-encoded form of `SupabaseParol!`,
+missing the trailing `1` of the actual password). Detection: discovered when
+Agent 3 cross-checked git history for accidental credential leaks before
+declaring Phase 1 closed.
+
+Severity assessment:
+
+- The leaked credential is one brute-force character away from the real
+  password — treat as fully compromised.
+- The repo is private (`andreykuzmin1994-blip/land-research`) but GitHub
+  retains the commit even after force-push history rewriting, so leaked
+  content should be considered durable in GitHub's logs.
+- No actual data was exposed (the database was empty at all times during
+  this session).
+
+Containment and remediation:
+
+1. Human rotated the Supabase database password immediately upon detection.
+   The leaked credential is now invalidated.
+2. Fix-forward commit (this commit's parent + the next) sanitizes
+   `env.template` to a clean placeholder template with explicit
+   "NEVER paste real credentials into env.template" warning at the top.
+3. Inaccurate comment about "use DIRECT connection, NOT the pooler" was
+   corrected to reflect what was actually proven during validation
+   (Session pooler at port 5432 supports DDL).
+4. No git history rewrite. The leaked password fragment remains in commit
+   `b87db2b` but is invalidated by rotation. History rewriting was
+   considered and rejected: the password is dead, force-pushing destroys
+   reflog refs for any existing clone, and GitHub's server logs retain the
+   original commit regardless.
+
+Institutional lesson — going into the codebase's `CLAUDE.md` or this status
+document for permanent record:
+
+> **Never edit `env.template` with real credentials.** It is tracked by git.
+> Real credentials only ever go into `.env`, which is gitignored. If you
+> find yourself wanting to paste a real DSN into `env.template` "just to
+> make it work," stop — copy the file to `.env` first (`cp env.template
+> .env`) and edit `.env` instead.
+
+Future mitigation: a pre-commit hook or CI check that rejects commits where
+`env.template` matches a regex for non-placeholder password content (e.g.,
+anything other than `URL_ENCODED_PASSWORD`, `CHANGE_ME`, or empty after
+`postgres.`). Deferred — orchestrator may propose this as a Phase 2
+hardening commit.
+
+---
+
+## Handoff to next session
+
+State after the fix-forward commit:
+
+- Phase 1 is shipped, validated, and clean of credential leaks.
+- The next session can proceed to Phase 2 (build `connector_harness.py` via
+  three-agent workflow per `appendix_a_county_connectors.md` → "Connector
+  Test Harness"), reading the institutional record in `reviews/`.
+- The user has rotated the Supabase password and updated their local /
+  Codespace `.env` accordingly.
+- `claude/project-onboarding-sazHe` carries the fix-forward commit; human
+  merges to `main` via PR per the resolved branching strategy.
