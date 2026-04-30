@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Block commits that would put real credentials into env.template.
+# Activate once per clone:  git config core.hooksPath .githooks
+
+set -euo pipefail
+
+# Only run if env.template is among the staged files.
+if ! git diff --cached --name-only | grep -qx "env.template"; then
+    exit 0
+fi
+
+# Read the staged version of env.template (handles the "deleted" case too).
+staged_content=$(git show ":env.template" 2>/dev/null || true)
+
+if [ -z "$staged_content" ]; then
+    # File is being deleted; allow.
+    exit 0
+fi
+
+line=$(printf '%s\n' "$staged_content" | grep "^DATABASE_URL=" || true)
+
+if [ -z "$line" ]; then
+    cat >&2 <<'EOF'
+pre-commit: env.template is missing the DATABASE_URL= line. Refusing to commit.
+            If you intentionally restructured the file, override with:
+              git commit --no-verify
+EOF
+    exit 1
+fi
+
+# Extract password slot between USER: and @HOST.
+password=$(printf '%s\n' "$line" | sed -E 's|^DATABASE_URL=postgresql://[^:]+:([^@]*)@.*$|\1|')
+
+case "$password" in
+    URL_ENCODED_PASSWORD|CHANGE_ME|PASSWORD|"")
+        ;;
+    *)
+        cat >&2 <<EOF
+pre-commit: env.template's DATABASE_URL appears to contain a real password.
+            Found password slot: "$password"
+            Allowed placeholders: URL_ENCODED_PASSWORD, CHANGE_ME, PASSWORD, or empty.
+            Real credentials must only ever go into the gitignored .env file.
+            See reviews/02_setup_phase/00_setup_status.md "Incident" section.
+            If this is a false positive, override with:
+              git commit --no-verify
+EOF
+        exit 1
+        ;;
+esac
