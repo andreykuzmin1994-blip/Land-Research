@@ -1,0 +1,98 @@
+name: Discovery — Fulton live PostGIS smoke test
+
+# Phase 3.1 §10.5 / §6.1: the offline test suite uses FakeConnection and
+# never executes SQL. This workflow spins up a postgres+postgis service
+# container, applies the schema via prepare.apply_schema, and runs a
+# single happy-path UPSERT through research._process_parcel against the
+# live DB. Asserts ST_IsValid, ST_Within, and the absence of the
+# deprecated '(none)' parcel_id sentinel in flagged_items.
+#
+# Triggered on changes to research.py, prepare.py, the storage spec, the
+# discovery test suite, the smoke script itself, or this workflow.
+
+on:
+  push:
+    paths:
+      - 'research.py'
+      - 'prepare.py'
+      - 'STORAGE_ARCHITECTURE.md'
+      - 'tests/test_discovery.py'
+      - 'tests/test_postgis_smoke.py'
+      - 'tests/fixtures/discovery/**'
+      - 'requirements.txt'
+      - '.github/workflows/discovery-fulton.yml'
+  pull_request:
+    paths:
+      - 'research.py'
+      - 'prepare.py'
+      - 'STORAGE_ARCHITECTURE.md'
+      - 'tests/test_discovery.py'
+      - 'tests/test_postgis_smoke.py'
+      - 'tests/fixtures/discovery/**'
+      - 'requirements.txt'
+      - '.github/workflows/discovery-fulton.yml'
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Offline discovery tests
+        run: python -m unittest tests.test_discovery -v
+
+  live-postgis:
+    needs: offline-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: lr
+          POSTGRES_PASSWORD: lr_pw
+          POSTGRES_DB: lr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lr -d lr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://lr:lr_pw@localhost:5432/lr_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for postgis service
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U lr -d lr_test; then
+              echo "postgis is ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error ::postgis service did not become ready in 60s"
+          exit 1
+
+      - name: Run live-PostGIS smoke test
+        run: python tests/test_postgis_smoke.py
