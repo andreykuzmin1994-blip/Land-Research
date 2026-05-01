@@ -436,9 +436,13 @@ class TestHardFilters(unittest.TestCase):
         self.assertFalse(research._h2_pass(None, self.params))
 
     def test_filter_pipeline_order(self) -> None:
-        """Pipeline is H1 → H2 → H3-flag → H4-flag (R-24)."""
+        """Pipeline is H1 → H2 → H3-flag → H4-flag → H5..H10 stubs (R-24, R-101)."""
         ids = [f.__name__ for f in research._HARD_FILTERS]
-        self.assertEqual(ids, ["_h1_filter", "_h2_filter", "_h3_flag", "_h4_flag"])
+        self.assertEqual(ids, [
+            "_h1_filter", "_h2_filter",
+            "_h3_flag", "_h4_flag",
+            "_h5_filter", "_h6_filter", "_h7_filter", "_h8_filter", "_h9_filter", "_h10_filter",
+        ])
 
     def test_filter_pipeline_extensible(self) -> None:
         """R-42: Phase 4+ can append H5 onwards without rewriting."""
@@ -695,10 +699,11 @@ class TestHappyPathDryRun(unittest.TestCase):
         sqls = [s for s, _ in fake.all_executes]
         self.assertTrue(any("INSERT INTO parcels" in s for s in sqls))
         self.assertTrue(any("ON CONFLICT (parcel_id) DO UPDATE" in s for s in sqls))
-        # Each parcel got two flag rows (H3, H4).
+        # Each parcel got eight flag rows (H3, H4, H5, H6, H7, H8, H9, H10).
         flag_rows = [s for s, _ in fake.all_executes if "flagged_items" in s]
-        # 4 parcels x 2 flags = 8 minimum (multipolygon flag may add more).
-        self.assertGreaterEqual(len(flag_rows), 8)
+        # 4 parcels x 8 flags (H3, H4, H5, H6, H7, H8, H9, H10) = 32 minimum
+        # (multipolygon flag may add more) (R-105).
+        self.assertGreaterEqual(len(flag_rows), 32)
 
 
 # ---------------------------------------------------------------------------
@@ -996,3 +1001,73 @@ class TestPhase31FilterPipelineExtensibleExecutes(unittest.TestCase):
             any(marker in d for d in flag_descriptions),
             f"synthetic H5 marker not seen in flag rows: {flag_descriptions}",
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — H5..H10 PASS-WITH-FLAG stubs
+# ---------------------------------------------------------------------------
+class TestPhase4HardFilterStubs(unittest.TestCase):
+    """R-106: every new H5..H10 stub returns _FilterResult('flag', 'H<N>', non-empty).
+
+    Each stub is pure (no params reads, no DB, no HTTP) per R-104, R-111.
+    """
+
+    def _assert_flag(self, filter_id: str, result: research._FilterResult, tokens: list[str]) -> None:
+        self.assertEqual(result.action, "flag")
+        self.assertEqual(result.filter_id, filter_id)
+        self.assertTrue(result.reason, f"{filter_id} reason was empty")
+        self.assertTrue(
+            any(token.lower() in result.reason.lower() for token in tokens),
+            f"{filter_id} reason missing expected token(s) {tokens}: {result.reason!r}",
+        )
+
+    def test_h5_returns_flag(self) -> None:
+        result = research._h5_filter({}, None, _passing_params())
+        self._assert_flag("H5", result, ["EPA", "Envirofacts"])
+
+    def test_h6_returns_flag(self) -> None:
+        result = research._h6_filter({}, None, _passing_params())
+        self._assert_flag("H6", result, ["NWI", "wetlands", "USGS"])
+
+    def test_h7_returns_flag(self) -> None:
+        result = research._h7_filter({}, None, _passing_params())
+        self._assert_flag("H7", result, ["road", "DOT"])
+
+    def test_h8_returns_flag(self) -> None:
+        result = research._h8_filter({}, None, _passing_params())
+        self._assert_flag("H8", result, ["utility"])
+
+    def test_h9_returns_flag(self) -> None:
+        result = research._h9_filter({}, None, _passing_params())
+        self._assert_flag("H9", result, ["topography", "USGS", "3DEP"])
+
+    def test_h10_returns_flag(self) -> None:
+        result = research._h10_filter({}, None, _passing_params())
+        self._assert_flag("H10", result, ["ownership", "easement", "deed"])
+
+
+class TestPhase4FilterPipelineEndToEnd(unittest.TestCase):
+    """Integration-style test: _process_parcel emits one flagged_items row per
+    H5..H10 stub for a happy-path parcel (R-103, R-105)."""
+
+    def test_h5_through_h10_emit_flag_rows(self) -> None:
+        feature = _load_fixture("arcgis_query_two_features.json")["features"][0]
+        mapping = _sources_payload()["county_parcel_data"]["fulton_ga"]["field_mapping"]
+        params = _passing_params()
+        fake = FakeConnection()
+        cycle_id = research._make_cycle_id("fulton")
+        status = research._process_parcel(
+            feature, fake, cycle_id, "south_fulton_campbellton", "atlanta",
+            mapping, params["owner_classification"], params,
+            raw_response_path="/tmp/cache/x.json",
+        )
+        self.assertEqual(status, "discovery")
+        flag_descriptions = [
+            params[3] for sql, params in fake.all_executes
+            if "flagged_items" in sql and len(params) >= 4
+        ]
+        for filter_id in ("H5", "H6", "H7", "H8", "H9", "H10"):
+            self.assertTrue(
+                any(filter_id in d for d in flag_descriptions),
+                f"{filter_id} flag row not seen in flag descriptions: {flag_descriptions}",
+            )

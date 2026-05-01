@@ -12,12 +12,14 @@ Python file the agent edits while the experiment loop is active. The agent:
     - never modifies :mod:`prepare` or any spec ``.md`` file.
 
 ============================================================================
-PHASE 3 SCOPE — Fulton County discovery connector
+PHASE 3 + PHASE 4 SCOPE — Fulton County discovery connector + H5-H10 stubs
 ============================================================================
 This module implements the Fulton County discovery connector per
 BUILD_PHASES.md Phase 3 and the Agent 1 risk review at
 ``reviews/04_phase3_fulton_discovery/01_risk_review.md`` (48 risks, 12
-categories, GO-WITH-CONDITIONS verdict). The connector:
+categories, GO-WITH-CONDITIONS verdict). Phase 4 added H5..H10 as
+PASS-WITH-FLAG stubs per ``reviews/06_phase4_hard_filters/01_risk_review.md``
+(R-101..R-114). The connector:
 
     1. Calls ``connector_harness.run_harness_for_county("fulton")`` BEFORE
        any production query (appendix integration point #2 — appendix
@@ -32,10 +34,12 @@ categories, GO-WITH-CONDITIONS verdict). The connector:
     4. Maps ArcGIS attributes + geometry to the ``parcels`` schema using
        the validated ``field_mapping`` in ``sources.json``.
     5. Runs hard filters H1 (Fulton envelope) and H2 (acreage client-side
-       recheck) as deterministic reject filters.  H3 (zoning) and H4
-       (flood) are PASS-WITH-FLAG stubs that emit ``flagged_items`` rows
-       of ``flag_type='data_gap'`` and let the parcel through pending
-       Phase 4.
+       recheck) as deterministic reject filters.  H3..H10 are
+       PASS-WITH-FLAG stubs that emit ``flagged_items`` rows of
+       ``flag_type='data_gap'`` and let the parcel through pending Phase 5+
+       data wiring (H3 zoning Layer 34, H4 FEMA NFIP, H5 EPA Envirofacts,
+       H6 USGS NWI, H7 county roads/DOT, H8 utility provider service maps,
+       H9 USGS 3DEP, H10 deed records / conservation easement registries).
     6. UPSERTs into ``parcels`` (preserves first-seen ``discovery_date``,
        bumps ``last_updated``).  Logs every action to ``research_log``.
     7. Caches raw ArcGIS responses to ``sources/{cycle_id}/{corridor}_{offset}.json``
@@ -530,26 +534,93 @@ def _h2_filter(
 def _h3_flag(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H3 zoning is unjoined in Phase 3 — emit data_gap flag, parcel passes (R-22)."""
+    """H3 zoning is unjoined — emit data_gap flag, parcel passes (R-22). Replace body in Phase 5+; preserve signature."""
     return _FilterResult(
         "flag", "H3",
-        "H3 zoning unjoined: pending Layer 34 cross-query (Phase 4)",
+        "H3 zoning unjoined: pending Layer 34 cross-query (Phase 5+)",
     )
 
 
 def _h4_flag(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H4 flood is unjoined in Phase 3 — emit data_gap flag, parcel passes (R-23)."""
+    """H4 flood is unjoined — emit data_gap flag, parcel passes (R-23). Replace body in Phase 5+; preserve signature."""
     return _FilterResult(
         "flag", "H4",
-        "H4 flood unjoined: pending FEMA NFIP wiring (Phase 4)",
+        "H4 flood unjoined: pending FEMA NFIP wiring (Phase 5+)",
     )
 
 
-# Pipeline order: H1 → H2 → (insert) → H3 → H4. Reject filters short-circuit.
-# Phase 4 will append _h5..._h10 here without other code changes (R-42).
-_HARD_FILTERS: list[Any] = [_h1_filter, _h2_filter, _h3_flag, _h4_flag]
+def _h5_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H5 environmental contamination is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will spatially join EPA Envirofacts (NPL/RCRA) + state EPD/GEOS brownfield registries with a 500 ft adjacency buffer; replace body in Phase 5+, preserve (parcel, conn, params) -> _FilterResult signature."""
+    return _FilterResult(
+        "flag", "H5",
+        "H5 environmental unjoined: pending EPA Envirofacts + state EPD wiring (Phase 5+)",
+    )
+
+
+def _h6_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H6 wetlands is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['wetlands_max_pct_of_parcel'] (default 20) and compute ST_Area(ST_Intersection(parcel,wetland))/ST_Area(parcel) against USGS NWI; replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H6",
+        "H6 wetlands unjoined: pending USGS NWI mapper wiring (Phase 5+)",
+    )
+
+
+def _h7_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H7 road access is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['min_road_classification'] (default 'county_collector') and test ST_Touches/ST_Intersects against a county road classification + DOT layer; replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H7",
+        "H7 road access unjoined: pending county road classification + DOT layer wiring (Phase 5+)",
+    )
+
+
+def _h8_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H8 utility availability is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['max_utility_extension_ft'] (default 1500) and compute ST_Distance to the nearest water/sewer main from utility provider service maps; replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H8",
+        "H8 utility availability unjoined: pending utility provider service map + extension-distance wiring (Phase 5+)",
+    )
+
+
+def _h9_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H9 topography is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['max_grade_differential_ft'] (default 15) and compute zonal max-min on USGS 3DEP elevation rasters; Phase 5+ should share the grade-differential computation with scored parameter S3. Replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H9",
+        "H9 topography unjoined: pending USGS 3DEP elevation wiring (Phase 5+)",
+    )
+
+
+def _h10_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H10 ownership availability is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will join county deed records / Clerk of Court for active conservation easements and county assessor for government-owner-without-disposition tests; do NOT short-circuit on parcels.owner_type_inferred='government' here (R-110). Replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H10",
+        "H10 ownership availability unjoined: pending deed records + conservation easement registry wiring (Phase 5+)",
+    )
+
+
+# Pipeline order: H1 → H2 → (insert) → H3..H10 (flag-only stubs).
+# Reject filters MUST come first; PASS-WITH-FLAG stubs follow (R-102, R-24).
+# Phase 4 added H5..H10 as PASS-WITH-FLAG stubs; appended at the end so the
+# H1/H2 short-circuit semantics in _process_parcel are preserved. When Phase 5+
+# replaces a stub with a reject-capable real filter, ordering must be revisited.
+_HARD_FILTERS: list[Any] = [
+    _h1_filter, _h2_filter,
+    _h3_flag, _h4_flag,
+    _h5_filter, _h6_filter, _h7_filter, _h8_filter, _h9_filter, _h10_filter,
+]
 
 
 # ---------------------------------------------------------------------------
