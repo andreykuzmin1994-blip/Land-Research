@@ -1,0 +1,47 @@
+{
+  "type": "FeatureCollection",
+  "name": "ga_opportunity_zones_stub",
+  "_comment": "Phase 5 STUB. See data/_README.md for the human action required to populate from HUD opportunityzones.hud.gov.",
+  "crs": {
+    "type": "name",
+    "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "GEOID": "STUB-13121-SOUTH-FULTON",
+        "tract_name": "South Fulton / Campbellton-Fairburn (stub)",
+        "is_stub": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-84.62, 33.52],
+          [-84.50, 33.52],
+          [-84.50, 33.58],
+          [-84.62, 33.58],
+          [-84.62, 33.52]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "GEOID": "STUB-13063-CLAYTON-I85S",
+        "tract_name": "Clayton County / I-85 South (stub)",
+        "is_stub": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-84.42, 33.55],
+          [-84.32, 33.55],
+          [-84.32, 33.63],
+          [-84.42, 33.63],
+          [-84.42, 33.55]
+        ]]
+      }
+    }
+  ]
+}

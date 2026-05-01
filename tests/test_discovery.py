@@ -1071,3 +1071,520 @@ class TestPhase4FilterPipelineEndToEnd(unittest.TestCase):
                 any(filter_id in d for d in flag_descriptions),
                 f"{filter_id} flag row not seen in flag descriptions: {flag_descriptions}",
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Scoring Engine MVP (Option B)
+# See reviews/07_phase5_scoring_mvp/01_risk_review.md for the R-2XX gates.
+# ---------------------------------------------------------------------------
+class _SharedQueueCursor:
+    """Cursor backed by SHARED fetchone+fetchall queues on the parent
+    connection. Lets multi-cursor scoring flows replay sequenced fixtures."""
+
+    def __init__(self, conn: "Phase5FakeConnection") -> None:
+        self.conn = conn
+        self.executes: list[tuple[str, tuple]] = []
+
+    def execute(self, sql: str, params: tuple = ()) -> None:
+        rec = (sql, tuple(params or ()))
+        self.executes.append(rec)
+        self.conn._all_executes.append(rec)
+
+    def fetchone(self) -> tuple | None:
+        if self.conn._fetchone_queue:
+            return self.conn._fetchone_queue.pop(0)
+        return None
+
+    def fetchall(self) -> list[tuple]:
+        if self.conn._fetchall_queue:
+            return self.conn._fetchall_queue.pop(0)
+        return []
+
+    def __enter__(self) -> "_SharedQueueCursor":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        return None
+
+
+class Phase5FakeConnection:
+    """psycopg.Connection stand-in for Phase 5 scoring tests with proper
+    sequenced fetchone/fetchall queues shared across all cursors."""
+
+    def __init__(
+        self,
+        fetchone_queue: list[tuple] | None = None,
+        fetchall_queue: list[list[tuple]] | None = None,
+    ) -> None:
+        self._fetchone_queue: list[tuple] = list(fetchone_queue or [])
+        self._fetchall_queue: list[list[tuple]] = list(fetchall_queue or [])
+        self.cursors: list[_SharedQueueCursor] = []
+        self._all_executes: list[tuple[str, tuple]] = []
+        self.commits = 0
+        self.rollbacks = 0
+        self.transaction_count = 0
+
+    def cursor(self) -> _SharedQueueCursor:
+        c = _SharedQueueCursor(self)
+        self.cursors.append(c)
+        return c
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+    @contextmanager
+    def transaction(self):
+        self.transaction_count += 1
+        try:
+            yield self
+            self.commit()
+        except Exception:
+            self.rollback()
+            raise
+
+    @property
+    def all_executes(self) -> list[tuple[str, tuple]]:
+        return list(self._all_executes)
+
+
+class TestPhase5OzPnpoly(unittest.TestCase):
+    """Pure-Python point-in-polygon (R-206)."""
+
+    SQUARE = [
+        [-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0],
+    ]
+
+    def test_point_inside_simple_square(self) -> None:
+        self.assertTrue(research._point_in_ring(0.0, 0.0, self.SQUARE))
+
+    def test_point_outside_simple_square(self) -> None:
+        self.assertFalse(research._point_in_ring(2.0, 2.0, self.SQUARE))
+
+    def test_point_outside_nearby(self) -> None:
+        self.assertFalse(research._point_in_ring(1.5, 0.0, self.SQUARE))
+
+    def test_degenerate_ring_returns_false(self) -> None:
+        self.assertFalse(research._point_in_ring(0.0, 0.0, [[0, 0], [1, 0]]))
+
+
+class TestPhase5OzCheck(unittest.TestCase):
+    """S10 OZ check against the bundled stub data (R-205, R-219)."""
+
+    def setUp(self) -> None:
+        # Reset the OZ cache so each test re-loads fresh.
+        research._OZ_TRACTS_CACHE = None
+
+    def test_in_south_fulton_stub_returns_true(self) -> None:
+        # Centroid in the stub South Fulton polygon (-84.62..-84.50, 33.52..33.58).
+        self.assertTrue(research._check_oz(-84.55, 33.55))
+
+    def test_in_clayton_stub_returns_true(self) -> None:
+        self.assertTrue(research._check_oz(-84.37, 33.59))
+
+    def test_outside_known_stubs_returns_false(self) -> None:
+        # Far outside any stub polygon.
+        self.assertFalse(research._check_oz(-83.0, 35.0))
+
+    def test_null_centroid_returns_false(self) -> None:
+        self.assertFalse(research._check_oz(None, None))
+
+
+class TestPhase5S2Geometry(unittest.TestCase):
+    """S2 score mapping (R-207)."""
+
+    def test_perfect_square_scores_10(self) -> None:
+        # compactness = area / bbox_area = 1.0; aspect = 1.0
+        self.assertEqual(research._score_geometry(100.0, 100.0, 1.0), 10)
+
+    def test_near_perfect_rectangle_scores_10(self) -> None:
+        # compactness = 0.95, aspect = 1.5 → 10
+        self.assertEqual(research._score_geometry(95.0, 100.0, 1.5), 10)
+
+    def test_minor_irregularity_scores_7(self) -> None:
+        # compactness = 0.87, aspect = 2.5 → 7
+        self.assertEqual(research._score_geometry(87.0, 100.0, 2.5), 7)
+
+    def test_significant_irregularity_scores_4(self) -> None:
+        # compactness = 0.70 → 4
+        self.assertEqual(research._score_geometry(70.0, 100.0, 1.5), 4)
+
+    def test_unbuildable_scores_0(self) -> None:
+        # compactness = 0.40 → 0
+        self.assertEqual(research._score_geometry(40.0, 100.0, 1.5), 0)
+
+    def test_long_thin_rectangle_drops_to_4(self) -> None:
+        # aspect = 5.0 disqualifies from the >=7 tier; compactness 0.93 → 4
+        # (compactness_high but aspect_too_high → falls through to else if no
+        # 0.65 threshold met; with 0.93 it lands at 4).
+        self.assertEqual(research._score_geometry(93.0, 100.0, 5.0), 4)
+
+    def test_null_geometry_returns_none(self) -> None:
+        self.assertIsNone(research._score_geometry(None, 100.0, 1.0))
+        self.assertIsNone(research._score_geometry(100.0, None, 1.0))
+        self.assertIsNone(research._score_geometry(0.0, 100.0, 1.0))
+
+
+class TestPhase5S9(unittest.TestCase):
+    """S9 entitlement stub (R-218)."""
+
+    def test_returns_moderate_5(self) -> None:
+        self.assertEqual(research._compute_s9(), 5)
+
+
+class TestPhase5S10(unittest.TestCase):
+    """S10 incentives — OZ portion only."""
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def test_in_oz_returns_4(self) -> None:
+        # In stub South Fulton OZ.
+        self.assertEqual(research._compute_s10(-84.55, 33.55), 4)
+
+    def test_outside_oz_returns_0(self) -> None:
+        self.assertEqual(research._compute_s10(-83.0, 35.0), 0)
+
+    def test_null_centroid_returns_none(self) -> None:
+        self.assertIsNone(research._compute_s10(None, None))
+        self.assertIsNone(research._compute_s10(-84.55, None))
+
+
+class TestPhase5Composite(unittest.TestCase):
+    """Composite formula edge cases (R-203)."""
+
+    WEIGHTS = {
+        "S1_interstate_proximity": 15,
+        "S2_parcel_geometry": 10,
+        "S3_topography": 10,
+        "S4_submarket_vacancy": 10,
+        "S5_submarket_absorption": 10,
+        "S6_competing_pipeline": 8,
+        "S7_labor_pool": 8,
+        "S8_land_basis": 7,
+        "S9_entitlement_complexity": 7,
+        "S10_incentives": 5,
+        "S11_rail_adjacency": 5,
+        "S12_demand_generators": 5,
+    }
+
+    def _all_null(self) -> dict[str, int | None]:
+        return {n: None for n in research._SUB_SCORE_NAMES}
+
+    def test_all_null_returns_none(self) -> None:
+        sub = self._all_null()
+        self.assertIsNone(research._compute_composite(sub, self.WEIGHTS))
+
+    def test_single_subscore(self) -> None:
+        # Only S2 = 10, weight 10 → composite = (10*10/10) * 10 = 100.0
+        sub = self._all_null()
+        sub["S2_parcel_geometry"] = 10
+        self.assertEqual(research._compute_composite(sub, self.WEIGHTS), 100.0)
+
+    def test_phase5_mvp_scenario(self) -> None:
+        # Realistic MVP: S2=10 (w=10), S9=5 (w=7), S10=4 (w=5).
+        # numerator = 10*10 + 5*7 + 4*5 = 100 + 35 + 20 = 155
+        # denominator = 10 + 7 + 5 = 22
+        # composite = (155/22) * 10 = 70.45...
+        sub = self._all_null()
+        sub["S2_parcel_geometry"] = 10
+        sub["S9_entitlement_complexity"] = 5
+        sub["S10_incentives"] = 4
+        result = research._compute_composite(sub, self.WEIGHTS)
+        self.assertAlmostEqual(result, 70.45, places=1)
+
+    def test_max_composite_is_100(self) -> None:
+        sub = {n: 10 for n in research._SUB_SCORE_NAMES}
+        self.assertEqual(research._compute_composite(sub, self.WEIGHTS), 100.0)
+
+    def test_zero_subscore_contributes_zero(self) -> None:
+        sub = self._all_null()
+        sub["S2_parcel_geometry"] = 0
+        # Only S2 populated with score 0 → composite = 0
+        self.assertEqual(research._compute_composite(sub, self.WEIGHTS), 0.0)
+
+
+class TestPhase5Confidence(unittest.TestCase):
+    """Confidence score range (R-208, R-216)."""
+
+    def test_zero_populated(self) -> None:
+        sub = {n: None for n in research._SUB_SCORE_NAMES}
+        self.assertEqual(research._compute_confidence(sub), 0.0)
+
+    def test_full_populated(self) -> None:
+        sub = {n: 5 for n in research._SUB_SCORE_NAMES}
+        self.assertEqual(research._compute_confidence(sub), 1.0)
+
+    def test_three_populated(self) -> None:
+        sub = {n: None for n in research._SUB_SCORE_NAMES}
+        sub["S2_parcel_geometry"] = 10
+        sub["S9_entitlement_complexity"] = 5
+        sub["S10_incentives"] = 4
+        self.assertAlmostEqual(research._compute_confidence(sub), 3 / 12)
+
+    def test_zero_subscore_counts_as_populated(self) -> None:
+        sub = {n: None for n in research._SUB_SCORE_NAMES}
+        sub["S2_parcel_geometry"] = 0
+        self.assertAlmostEqual(research._compute_confidence(sub), 1 / 12)
+
+
+class TestPhase5ScoreParcel(unittest.TestCase):
+    """End-to-end score_parcel against Phase5FakeConnection."""
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def _params(self) -> dict[str, Any]:
+        p = _passing_params()
+        p["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        return p
+
+    def test_happy_path_inserts_parcel_score_and_log(self) -> None:
+        # Centroid in South Fulton OZ stub.
+        fake = Phase5FakeConnection(
+            fetchone_queue=[
+                ("fulton-001", "atlanta", -84.55, 33.55),  # _SQL_FETCH_PARCEL
+                (1000.0, 1100.0, 1.5),                       # _SQL_S2_GEOMETRY
+            ],
+        )
+        result = research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-test-0001",
+            params=self._params(),
+        )
+        self.assertEqual(result["status"], "scored")
+        self.assertEqual(result["sub_scores"]["S2_parcel_geometry"], 7)  # 1000/1100=0.909
+        self.assertEqual(result["sub_scores"]["S9_entitlement_complexity"], 5)
+        self.assertEqual(result["sub_scores"]["S10_incentives"], 4)
+        # parcel_scores INSERT issued with PENDING actionability.
+        score_inserts = [
+            (sql, params) for sql, params in fake.all_executes
+            if "INSERT INTO parcel_scores" in sql
+        ]
+        self.assertEqual(len(score_inserts), 1)
+        self.assertEqual(score_inserts[0][1][3], "PENDING")
+        # research_log scoring row issued.
+        log_inserts = [
+            sql for sql, params in fake.all_executes
+            if "INSERT INTO research_log" in sql and "scoring" in str(params)
+        ]
+        self.assertEqual(len(log_inserts), 1)
+
+    def test_data_gap_flag_per_null_subscore(self) -> None:
+        # 9 sub-scores stay null in MVP (S1, S3..S8, S11, S12) → 9 data_gap flags.
+        fake = Phase5FakeConnection(
+            fetchone_queue=[
+                ("fulton-001", "atlanta", -84.55, 33.55),
+                (1000.0, 1100.0, 1.5),
+            ],
+        )
+        research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-test-0002",
+            params=self._params(),
+        )
+        flag_inserts = [
+            params[3] for sql, params in fake.all_executes
+            if "flagged_items" in sql and len(params) >= 4
+        ]
+        for null_subscore in (
+            "S1_interstate_proximity", "S3_topography", "S4_submarket_vacancy",
+            "S5_submarket_absorption", "S6_competing_pipeline", "S7_labor_pool",
+            "S8_land_basis", "S11_rail_adjacency", "S12_demand_generators",
+        ):
+            self.assertTrue(
+                any(null_subscore in d for d in flag_inserts),
+                f"{null_subscore} data_gap flag not seen: {flag_inserts}",
+            )
+        # And no flag for the populated ones.
+        for populated in (
+            "S2_parcel_geometry", "S9_entitlement_complexity", "S10_incentives",
+        ):
+            self.assertFalse(
+                any(populated in d for d in flag_inserts),
+                f"unexpected data_gap flag for populated {populated}: {flag_inserts}",
+            )
+
+    def test_missing_parcel_returns_missing_status(self) -> None:
+        fake = Phase5FakeConnection(fetchone_queue=[])  # _SQL_FETCH_PARCEL returns None
+        result = research.score_parcel(
+            "fulton-nonexistent", conn=fake, cycle_id="score-atlanta-test-0003",
+            params=self._params(),
+        )
+        self.assertEqual(result["status"], "missing")
+        # No parcel_scores INSERT.
+        score_inserts = [
+            sql for sql, _ in fake.all_executes if "INSERT INTO parcel_scores" in sql
+        ]
+        self.assertEqual(score_inserts, [])
+
+    def test_actionability_is_pending(self) -> None:
+        # Phase 5 MUST set actionability='PENDING' so the metric SQL excludes
+        # these rows from actionable_pipeline_count until Phase 8 runs.
+        fake = Phase5FakeConnection(
+            fetchone_queue=[
+                ("fulton-001", "atlanta", -84.55, 33.55),
+                (1000.0, 1100.0, 1.5),
+            ],
+        )
+        research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-test-0004",
+            params=self._params(),
+        )
+        score_insert_params = next(
+            params for sql, params in fake.all_executes
+            if "INSERT INTO parcel_scores" in sql
+        )
+        # Position 3 in _SQL_INSERT_PARCEL_SCORE is actionability.
+        self.assertEqual(score_insert_params[3], "PENDING")
+
+
+class TestPhase5ParcelScoresAppendOnly(unittest.TestCase):
+    """R-204, R-210 — versioned-append; two calls = two INSERTs."""
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def test_two_calls_produce_two_inserts(self) -> None:
+        params = _passing_params()
+        params["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        fake = Phase5FakeConnection(
+            fetchone_queue=[
+                ("fulton-001", "atlanta", -84.55, 33.55),
+                (1000.0, 1100.0, 1.5),
+                ("fulton-001", "atlanta", -84.55, 33.55),
+                (1000.0, 1100.0, 1.5),
+            ],
+        )
+        research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-call1-aaaa",
+            params=params,
+        )
+        research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-call2-bbbb",
+            params=params,
+        )
+        score_inserts = [
+            sql for sql, _ in fake.all_executes
+            if "INSERT INTO parcel_scores" in sql
+        ]
+        self.assertEqual(len(score_inserts), 2)
+        # And no UPDATE / DELETE against parcel_scores anywhere.
+        for sql, _ in fake.all_executes:
+            self.assertNotIn("UPDATE parcel_scores", sql)
+            self.assertNotIn("DELETE FROM parcel_scores", sql)
+
+
+class TestPhase5RunScoringCycle(unittest.TestCase):
+    """run_scoring_cycle driver behavior."""
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def test_unsupported_market_raises(self) -> None:
+        with self.assertRaises(NotImplementedError):
+            research.run_scoring_cycle("dallas-fort-worth")
+
+    def test_iterates_unscored_parcels(self) -> None:
+        params = _passing_params()
+        params["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        # Cycle: collision check (None default → 0), unscored list (2 parcels),
+        # then per-parcel: fetch + S2.
+        fake = Phase5FakeConnection(
+            fetchone_queue=[
+                (0,),                                     # collision check
+                ("fulton-001", "atlanta", -84.55, 33.55), # parcel 1 fetch
+                (1000.0, 1100.0, 1.5),                    # parcel 1 S2
+                ("fulton-002", "atlanta", -83.0, 35.0),   # parcel 2 fetch (outside OZ)
+                (500.0, 1000.0, 4.0),                     # parcel 2 S2 (compactness 0.5 → 0)
+            ],
+            fetchall_queue=[
+                [("fulton-001",), ("fulton-002",)],
+            ],
+        )
+
+        @contextmanager
+        def _ctx():
+            yield fake
+
+        with mock.patch("research.prepare.get_parameters", return_value=params), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch("research.prepare.get_connection", _ctx):
+            summary = research.run_scoring_cycle("atlanta")
+
+        self.assertFalse(summary["aborted"])
+        self.assertEqual(summary["counts"]["scored"], 2)
+        self.assertEqual(len(summary["parcels"]), 2)
+        # Both parcels got parcel_scores INSERTs.
+        score_inserts = [
+            sql for sql, _ in fake.all_executes if "INSERT INTO parcel_scores" in sql
+        ]
+        self.assertEqual(len(score_inserts), 2)
+
+    def test_cycle_id_collision_aborts(self) -> None:
+        params = _passing_params()
+        params["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        fake = Phase5FakeConnection(
+            fetchone_queue=[(7,)],  # collision check returns 7
+        )
+
+        @contextmanager
+        def _ctx():
+            yield fake
+
+        with mock.patch("research.prepare.get_parameters", return_value=params), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch("research.prepare.get_connection", _ctx):
+            summary = research.run_scoring_cycle("atlanta")
+
+        self.assertTrue(summary["aborted"])
+        self.assertEqual(summary["abort_reason"], "cycle_id_collision")
+        # No parcel_scores INSERTs after abort.
+        score_inserts = [
+            sql for sql, _ in fake.all_executes if "INSERT INTO parcel_scores" in sql
+        ]
+        self.assertEqual(score_inserts, [])
+
+
+class TestPhase5OzDataFile(unittest.TestCase):
+    """Bundled OZ stub file structure (R-205)."""
+
+    def test_oz_stub_file_exists(self) -> None:
+        self.assertTrue(research._OZ_DATA_PATH.is_file())
+
+    def test_oz_stub_loads_as_geojson(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+        tracts = research._load_oz_tracts()
+        # Stub has 2 features; verify we got polygons.
+        self.assertGreaterEqual(len(tracts), 1)
+        for bbox, rings, props in tracts:
+            self.assertEqual(len(bbox), 4)
+            self.assertGreaterEqual(len(rings[0]), 4)  # closed ring
+
+
+class TestPhase5SqlConstantsStaticChecks(unittest.TestCase):
+    """R-202, R-204 — static SQL invariants."""
+
+    def test_no_update_or_delete_against_parcel_scores(self) -> None:
+        forbidden = ("UPDATE parcel_scores", "DELETE FROM parcel_scores")
+        for needle in forbidden:
+            self.assertNotIn(
+                needle, RESEARCH_PY_SRC,
+                f"Phase 5 must be append-only against parcel_scores; found {needle!r}",
+            )
+
+    def test_scoring_sql_uses_parameterized_placeholders(self) -> None:
+        # Every new SQL constant uses %s placeholders, no f-string interpolation.
+        for const in (
+            "_SQL_INSERT_PARCEL_SCORE",
+            "_SQL_INSERT_RESEARCH_LOG_SCORING",
+            "_SQL_FETCH_PARCEL",
+            "_SQL_S2_GEOMETRY",
+            "_SQL_LIST_UNSCORED_PARCELS",
+            "_SQL_COUNT_LOG_FOR_SCORING_CYCLE",
+        ):
+            self.assertTrue(hasattr(research, const), f"missing SQL constant {const}")
+            sql = getattr(research, const)
+            self.assertIsInstance(sql, str)
+            # Must not contain runtime-format markers — only %s for psycopg.
+            self.assertNotIn("{", sql, f"f-string brace in {const}: {sql}")
