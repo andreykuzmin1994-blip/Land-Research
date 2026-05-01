@@ -123,7 +123,7 @@ After each cycle, record to `results.tsv`:
 cycle | timestamp | action_type | market | parcel_id | composite_score | actionability | strategy_fit | actionable_pipeline_count | discovery_rate_24h | scoring_completeness | conversion_rate | notes
 ```
 
-Where `action_type` is one of: `discovery`, `scoring`, `rescore`, `rejection`, `flag`.
+Where `action_type` is one of: `discovery`, `discovery_empty`, `scoring`, `rescore`, `rejection`, `flag`, `abort`.
 Where `actionability` is one of: `PASS`, `FAIL:control`, `FAIL:entitlement`, `FAIL:strategy`, `FAIL:deal_killer`, `PENDING`.
 Where `strategy_fit` is a comma-separated list of strategies rated STRONG or MODERATE (e.g., `land_bank,spec_dev`).
 

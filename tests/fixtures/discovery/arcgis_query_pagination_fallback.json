@@ -1,0 +1,29 @@
+{
+  "_comment": "Phase 3.1 §6.4 fallback test fixture: exceededTransferLimit field is ABSENT and len(features) < page_size. The pagination loop must terminate via the short-page heuristic at research.py:801-802 without an extra round-trip.",
+  "features": [
+    {
+      "attributes": {
+        "ParcelID": "14F-FALLBACK-001",
+        "Owner": "FALLBACK PARCEL OWNER",
+        "OwnerAddr1": "PO BOX 1",
+        "OwnerAddr2": "ATLANTA GA 30331",
+        "Address": "0 FALLBACK RD",
+        "LandAcres": 12.0,
+        "LandAssess": 100000,
+        "ImprAssess": 0,
+        "TotAssess": 100000,
+        "LUCode": "100",
+        "TaxYear": 2025
+      },
+      "geometry": {
+        "rings": [[
+          [-84.555, 33.553],
+          [-84.553, 33.553],
+          [-84.553, 33.555],
+          [-84.555, 33.555],
+          [-84.555, 33.553]
+        ]]
+      }
+    }
+  ]
+}

@@ -248,6 +248,15 @@ class _DiscoverySession:
     Tests monkeypatch the ``get`` method to return fixture JSON without
     touching the network. Production code path uses ``requests.Session``
     underneath with a polite-scrape 1-req/sec floor per host.
+
+    Threading: the discovery cycle is single-threaded by design and this
+    class is only safe to share within a single cycle. The lock-protected
+    ``_last_request_at`` reservation in ``_spacing_sleep`` is correct under
+    concurrent use (it stages requests at the cost of being slightly
+    over-conservative when threads collide), but no production caller
+    exercises that path. If a future phase introduces concurrent discovery,
+    re-validate the per-host budget end-to-end rather than assuming the
+    staggering is sufficient.
     """
 
     def __init__(self) -> None:
@@ -305,14 +314,23 @@ def _ring_signed_area(ring: Sequence[Sequence[float]]) -> float:
     return s * 0.5
 
 
-def _arcgis_polygon_to_wkt(rings: Sequence[Sequence[Sequence[float]]]) -> tuple[str, bool]:
+def _arcgis_polygon_to_wkt(
+    rings: Sequence[Sequence[Sequence[float]]],
+) -> tuple[str, bool, Sequence[Sequence[float]]]:
     """Convert Esri JSON polygon ``rings`` to OGC WKT POLYGON (R-07, R-16).
 
-    Returns ``(wkt, was_multipolygon_reduced)``. If multiple outer rings
-    are present (disjoint polygons in Esri JSON), keep the largest by
-    absolute area and emit ``True`` for the bool. The dropped rings are
-    intentionally lost from the canonical record; the caller flags the
-    parcel via flagged_items so Phase 4+ can revisit.
+    Returns ``(wkt, was_multipolygon_reduced, kept_outer_ring)``.
+
+    If multiple outer rings are present (disjoint polygons in Esri JSON),
+    keep the largest by absolute area and emit ``True`` for the bool. The
+    dropped rings are intentionally lost from the canonical record; the
+    caller flags the parcel via flagged_items so Phase 4+ can revisit.
+
+    The third return value, ``kept_outer_ring``, is the ring whose
+    coordinates appear in the WKT — callers who need a centroid for the
+    H1 envelope check must use this rather than ``rings[0]`` so multi-
+    polygon parcels with a non-first largest ring are evaluated
+    consistently with what is stored in PostGIS (Phase 3.1 §6.B fix).
     """
     if not rings:
         raise ValueError("empty rings; cannot construct WKT POLYGON")
@@ -342,7 +360,7 @@ def _arcgis_polygon_to_wkt(rings: Sequence[Sequence[Sequence[float]]]) -> tuple[
         kept_holes = holes
     parts = [_ring_to_wkt(kept_outer), *(_ring_to_wkt(h) for h in kept_holes)]
     wkt = f"POLYGON({','.join(parts)})"
-    return wkt, multipolygon
+    return wkt, multipolygon, kept_outer
 
 
 def _ring_to_wkt(ring: Sequence[Sequence[float]]) -> str:
@@ -632,13 +650,19 @@ def _log_research(
 def _flag(
     conn: Any,
     cycle_id: str,
-    parcel_id: str,
+    parcel_id: str | None,
     market: str,
     flag_type: str,
     description: str,
     suggested_resolution: str,
 ) -> None:
-    """Insert one flagged_items row. Embeds cycle_id into description (R-38)."""
+    """Insert one flagged_items row. Embeds cycle_id into description (R-38).
+
+    ``parcel_id`` is ``None`` for cycle-level flag rows that aren't tied to a
+    specific parcel (e.g. ``harness=degraded`` or partial-corridor abort).
+    psycopg sends Python ``None`` as SQL NULL; using a sentinel string like
+    ``"(none)"`` would break future joins against the parcels table.
+    """
     cycle_prefixed = f"cycle={cycle_id}; {description}"
     with conn.cursor() as cur:
         cur.execute(
@@ -837,11 +861,16 @@ def _map_feature_to_parcel(
     if not rings:
         return None, None, "missing polygon rings", False
     try:
-        wkt, multipolygon = _arcgis_polygon_to_wkt(rings)
+        wkt, multipolygon, kept_outer = _arcgis_polygon_to_wkt(rings)
     except ValueError as exc:
         return None, None, f"polygon construction failed: {exc}", False
 
-    cx, cy = _ring_centroid(rings[0])
+    # Phase 3.1 §6.B fix: centroid must come from the *kept* outer ring, not
+    # rings[0]. For multi-polygon parcels where the largest ring is not first,
+    # using rings[0] would feed the wrong centroid into the H1 envelope check
+    # while PostGIS's server-side ST_Centroid (computed from ``wkt``) sees the
+    # correct one — silent client/server divergence.
+    cx, cy = _ring_centroid(kept_outer)
     if not _check_srid_sanity(cx, cy):
         return None, None, "ArcGIS ignored outSR=4326 (centroid not in WGS84 range)", False
 
@@ -1053,7 +1082,7 @@ def _discover_fulton_corridor(
                     f"corridor={corridor_name}: network error: {exc!r}",
                 )
                 _flag(
-                    conn, cycle_id, "(none)", market, "data_gap",
+                    conn, cycle_id, None, market, "data_gap",
                     f"partial corridor: {corridor_name}; processed_parcels={counts['discovery']+counts['rejection']+counts['unmappable']}",
                     f"re-run discovery for corridor={corridor_name} when upstream is healthy",
                 )
@@ -1202,7 +1231,7 @@ def _run_for_counties(
             try:
                 with conn.transaction():
                     _flag(
-                        conn, cycle_id, "(none)", market, "data_gap",
+                        conn, cycle_id, None, market, "data_gap",
                         f"harness=degraded for county={county}; proceeding with reduced confidence",
                         "review harness_reports for cause; refresh field_mapping if needed",
                     )
