@@ -361,16 +361,45 @@ class TestPolygonAndSrid(unittest.TestCase):
             [-84.555, 33.555],
             [-84.555, 33.553],
         ]]
-        wkt, multi = research._arcgis_polygon_to_wkt(rings)
+        wkt, multi, kept = research._arcgis_polygon_to_wkt(rings)
         self.assertFalse(multi)
         self.assertTrue(wkt.startswith("POLYGON("))
         self.assertIn("-84.555 33.553", wkt)
+        # Single-polygon: kept_outer == rings[0].
+        self.assertEqual(list(kept), list(rings[0]))
 
     def test_multipolygon_keeps_largest_outer(self) -> None:
         feature = _load_fixture("arcgis_query_multipolygon.json")["features"][0]
-        wkt, multi = research._arcgis_polygon_to_wkt(feature["geometry"]["rings"])
+        wkt, multi, kept = research._arcgis_polygon_to_wkt(feature["geometry"]["rings"])
         self.assertTrue(multi)
         self.assertTrue(wkt.startswith("POLYGON("))
+        # kept_outer is one of the input rings.
+        self.assertIn(list(kept), [list(r) for r in feature["geometry"]["rings"]])
+
+    def test_multipolygon_centroid_uses_kept_outer(self) -> None:
+        """Phase 3.1 §6.B: when rings[0] is not the largest, the centroid
+        computed from the kept_outer ring must match what PostGIS will
+        derive from the WKT, not the rings[0] centroid.
+        """
+        small = [
+            [-84.555, 33.553], [-84.553, 33.553], [-84.553, 33.555],
+            [-84.555, 33.555], [-84.555, 33.553],
+        ]
+        large = [
+            [-84.560, 33.560], [-84.500, 33.560], [-84.500, 33.580],
+            [-84.560, 33.580], [-84.560, 33.560],
+        ]
+        rings = [small, large]
+        wkt, multi, kept = research._arcgis_polygon_to_wkt(rings)
+        self.assertTrue(multi)
+        cx_kept, cy_kept = research._ring_centroid(kept)
+        cx_first, cy_first = research._ring_centroid(rings[0])
+        # Centroid from kept_outer must NOT match centroid from rings[0]
+        # — that's the whole point: large ring is second, small is first.
+        self.assertNotAlmostEqual(cx_kept, cx_first, places=3)
+        self.assertNotAlmostEqual(cy_kept, cy_first, places=3)
+        # And the WKT must contain the large ring's coordinates.
+        self.assertIn("-84.56 33.56", wkt)
 
     def test_srid_sanity_accepts_wgs84(self) -> None:
         self.assertTrue(research._check_srid_sanity(-84.5, 33.6))
@@ -670,3 +699,300 @@ class TestHappyPathDryRun(unittest.TestCase):
         flag_rows = [s for s, _ in fake.all_executes if "flagged_items" in s]
         # 4 parcels x 2 flags = 8 minimum (multipolygon flag may add more).
         self.assertGreaterEqual(len(flag_rows), 8)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.1 punch-list additions
+# ---------------------------------------------------------------------------
+def _sources_payload() -> dict[str, Any]:
+    """Shared sources.json shape for the harness/cycle integration tests."""
+    return {
+        "county_parcel_data": {"fulton_ga": {
+            "service_url": "https://example.test/MapServer",
+            "parcel_layer_id": 11,
+            "field_mapping": {
+                "parcel_id": "ParcelID", "owner_name": "Owner",
+                "owner_mailing_address": "OwnerAddr1",
+                "owner_mailing_address_2": "OwnerAddr2",
+                "site_address": "Address", "acreage": "LandAcres",
+                "land_value": "LandAssess", "improvement_value": "ImprAssess",
+                "total_value": "TotAssess", "land_use_code": "LUCode",
+                "tax_year": "TaxYear",
+            },
+        }},
+    }
+
+
+class TestPhase31ImmutableWritesStrict(unittest.TestCase):
+    """Phase 3.1 §6.A: strengthen the immutable-write scan to catch
+    Path.write_text, Path.open, json.dump, csv.writer patterns whose
+    target string contains parameters.json / program.md / sources.json.
+    The original test only caught open(<Constant>, <Constant 'w'>)."""
+
+    FORBIDDEN = ("parameters.json", "program.md", "sources.json")
+
+    def test_strict_no_immutable_writes(self) -> None:
+        tree = ast.parse(RESEARCH_PY_SRC)
+        violations: list[tuple[int, str]] = []
+
+        def _string_constants_in(node: ast.AST) -> list[str]:
+            """All string constants reachable from this AST node."""
+            out: list[str] = []
+            for inner in ast.walk(node):
+                if isinstance(inner, ast.Constant) and isinstance(inner.value, str):
+                    out.append(inner.value)
+            return out
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            # Pattern 1: open(path, "w...")
+            is_open = isinstance(node.func, ast.Name) and node.func.id == "open"
+            # Pattern 2: <expr>.open("w..."), <expr>.write_text(...),
+            # <expr>.write_bytes(...), json.dump(obj, fh), csv.writer(fh).
+            attr_call = isinstance(node.func, ast.Attribute)
+            attr_name = node.func.attr if attr_call else ""
+            is_pathlike_write = attr_name in {"write_text", "write_bytes"}
+            is_path_open_write = False
+            if attr_call and attr_name == "open":
+                # Path(...).open("w") — second arg is the mode.
+                if node.args and len(node.args) >= 1:
+                    first = node.args[0]
+                    if isinstance(first, ast.Constant) and isinstance(first.value, str) and "w" in first.value:
+                        is_path_open_write = True
+            is_jsondump = attr_call and attr_name == "dump" and isinstance(node.func.value, ast.Name) and node.func.value.id == "json"
+            is_csvwriter = attr_call and attr_name == "writer" and isinstance(node.func.value, ast.Name) and node.func.value.id == "csv"
+
+            interesting = is_open or is_pathlike_write or is_path_open_write or is_jsondump or is_csvwriter
+            if not interesting:
+                continue
+
+            # Look at the call and the receiver (e.g. Path("parameters.json")
+            # or _PARAMS_PATH) for any forbidden string constant.
+            search_targets: list[ast.AST] = list(node.args)
+            if attr_call:
+                search_targets.append(node.func.value)
+
+            for tgt in search_targets:
+                for s in _string_constants_in(tgt):
+                    if any(p in s for p in self.FORBIDDEN):
+                        violations.append((node.lineno, s))
+
+        self.assertFalse(
+            violations,
+            f"forbidden write to immutable file detected: {violations}",
+        )
+
+
+class TestPhase31CycleLevelFlagNullsParcelId(unittest.TestCase):
+    """Phase 3.1 §6.2: cycle-level flag rows (no specific parcel) must use
+    SQL NULL for parcel_id, not the string sentinel "(none)"."""
+
+    def test_harness_degraded_emits_null_parcel_id(self) -> None:
+        with fake_connection_context() as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()), \
+                mock.patch.object(research, "_DiscoverySession", return_value=_HappyPathSession()), \
+                mock.patch.object(
+                    research.connector_harness, "run_harness_for_county",
+                    return_value=_load_fixture("harness_degraded.json"),
+                ):
+            research.run_discovery_cycle("atlanta")
+
+        flag_inserts = [
+            (sql, params) for sql, params in fake.all_executes
+            if "flagged_items" in sql
+        ]
+        # The first flag row is the cycle-level harness=degraded row.
+        # _SQL_INSERT_FLAG params order: (flag_type, parcel_id, market, description, suggested_resolution).
+        cycle_level_rows = [
+            params for _, params in flag_inserts
+            if params and len(params) >= 5
+            and isinstance(params[3], str)
+            and "harness=degraded" in params[3]
+        ]
+        self.assertTrue(cycle_level_rows, "no harness=degraded flag row was emitted")
+        for params in cycle_level_rows:
+            self.assertIsNone(
+                params[1],
+                f"cycle-level flag row must use NULL parcel_id, got {params[1]!r}",
+            )
+            self.assertNotEqual(params[1], "(none)")
+
+
+class TestPhase31FallbackPagination(unittest.TestCase):
+    """Phase 3.1 §6.4: when ArcGIS omits exceededTransferLimit AND
+    len(features) < page_size, the pagination loop must terminate via
+    the short-page heuristic without an extra round-trip."""
+
+    def test_pagination_terminates_on_short_page_when_field_absent(self) -> None:
+        fixture = _load_fixture("arcgis_query_pagination_fallback.json")
+        # Sanity: fixture has exactly 1 feature and no exceededTransferLimit field.
+        self.assertEqual(len(fixture["features"]), 1)
+        self.assertNotIn("exceededTransferLimit", fixture)
+
+        class _MockSession:
+            def __init__(self):
+                self.calls = 0
+            def get(self, url, params=None, timeout=None):
+                self.calls += 1
+                return fixture
+
+        sess = _MockSession()
+        gen = research._query_arcgis_corridor(
+            sess, "https://example.test/MapServer", 11,
+            {"xmin": -84.62, "ymin": 33.52, "xmax": -84.50, "ymax": 33.58},
+            {"acreage": "LandAcres", "parcel_id": "ParcelID"},
+            _passing_params(), research._make_cycle_id("fulton"),
+            "south_fulton_campbellton",
+            page_size=10,  # fixture has 1 feature; 1 < 10 triggers the fallback branch.
+        )
+        feats = list(gen)
+        self.assertEqual(len(feats), 1)
+        # Only one round-trip — the short-page heuristic terminated the loop.
+        self.assertEqual(sess.calls, 1)
+
+
+class TestPhase31FieldMappingDrift(unittest.TestCase):
+    """Phase 3.1 §6.6: _check_field_mapping_drift detects a missing mapped
+    field via the ArcGIS layer schema endpoint."""
+
+    def test_missing_landacres_returns_false_with_field_listed(self) -> None:
+        schema = _load_fixture("arcgis_layer11_schema_missing_landacres.json")
+
+        class _MockSession:
+            def get(self, url, params=None, timeout=None):
+                return schema
+
+        ok, missing = research._check_field_mapping_drift(
+            _MockSession(),
+            "https://example.test/MapServer",
+            11,
+            {
+                "parcel_id": "ParcelID", "owner_name": "Owner",
+                "owner_mailing_address": "OwnerAddr1",
+                "acreage": "LandAcres",
+            },
+        )
+        self.assertFalse(ok)
+        self.assertIn("LandAcres", missing)
+
+    def test_full_schema_returns_true(self) -> None:
+        schema = _load_fixture("arcgis_layer11_schema.json")
+
+        class _MockSession:
+            def get(self, url, params=None, timeout=None):
+                return schema
+
+        ok, missing = research._check_field_mapping_drift(
+            _MockSession(),
+            "https://example.test/MapServer",
+            11,
+            {
+                "parcel_id": "ParcelID", "owner_name": "Owner",
+                "owner_mailing_address": "OwnerAddr1",
+                "acreage": "LandAcres",
+            },
+        )
+        self.assertTrue(ok)
+        self.assertEqual(missing, [])
+
+
+class TestPhase31CycleIdCollision(unittest.TestCase):
+    """Phase 3.1 §6.6: a non-zero count of existing rows with the cycle_id
+    aborts the cycle with abort_reason='cycle_id_collision'."""
+
+    def test_cycle_id_collision_aborts(self) -> None:
+        # FakeConnection.fetchone_returns drives the _count_log_rows result.
+        # A non-zero row count triggers the collision abort path.
+        with fake_connection_context(fetchone_returns=[(7,)]) as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()):
+            summary = research.run_discovery_cycle("atlanta")
+        self.assertTrue(summary["aborted"])
+        self.assertEqual(summary["abort_reason"], "cycle_id_collision")
+
+
+class _HappyPathSession:
+    """Reusable fake _DiscoverySession for the harness=degraded test."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def get(self, url, params=None, timeout=None):
+        self.calls += 1
+        if url.endswith("/11"):
+            return _load_fixture("arcgis_layer11_schema.json")
+        return _load_fixture("arcgis_query_two_features.json")
+
+    def close(self):
+        pass
+
+
+class TestPhase31HarnessDegradedProceeds(unittest.TestCase):
+    """Phase 3.1 §6.C: harness=degraded does NOT abort the cycle; it emits
+    one cycle-level flag row and proceeds into the connector."""
+
+    def test_harness_degraded_proceeds_with_flag(self) -> None:
+        with fake_connection_context() as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()), \
+                mock.patch.object(research, "_DiscoverySession", return_value=_HappyPathSession()), \
+                mock.patch.object(
+                    research.connector_harness, "run_harness_for_county",
+                    return_value=_load_fixture("harness_degraded.json"),
+                ):
+            summary = research.run_discovery_cycle("atlanta")
+        self.assertFalse(summary["aborted"])
+        self.assertEqual(summary["harness_status"], "degraded")
+        # Exactly one harness-degraded flag row at cycle level.
+        deg_flags = [
+            params for sql, params in fake.all_executes
+            if "flagged_items" in sql and len(params) >= 5
+            and isinstance(params[3], str) and "harness=degraded" in params[3]
+        ]
+        self.assertEqual(len(deg_flags), 1)
+        # Connector still ran.
+        self.assertIn("fulton", summary["per_county"])
+
+
+class TestPhase31FilterPipelineExtensibleExecutes(unittest.TestCase):
+    """Phase 3.1 §6.D: appending a new filter to _HARD_FILTERS at runtime
+    must affect actual per-parcel processing, not just the list length."""
+
+    def test_synthetic_h5_filter_emits_marker_flag(self) -> None:
+        feature = _load_fixture("arcgis_query_two_features.json")["features"][0]
+        mapping = _sources_payload()["county_parcel_data"]["fulton_ga"]["field_mapping"]
+        params = _passing_params()
+        marker = "marker_h5_synthetic"
+
+        def _h5_test_stub(parcel, conn, p):
+            return research._FilterResult("flag", "H5_TEST", marker)
+
+        original = list(research._HARD_FILTERS)
+        try:
+            research._HARD_FILTERS.append(_h5_test_stub)
+            fake = FakeConnection()
+            cycle_id = research._make_cycle_id("fulton")
+            status = research._process_parcel(
+                feature, fake, cycle_id, "south_fulton_campbellton", "atlanta",
+                mapping, params["owner_classification"], params,
+                raw_response_path="/tmp/cache/x.json",
+            )
+        finally:
+            research._HARD_FILTERS[:] = original
+
+        self.assertEqual(status, "discovery")
+        # The synthetic H5 filter should have produced a flagged_items insert
+        # whose description contains the marker.
+        flag_descriptions = [
+            params[3] for sql, params in fake.all_executes
+            if "flagged_items" in sql and len(params) >= 4
+        ]
+        self.assertTrue(
+            any(marker in d for d in flag_descriptions),
+            f"synthetic H5 marker not seen in flag rows: {flag_descriptions}",
+        )
