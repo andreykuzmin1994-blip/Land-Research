@@ -12,12 +12,14 @@ Python file the agent edits while the experiment loop is active. The agent:
     - never modifies :mod:`prepare` or any spec ``.md`` file.
 
 ============================================================================
-PHASE 3 SCOPE — Fulton County discovery connector
+PHASE 3 + PHASE 4 SCOPE — Fulton County discovery connector + H5-H10 stubs
 ============================================================================
 This module implements the Fulton County discovery connector per
 BUILD_PHASES.md Phase 3 and the Agent 1 risk review at
 ``reviews/04_phase3_fulton_discovery/01_risk_review.md`` (48 risks, 12
-categories, GO-WITH-CONDITIONS verdict). The connector:
+categories, GO-WITH-CONDITIONS verdict). Phase 4 added H5..H10 as
+PASS-WITH-FLAG stubs per ``reviews/06_phase4_hard_filters/01_risk_review.md``
+(R-101..R-114). The connector:
 
     1. Calls ``connector_harness.run_harness_for_county("fulton")`` BEFORE
        any production query (appendix integration point #2 — appendix
@@ -32,10 +34,12 @@ categories, GO-WITH-CONDITIONS verdict). The connector:
     4. Maps ArcGIS attributes + geometry to the ``parcels`` schema using
        the validated ``field_mapping`` in ``sources.json``.
     5. Runs hard filters H1 (Fulton envelope) and H2 (acreage client-side
-       recheck) as deterministic reject filters.  H3 (zoning) and H4
-       (flood) are PASS-WITH-FLAG stubs that emit ``flagged_items`` rows
-       of ``flag_type='data_gap'`` and let the parcel through pending
-       Phase 4.
+       recheck) as deterministic reject filters.  H3..H10 are
+       PASS-WITH-FLAG stubs that emit ``flagged_items`` rows of
+       ``flag_type='data_gap'`` and let the parcel through pending Phase 5+
+       data wiring (H3 zoning Layer 34, H4 FEMA NFIP, H5 EPA Envirofacts,
+       H6 USGS NWI, H7 county roads/DOT, H8 utility provider service maps,
+       H9 USGS 3DEP, H10 deed records / conservation easement registries).
     6. UPSERTs into ``parcels`` (preserves first-seen ``discovery_date``,
        bumps ``last_updated``).  Logs every action to ``research_log``.
     7. Caches raw ArcGIS responses to ``sources/{cycle_id}/{corridor}_{offset}.json``
@@ -530,26 +534,93 @@ def _h2_filter(
 def _h3_flag(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H3 zoning is unjoined in Phase 3 — emit data_gap flag, parcel passes (R-22)."""
+    """H3 zoning is unjoined — emit data_gap flag, parcel passes (R-22). Replace body in Phase 5+; preserve signature."""
     return _FilterResult(
         "flag", "H3",
-        "H3 zoning unjoined: pending Layer 34 cross-query (Phase 4)",
+        "H3 zoning unjoined: pending Layer 34 cross-query (Phase 5+)",
     )
 
 
 def _h4_flag(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H4 flood is unjoined in Phase 3 — emit data_gap flag, parcel passes (R-23)."""
+    """H4 flood is unjoined — emit data_gap flag, parcel passes (R-23). Replace body in Phase 5+; preserve signature."""
     return _FilterResult(
         "flag", "H4",
-        "H4 flood unjoined: pending FEMA NFIP wiring (Phase 4)",
+        "H4 flood unjoined: pending FEMA NFIP wiring (Phase 5+)",
     )
 
 
-# Pipeline order: H1 → H2 → (insert) → H3 → H4. Reject filters short-circuit.
-# Phase 4 will append _h5..._h10 here without other code changes (R-42).
-_HARD_FILTERS: list[Any] = [_h1_filter, _h2_filter, _h3_flag, _h4_flag]
+def _h5_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H5 environmental contamination is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will spatially join EPA Envirofacts (NPL/RCRA) + state EPD/GEOS brownfield registries with a 500 ft adjacency buffer; replace body in Phase 5+, preserve (parcel, conn, params) -> _FilterResult signature."""
+    return _FilterResult(
+        "flag", "H5",
+        "H5 environmental unjoined: pending EPA Envirofacts + state EPD wiring (Phase 5+)",
+    )
+
+
+def _h6_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H6 wetlands is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['wetlands_max_pct_of_parcel'] (default 20) and compute ST_Area(ST_Intersection(parcel,wetland))/ST_Area(parcel) against USGS NWI; replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H6",
+        "H6 wetlands unjoined: pending USGS NWI mapper wiring (Phase 5+)",
+    )
+
+
+def _h7_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H7 road access is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['min_road_classification'] (default 'county_collector') and test ST_Touches/ST_Intersects against a county road classification + DOT layer; replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H7",
+        "H7 road access unjoined: pending county road classification + DOT layer wiring (Phase 5+)",
+    )
+
+
+def _h8_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H8 utility availability is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['max_utility_extension_ft'] (default 1500) and compute ST_Distance to the nearest water/sewer main from utility provider service maps; replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H8",
+        "H8 utility availability unjoined: pending utility provider service map + extension-distance wiring (Phase 5+)",
+    )
+
+
+def _h9_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H9 topography is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['max_grade_differential_ft'] (default 15) and compute zonal max-min on USGS 3DEP elevation rasters; Phase 5+ should share the grade-differential computation with scored parameter S3. Replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H9",
+        "H9 topography unjoined: pending USGS 3DEP elevation wiring (Phase 5+)",
+    )
+
+
+def _h10_filter(
+    parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
+) -> _FilterResult:
+    """H10 ownership availability is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will join county deed records / Clerk of Court for active conservation easements and county assessor for government-owner-without-disposition tests; do NOT short-circuit on parcels.owner_type_inferred='government' here (R-110). Replace body in Phase 5+, preserve signature."""
+    return _FilterResult(
+        "flag", "H10",
+        "H10 ownership availability unjoined: pending deed records + conservation easement registry wiring (Phase 5+)",
+    )
+
+
+# Pipeline order: H1 → H2 → (insert) → H3..H10 (flag-only stubs).
+# Reject filters MUST come first; PASS-WITH-FLAG stubs follow (R-102, R-24).
+# Phase 4 added H5..H10 as PASS-WITH-FLAG stubs; appended at the end so the
+# H1/H2 short-circuit semantics in _process_parcel are preserved. When Phase 5+
+# replaces a stub with a reject-capable real filter, ordering must be revisited.
+_HARD_FILTERS: list[Any] = [
+    _h1_filter, _h2_filter,
+    _h3_flag, _h4_flag,
+    _h5_filter, _h6_filter, _h7_filter, _h8_filter, _h9_filter, _h10_filter,
+]
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +642,58 @@ _SQL_INSERT_FLAG = (
 
 _SQL_COUNT_LOG_FOR_CYCLE = (
     "SELECT COUNT(*) FROM research_log WHERE cycle_id = %s"
+)
+
+_SQL_INSERT_PARCEL_SCORE = (
+    "INSERT INTO parcel_scores ("
+    "parcel_id, composite_score, confidence_score, "
+    "actionability, sub_scores, notes"
+    ") VALUES (%s, %s, %s, %s, %s::jsonb, %s) "
+    "RETURNING score_id"
+)
+
+_SQL_INSERT_RESEARCH_LOG_SCORING = (
+    "INSERT INTO research_log "
+    "(cycle_id, action_type, market, parcel_id, "
+    "composite_score, actionability, notes) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+)
+
+_SQL_FETCH_PARCEL = (
+    "SELECT parcel_id, market, "
+    "ST_X(centroid)::float AS centroid_lng, "
+    "ST_Y(centroid)::float AS centroid_lat "
+    "FROM parcels WHERE parcel_id = %s"
+)
+
+# S2 PostGIS query — returns area, bbox area, and aspect ratio in one shot.
+# NULLIF guards the divide-by-zero in degenerate (zero-extent) bbox cases.
+_SQL_S2_GEOMETRY = (
+    "WITH g AS ("
+    "  SELECT geometry AS geom, ST_Envelope(geometry) AS bbox "
+    "  FROM parcels WHERE parcel_id = %s"
+    ") "
+    "SELECT "
+    "  ST_Area(geom::geography) AS area_m2, "
+    "  ST_Area(bbox::geography) AS bbox_area_m2, "
+    "  GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox)) "
+    "  / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox), "
+    "                 ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio "
+    "FROM g WHERE geom IS NOT NULL"
+)
+
+_SQL_LIST_UNSCORED_PARCELS = (
+    "SELECT parcel_id FROM parcels p "
+    "WHERE market = %s "
+    "AND NOT EXISTS ("
+    "  SELECT 1 FROM parcel_scores ps WHERE ps.parcel_id = p.parcel_id"
+    ") "
+    "ORDER BY parcel_id"
+)
+
+_SQL_COUNT_LOG_FOR_SCORING_CYCLE = (
+    "SELECT COUNT(*) FROM research_log "
+    "WHERE cycle_id = %s AND action_type = 'scoring'"
 )
 
 _SQL_UPSERT_PARCEL = (
@@ -1262,13 +1385,416 @@ def _harness_gate(county: str) -> tuple[str, dict[str, Any] | None]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 5+ / Phase 7: scoring (S1..S12). S4/S5/S6 in Phase 7.
+# Phase 5: scoring engine MVP — Option B (S2 real, S9 stub-moderate, S10 OZ
+# real, all other sub-scores null with flagged_items data_gap rows).
+#
+# See reviews/07_phase5_scoring_mvp/01_risk_review.md for the 24 R-2XX risks
+# and reviews/07_phase5_scoring_mvp/02_code_writer_response.md for the
+# per-risk responses.
 # ---------------------------------------------------------------------------
-def score_parcel(parcel_id: str) -> dict[str, Any]:
-    """Compute sub-scores S1..S12 for a parcel. Phase 5+ (S4/S5/S6 in Phase 7)."""
-    raise NotImplementedError(
-        "Scoring is not implemented at Phase 3; see BUILD_PHASES.md Phase 5/7"
-    )
+_OZ_DATA_PATH = _REPO_ROOT / "data" / "oz_ga_stub.geojson"
+
+# Canonical sub-score order. Names match the keys in
+# parameters.json["scoring_weights"] so the composite computation can
+# zip them together without a separate mapping table.
+_SUB_SCORE_NAMES: tuple[str, ...] = (
+    "S1_interstate_proximity",
+    "S2_parcel_geometry",
+    "S3_topography",
+    "S4_submarket_vacancy",
+    "S5_submarket_absorption",
+    "S6_competing_pipeline",
+    "S7_labor_pool",
+    "S8_land_basis",
+    "S9_entitlement_complexity",
+    "S10_incentives",
+    "S11_rail_adjacency",
+    "S12_demand_generators",
+)
+
+# Pretty names + data-source provenance (mirrors program.md L184-L197).
+# Used in flagged_items rows for null sub-scores.
+_SUB_SCORE_PROVENANCE: dict[str, tuple[str, str]] = {
+    "S1_interstate_proximity": ("interstate proximity", "Google Maps API / GIS"),
+    "S2_parcel_geometry": ("parcel geometry", "PostGIS (parcels.geometry)"),
+    "S3_topography": ("topography / grading cost", "USGS 3DEP LiDAR"),
+    "S4_submarket_vacancy": ("submarket vacancy", "CoStar"),
+    "S5_submarket_absorption": ("submarket net absorption (T12)", "CoStar"),
+    "S6_competing_pipeline": ("competing pipeline", "CoStar / Dodge Data"),
+    "S7_labor_pool": ("labor pool density", "Census LODES / OnTheMap"),
+    "S8_land_basis": ("land basis ($/acre)", "CoStar Land / assessor comps"),
+    "S9_entitlement_complexity": ("entitlement complexity", "zoning ordinance / municipality"),
+    "S10_incentives": ("incentive availability", "HUD OZ map / state EDA / municipality"),
+    "S11_rail_adjacency": ("rail adjacency", "Class I railroad maps"),
+    "S12_demand_generators": ("proximity to demand generators", "GIS / facility locations"),
+}
+
+# Phase 5 fixed value for S9 — see risk review §2.C and R-218.
+_S9_MODERATE_DEFAULT: int = 5
+
+# Phase 5 OZ-only S10 score: 1 of 3 incentive criteria → 4 per program.md L196.
+_S10_OZ_ONLY_SCORE: int = 4
+
+# Cycle id format for scoring cycles (parallel to the discovery format).
+_SCORING_CYCLE_ID_RE = re.compile(
+    r"^score-[a-z\-]+-\d{8}T\d{6}Z-[0-9a-f]{4}$"
+)
+
+
+def _make_scoring_cycle_id(market: str) -> str:
+    """Generate a unique sortable scoring cycle id (R-213)."""
+    now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    suffix = secrets.token_hex(2)
+    return f"score-{market.lower()}-{now}-{suffix}"
+
+
+# ---------------------------------------------------------------------------
+# Pure-Python point-in-polygon (R-206) — PNPOLY ray-casting, ~30 lines.
+# Avoids the shapely / GEOS native dep for one geometric check.
+# ---------------------------------------------------------------------------
+def _point_in_ring(lng: float, lat: float, ring: Sequence[Sequence[float]]) -> bool:
+    """PNPOLY ray-casting against a single closed ring of (lng, lat) pairs."""
+    inside = False
+    n = len(ring)
+    if n < 3:
+        return False
+    j = n - 1
+    for i in range(n):
+        xi, yi = ring[i][0], ring[i][1]
+        xj, yj = ring[j][0], ring[j][1]
+        intersects = ((yi > lat) != (yj > lat)) and (
+            lng < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-30) + xi
+        )
+        if intersects:
+            inside = not inside
+        j = i
+    return inside
+
+
+def _ring_bbox(ring: Sequence[Sequence[float]]) -> tuple[float, float, float, float]:
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+# ---------------------------------------------------------------------------
+# OZ tract loader — lazy at first call so module import stays cheap (R-205).
+# ---------------------------------------------------------------------------
+_OZ_TRACTS_CACHE: list[tuple[tuple[float, float, float, float], list[Sequence[Sequence[float]]], dict[str, Any]]] | None = None
+
+
+def _load_oz_tracts() -> list[tuple[tuple[float, float, float, float], list[Sequence[Sequence[float]]], dict[str, Any]]]:
+    """Load and cache the bundled OZ tract polygons.
+
+    Returns a list of (bbox, [ring, ...], properties) tuples — one per
+    Polygon Feature in the bundled GeoJSON. The bbox is precomputed for
+    the spatial pre-filter (R-219).
+    """
+    global _OZ_TRACTS_CACHE
+    if _OZ_TRACTS_CACHE is not None:
+        return _OZ_TRACTS_CACHE
+    if not _OZ_DATA_PATH.is_file():
+        log.warning("OZ data file missing at %s; S10 will return None", _OZ_DATA_PATH)
+        _OZ_TRACTS_CACHE = []
+        return _OZ_TRACTS_CACHE
+    with _OZ_DATA_PATH.open("r", encoding="utf-8") as fh:
+        fc = json.load(fh)
+    tracts: list[tuple[tuple[float, float, float, float], list[Sequence[Sequence[float]]], dict[str, Any]]] = []
+    for feat in fc.get("features") or []:
+        geom = feat.get("geometry") or {}
+        if geom.get("type") != "Polygon":
+            continue
+        rings = geom.get("coordinates") or []
+        if not rings:
+            continue
+        outer = rings[0]
+        bbox = _ring_bbox(outer)
+        tracts.append((bbox, [outer], feat.get("properties") or {}))
+    _OZ_TRACTS_CACHE = tracts
+    return tracts
+
+
+def _check_oz(centroid_lng: float | None, centroid_lat: float | None) -> bool:
+    """True iff (lng, lat) falls inside any bundled OZ tract polygon (R-205, R-219)."""
+    if centroid_lng is None or centroid_lat is None:
+        return False
+    for bbox, rings, _props in _load_oz_tracts():
+        xmin, ymin, xmax, ymax = bbox
+        # Closed-interval bbox pre-filter (R-219).
+        if not (xmin <= centroid_lng <= xmax and ymin <= centroid_lat <= ymax):
+            continue
+        if _point_in_ring(centroid_lng, centroid_lat, rings[0]):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Sub-score computations
+# ---------------------------------------------------------------------------
+def _score_geometry(
+    area_m2: float | None,
+    bbox_area_m2: float | None,
+    aspect_ratio: float | None,
+) -> int | None:
+    """Pure-function S2 score mapping (R-207).
+
+    Mapping per program.md L187:
+        compactness >= 0.92 AND aspect in [1, 2]   -> 10
+        compactness >= 0.85 AND aspect <= 3.0      -> 7
+        compactness >= 0.65                         -> 4
+        else                                        -> 0
+    """
+    if not area_m2 or not bbox_area_m2:
+        return None
+    compactness = float(area_m2) / float(bbox_area_m2)
+    aspect = float(aspect_ratio) if aspect_ratio else 99.0
+    if compactness >= 0.92 and 1.0 <= aspect <= 2.0:
+        return 10
+    if compactness >= 0.85 and aspect <= 3.0:
+        return 7
+    if compactness >= 0.65:
+        return 4
+    return 0
+
+
+def _compute_s2(conn: Any, parcel_id: str) -> int | None:
+    """S2 — parcel geometry. Returns 0..10 or None if geometry unavailable."""
+    with conn.cursor() as cur:
+        cur.execute(_SQL_S2_GEOMETRY, (parcel_id,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    area_m2, bbox_area_m2, aspect_ratio = row[0], row[1], row[2]
+    return _score_geometry(area_m2, bbox_area_m2, aspect_ratio)
+
+
+def _compute_s9() -> int:
+    """S9 — entitlement complexity. Phase 5 stub returns moderate default."""
+    return _S9_MODERATE_DEFAULT
+
+
+def _compute_s10(centroid_lng: float | None, centroid_lat: float | None) -> int | None:
+    """S10 — incentives (OZ portion only). Returns 4 if in OZ, 0 if not, None if unknown."""
+    if centroid_lng is None or centroid_lat is None:
+        return None
+    return _S10_OZ_ONLY_SCORE if _check_oz(centroid_lng, centroid_lat) else 0
+
+
+# ---------------------------------------------------------------------------
+# Composite + confidence
+# ---------------------------------------------------------------------------
+def _compute_composite(
+    sub_scores: Mapping[str, int | None],
+    weights: Mapping[str, int],
+) -> float | None:
+    """Weighted composite per program.md L201-L203.
+
+    Sums only non-null sub-scores; returns None when total weight is zero
+    (R-203). Result is on the 0-100 scale.
+    """
+    weighted_sum = 0.0
+    weight_sum = 0
+    for name in _SUB_SCORE_NAMES:
+        score = sub_scores.get(name)
+        if score is None:
+            continue
+        w = int(weights.get(name, 0))
+        if w <= 0:
+            continue
+        weighted_sum += float(score) * w
+        weight_sum += w
+    if weight_sum == 0:
+        return None
+    return round((weighted_sum / weight_sum) * 10.0, 2)
+
+
+def _compute_confidence(sub_scores: Mapping[str, int | None]) -> float:
+    """Fraction of sub-scores populated, bounded in [0, 1] (R-208)."""
+    populated = sum(1 for n in _SUB_SCORE_NAMES if sub_scores.get(n) is not None)
+    return min(1.0, max(0.0, populated / len(_SUB_SCORE_NAMES)))
+
+
+# ---------------------------------------------------------------------------
+# Per-parcel scoring orchestrator (R-201, R-204, R-211)
+# ---------------------------------------------------------------------------
+def _fetch_parcel_for_scoring(conn: Any, parcel_id: str) -> dict[str, Any] | None:
+    with conn.cursor() as cur:
+        cur.execute(_SQL_FETCH_PARCEL, (parcel_id,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "parcel_id": row[0],
+        "market": row[1],
+        "centroid_lng": row[2],
+        "centroid_lat": row[3],
+    }
+
+
+def score_parcel(
+    parcel_id: str,
+    *,
+    conn: Any = None,
+    cycle_id: str | None = None,
+    params: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Compute sub-scores S1..S12 for one parcel and persist.
+
+    Phase 5 — Option B per BUILD_PHASES.md L84-L91. S2 and S10 are real,
+    S9 is a moderate stub, all others are null with data_gap flag rows.
+    Returns a status dict {parcel_id, composite_score, confidence_score,
+    sub_scores, status}. ``actionability`` is set to 'PENDING' (Phase 8).
+    """
+    own_conn = False
+    if conn is None:
+        # Production path opens its own connection.
+        own_conn = True
+        ctx = prepare.get_connection()
+        conn = ctx.__enter__()
+    if params is None:
+        prepare.verify_parameters_unchanged()
+        params = prepare.get_parameters()
+    if cycle_id is None:
+        cycle_id = _make_scoring_cycle_id("adhoc")
+
+    weights = params["scoring_weights"]
+
+    try:
+        parcel = _fetch_parcel_for_scoring(conn, parcel_id)
+        if parcel is None:
+            return {
+                "parcel_id": parcel_id,
+                "status": "missing",
+                "composite_score": None,
+                "confidence_score": None,
+                "sub_scores": {},
+            }
+
+        sub_scores: dict[str, int | None] = {n: None for n in _SUB_SCORE_NAMES}
+        sub_scores["S2_parcel_geometry"] = _compute_s2(conn, parcel_id)
+        sub_scores["S9_entitlement_complexity"] = _compute_s9()
+        sub_scores["S10_incentives"] = _compute_s10(
+            parcel.get("centroid_lng"), parcel.get("centroid_lat"),
+        )
+
+        composite = _compute_composite(sub_scores, weights)
+        confidence = _compute_confidence(sub_scores)
+
+        notes = (
+            f"phase5 mvp: S2={sub_scores['S2_parcel_geometry']} "
+            f"S9={sub_scores['S9_entitlement_complexity']} "
+            f"S10={sub_scores['S10_incentives']}"
+        )
+
+        try:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        _SQL_INSERT_PARCEL_SCORE,
+                        (
+                            parcel_id,
+                            composite,
+                            confidence,
+                            "PENDING",
+                            json.dumps(sub_scores),
+                            notes,
+                        ),
+                    )
+                with conn.cursor() as cur:
+                    cur.execute(
+                        _SQL_INSERT_RESEARCH_LOG_SCORING,
+                        (
+                            cycle_id, "scoring", parcel.get("market"), parcel_id,
+                            composite, "PENDING", notes,
+                        ),
+                    )
+                # One data_gap flag per null sub-score (R-220).
+                for name in _SUB_SCORE_NAMES:
+                    if sub_scores.get(name) is not None:
+                        continue
+                    pretty, source = _SUB_SCORE_PROVENANCE[name]
+                    _flag(
+                        conn, cycle_id, parcel_id, parcel.get("market") or "",
+                        "data_gap",
+                        f"{name} ({pretty}) unjoined: pending Phase 5+ data wiring ({source})",
+                        f"Phase 5+: wire {source} for parcel_id={parcel_id}",
+                    )
+        except Exception:
+            log.exception("scoring transaction failed for parcel %s", parcel_id)
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            return {
+                "parcel_id": parcel_id,
+                "status": "error",
+                "composite_score": None,
+                "confidence_score": None,
+                "sub_scores": sub_scores,
+            }
+
+        return {
+            "parcel_id": parcel_id,
+            "status": "scored",
+            "composite_score": composite,
+            "confidence_score": confidence,
+            "sub_scores": sub_scores,
+        }
+    finally:
+        if own_conn:
+            try:
+                ctx.__exit__(None, None, None)
+            except Exception:
+                log.exception("scoring connection close failed")
+
+
+# ---------------------------------------------------------------------------
+# Scoring cycle driver (R-213)
+# ---------------------------------------------------------------------------
+def run_scoring_cycle(market: str) -> dict[str, Any]:
+    """Score every unscored parcel in the given market.
+
+    Phase 5 — selects parcels with no parcel_scores row at all (no
+    re-scoring in MVP). Returns a summary dict with per-status counts.
+    """
+    if market not in _MARKET_TO_COUNTIES:
+        raise NotImplementedError(
+            f"market={market!r} not configured for Phase 5; only 'atlanta' is supported"
+        )
+
+    prepare.verify_parameters_unchanged()
+    params = prepare.get_parameters()
+    cycle_id = _make_scoring_cycle_id(market)
+
+    summary: dict[str, Any] = {
+        "cycle_id": cycle_id,
+        "market": market,
+        "aborted": False,
+        "abort_reason": None,
+        "counts": {"scored": 0, "missing": 0, "error": 0},
+        "parcels": [],
+    }
+
+    with prepare.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_COUNT_LOG_FOR_SCORING_CYCLE, (cycle_id,))
+            row = cur.fetchone()
+        if row and int(row[0]) > 0:
+            summary["aborted"] = True
+            summary["abort_reason"] = "cycle_id_collision"
+            return summary
+
+        with conn.cursor() as cur:
+            cur.execute(_SQL_LIST_UNSCORED_PARCELS, (market,))
+            parcel_ids = [r[0] for r in cur.fetchall()]
+
+        for pid in parcel_ids:
+            result = score_parcel(pid, conn=conn, cycle_id=cycle_id, params=params)
+            status = result.get("status", "error")
+            summary["counts"][status] = summary["counts"].get(status, 0) + 1
+            summary["parcels"].append(result)
+
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -1322,7 +1848,7 @@ def _print_phase1_status() -> None:
     """Print enough state to prove the immutable layer is wired correctly."""
     params = prepare.get_parameters()
     threshold = params["composite_threshold"]
-    print("research.py — Phase 3 scaffold; experiment loop not yet implemented.")
+    print("research.py — Phase 5 scoring MVP; experiment loop not yet implemented.")
     print(f"composite_threshold (from parameters.json, frozen): {threshold}")
 
 
