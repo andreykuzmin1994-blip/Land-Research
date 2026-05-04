@@ -3694,3 +3694,871 @@ class TestPhase78SqlConstantsStaticChecks(unittest.TestCase):
         self.assertTrue(hasattr(prepare, "calculate_confidence_weighted_pipeline"))
         # parameters.json hash sentinel still active.
         self.assertTrue(hasattr(prepare, "verify_parameters_unchanged"))
+
+
+# ===========================================================================
+# Phase 9 — snapshot + memo tests
+# ===========================================================================
+# Per reviews/11_phase9_snapshots_memos/01_risk_review.md (R-601..R-647).
+
+import os as _os  # for getpid in atomic-write tests
+import prepare as _prepare  # for the real parameters dict in end-to-end tests
+
+
+def _phase9_params() -> dict[str, Any]:
+    """Real parameters from parameters.json — Phase 9 reads but never
+    writes. Tests can mutate the returned dict freely; it's a copy."""
+    return dict(_prepare.get_parameters())
+
+
+def _phase9_parcel_row(**overrides: Any) -> tuple:
+    """29-field tuple matching _SQL_FETCH_PARCEL_FOR_SNAPSHOT."""
+    base = {
+        "parcel_id": "fulton-14-0123-LL-045-8",
+        "county": "fulton", "state": "GA", "market": "atlanta",
+        "submarket": "south_fulton",
+        "address": "0 Campbellton Fairburn Rd, Union City, GA 30349",
+        "owner_name": "SMITH FAMILY TRUST",
+        "owner_mailing_address": "PO Box 445, Sarasota, FL 34230",
+        "owner_type_inferred": "trust",
+        "acreage": 14.7, "land_sf": 640332.0,
+        "zoning": "AG-1", "zoning_description": "Agricultural",
+        "land_use_code": "100",
+        "land_use_description": "Vacant agricultural",
+        "assessed_value_land": 185000,
+        "assessed_value_improvement": 0,
+        "assessed_value_total": 185000,
+        "fair_market_value": 462500, "tax_year": 2025,
+        "tax_amount": 2370.0, "tax_status": "current",
+        "last_sale_date": "2010-06-12", "last_sale_price": 95000,
+        "year_built": None,
+        "discovery_source": "fulton_arcgis",
+        "discovery_date": "2026-04-30",
+        "centroid_lng": -84.5612, "centroid_lat": 33.5521,
+    }
+    base.update(overrides)
+    return (
+        base["parcel_id"], base["county"], base["state"], base["market"],
+        base["submarket"], base["address"], base["owner_name"],
+        base["owner_mailing_address"], base["owner_type_inferred"],
+        base["acreage"], base["land_sf"], base["zoning"],
+        base["zoning_description"], base["land_use_code"],
+        base["land_use_description"], base["assessed_value_land"],
+        base["assessed_value_improvement"], base["assessed_value_total"],
+        base["fair_market_value"], base["tax_year"], base["tax_amount"],
+        base["tax_status"], base["last_sale_date"], base["last_sale_price"],
+        base["year_built"], base["discovery_source"], base["discovery_date"],
+        base["centroid_lng"], base["centroid_lat"],
+    )
+
+
+def _phase9_score_row(**overrides: Any) -> tuple:
+    """10-field tuple matching _SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT.
+    JSONB columns are stored as JSON strings to mirror the score_parcel
+    persistence path (json.dumps inside score_parcel)."""
+    base = {
+        "composite_score": 75.0, "confidence_score": 0.50,
+        "actionability": "PASS",
+        "actionability_blockers": json.dumps({}),
+        "sub_scores": json.dumps({
+            "S2_parcel_geometry": 7,
+            "S4_submarket_vacancy": 8,
+            "S5_submarket_absorption": 8,
+            "S6_competing_pipeline": 7,
+            "S8_land_basis": 8,
+            "S9_entitlement_complexity": 5,
+            "S10_incentives": 4,
+        }),
+        "strategy_fit": json.dumps({
+            "bts": "MODERATE", "spec": "MODERATE",
+            "land_bank": "STRONG", "ground_lease": "WEAK",
+            "flip": "WEAK",
+        }),
+        "primary_strategy": "land_bank",
+        "investment_thesis": None, "notes": "phase78: composite=75",
+        "scored_at": "2026-05-04T10:00:00Z",
+    }
+    base.update(overrides)
+    return (
+        base["composite_score"], base["confidence_score"],
+        base["actionability"], base["actionability_blockers"],
+        base["sub_scores"], base["strategy_fit"],
+        base["primary_strategy"], base["investment_thesis"],
+        base["notes"], base["scored_at"],
+    )
+
+
+def _phase9_mc_row(**overrides: Any) -> tuple:
+    """7-field tuple matching _SQL_LATEST_MARKET_CONTEXT."""
+    base = {
+        "vacancy_rate_pct": 4.2, "net_absorption_t12_sf": 1_800_000,
+        "under_construction_sf": 400_000, "proposed_sf": 600_000,
+        "asking_rent_nnn_psf": 7.50,
+        "as_of_date": "2026-04-15", "source": "costar",
+    }
+    base.update(overrides)
+    return (
+        base["vacancy_rate_pct"], base["net_absorption_t12_sf"],
+        base["under_construction_sf"], base["proposed_sf"],
+        base["asking_rent_nnn_psf"], base["as_of_date"], base["source"],
+    )
+
+
+def _phase9_memo_row(**overrides: Any) -> tuple:
+    """15-field tuple matching _SQL_FETCH_SCORED_PARCELS_FOR_MEMO."""
+    base = {
+        "parcel_id": "fulton-1", "address": "100 Test Rd",
+        "county": "fulton", "submarket": "south_fulton",
+        "acreage": 12.0, "owner_name": "OWNER", "owner_type_inferred": "trust",
+        "composite_score": 78.0, "confidence_score": 0.55,
+        "actionability": "PASS",
+        "actionability_blockers": json.dumps({}),
+        "sub_scores": json.dumps({"S2_parcel_geometry": 7}),
+        "strategy_fit": json.dumps({"land_bank": "STRONG"}),
+        "primary_strategy": "land_bank",
+        "scored_at": "2026-05-04T10:00:00Z",
+    }
+    base.update(overrides)
+    return (
+        base["parcel_id"], base["address"], base["county"],
+        base["submarket"], base["acreage"], base["owner_name"],
+        base["owner_type_inferred"], base["composite_score"],
+        base["confidence_score"], base["actionability"],
+        base["actionability_blockers"], base["sub_scores"],
+        base["strategy_fit"], base["primary_strategy"], base["scored_at"],
+    )
+
+
+class TestPhase9SafeFilenameSlug(unittest.TestCase):
+    """R-615 — _safe_filename_slug rejects path-traversal-prone input."""
+
+    def test_accepts_typical_parcel_id(self) -> None:
+        self.assertEqual(
+            research._safe_filename_slug("fulton-14-0123-LL-045-8"),
+            "fulton-14-0123-ll-045-8",
+        )
+
+    def test_accepts_market_label(self) -> None:
+        self.assertEqual(research._safe_filename_slug("atlanta"), "atlanta")
+        self.assertEqual(
+            research._safe_filename_slug("dallas-fort-worth"),
+            "dallas-fort-worth",
+        )
+
+    def test_lowercases(self) -> None:
+        self.assertEqual(research._safe_filename_slug("FOO_BAR"), "foo_bar")
+
+    def test_rejects_empty(self) -> None:
+        with self.assertRaises(ValueError):
+            research._safe_filename_slug("")
+
+    def test_rejects_none(self) -> None:
+        with self.assertRaises(ValueError):
+            research._safe_filename_slug(None)  # type: ignore[arg-type]
+
+    def test_rejects_path_traversal(self) -> None:
+        for bad in ("..", "../etc", "/abs", "fulton/14", "a\\b"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    research._safe_filename_slug(bad)
+
+    def test_rejects_whitespace(self) -> None:
+        with self.assertRaises(ValueError):
+            research._safe_filename_slug("foo bar")
+        with self.assertRaises(ValueError):
+            research._safe_filename_slug("foo\tbar")
+
+    def test_rejects_nul(self) -> None:
+        with self.assertRaises(ValueError):
+            research._safe_filename_slug("foo\0bar")
+
+
+class TestPhase9MarkdownEscaping(unittest.TestCase):
+    """R-622 — _md_table_cell escapes pipes, newlines, length-caps."""
+
+    def test_pipe_is_escaped(self) -> None:
+        self.assertIn(r"\|", research._md_table_cell("a|b"))
+
+    def test_newline_collapsed_to_space(self) -> None:
+        self.assertEqual(research._md_table_cell("a\nb"), "a b")
+
+    def test_tab_collapsed_to_space(self) -> None:
+        self.assertEqual(research._md_table_cell("a\tb"), "a b")
+
+    def test_length_capped_with_ellipsis(self) -> None:
+        long = "x" * 200
+        out = research._md_table_cell(long)
+        self.assertLessEqual(len(out), research._MD_TABLE_CELL_MAX)
+        self.assertTrue(out.endswith("…"))
+
+    def test_none_returns_default(self) -> None:
+        self.assertEqual(research._md_table_cell(None), "—")
+        self.assertEqual(research._md_table_cell(""), "—")
+
+    def test_md_cell_strips_whitespace(self) -> None:
+        self.assertEqual(research._md_cell("  hello  "), "hello")
+        self.assertEqual(research._md_cell(None), "—")
+
+
+class TestPhase9CoerceJson(unittest.TestCase):
+    """R-609 — JSONB columns may arrive as dict or string."""
+
+    def test_dict_passthrough(self) -> None:
+        self.assertEqual(research._coerce_json_field({"a": 1}), {"a": 1})
+
+    def test_json_string_parsed(self) -> None:
+        self.assertEqual(
+            research._coerce_json_field('{"a": 1}'), {"a": 1},
+        )
+
+    def test_none_returns_empty(self) -> None:
+        self.assertEqual(research._coerce_json_field(None), {})
+
+    def test_empty_string_returns_empty(self) -> None:
+        self.assertEqual(research._coerce_json_field(""), {})
+        self.assertEqual(research._coerce_json_field("   "), {})
+
+    def test_unparseable_returns_empty(self) -> None:
+        self.assertEqual(research._coerce_json_field("not json"), {})
+
+    def test_non_dict_json_returns_empty(self) -> None:
+        self.assertEqual(research._coerce_json_field('"a string"'), {})
+        self.assertEqual(research._coerce_json_field("[1, 2, 3]"), {})
+
+    def test_bytes_decoded(self) -> None:
+        self.assertEqual(research._coerce_json_field(b'{"a": 1}'), {"a": 1})
+
+
+class TestPhase9Formatters(unittest.TestCase):
+    """R-610 — currency / acres / pct / int formatters."""
+
+    def test_currency_int(self) -> None:
+        self.assertEqual(research._format_currency(1234567), "$1,234,567")
+
+    def test_currency_none(self) -> None:
+        self.assertEqual(research._format_currency(None), "—")
+
+    def test_currency_psf(self) -> None:
+        self.assertEqual(research._format_currency_psf(7.5), "$7.50/SF")
+        self.assertEqual(research._format_currency_psf(None), "—")
+
+    def test_acres(self) -> None:
+        self.assertEqual(research._format_acres(14.7), "14.70 acres")
+        self.assertEqual(research._format_acres(None), "—")
+
+    def test_pct(self) -> None:
+        self.assertEqual(research._format_pct(4.2), "4.2%")
+        self.assertEqual(research._format_pct(None), "—")
+
+    def test_int_thousands(self) -> None:
+        self.assertEqual(research._format_int_thousands(1800000), "1,800,000")
+        self.assertEqual(research._format_int_thousands(None), "—")
+
+    def test_to_float_handles_decimal_like(self) -> None:
+        # Simulate a Decimal-like via str input that Python's float can parse.
+        self.assertEqual(research._to_float("4.2"), 4.2)
+        self.assertEqual(research._to_float(None), None)
+        self.assertEqual(research._to_float("not a number"), None)
+
+
+class TestPhase9SnapshotRender(unittest.TestCase):
+    """Per-section render assertions against synthetic data."""
+
+    def test_score_breakdown_lists_all_12_sub_scores(self) -> None:
+        params = _phase9_params()
+        sub_scores = {
+            "S2_parcel_geometry": 7, "S4_submarket_vacancy": 8,
+        }
+        md, _ws, composite = research._render_score_breakdown_table(
+            sub_scores, params["scoring_weights"],
+        )
+        for name in research._SUB_SCORE_NAMES:
+            pretty, _src = research._SUB_SCORE_PROVENANCE[name]
+            self.assertIn(pretty, md, f"{pretty} missing from breakdown table")
+        self.assertIn("**Composite**", md)
+        # composite = (7*10 + 8*10) / 100 * 10 = 15.0  — partially populated.
+        self.assertGreater(composite, 0.0)
+
+    def test_strategy_fit_table_lists_5_strategies(self) -> None:
+        sf = {
+            "bts": "MODERATE", "spec": "WEAK", "land_bank": "STRONG",
+            "ground_lease": "N/A", "flip": "WEAK",
+        }
+        md = research._render_strategy_fit_table(sf)
+        for label in research._STRATEGY_LABELS.values():
+            self.assertIn(label, md)
+        self.assertIn("STRONG", md)
+        self.assertIn("MODERATE", md)
+        self.assertIn("N/A", md)
+
+    def test_actionability_table_pass_marks_all_pass(self) -> None:
+        md = research._render_actionability_table("PASS", {})
+        self.assertEqual(md.count("| PASS |"), 4)
+        self.assertNotIn("| FAIL |", md)
+        self.assertIn("Overall actionability**: PASS", md)
+
+    def test_actionability_table_fail_strategy_short_circuits(self) -> None:
+        md = research._render_actionability_table(
+            "FAIL:strategy",
+            {"strategy": "no strategy rated STRONG or MODERATE"},
+        )
+        # control + entitlement = PASS, strategy = FAIL, deal_killer = PENDING
+        self.assertEqual(md.count("| PASS |"), 2)
+        self.assertEqual(md.count("| FAIL |"), 1)
+        self.assertEqual(md.count("| PENDING |"), 1)
+        self.assertIn("no strategy rated STRONG", md)
+
+    def test_actionability_table_pending_when_unscored(self) -> None:
+        md = research._render_actionability_table(None, {})
+        self.assertEqual(md.count("| PENDING |"), 4)
+        self.assertIn("Overall actionability**: PENDING", md)
+
+    def test_recommendation_pursue(self) -> None:
+        rec, reason = research._compute_recommendation(
+            83.0, "PASS", 70.0, "land_bank", {},
+        )
+        self.assertEqual(rec, "PURSUE")
+        self.assertIn("Land Bank", reason)
+
+    def test_recommendation_monitor(self) -> None:
+        rec, reason = research._compute_recommendation(
+            75.0, "FAIL:entitlement", 70.0, None,
+            {"entitlement": "no rezoning precedent"},
+        )
+        self.assertEqual(rec, "MONITOR")
+        self.assertIn("entitlement", reason)
+        self.assertIn("no rezoning precedent", reason)
+
+    def test_recommendation_pass_below_threshold(self) -> None:
+        rec, reason = research._compute_recommendation(
+            55.0, "PASS", 70.0, "land_bank", {},
+        )
+        self.assertEqual(rec, "PASS")
+        self.assertIn("below", reason)
+
+    def test_thesis_omits_clauses_with_null_data(self) -> None:
+        parcel = {
+            "market": None, "submarket": None, "acreage": None,
+            "zoning": None, "assessed_value_total": None,
+            "owner_type_inferred": None,
+        }
+        score = {"actionability": "PENDING", "actionability_blockers": {}}
+        md = research._render_investment_thesis(parcel, score, {}, [])
+        # Should still produce the actionability paragraph but no "good location" etc.
+        for banned in ("strong fundamentals", "good location",
+                       "favorable market", "promising opportunity"):
+            self.assertNotIn(banned, md.lower())
+
+    def test_thesis_cites_specific_data_when_present(self) -> None:
+        parcel = {
+            "market": "atlanta", "submarket": "south_fulton", "acreage": 14.7,
+            "zoning": "AG-1", "assessed_value_total": 185000,
+            "owner_type_inferred": "trust",
+        }
+        score = {"actionability": "PASS", "primary_strategy": "land_bank"}
+        mc = {
+            "vacancy_rate_pct": 4.2, "net_absorption_t12_sf": 1_800_000,
+            "under_construction_sf": 400_000, "as_of_date": "2026-04-15",
+            "source": "costar",
+        }
+        comps = [
+            {"price_per_acre": 25000.0}, {"price_per_acre": 30000.0},
+            {"price_per_acre": 28000.0},
+        ]
+        md = research._render_investment_thesis(parcel, score, mc, comps)
+        self.assertIn("south_fulton", md)
+        self.assertIn("14.70 acres", md)
+        self.assertIn("AG-1", md)
+        self.assertIn("$185,000", md)
+        self.assertIn("4.2%", md)
+        self.assertIn("trust", md)
+        self.assertIn("costar", md)
+
+    def test_thesis_records_pending_actionability(self) -> None:
+        parcel = {"market": "atlanta"}
+        score = {"actionability": "PENDING"}
+        md = research._render_investment_thesis(parcel, score, {}, [])
+        self.assertIn("PENDING", md)
+
+
+class TestPhase9SnapshotEndToEnd(unittest.TestCase):
+    """Full happy-path render against Phase5FakeConnection."""
+
+    def test_snapshot_with_full_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake = Phase5FakeConnection(
+                fetchone_queue=[
+                    _phase9_parcel_row(),
+                    _phase9_score_row(),
+                    _phase9_mc_row(),
+                    ("South Fulton",),  # submarket name
+                ],
+                fetchall_queue=[
+                    [  # comps (5 fields per row matching SELECT)
+                        ("123 Comp Rd", "2026-02-01", 350000, 25000.0, 14.0,
+                         "land", "ACME LLC"),
+                        ("456 Comp Rd", "2026-01-15", 300000, 22000.0, 13.6,
+                         "land", "BUYER 2"),
+                    ],
+                    [  # flags
+                        ("data_gap", "S1 not yet wired", "wire S1", "2026-05-04T10:00:00Z"),
+                    ],
+                ],
+            )
+            params = _phase9_params()
+            target = research.generate_snapshot(
+                "fulton-14-0123-LL-045-8",
+                conn=fake, output_dir=tmp_path, params=params,
+            )
+
+            self.assertTrue(target.exists())
+            self.assertEqual(target.parent, tmp_path)
+            self.assertEqual(target.name, "fulton-14-0123-ll-045-8_snapshot.md")
+
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("Site Snapshot:", content)
+            self.assertIn("Campbellton Fairburn", content)
+            self.assertIn("ACTIONABLE", content)
+            self.assertIn("Investment Thesis", content)
+            self.assertIn("Score Breakdown", content)
+            self.assertIn("Strategy Fit Assessment", content)
+            self.assertIn("Actionability Assessment", content)
+            self.assertIn("**PURSUE**", content)
+            self.assertIn("Land Bank", content)
+            # NULL handling — no "None" rendered in markdown output.
+            self.assertNotIn(" None\n", content)
+            self.assertNotIn(" None ", content)
+
+    def test_snapshot_no_submarket_skips_market_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake = Phase5FakeConnection(
+                fetchone_queue=[
+                    _phase9_parcel_row(submarket=None),
+                    _phase9_score_row(),
+                ],
+                fetchall_queue=[
+                    [],  # flags only (no comps because no submarket)
+                ],
+            )
+            params = _phase9_params()
+            target = research.generate_snapshot(
+                "fulton-14-0123-LL-045-8",
+                conn=fake, output_dir=tmp_path, params=params,
+            )
+            content = target.read_text(encoding="utf-8")
+            # Market context line still rendered with "—" placeholders.
+            self.assertIn("Submarket vacancy", content)
+
+    def test_snapshot_missing_parcel_raises_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake = Phase5FakeConnection(fetchone_queue=[])  # parcel returns None
+            params = _phase9_params()
+            with self.assertRaises(LookupError):
+                research.generate_snapshot(
+                    "fulton-missing",
+                    conn=fake, output_dir=tmp_path, params=params,
+                )
+
+    def test_snapshot_missing_score_raises_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake = Phase5FakeConnection(
+                fetchone_queue=[_phase9_parcel_row()],  # parcel only, no score
+            )
+            params = _phase9_params()
+            with self.assertRaises(LookupError):
+                research.generate_snapshot(
+                    "fulton-14-0123-LL-045-8",
+                    conn=fake, output_dir=tmp_path, params=params,
+                )
+
+    def test_snapshot_idempotent(self) -> None:
+        """R-618: same DB state -> byte-identical output on re-run."""
+        params = _phase9_params()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake1 = Phase5FakeConnection(
+                fetchone_queue=[
+                    _phase9_parcel_row(), _phase9_score_row(),
+                    _phase9_mc_row(), ("South Fulton",),
+                ],
+                fetchall_queue=[[], []],
+            )
+            t1 = research.generate_snapshot(
+                "fulton-14-0123-LL-045-8",
+                conn=fake1, output_dir=tmp_path, params=params,
+            )
+            content1 = t1.read_bytes()
+
+            fake2 = Phase5FakeConnection(
+                fetchone_queue=[
+                    _phase9_parcel_row(), _phase9_score_row(),
+                    _phase9_mc_row(), ("South Fulton",),
+                ],
+                fetchall_queue=[[], []],
+            )
+            t2 = research.generate_snapshot(
+                "fulton-14-0123-LL-045-8",
+                conn=fake2, output_dir=tmp_path, params=params,
+            )
+            content2 = t2.read_bytes()
+            self.assertEqual(t1, t2)
+            self.assertEqual(content1, content2)
+
+    def test_snapshot_path_traversal_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                research.generate_snapshot(
+                    "../etc/passwd",
+                    conn=Phase5FakeConnection(),
+                    output_dir=Path(tmp),
+                    params=_phase9_params(),
+                )
+
+    def test_snapshot_uses_latest_score_row(self) -> None:
+        """R-608: snapshot describes the latest scored_at row, not earlier
+        ones. We assert the SQL contains ORDER BY scored_at DESC LIMIT 1."""
+        self.assertIn(
+            "ORDER BY scored_at DESC LIMIT 1",
+            research._SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT,
+        )
+
+
+class TestPhase9MemoAggregates(unittest.TestCase):
+    """Pipeline-composition aggregation correctness."""
+
+    def test_aggregates_count_actionable(self) -> None:
+        rows = [
+            {"composite_score": 80, "actionability": "PASS",
+             "primary_strategy": "land_bank", "submarket": "south_fulton"},
+            {"composite_score": 75, "actionability": "PASS",
+             "primary_strategy": "spec", "submarket": "south_fulton"},
+            {"composite_score": 73, "actionability": "FAIL:strategy",
+             "primary_strategy": None, "submarket": "west_atlanta"},
+            {"composite_score": 60, "actionability": "PENDING",
+             "primary_strategy": None, "submarket": "south_fulton"},
+        ]
+        agg = research._aggregate_pipeline_composition(rows, threshold=70.0)
+        self.assertEqual(agg["total_scored"], 4)
+        self.assertEqual(agg["above_threshold_count"], 3)
+        self.assertEqual(agg["actionable_count"], 2)
+        self.assertEqual(agg["by_strategy"]["land_bank"], 1)
+        self.assertEqual(agg["by_strategy"]["spec"], 1)
+        self.assertEqual(agg["by_strategy"]["bts"], 0)
+        self.assertEqual(agg["by_submarket"]["south_fulton"], 3)
+        self.assertEqual(agg["by_actionability"]["PASS"], 2)
+
+    def test_top_n_prefers_actionable(self) -> None:
+        rows = [
+            {"actionability": "FAIL:strategy", "composite_score": 95},
+            {"actionability": "PASS", "composite_score": 75},
+            {"actionability": "PASS", "composite_score": 80},
+        ]
+        # rows are already pre-sorted by composite DESC by SQL; the helper
+        # filters to PASS first, then falls back if N exceeds the count.
+        top = research._select_top_n_actionable(rows, n=2)
+        self.assertEqual(len(top), 2)
+        self.assertTrue(all(r["actionability"] == "PASS" for r in top))
+
+    def test_top_n_falls_back_when_few_actionable(self) -> None:
+        rows = [
+            {"actionability": "PASS", "composite_score": 80},
+            {"actionability": "FAIL:strategy", "composite_score": 75},
+            {"actionability": "PENDING", "composite_score": 70},
+        ]
+        top = research._select_top_n_actionable(rows, n=10)
+        self.assertEqual(len(top), 3)
+        self.assertEqual(top[0]["actionability"], "PASS")
+
+    def test_aggregate_empty_market(self) -> None:
+        agg = research._aggregate_pipeline_composition([], threshold=70.0)
+        self.assertEqual(agg["total_scored"], 0)
+        self.assertEqual(agg["actionable_count"], 0)
+        self.assertEqual(agg["avg_composite"], 0.0)
+
+
+class TestPhase9MemoRender(unittest.TestCase):
+    """Memo markdown rendering."""
+
+    def test_memo_with_pipeline(self) -> None:
+        rows = [
+            {"parcel_id": "p-1", "address": "100 Main",
+             "submarket": "south_fulton", "acreage": 12.0,
+             "owner_name": "OWNER A", "composite_score": 80,
+             "actionability": "PASS", "primary_strategy": "land_bank"},
+            {"parcel_id": "p-2", "address": "200 Oak",
+             "submarket": "south_fulton", "acreage": 9.5,
+             "owner_name": "OWNER B", "composite_score": 75,
+             "actionability": "PASS", "primary_strategy": "spec"},
+        ]
+        md = research._render_memo_markdown(
+            "atlanta", "score-atlanta-20260504T100000Z-abcd",
+            rows, [], [], params=_phase9_params(), today="2026-05-04",
+        )
+        self.assertIn("Atlanta Strategy Memo — 2026-05-04", md)
+        self.assertIn("score-atlanta-20260504T100000Z-abcd", md)
+        self.assertIn("Total scored parcels in atlanta: **2**", md)
+        self.assertIn("Actionable", md)
+        self.assertIn("Land Bank: 1", md)
+        self.assertIn("Spec Development: 1", md)
+        self.assertIn("**p-1**", md)
+        self.assertIn("**p-2**", md)
+        self.assertIn("south_fulton: 2", md)
+
+    def test_memo_empty_market_still_renders(self) -> None:
+        """D4 / R-635: a zero-pipeline memo is still informative."""
+        md = research._render_memo_markdown(
+            "atlanta", None, [], [], [],
+            params=_phase9_params(), today="2026-05-04",
+        )
+        self.assertIn("Atlanta Strategy Memo — 2026-05-04", md)
+        self.assertIn("Total scored parcels in atlanta: **0**", md)
+        self.assertIn("(no parcels passed actionability)", md)
+        self.assertIn("(no submarkets observed)", md)
+        self.assertIn("No actionable or qualified parcels", md)
+        self.assertIn("No data-driven parameter adjustments", md)
+
+    def test_memo_high_failure_count_triggers_open_question(self) -> None:
+        rows = [
+            {"composite_score": 75, "actionability": "FAIL:entitlement",
+             "submarket": "x", "primary_strategy": None}
+            for _ in range(6)
+        ]
+        md = research._render_memo_markdown(
+            "atlanta", None, rows, [], [],
+            params=_phase9_params(), today="2026-05-04",
+        )
+        self.assertIn("6 parcels failed the entitlement gate", md)
+
+
+class TestPhase9MemoEndToEnd(unittest.TestCase):
+    """Memo via Phase5FakeConnection + tmp_path."""
+
+    def test_memo_writes_file_and_aggregates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake = Phase5FakeConnection(
+                fetchone_queue=[("score-atlanta-20260504T100000Z-abcd", "2026-05-04T10:00:00Z")],
+                fetchall_queue=[
+                    [_phase9_memo_row(), _phase9_memo_row(parcel_id="fulton-2", composite_score=72.0)],
+                    [],  # flags
+                    [],  # research_log
+                ],
+            )
+            params = _phase9_params()
+            target = research.generate_strategy_memo(
+                "atlanta",
+                conn=fake, output_dir=tmp_path, params=params,
+                today="2026-05-04",
+            )
+            self.assertTrue(target.exists())
+            self.assertEqual(target.name, "atlanta_strategy_memo.md")
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("Atlanta Strategy Memo", content)
+            self.assertIn("Total scored parcels in atlanta: **2**", content)
+            self.assertIn("score-atlanta-20260504T100000Z-abcd", content)
+
+    def test_memo_with_explicit_cycle_id_skips_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # No cycle-row in fetchone queue — caller passed cycle_id explicitly.
+            fake = Phase5FakeConnection(
+                fetchall_queue=[
+                    [_phase9_memo_row()],
+                    [],  # flags
+                    [],  # log
+                ],
+            )
+            params = _phase9_params()
+            target = research.generate_strategy_memo(
+                "atlanta",
+                conn=fake, output_dir=tmp_path, params=params,
+                cycle_id="caller-cycle-123",
+                today="2026-05-04",
+            )
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("caller-cycle-123", content)
+
+    def test_memo_zero_scored_parcels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake = Phase5FakeConnection(
+                fetchone_queue=[None],  # no scoring cycle
+                fetchall_queue=[[], [], []],
+            )
+            params = _phase9_params()
+            target = research.generate_strategy_memo(
+                "atlanta",
+                conn=fake, output_dir=tmp_path, params=params,
+                today="2026-05-04",
+            )
+            content = target.read_text(encoding="utf-8")
+            self.assertIn("Total scored parcels in atlanta: **0**", content)
+
+
+class TestPhase9NoDatabaseWrites(unittest.TestCase):
+    """R-601 / R-646 — Phase 9 makes NO writes to the database."""
+
+    def _assert_only_reads(self, fake: Phase5FakeConnection) -> None:
+        for sql, _params in fake.all_executes:
+            first = sql.lstrip().split(None, 1)[0].upper()
+            self.assertIn(
+                first, {"SELECT", "WITH"},
+                f"Phase 9 must not issue {first} statements; saw: {sql[:80]}",
+            )
+
+    def test_snapshot_is_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Phase5FakeConnection(
+                fetchone_queue=[
+                    _phase9_parcel_row(), _phase9_score_row(),
+                    _phase9_mc_row(), ("South Fulton",),
+                ],
+                fetchall_queue=[[], []],
+            )
+            research.generate_snapshot(
+                "fulton-14-0123-LL-045-8",
+                conn=fake, output_dir=Path(tmp), params=_phase9_params(),
+            )
+            self._assert_only_reads(fake)
+            self.assertEqual(fake.commits, 0)
+            self.assertEqual(fake.transaction_count, 0)
+
+    def test_memo_is_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Phase5FakeConnection(
+                fetchone_queue=[None],
+                fetchall_queue=[[], [], []],
+            )
+            research.generate_strategy_memo(
+                "atlanta",
+                conn=fake, output_dir=Path(tmp), params=_phase9_params(),
+                today="2026-05-04",
+            )
+            self._assert_only_reads(fake)
+            self.assertEqual(fake.commits, 0)
+            self.assertEqual(fake.transaction_count, 0)
+
+
+class TestPhase9NoFabrication(unittest.TestCase):
+    """R-636 — null DB fields render as '—' or 'not yet wired', never made up."""
+
+    def test_all_null_parcel_renders_clean_placeholders(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            null_parcel = _phase9_parcel_row(
+                county=None, state=None, market=None, submarket=None,
+                address=None, owner_name=None, owner_mailing_address=None,
+                owner_type_inferred=None, acreage=None, land_sf=None,
+                zoning=None, zoning_description=None, land_use_code=None,
+                land_use_description=None, assessed_value_total=None,
+                last_sale_date=None, last_sale_price=None,
+                discovery_source=None, discovery_date=None,
+                centroid_lng=None, centroid_lat=None,
+            )
+            fake = Phase5FakeConnection(
+                fetchone_queue=[null_parcel, _phase9_score_row()],
+                fetchall_queue=[[]],  # only flags fetched (no submarket)
+            )
+            target = research.generate_snapshot(
+                "fulton-empty",
+                conn=fake, output_dir=tmp_path, params=_phase9_params(),
+            )
+            content = target.read_text(encoding="utf-8")
+            # Must not render the literal "None" anywhere.
+            self.assertNotIn(" None", content)
+            self.assertNotIn("None,", content)
+            self.assertNotIn("None.", content)
+            # Should use the placeholder dash.
+            self.assertIn("—", content)
+
+
+class TestPhase9SqlConstantsStaticChecks(unittest.TestCase):
+    """R-642 — Phase 9 SQL constants are interpolation-free."""
+
+    PHASE9_CONSTANTS = (
+        "_SQL_FETCH_PARCEL_FOR_SNAPSHOT",
+        "_SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT",
+        "_SQL_FETCH_NEARBY_SALES_COMPS",
+        "_SQL_FETCH_OPEN_FLAGS_FOR_PARCEL",
+        "_SQL_FETCH_SCORED_PARCELS_FOR_MEMO",
+        "_SQL_FETCH_LATEST_SCORING_CYCLE_FOR_MEMO",
+        "_SQL_FETCH_RESEARCH_LOG_FOR_MEMO",
+        "_SQL_FETCH_RECENT_FLAGS_FOR_MARKET",
+    )
+
+    def test_constants_exist(self) -> None:
+        for name in self.PHASE9_CONSTANTS:
+            self.assertTrue(
+                hasattr(research, name),
+                f"missing Phase 9 SQL constant: {name}",
+            )
+
+    def test_no_string_interpolation(self) -> None:
+        for name in self.PHASE9_CONSTANTS:
+            sql = getattr(research, name)
+            self.assertIsInstance(sql, str)
+            self.assertNotIn(
+                "{", sql,
+                f"{name} contains '{{' — possible f-string interpolation",
+            )
+
+    def test_only_select_statements(self) -> None:
+        for name in self.PHASE9_CONSTANTS:
+            sql = getattr(research, name).lstrip()
+            first = sql.split(None, 1)[0].upper()
+            self.assertEqual(
+                first, "SELECT",
+                f"{name} must start with SELECT (Phase 9 is read-only); "
+                f"got: {first}",
+            )
+
+
+class TestPhase9AtomicWrite(unittest.TestCase):
+    """R-617 — atomic write semantics."""
+
+    def test_atomic_write_creates_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "subdir" / "x.md"
+            research._atomic_write_text(target, "hello\n")
+            self.assertTrue(target.exists())
+            self.assertEqual(target.read_text(encoding="utf-8"), "hello\n")
+
+    def test_atomic_write_normalizes_crlf(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "x.md"
+            research._atomic_write_text(target, "line1\r\nline2\r\n")
+            data = target.read_bytes()
+            self.assertNotIn(b"\r\n", data)
+            self.assertIn(b"line1\nline2\n", data)
+
+    def test_atomic_write_overwrites(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "x.md"
+            research._atomic_write_text(target, "v1\n")
+            research._atomic_write_text(target, "v2\n")
+            self.assertEqual(target.read_text(encoding="utf-8"), "v2\n")
+
+    def test_atomic_write_no_tmp_remains(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "x.md"
+            research._atomic_write_text(target, "ok\n")
+            tmp_files = [
+                p for p in Path(tmp).iterdir()
+                if p.name.startswith(".") and ".tmp." in p.name
+            ]
+            self.assertEqual(tmp_files, [])
+
+
+class TestPhase9GitignorePresence(unittest.TestCase):
+    """R-647 — rankings/*.md is gitignored."""
+
+    def test_rankings_md_in_gitignore(self) -> None:
+        gitignore = REPO_ROOT / ".gitignore"
+        content = gitignore.read_text(encoding="utf-8")
+        self.assertIn("rankings/*.md", content)
+        # snapshots/*.md was already there from before; double-check.
+        self.assertIn("snapshots/*.md", content)
