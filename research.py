@@ -1301,9 +1301,12 @@ def _process_parcel(
         return "skip_unmappable"
 
     parcel_id = row["parcel_id"]
-    # Run reject filters (H1, H2) BEFORE any insert or flag (R-24).
-    for filt in _HARD_FILTERS:
-        result = filt(row, conn, params)
+    # Run hard filters once (R-24). Cache the results so the post-UPSERT flag
+    # emission loop reuses them instead of re-running every filter — re-running
+    # would double the DB cost and create a window where a state-dependent
+    # filter could disagree between the two passes.
+    filter_results = [filt(row, conn, params) for filt in _HARD_FILTERS]
+    for result in filter_results:
         if result.action == "reject":
             try:
                 with conn.transaction():
@@ -1318,11 +1321,7 @@ def _process_parcel(
                 except Exception:
                     pass
             return f"rejection_{result.filter_id.lower()}"
-        if result.action == "flag":
-            # Defer flag inserts until after the parcel UPSERT lands so
-            # the foreign-key-equivalent parcel_id reference is meaningful.
-            continue
-        if result.action != "pass":
+        if result.action not in ("pass", "flag"):
             log.warning("unknown filter result action=%r for %s", result.action, parcel_id)
 
     # All reject filters passed. UPSERT parcel + log discovery + emit
@@ -1334,8 +1333,7 @@ def _process_parcel(
                 conn, cycle_id, "discovery", market, parcel_id,
                 f"corridor={corridor_name}; acreage={row['acreage']}; owner_type={row['owner_type_inferred']}",
             )
-            for filt in _HARD_FILTERS:
-                result = filt(row, conn, params)
+            for result in filter_results:
                 if result.action == "flag":
                     _flag(
                         conn, cycle_id, parcel_id, market,
@@ -2205,7 +2203,16 @@ def _compute_strategy_fit(
     sub_scores: Mapping[str, int | None],
     acreage: float | None,
 ) -> dict[str, str]:
-    """Aggregate the five strategy assessments into a JSONB-shaped dict."""
+    """Aggregate the five strategy assessments into a JSONB-shaped dict.
+
+    Shape note for downstream callers: this dict is the persistent shape for
+    the parcel_scores.strategy_fit JSONB column (all five keys, every
+    rating). For results.tsv (program.md L128) the column is a
+    comma-separated list of ONLY strategies rated STRONG or MODERATE — the
+    eventual TSV writer must filter and flatten via something like
+    ``",".join(k for k, v in fit.items() if v in ("STRONG", "MODERATE"))``,
+    NOT serialise the dict directly.
+    """
     return {
         "bts": _assess_strategy_bts(sub_scores, acreage),
         "spec": _assess_strategy_spec(sub_scores, acreage),
@@ -2393,8 +2400,11 @@ def score_parcel(
     primary_strategy}.
     """
     own_conn = False
+    ctx = None
     if conn is None:
-        # Production path opens its own connection.
+        # Production path opens its own connection. Bind ctx before __enter__
+        # so that an exception during __enter__ doesn't leave the finally
+        # block referring to an unbound name.
         own_conn = True
         ctx = prepare.get_connection()
         conn = ctx.__enter__()
@@ -2561,7 +2571,7 @@ def score_parcel(
             "primary_strategy": primary_strategy,
         }
     finally:
-        if own_conn:
+        if own_conn and ctx is not None:
             try:
                 ctx.__exit__(None, None, None)
             except Exception:

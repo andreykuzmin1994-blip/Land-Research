@@ -17,6 +17,7 @@ on:
       - 'parameters.json'
       - 'requirements.txt'
       - 'STORAGE_ARCHITECTURE.md'
+      - 'tests/test_prepare.py'
       - '.github/workflows/validate-phase1.yml'
   pull_request:
     paths:
@@ -24,6 +25,7 @@ on:
       - 'parameters.json'
       - 'requirements.txt'
       - 'STORAGE_ARCHITECTURE.md'
+      - 'tests/test_prepare.py'
       - '.github/workflows/validate-phase1.yml'
 
 jobs:
@@ -56,3 +58,70 @@ jobs:
           grep -q "^postgis_version:" prepare.log
           grep -q "^actionable_pipeline_count:" prepare.log
           grep -q "^confidence_weighted_pipeline:" prepare.log
+
+      - name: Run offline prepare.py unit tests
+        # The metric calculation is the AutoResearch ground truth. Run the
+        # offline tests in CI so a refactor that breaks the SQL surface or
+        # the threshold-binding contract fails before the live-Supabase
+        # smoke test does.
+        run: |
+          python -m unittest tests.test_prepare -v
+
+      - name: Sanity-check metric values and emit to job summary
+        # Catches garbage outputs (negative metric, NaN, absurd magnitude)
+        # and surfaces the metric values in the GitHub UI so a human can
+        # eyeball drift across runs. We do NOT auto-compare against main —
+        # legitimate between-runs prepare.py mutations would produce
+        # false-positive failures, and the metric depends on live DB state
+        # that other CI activity can mutate.
+        run: |
+          python - <<'PY'
+          import os, re, sys
+
+          log = open("prepare.log").read()
+          def grab(key):
+              m = re.search(rf"^{re.escape(key)}:\s*(\S+)\s*$", log, re.MULTILINE)
+              if not m:
+                  print(f"::error ::missing line {key!r} in prepare.log", file=sys.stderr)
+                  sys.exit(1)
+              return m.group(1)
+
+          count = grab("actionable_pipeline_count")
+          confidence = grab("confidence_weighted_pipeline")
+
+          try:
+              count_i = int(count)
+          except ValueError:
+              print(f"::error ::actionable_pipeline_count is not an int: {count!r}", file=sys.stderr)
+              sys.exit(1)
+          try:
+              confidence_f = float(confidence)
+          except ValueError:
+              print(f"::error ::confidence_weighted_pipeline is not a float: {confidence!r}", file=sys.stderr)
+              sys.exit(1)
+
+          # Sanity bounds: counts must be non-negative; confidence must be
+          # non-negative and finite. The upper bound is a sentinel — a
+          # 1M+-parcel actionable pipeline almost certainly indicates a
+          # broken filter, not a real result.
+          import math
+          if count_i < 0 or count_i > 1_000_000:
+              print(f"::error ::actionable_pipeline_count out of sanity range: {count_i}", file=sys.stderr)
+              sys.exit(1)
+          if confidence_f < 0 or not math.isfinite(confidence_f):
+              print(f"::error ::confidence_weighted_pipeline out of sanity range: {confidence_f}", file=sys.stderr)
+              sys.exit(1)
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("## prepare.py metric snapshot\n\n")
+                  fh.write(f"- actionable_pipeline_count: **{count_i}**\n")
+                  fh.write(f"- confidence_weighted_pipeline: **{confidence_f}**\n")
+                  fh.write(
+                      "\nReview against the most recent main run before "
+                      "merging. A non-trivial change here on a PR that does "
+                      "NOT touch parcel data is a red flag — the metric "
+                      "calculation may have drifted.\n"
+                  )
+          PY

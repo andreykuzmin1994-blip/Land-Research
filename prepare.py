@@ -82,6 +82,7 @@ EXIT_DATABASE_URL_MISSING = 2
 EXIT_EXTENSION_PRECONDITION = 3
 EXIT_SCHEMA_APPLY_FAILED = 4
 EXIT_BUDGET_EXCEEDED = 5
+EXIT_RUNTIME_ERROR = 6
 
 
 # ---------------------------------------------------------------------------
@@ -574,7 +575,6 @@ def calculate_actionable_pipeline_count(conn: "psycopg.Connection") -> int:
     threshold = _PARAMETERS["composite_threshold"]
     sql = (
         "SELECT COUNT(*) FROM parcel_scores ps "
-        "JOIN parcels p USING (parcel_id) "
         f"WHERE {_LATEST_SCORE_WHERE}"
     )
     with conn.cursor() as cur:
@@ -592,7 +592,6 @@ def calculate_confidence_weighted_pipeline(conn: "psycopg.Connection") -> float:
     threshold = _PARAMETERS["composite_threshold"]
     sql = (
         "SELECT COALESCE(SUM(ps.confidence_score), 0) FROM parcel_scores ps "
-        "JOIN parcels p USING (parcel_id) "
         f"WHERE {_LATEST_SCORE_WHERE}"
     )
     with conn.cursor() as cur:
@@ -696,7 +695,7 @@ if __name__ == "__main__":
         log.error("runtime error: %s", msg)
         if "schema apply failed" in msg:
             sys.exit(EXIT_SCHEMA_APPLY_FAILED)
-        sys.exit(EXIT_SCHEMA_APPLY_FAILED)
+        sys.exit(EXIT_RUNTIME_ERROR)
     except psycopg.Error as exc:
         log.error("database error: %s", exc)
         sys.exit(EXIT_EXTENSION_PRECONDITION)
