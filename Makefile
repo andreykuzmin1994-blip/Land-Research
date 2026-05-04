@@ -1,0 +1,189 @@
+# Makefile — operator targets for the Land Research autoresearch loop.
+#
+# Wraps the Python public API in research.py (Phase 10) so the human
+# operator does not have to type `python -c "..."` ceremonies. Pure
+# ergonomic sugar — does not modify the Five-File Contract layer
+# (prepare.py, parameters.json, sources.json, program.md), does not
+# replace the agent's role, does not change keep-or-revert semantics.
+#
+# Configuration-only file per appendix_a_county_connectors.md L72-73 —
+# does not require the three-agent workflow.
+#
+# Conventions:
+#   - `## description` after a target produces `make help` output.
+#   - `.DEFAULT_GOAL := help` so bare `make` shows the menu.
+#   - `==>` prefix on operator-visible messages.
+#   - All targets are .PHONY (none produce artifacts at the target name).
+#   - `set -euo pipefail` in any multi-command recipe.
+
+SHELL          := /bin/bash
+.DEFAULT_GOAL  := help
+
+# ---------------------------------------------------------------------
+# Variables (override via `make TARGET VAR=value`)
+# ---------------------------------------------------------------------
+# Today's UTC date, lowercase, matches research._AUTORESEARCH_BRANCH_RE.
+TAG     ?= atl-$(shell date -u +%Y-%m-%d)
+MARKET  ?= atlanta
+# Empty MAX means NEVER STOP. `make loop MAX=2` caps at 2 iterations.
+MAX     ?=
+
+# ---------------------------------------------------------------------
+# Help (default target)
+# ---------------------------------------------------------------------
+.PHONY: help
+help:  ## Show this help (default target).
+	@echo "Land Research — autoresearch operator targets"
+	@echo ""
+	@echo "Usage: make <target> [VAR=value ...]"
+	@echo ""
+	@echo "Variables (override with VAR=value):"
+	@printf "  %-12s %s\n" "TAG"     "autoresearch tag (current default: $(TAG))"
+	@printf "  %-12s %s\n" "MARKET"  "target market (current default: $(MARKET))"
+	@printf "  %-12s %s\n" "MAX"     "loop max_iterations (empty = NEVER STOP)"
+	@echo ""
+	@echo "Targets:"
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z][a-zA-Z0-9_-]*:.*##/ \
+	  { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "Typical first-run sequence:"
+	@echo "  make db-check       # sanity-check Supabase + PostGIS"
+	@echo "  make setup          # cut autoresearch/$(TAG) from main"
+	@echo "  make loop MAX=2     # bootstrap baseline + 2 iterations"
+	@echo "  make status         # verify_setup + last 10 TSV rows"
+	@echo "  make halt           # exit the loop on next iteration boundary"
+
+# ---------------------------------------------------------------------
+# Setup phase (AUTORESEARCH_MECHANICS.md "Setup Sequence")
+# ---------------------------------------------------------------------
+.PHONY: setup
+setup:  ## Cut autoresearch/<TAG> from clean main, push, run verify.
+	@set -euo pipefail; \
+	if [ -n "$$(git status --porcelain)" ]; then \
+	  echo "==> ERROR: working tree is dirty. Commit or stash first."; \
+	  git status --short; \
+	  exit 1; \
+	fi; \
+	echo "==> syncing main from origin"; \
+	git checkout main; \
+	git pull --ff-only origin main; \
+	echo "==> cutting autoresearch/$(TAG) from main"; \
+	if git show-ref --verify --quiet refs/heads/autoresearch/$(TAG); then \
+	  echo "==> ERROR: autoresearch/$(TAG) already exists locally."; \
+	  echo "    Use a different TAG, e.g. make setup TAG=$(TAG)-2"; \
+	  exit 1; \
+	fi; \
+	git checkout -b autoresearch/$(TAG); \
+	echo "==> pushing autoresearch/$(TAG) to origin"; \
+	git push -u origin autoresearch/$(TAG); \
+	echo ""; \
+	echo "==> branch ready. Running verify_setup..."
+	@$(MAKE) --no-print-directory verify
+
+.PHONY: verify
+verify:  ## Run verify_setup(MARKET) and pretty-print the result.
+	@python -c "import json, research; \
+	print(json.dumps(research.verify_setup('$(MARKET)'), indent=2, default=str))"
+
+.PHONY: db-check
+db-check:  ## Run python prepare.py — Supabase + PostGIS sanity ping.
+	@python prepare.py
+
+# ---------------------------------------------------------------------
+# Loop control
+# ---------------------------------------------------------------------
+.PHONY: _assert-autoresearch-branch
+_assert-autoresearch-branch:
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	if ! echo "$$branch" | grep -qE '^autoresearch/[a-z0-9._-]+$$'; then \
+	  echo "==> ERROR: current branch '$$branch' is not autoresearch/<tag>."; \
+	  echo "    Run 'make setup' first, or 'git checkout autoresearch/<tag>'."; \
+	  exit 1; \
+	fi
+
+.PHONY: baseline
+baseline: _assert-autoresearch-branch  ## Run the baseline experiment for MARKET.
+	@echo "==> running baseline experiment for market=$(MARKET)"
+	@python -c "import json, research; \
+	row = research.run_baseline_experiment('$(MARKET)'); \
+	print(json.dumps(row, indent=2, default=str))"
+	@echo ""
+	@echo "==> baseline row appended to experiment_log.tsv:"
+	@$(MAKE) --no-print-directory log
+
+.PHONY: loop
+loop: _assert-autoresearch-branch  ## Run experiment_loop. NEVER STOP unless MAX is set.
+	@if [ -f .halt ]; then \
+	  echo "==> WARNING: .halt sentinel exists — the loop will exit immediately."; \
+	  echo "    Run 'make unhalt' first to clear it."; \
+	  exit 1; \
+	fi
+	@echo "==> starting experiment_loop(market=$(MARKET), max_iterations=$(if $(MAX),$(MAX),None))"
+	@echo "==> halt with: 'make halt' from another shell, or set EXPERIMENT_LOOP_HALT=1"
+	@MAX="$(MAX)" python -c "import os, research; \
+m = os.environ.get('MAX', '').strip(); \
+mi = int(m) if m else None; \
+summary = research.experiment_loop('$(MARKET)', max_iterations=mi, confirmed=True); \
+print(summary)"
+
+.PHONY: halt
+halt:  ## Touch .halt — the running loop exits on next iteration boundary.
+	@if [ -f .halt ]; then \
+	  echo "==> .halt already exists ($(shell ls -l .halt 2>/dev/null | awk '{print $$6, $$7, $$8}'))"; \
+	else \
+	  touch .halt; \
+	  echo "==> .halt sentinel created. The loop will exit on its next iteration boundary."; \
+	fi
+
+.PHONY: unhalt
+unhalt:  ## Remove .halt — required before starting a new loop run.
+	@rm -f .halt
+	@echo "==> .halt sentinel removed."
+
+# ---------------------------------------------------------------------
+# Inspection (read-only)
+# ---------------------------------------------------------------------
+.PHONY: status
+status:  ## Print verify_setup + last 10 rows of experiment_log.tsv.
+	@echo "==> verify_setup(market=$(MARKET))"
+	@python -c "import json, research; \
+	print(json.dumps(research.verify_setup('$(MARKET)'), indent=2, default=str))"
+	@echo ""
+	@if [ -f experiment_log.tsv ]; then \
+	  echo "==> last 10 rows of experiment_log.tsv:"; \
+	  (head -1 experiment_log.tsv; tail -10 experiment_log.tsv | grep -v '^commit\b' || true) \
+	    | column -t -s "$$(printf '\t')"; \
+	else \
+	  echo "==> experiment_log.tsv does not exist yet (run 'make baseline' or 'make loop')"; \
+	fi
+	@if [ -f .halt ]; then echo ""; echo "==> NOTE: .halt sentinel is set"; fi
+
+.PHONY: log
+log:  ## Pretty-print full experiment_log.tsv as an aligned table.
+	@if [ -f experiment_log.tsv ]; then \
+	  column -t -s "$$(printf '\t')" experiment_log.tsv; \
+	else \
+	  echo "==> no experiment_log.tsv yet"; \
+	fi
+
+.PHONY: tail
+tail:  ## tail -f experiment_log.tsv for live monitoring (Ctrl-C to exit).
+	@if [ ! -f experiment_log.tsv ]; then \
+	  echo "==> waiting for experiment_log.tsv to be created..."; \
+	  while [ ! -f experiment_log.tsv ]; do sleep 1; done; \
+	fi
+	@tail -f experiment_log.tsv
+
+# ---------------------------------------------------------------------
+# Tests + dev hygiene
+# ---------------------------------------------------------------------
+.PHONY: tests
+tests:  ## Run the offline test suite (unittest, no network).
+	@python -m unittest discover tests
+
+.PHONY: clean-runtime
+clean-runtime:  ## Remove runtime artifacts (snapshots, rankings, .halt). Preserves TSV.
+	@rm -rf snapshots rankings harness_reports sources flagged
+	@rm -f .halt
+	@echo "==> cleared snapshots/ rankings/ harness_reports/ sources/ flagged/ and .halt"
+	@echo "==> experiment_log.tsv preserved"
