@@ -1,0 +1,4 @@
+address,submarket,tenant_name,tenant_industry,lease_start_date,lease_term_months,building_sf_leased,starting_rent_psf_nnn,rent_escalation_pct,lease_type
+4040 Logistics Dr,South Fulton,Amazon Logistics,3PL,2025-09-15,84,250000,7.95,3.0,NNN
+2200 Cross Dock Way,West Atlanta / I-20,Home Depot DC,Retail Distribution,2025-11-01,120,180000,8.25,2.5,NNN
+880 Highway 138,Clayton County,Wayfair Fulfillment,E-commerce,2026-01-10,60,140000,7.50,3.0,NNN

@@ -14,6 +14,8 @@ from __future__ import annotations
 import ast
 import json
 import re
+import shutil
+import tempfile
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -25,6 +27,7 @@ from unittest import mock
 import research
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "discovery"
+COSTAR_FIXTURES_DIR = Path(__file__).parent / "fixtures" / "costar"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESEARCH_PY_SRC = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
 
@@ -1588,3 +1591,1225 @@ class TestPhase5SqlConstantsStaticChecks(unittest.TestCase):
             self.assertIsInstance(sql, str)
             # Must not contain runtime-format markers — only %s for psycopg.
             self.assertNotIn("{", sql, f"f-string brace in {const}: {sql}")
+
+
+# ===========================================================================
+# Phase 6 — CoStar ingestion (Option A) tests
+# ===========================================================================
+@contextmanager
+def _temp_costar_base():
+    """Monkey-patch research._COSTAR_BASE_DIR to a tempdir for the test scope (R-329)."""
+    original = research._COSTAR_BASE_DIR
+    with tempfile.TemporaryDirectory() as td:
+        research._COSTAR_BASE_DIR = Path(td)
+        try:
+            yield Path(td)
+        finally:
+            research._COSTAR_BASE_DIR = original
+
+
+def _stage_fixture(base: Path, subdir: str, fixture_name: str, dest_name: str | None = None) -> Path:
+    """Copy a fixture file into the temp costar tree under subdir/."""
+    target_dir = base / subdir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / (dest_name or fixture_name)
+    shutil.copy2(COSTAR_FIXTURES_DIR / fixture_name, target)
+    return target
+
+
+class TestPhase6Slugify(unittest.TestCase):
+    """R-301, R-315 — slug derivation rules."""
+
+    def test_simple_lowercase(self) -> None:
+        self.assertEqual(research._slugify("Atlanta"), "atlanta")
+
+    def test_punctuation_collapses_to_underscore(self) -> None:
+        self.assertEqual(
+            research._slugify("West Atlanta / I-20"),
+            "west_atlanta_i_20",
+        )
+
+    def test_strips_edges(self) -> None:
+        self.assertEqual(research._slugify("  South Fulton  "), "south_fulton")
+
+    def test_truncates_long_inputs(self) -> None:
+        long = "x" * 200
+        self.assertEqual(len(research._slugify(long)), 60)
+
+    def test_empty_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            research._slugify("")
+
+    def test_punctuation_only_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            research._slugify("///---")
+
+
+class TestPhase6IngestionCycleId(unittest.TestCase):
+    """R-321 — cycle id format and uniqueness."""
+
+    def test_format(self) -> None:
+        cid = research._make_ingestion_cycle_id()
+        self.assertRegex(cid, research._INGESTION_CYCLE_ID_RE)
+
+    def test_uniqueness(self) -> None:
+        a = research._make_ingestion_cycle_id()
+        b = research._make_ingestion_cycle_id()
+        self.assertNotEqual(a, b)
+
+
+class TestPhase6ScanExportDir(unittest.TestCase):
+    """R-303, R-304, R-305, R-310, R-311 — directory scanning."""
+
+    def test_empty_dir_returns_empty(self) -> None:
+        with _temp_costar_base():
+            self.assertEqual(research._scan_export_dir("submarket_stats"), [])
+
+    def test_missing_dir_returns_empty(self) -> None:
+        with _temp_costar_base() as base:
+            self.assertFalse((base / "submarket_stats").exists())
+            self.assertEqual(research._scan_export_dir("submarket_stats"), [])
+
+    def test_returns_matching_files_sorted_by_date(self) -> None:
+        with _temp_costar_base() as base:
+            d = base / "submarket_stats"
+            d.mkdir(parents=True)
+            (d / "submarket_stats_20260420.csv").write_text("x", encoding="utf-8")
+            (d / "submarket_stats_20260427.csv").write_text("x", encoding="utf-8")
+            (d / "submarket_stats_20260413.csv").write_text("x", encoding="utf-8")
+            (d / "ignore_me.txt").write_text("x", encoding="utf-8")
+            (d / ".hidden.csv").write_text("x", encoding="utf-8")
+            results = research._scan_export_dir("submarket_stats")
+            dates = [d for _, d in results]
+            self.assertEqual(dates, ["20260413", "20260420", "20260427"])
+
+    def test_archived_and_failed_subdirs_skipped(self) -> None:
+        with _temp_costar_base() as base:
+            d = base / "submarket_stats"
+            d.mkdir(parents=True)
+            (d / "submarket_stats_20260427.csv").write_text("x", encoding="utf-8")
+            archived = base / "ARCHIVED" / "submarket_stats"
+            archived.mkdir(parents=True)
+            (archived / "submarket_stats_20260101.csv").write_text(
+                "x", encoding="utf-8",
+            )
+            results = research._scan_export_dir("submarket_stats")
+            names = [p.name for p, _ in results]
+            self.assertEqual(names, ["submarket_stats_20260427.csv"])
+
+    def test_directory_traversal_rejected(self) -> None:
+        with _temp_costar_base():
+            with self.assertRaises(ValueError):
+                research._scan_export_dir("../etc")
+            with self.assertRaises(ValueError):
+                research._scan_export_dir("/abs/path")
+
+
+class TestPhase6ArchiveAndFailMovement(unittest.TestCase):
+    """R-312, R-313, R-314 — archive / fail file movement."""
+
+    def test_archive_round_trip(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(base, "submarket_stats", "submarket_stats_happy.csv",
+                                    dest_name="submarket_stats_20260427.csv")
+            archived = research._archive_file(staged)
+            self.assertFalse(staged.exists())
+            self.assertTrue(archived.exists())
+            self.assertEqual(archived.parent.name, "submarket_stats")
+            self.assertEqual(archived.parent.parent.name, "ARCHIVED")
+            self.assertTrue(archived.name.startswith("submarket_stats_20260427_"))
+            self.assertTrue(archived.name.endswith(".csv"))
+
+    def test_fail_writes_error_json(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(base, "submarket_stats",
+                                    "submarket_stats_missing_column.csv",
+                                    dest_name="submarket_stats_20260427.csv")
+            dest, err_path = research._fail_file(
+                staged, {"errors": ["missing required column(s): vacancy_rate_pct"]}
+            )
+            self.assertFalse(staged.exists())
+            self.assertTrue(dest.exists())
+            self.assertEqual(dest.parent.parent.name, "FAILED")
+            self.assertTrue(err_path.exists())
+            payload = json.loads(err_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["file"], "submarket_stats_20260427.csv")
+            self.assertIn("missing required column", payload["errors"][0])
+            self.assertIn("ingested_at", payload)
+
+    def test_archive_destination_collision_uniquified(self) -> None:
+        with _temp_costar_base() as base:
+            a_dir = base / "submarket_stats"
+            a_dir.mkdir(parents=True)
+            f1 = a_dir / "submarket_stats_20260427.csv"
+            f1.write_text("a", encoding="utf-8")
+            d1 = research._archive_destination(f1, "ARCHIVED")
+            d2 = research._archive_destination(f1, "ARCHIVED")
+            self.assertNotEqual(d1, d2)
+
+
+class TestPhase6Coercion(unittest.TestCase):
+    """R-306 — locale-tolerant number parsing."""
+
+    def test_plain_int(self) -> None:
+        self.assertEqual(research._coerce_optional_int("28500000"), (28500000, None))
+
+    def test_thousands_commas_stripped(self) -> None:
+        self.assertEqual(research._coerce_optional_int("28,500,000"), (28500000, None))
+
+    def test_dollar_sign_stripped(self) -> None:
+        val, err = research._coerce_optional_decimal("$7.85")
+        self.assertEqual(val, 7.85)
+        self.assertIsNone(err)
+
+    def test_percent_sign_stripped(self) -> None:
+        val, err = research._coerce_optional_decimal("5.4%")
+        self.assertEqual(val, 5.4)
+        self.assertIsNone(err)
+
+    def test_blank_returns_none(self) -> None:
+        self.assertEqual(research._coerce_optional_decimal(""), (None, None))
+        self.assertEqual(research._coerce_optional_decimal("N/A"), (None, None))
+
+    def test_unparseable_returns_error(self) -> None:
+        val, err = research._coerce_optional_decimal("xyz")
+        self.assertIsNone(val)
+        self.assertIn("unparseable", err)
+
+    def test_negative_int_supported(self) -> None:
+        self.assertEqual(research._coerce_optional_int("-420000"), (-420000, None))
+
+
+class TestPhase6DateParsing(unittest.TestCase):
+    """R-307 — multiple acceptable date formats."""
+
+    def test_iso_format(self) -> None:
+        self.assertEqual(research._parse_report_date("2026-04-27"),
+                         ("2026-04-27", None))
+
+    def test_us_slash_format(self) -> None:
+        self.assertEqual(research._parse_report_date("04/27/2026"),
+                         ("2026-04-27", None))
+
+    def test_iso_with_time(self) -> None:
+        self.assertEqual(research._parse_report_date("2026-04-27T00:00:00"),
+                         ("2026-04-27", None))
+
+    def test_unparseable_returns_error(self) -> None:
+        out, err = research._parse_report_date("not-a-date")
+        self.assertIsNone(out)
+        self.assertIn("unparseable", err)
+
+    def test_empty_returns_error(self) -> None:
+        out, err = research._parse_report_date("")
+        self.assertIsNone(out)
+
+
+class TestPhase6HeaderValidation(unittest.TestCase):
+    """R-309, R-310 — header set + duplicate detection."""
+
+    def test_happy_headers(self) -> None:
+        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS)
+        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+
+    def test_missing_column_detected(self) -> None:
+        headers = [c for c in research._SUBMARKET_STATS_REQUIRED_COLUMNS
+                   if c != "vacancy_rate_pct"]
+        err = research._validate_submarket_stats_headers(headers)
+        self.assertIn("vacancy_rate_pct", err)
+
+    def test_duplicate_column_detected(self) -> None:
+        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS) + ["submarket_name"]
+        err = research._validate_submarket_stats_headers(headers)
+        self.assertIn("duplicate", err)
+
+    def test_extra_columns_allowed(self) -> None:
+        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS) + ["extra_col"]
+        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+
+    def test_case_insensitive_headers(self) -> None:
+        headers = [c.upper() for c in research._SUBMARKET_STATS_REQUIRED_COLUMNS]
+        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+
+    def test_bom_stripped(self) -> None:
+        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS)
+        headers[0] = "﻿" + headers[0]
+        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+
+
+class TestPhase6RowValidation(unittest.TestCase):
+    """R-306, R-307, validation rules from COSTAR_INGESTION_CONTRACT.md."""
+
+    def _row(self, **overrides):
+        base = {
+            "submarket_name": "South Fulton",
+            "market": "Atlanta",
+            "total_inventory_sf": "28500000",
+            "vacancy_rate_pct": "5.4",
+            "availability_rate_pct": "7.1",
+            "net_absorption_t12_sf": "1850000",
+            "under_construction_sf": "2400000",
+            "proposed_sf": "1200000",
+            "asking_rent_nnn_psf": "7.85",
+            "report_date": "2026-04-27",
+        }
+        base.update(overrides)
+        return base
+
+    def test_happy_row(self) -> None:
+        out, err = research._validate_submarket_stats_row(self._row())
+        self.assertIsNone(err)
+        self.assertEqual(out["submarket_name"], "South Fulton")
+        self.assertEqual(out["report_date"], "2026-04-27")
+        self.assertEqual(out["vacancy_rate_pct"], 5.4)
+
+    def test_empty_submarket_name_rejected(self) -> None:
+        out, err = research._validate_submarket_stats_row(self._row(submarket_name=""))
+        self.assertIsNone(out)
+        self.assertIn("submarket_name", err)
+
+    def test_vacancy_out_of_range_rejected(self) -> None:
+        out, err = research._validate_submarket_stats_row(
+            self._row(vacancy_rate_pct="150"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("vacancy_rate_pct", err)
+
+    def test_zero_rent_rejected(self) -> None:
+        out, err = research._validate_submarket_stats_row(
+            self._row(asking_rent_nnn_psf="0"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("asking_rent_nnn_psf", err)
+
+    def test_optional_field_null_accepted(self) -> None:
+        out, err = research._validate_submarket_stats_row(
+            self._row(availability_rate_pct=""),
+        )
+        self.assertIsNone(err)
+        self.assertIsNone(out["availability_rate_pct"])
+
+    def test_unparseable_date_rejected(self) -> None:
+        out, err = research._validate_submarket_stats_row(
+            self._row(report_date="not-a-date"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("date", err)
+
+    def test_negative_absorption_accepted(self) -> None:
+        out, err = research._validate_submarket_stats_row(
+            self._row(net_absorption_t12_sf="-500000"),
+        )
+        self.assertIsNone(err)
+        self.assertEqual(out["net_absorption_t12_sf"], -500000)
+
+
+class TestPhase6EnsureSubmarket(unittest.TestCase):
+    """R-301, R-315 — auto-UPSERT markets/submarkets reference data."""
+
+    def test_creates_new_submarket_returning_name(self) -> None:
+        fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
+        sid, created, drift = research._ensure_submarket(fake, "Atlanta", "South Fulton")
+        self.assertEqual(sid, "atlanta__south_fulton")
+        self.assertTrue(created)
+        self.assertIsNone(drift)
+        self.assertEqual(len(fake.all_executes), 2)
+
+    def test_existing_submarket_no_drift(self) -> None:
+        fake = Phase5FakeConnection(fetchone_queue=[None, ("South Fulton",)])
+        sid, created, drift = research._ensure_submarket(fake, "Atlanta", "South Fulton")
+        self.assertEqual(sid, "atlanta__south_fulton")
+        self.assertFalse(created)
+        self.assertIsNone(drift)
+
+    def test_name_drift_emits_message(self) -> None:
+        fake = Phase5FakeConnection(fetchone_queue=[None, ("Old Name",)])
+        sid, created, drift = research._ensure_submarket(fake, "Atlanta", "New Name")
+        self.assertFalse(created)
+        self.assertIsNotNone(drift)
+        self.assertIn("Old Name", drift)
+        self.assertIn("New Name", drift)
+
+
+class TestPhase6LoadSubmarketStatsFile(unittest.TestCase):
+    """End-to-end loader against Phase5FakeConnection + tempdir."""
+
+    def test_happy_path_loads_and_archives(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats", "submarket_stats_happy.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+                ("Clayton County",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 3)
+            self.assertEqual(result["rows_failed"], 0)
+            self.assertEqual(len(result["submarkets_auto_created"]), 3)
+            self.assertEqual(fake.commits, 1)
+            self.assertEqual(fake.rollbacks, 0)
+            self.assertFalse(staged.exists())
+            archived_dir = base / "ARCHIVED" / "submarket_stats"
+            self.assertTrue(archived_dir.exists())
+            self.assertTrue(any(archived_dir.iterdir()))
+
+    def test_missing_column_quarantines_file(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats",
+                "submarket_stats_missing_column.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection()
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("vacancy_rate_pct", result["error"])
+            self.assertEqual(fake.commits, 0)
+            self.assertFalse(staged.exists())
+            failed_dir = base / "FAILED" / "submarket_stats"
+            self.assertTrue(any(failed_dir.iterdir()))
+            err_files = list(failed_dir.glob("*.error.json"))
+            self.assertEqual(len(err_files), 1)
+
+    def test_duplicate_header_quarantines_file(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats",
+                "submarket_stats_duplicate_header.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection()
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("duplicate", result["error"].lower())
+
+    def test_row_errors_flagged_but_other_rows_load(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats", "submarket_stats_row_errors.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 1)
+            self.assertEqual(result["rows_failed"], 2)
+            self.assertEqual(len(result["row_errors"]), 2)
+            self.assertFalse(staged.exists())
+            self.assertTrue(any((base / "ARCHIVED" / "submarket_stats").iterdir()))
+
+    def test_bom_csv_loads_cleanly(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats", "submarket_stats_with_bom.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 1)
+
+
+class TestPhase6Reingest(unittest.TestCase):
+    """R-302 — DELETE-then-INSERT idempotent re-ingest."""
+
+    def test_dedup_delete_executed_per_unique_key(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats", "submarket_stats_happy.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+                ("Clayton County",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            research._load_submarket_stats_file(fake, cycle_id, staged)
+
+            sql_strings = [sql for sql, _ in fake.all_executes]
+            delete_count = sum(
+                1 for s in sql_strings
+                if s == research._SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST
+            )
+            self.assertEqual(delete_count, 3)
+            insert_count = sum(
+                1 for s in sql_strings
+                if s == research._SQL_INSERT_MARKET_CONTEXT
+            )
+            self.assertEqual(insert_count, 3)
+
+    def test_delete_uses_costar_source_param(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "submarket_stats", "submarket_stats_happy.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+                ("Clayton County",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            research._load_submarket_stats_file(fake, cycle_id, staged)
+            for sql, params in fake.all_executes:
+                if sql == research._SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST:
+                    self.assertEqual(params[0], "costar")
+
+
+class TestPhase6RunIngestionCycle(unittest.TestCase):
+    """R-321, R-322 — driver dispatch + cycle-id collision guard."""
+
+    def _patch_get_connection(self, fake):
+        @contextmanager
+        def _ctx():
+            yield fake
+        return mock.patch("research.prepare.get_connection", _ctx)
+
+    def test_collision_aborts(self) -> None:
+        with _temp_costar_base():
+            fake = Phase5FakeConnection(fetchone_queue=[(1,)])
+            with self._patch_get_connection(fake):
+                summary = research.run_ingestion_cycle()
+            self.assertTrue(summary["aborted"])
+            self.assertEqual(summary["abort_reason"], "cycle_id_collision")
+
+    def test_no_files_returns_clean_summary(self) -> None:
+        # Phase 6.1: all 5 export types are now real loaders; with no
+        # files staged, each reports files_loaded=0 (not 'not_implemented').
+        with _temp_costar_base():
+            fake = Phase5FakeConnection(fetchone_queue=[(0,)])
+            with self._patch_get_connection(fake):
+                summary = research.run_ingestion_cycle()
+            self.assertFalse(summary["aborted"])
+            for export_type in (
+                "submarket_stats", "land_sales_comps", "building_sales_comps",
+                "leasing_comps", "land_listings",
+            ):
+                self.assertIn(export_type, summary["per_export_type"])
+                self.assertEqual(
+                    summary["per_export_type"][export_type]["files_loaded"], 0,
+                )
+                self.assertEqual(
+                    summary["per_export_type"][export_type]["status"], "loaded",
+                )
+
+    def test_dispatch_processes_submarket_stats_file(self) -> None:
+        with _temp_costar_base() as base:
+            _stage_fixture(
+                base, "submarket_stats", "submarket_stats_happy.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                (0,),
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+                ("Clayton County",),
+            ])
+            with self._patch_get_connection(fake):
+                summary = research.run_ingestion_cycle()
+            ss = summary["per_export_type"]["submarket_stats"]
+            self.assertEqual(ss["files_loaded"], 1)
+            self.assertEqual(ss["rows_loaded"], 3)
+            self.assertEqual(ss["rows_failed"], 0)
+
+
+class TestPhase6SqlConstantsStaticChecks(unittest.TestCase):
+    """R-326 — static SQL invariants for Phase 6."""
+
+    def test_ingestion_sql_uses_parameterized_placeholders(self) -> None:
+        for const in (
+            "_SQL_UPSERT_MARKETS_REF",
+            "_SQL_UPSERT_SUBMARKETS_REF",
+            "_SQL_FETCH_SUBMARKET_NAME",
+            "_SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST",
+            "_SQL_INSERT_MARKET_CONTEXT",
+            "_SQL_INSERT_RESEARCH_LOG_INGESTION",
+            "_SQL_COUNT_LOG_FOR_INGESTION_CYCLE",
+        ):
+            self.assertTrue(hasattr(research, const), f"missing SQL constant {const}")
+            sql = getattr(research, const)
+            self.assertIsInstance(sql, str)
+            self.assertNotIn("{", sql, f"f-string brace in {const}: {sql}")
+
+    def test_no_print_in_ingestion_helpers(self) -> None:
+        tree = ast.parse(RESEARCH_PY_SRC)
+        forbidden_names = {
+            "run_ingestion_cycle", "_load_submarket_stats_file",
+            "_load_submarket_stats", "_load_placeholder",
+            "_scan_export_dir", "_archive_file", "_fail_file",
+            "_validate_submarket_stats_row",
+            "_validate_submarket_stats_headers",
+            "_ensure_submarket", "_count_log_rows_for_ingestion_cycle",
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name not in forbidden_names:
+                    continue
+                for inner in ast.walk(node):
+                    if (isinstance(inner, ast.Call)
+                            and isinstance(inner.func, ast.Name)
+                            and inner.func.id == "print"):
+                        self.fail(f"print() in {node.name} at line {inner.lineno}")
+
+
+# ===========================================================================
+# Phase 6.1 — CoStar comps + listings loaders tests
+# ===========================================================================
+class TestPhase61CountyToMarket(unittest.TestCase):
+    """R-401, R-404 — county→market lookup."""
+
+    def test_known_county_resolves(self) -> None:
+        market, used_default = research._resolve_market_from_county("Fulton")
+        self.assertEqual(market, "Atlanta")
+        self.assertFalse(used_default)
+
+    def test_case_insensitive(self) -> None:
+        market, used_default = research._resolve_market_from_county("DEKALB")
+        self.assertEqual(market, "Atlanta")
+        self.assertFalse(used_default)
+
+    def test_unknown_county_uses_default(self) -> None:
+        market, used_default = research._resolve_market_from_county("Forsyth")
+        self.assertEqual(market, "Atlanta")
+        self.assertTrue(used_default)
+
+    def test_blank_uses_default(self) -> None:
+        market, used_default = research._resolve_market_from_county("")
+        self.assertTrue(used_default)
+        market2, _ = research._resolve_market_from_county(None)
+        self.assertEqual(market2, "Atlanta")
+
+    def test_lookup_covers_eight_atlanta_counties(self) -> None:
+        for county in (
+            "fulton", "dekalb", "cobb", "gwinnett",
+            "clayton", "henry", "spalding", "fayette",
+        ):
+            self.assertEqual(research._COUNTY_TO_MARKET[county], "Atlanta")
+
+
+class TestPhase61LandSalesCompsValidation(unittest.TestCase):
+    """R-406, R-407 — land sales comps row validator."""
+
+    def _row(self, **overrides):
+        base = {
+            "address": "1234 Industrial Blvd",
+            "parcel_id": "09F-1234-0001",
+            "county": "Fulton",
+            "submarket": "South Fulton",
+            "acres": "12.5",
+            "sale_date": "2026-03-14",
+            "sale_price": "1875000",
+            "price_per_acre": "150000",
+            "buyer_name": "Acme Logistics LLC",
+            "seller_name": "Smith Family Trust",
+            "zoning": "M-2",
+            "intended_use": "distribution",
+            "cap_rate": "",
+        }
+        base.update(overrides)
+        return base
+
+    def test_happy(self) -> None:
+        out, err = research._validate_land_sales_comps_row(self._row())
+        self.assertIsNone(err)
+        self.assertEqual(out["address"], "1234 Industrial Blvd")
+        self.assertEqual(out["sale_price"], 1875000)
+        self.assertEqual(out["acres"], 12.5)
+        self.assertIsNone(out["cap_rate"])
+        # raw is preserved for the JSONB column
+        self.assertIn("intended_use", out["raw"])
+
+    def test_blank_address_rejected(self) -> None:
+        out, err = research._validate_land_sales_comps_row(self._row(address=""))
+        self.assertIsNone(out)
+        self.assertIn("address", err)
+
+    def test_zero_sale_price_rejected(self) -> None:
+        out, err = research._validate_land_sales_comps_row(self._row(sale_price="0"))
+        self.assertIsNone(out)
+        self.assertIn("sale_price", err)
+
+    def test_blank_acres_rejected(self) -> None:
+        out, err = research._validate_land_sales_comps_row(self._row(acres=""))
+        self.assertIsNone(out)
+        self.assertIn("acres", err)
+
+    def test_unparseable_sale_date_rejected(self) -> None:
+        out, err = research._validate_land_sales_comps_row(self._row(sale_date="not-a-date"))
+        self.assertIsNone(out)
+        self.assertIn("sale_date", err)
+
+    def test_dollar_signs_in_price_accepted(self) -> None:
+        out, err = research._validate_land_sales_comps_row(
+            self._row(sale_price="$1,875,000")
+        )
+        self.assertIsNone(err)
+        self.assertEqual(out["sale_price"], 1875000)
+
+
+class TestPhase61BuildingSalesCompsValidation(unittest.TestCase):
+    """R-406, R-408 — building sales comps row validator."""
+
+    def _row(self, **overrides):
+        base = {
+            "address": "4040 Logistics Dr",
+            "submarket": "South Fulton",
+            "building_sf": "250000",
+            "year_built": "2015",
+            "clear_height_ft": "32",
+            "sale_date": "2026-03-05",
+            "sale_price": "32500000",
+            "price_psf": "130",
+            "cap_rate": "5.5",
+            "noi_at_sale": "1787500",
+            "buyer_name": "Industrial REIT",
+            "seller_name": "Original Developer LLC",
+            "tenant_at_sale": "Amazon Logistics",
+            "lease_term_remaining_years": "5.2",
+        }
+        base.update(overrides)
+        return base
+
+    def test_happy(self) -> None:
+        out, err = research._validate_building_sales_comps_row(self._row())
+        self.assertIsNone(err)
+        self.assertEqual(out["building_sf"], 250000.0)
+        self.assertEqual(out["sale_price"], 32500000)
+        self.assertIn("tenant_at_sale", out["raw"])
+        self.assertIn("lease_term_remaining_years", out["raw"])
+
+    def test_zero_building_sf_rejected(self) -> None:
+        out, err = research._validate_building_sales_comps_row(
+            self._row(building_sf="0"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("building_sf", err)
+
+    def test_year_built_out_of_range_rejected(self) -> None:
+        out, err = research._validate_building_sales_comps_row(
+            self._row(year_built="1700"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("year_built", err)
+
+    def test_clear_height_out_of_range_rejected(self) -> None:
+        out, err = research._validate_building_sales_comps_row(
+            self._row(clear_height_ft="100"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("clear_height_ft", err)
+
+    def test_optional_fields_null_accepted(self) -> None:
+        out, err = research._validate_building_sales_comps_row(
+            self._row(year_built="", clear_height_ft="", price_psf="", cap_rate=""),
+        )
+        self.assertIsNone(err)
+        self.assertIsNone(out["price_psf"])
+        self.assertIsNone(out["cap_rate"])
+
+
+class TestPhase61LeasingCompsValidation(unittest.TestCase):
+    """R-409, R-410 — leasing comps row validator."""
+
+    def _row(self, **overrides):
+        base = {
+            "address": "4040 Logistics Dr",
+            "submarket": "South Fulton",
+            "tenant_name": "Amazon Logistics",
+            "tenant_industry": "3PL",
+            "lease_start_date": "2025-09-15",
+            "lease_term_months": "84",
+            "building_sf_leased": "250000",
+            "starting_rent_psf_nnn": "7.95",
+            "rent_escalation_pct": "3.0",
+            "lease_type": "NNN",
+        }
+        base.update(overrides)
+        return base
+
+    def test_happy(self) -> None:
+        out, err = research._validate_leasing_comps_row(self._row())
+        self.assertIsNone(err)
+        self.assertEqual(out["tenant_name"], "Amazon Logistics")
+        self.assertEqual(out["lease_term_months"], 84)
+        self.assertEqual(out["starting_rent_psf_nnn"], 7.95)
+
+    def test_blank_tenant_rejected(self) -> None:
+        out, err = research._validate_leasing_comps_row(self._row(tenant_name=""))
+        self.assertIsNone(out)
+        self.assertIn("tenant_name", err)
+
+    def test_zero_term_rejected(self) -> None:
+        out, err = research._validate_leasing_comps_row(self._row(lease_term_months="0"))
+        self.assertIsNone(out)
+        self.assertIn("lease_term_months", err)
+
+    def test_zero_rent_rejected(self) -> None:
+        out, err = research._validate_leasing_comps_row(
+            self._row(starting_rent_psf_nnn="0"),
+        )
+        self.assertIsNone(out)
+        self.assertIn("starting_rent_psf_nnn", err)
+
+    def test_optional_escalation_null_accepted(self) -> None:
+        out, err = research._validate_leasing_comps_row(self._row(rent_escalation_pct=""))
+        self.assertIsNone(err)
+        self.assertIsNone(out["rent_escalation_pct"])
+
+    def test_naics_must_be_digits(self) -> None:
+        # naics_code is not in required cols, but if a CSV has one, validate.
+        row = self._row()
+        row["naics_code"] = "abc123"
+        out, err = research._validate_leasing_comps_row(row)
+        self.assertIsNone(out)
+        self.assertIn("naics_code", err)
+
+
+class TestPhase61LandListingsValidation(unittest.TestCase):
+    """R-411, R-412 — land listings row validator."""
+
+    def _row(self, **overrides):
+        base = {
+            "address": "1500 Industrial Pkwy",
+            "parcel_id": "09F-1500-0007",
+            "county": "Fulton",
+            "submarket": "South Fulton",
+            "acres": "18.5",
+            "zoning": "M-2",
+            "topography_notes": "gentle slope",
+            "asking_price": "2775000",
+            "asking_price_per_acre": "150000",
+            "listing_date": "2026-04-01",
+            "days_on_market": "42",
+            "listing_broker": "Jane Doe",
+            "listing_broker_firm": "CBRE",
+            "utilities_status": "water+sewer",
+            "entitlement_status": "zoned ready",
+        }
+        base.update(overrides)
+        return base
+
+    def test_happy(self) -> None:
+        out, err = research._validate_land_listings_row(self._row())
+        self.assertIsNone(err)
+        self.assertEqual(out["asking_price"], 2775000)
+        self.assertEqual(out["acres"], 18.5)
+
+    def test_blank_address_rejected(self) -> None:
+        out, err = research._validate_land_listings_row(self._row(address=""))
+        self.assertIsNone(out)
+
+    def test_asking_price_null_accepted(self) -> None:
+        out, err = research._validate_land_listings_row(
+            self._row(asking_price="", asking_price_per_acre=""),
+        )
+        self.assertIsNone(err)
+        self.assertIsNone(out["asking_price"])
+        self.assertIsNone(out["asking_price_per_acre"])
+
+    def test_zero_acres_rejected(self) -> None:
+        out, err = research._validate_land_listings_row(self._row(acres="0"))
+        self.assertIsNone(out)
+        self.assertIn("acres", err)
+
+    def test_zero_asking_price_rejected(self) -> None:
+        out, err = research._validate_land_listings_row(self._row(asking_price="0"))
+        self.assertIsNone(out)
+        self.assertIn("asking_price", err)
+
+    def test_negative_days_on_market_rejected(self) -> None:
+        out, err = research._validate_land_listings_row(self._row(days_on_market="-5"))
+        self.assertIsNone(out)
+        self.assertIn("days_on_market", err)
+
+
+class TestPhase61LandSalesCompsLoader(unittest.TestCase):
+    """End-to-end land_sales_comps loader."""
+
+    def test_happy_path_loads_and_archives(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_sales_comps", "land_sales_comps_happy.csv",
+                dest_name="land_sales_comps_202603.csv",
+            )
+            # 3 unique submarkets, all new -> 3 fetchone responses.
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("Clayton County",),
+                ("Henry County / I-75 South",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_land_sales_comps_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 3)
+            self.assertEqual(result["rows_failed"], 0)
+            self.assertEqual(fake.commits, 1)
+            self.assertFalse(staged.exists())
+            self.assertTrue(any((base / "ARCHIVED" / "land_sales_comps").iterdir()))
+
+    def test_missing_column_quarantines_file(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_sales_comps", "land_sales_comps_missing_column.csv",
+                dest_name="land_sales_comps_202603.csv",
+            )
+            fake = Phase5FakeConnection()
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_land_sales_comps_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("intended_use", result["error"])
+            self.assertEqual(fake.commits, 0)
+            self.assertFalse(staged.exists())
+            self.assertTrue(any((base / "FAILED" / "land_sales_comps").iterdir()))
+
+    def test_row_errors_flagged_other_rows_load(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_sales_comps", "land_sales_comps_row_errors.csv",
+                dest_name="land_sales_comps_202603.csv",
+            )
+            # Happy rows: row 1 (South Fulton, Fulton county - known) and
+            # row 4 (Cumming Industrial, Forsyth - unknown county defaults
+            # to Atlanta). Both new -> 2 fetchone responses.
+            # Row 2 fails (blank address); row 3 fails (zero sale_price).
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("Cumming Industrial",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_land_sales_comps_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 2)
+            self.assertEqual(result["rows_failed"], 2)
+            # The Forsyth -> Atlanta default-market flag fires too.
+            self.assertIn("Forsyth", result["default_market_used_for"])
+
+    def test_dedup_delete_executed_per_unique_key(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_sales_comps", "land_sales_comps_happy.csv",
+                dest_name="land_sales_comps_202603.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("Clayton County",),
+                ("Henry County / I-75 South",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            research._load_land_sales_comps_file(fake, cycle_id, staged)
+            sql_strings = [sql for sql, _ in fake.all_executes]
+            delete_count = sum(
+                1 for s in sql_strings
+                if s == research._SQL_DELETE_LAND_SALES_FOR_REINGEST
+            )
+            insert_count = sum(
+                1 for s in sql_strings
+                if s == research._SQL_INSERT_LAND_SALES
+            )
+            self.assertEqual(delete_count, 3)
+            self.assertEqual(insert_count, 3)
+
+
+class TestPhase61BuildingSalesCompsLoader(unittest.TestCase):
+    """End-to-end building_sales_comps loader."""
+
+    def test_happy_path_loads_and_archives(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "building_sales_comps", "building_sales_comps_happy.csv",
+                dest_name="building_sales_comps_202603.csv",
+            )
+            # 2 unique submarkets, all new -> 2 fetchone responses.
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_building_sales_comps_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 2)
+            self.assertEqual(result["rows_failed"], 0)
+
+    def test_dedup_uses_building_comp_type(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "building_sales_comps", "building_sales_comps_happy.csv",
+                dest_name="building_sales_comps_202603.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            research._load_building_sales_comps_file(fake, cycle_id, staged)
+            sql_strings = [sql for sql, _ in fake.all_executes]
+            # Building DELETE used, NOT land DELETE (R-422).
+            self.assertGreater(
+                sum(1 for s in sql_strings
+                    if s == research._SQL_DELETE_BUILDING_SALES_FOR_REINGEST), 0,
+            )
+            self.assertEqual(
+                sum(1 for s in sql_strings
+                    if s == research._SQL_DELETE_LAND_SALES_FOR_REINGEST), 0,
+            )
+
+
+class TestPhase61LeasingCompsLoader(unittest.TestCase):
+    """End-to-end leasing_comps loader."""
+
+    def test_happy_path_loads_and_archives(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "leasing_comps", "leasing_comps_happy.csv",
+                dest_name="leasing_comps_202603.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("West Atlanta / I-20",),
+                ("Clayton County",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_leasing_comps_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 3)
+            self.assertEqual(result["rows_failed"], 0)
+
+    def test_missing_column_quarantines_file(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "leasing_comps", "leasing_comps_missing_column.csv",
+                dest_name="leasing_comps_202603.csv",
+            )
+            fake = Phase5FakeConnection()
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_leasing_comps_file(fake, cycle_id, staged)
+            self.assertEqual(result["status"], "failed")
+            self.assertIn("lease_start_date", result["error"])
+
+
+class TestPhase61LandListingsLoader(unittest.TestCase):
+    """End-to-end land_listings loader (snapshot semantics R-426)."""
+
+    def test_happy_path_loads_and_archives(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_listings", "land_listings_happy.csv",
+                dest_name="land_listings_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("Henry County / I-75 South",),
+                ("Clayton County",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_land_listings_file(
+                fake, cycle_id, staged, "2026-04-27",
+            )
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 3)
+            self.assertEqual(result["rows_failed"], 0)
+            self.assertFalse(staged.exists())
+
+    def test_optional_nulls_accepted(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_listings", "land_listings_optional_nulls.csv",
+                dest_name="land_listings_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
+            cycle_id = research._make_ingestion_cycle_id()
+            result = research._load_land_listings_file(
+                fake, cycle_id, staged, "2026-04-27",
+            )
+            self.assertEqual(result["status"], "loaded")
+            self.assertEqual(result["rows_loaded"], 1)
+
+    def test_dedup_uses_snapshot_date_and_address(self) -> None:
+        with _temp_costar_base() as base:
+            staged = _stage_fixture(
+                base, "land_listings", "land_listings_happy.csv",
+                dest_name="land_listings_20260427.csv",
+            )
+            fake = Phase5FakeConnection(fetchone_queue=[
+                ("South Fulton",),
+                ("Henry County / I-75 South",),
+                ("Clayton County",),
+            ])
+            cycle_id = research._make_ingestion_cycle_id()
+            research._load_land_listings_file(fake, cycle_id, staged, "2026-04-27")
+            for sql, params in fake.all_executes:
+                if sql == research._SQL_DELETE_LAND_LISTINGS_FOR_REINGEST:
+                    # First param is snapshot_date, second is address.
+                    self.assertEqual(params[0], "2026-04-27")
+
+    def test_driver_passes_snapshot_date_from_filename(self) -> None:
+        with _temp_costar_base() as base:
+            _stage_fixture(
+                base, "land_listings", "land_listings_happy.csv",
+                dest_name="land_listings_20260427.csv",
+            )
+
+            @contextmanager
+            def _ctx():
+                yield Phase5FakeConnection(fetchone_queue=[
+                    (0,),  # cycle id collision check
+                    ("South Fulton",),
+                    ("Henry County / I-75 South",),
+                    ("Clayton County",),
+                ])
+            with mock.patch("research.prepare.get_connection", _ctx):
+                summary = research.run_ingestion_cycle()
+            ll = summary["per_export_type"]["land_listings"]
+            self.assertEqual(ll["files_loaded"], 1)
+            self.assertEqual(ll["rows_loaded"], 3)
+            # The driver derived snapshot_date from filename "20260427".
+            per_file = ll["per_file"][0]
+            self.assertEqual(per_file["status"], "loaded")
+
+
+class TestPhase61RunIngestionCycleAllReal(unittest.TestCase):
+    """R-417 — all 5 export types are now real loaders."""
+
+    def _patch_get_connection(self, fake):
+        @contextmanager
+        def _ctx():
+            yield fake
+        return mock.patch("research.prepare.get_connection", _ctx)
+
+    def test_mixed_files_dispatched_to_real_loaders(self) -> None:
+        with _temp_costar_base() as base:
+            _stage_fixture(
+                base, "submarket_stats", "submarket_stats_happy.csv",
+                dest_name="submarket_stats_20260427.csv",
+            )
+            _stage_fixture(
+                base, "leasing_comps", "leasing_comps_happy.csv",
+                dest_name="leasing_comps_202603.csv",
+            )
+            # 3 submarket_stats submarkets + 3 leasing_comps submarkets;
+            # all 6 are unique enough to need separate UPSERTs (different
+            # market for atlanta__south_fulton already exists from
+            # submarket_stats so leasing reuses it... but our
+            # Phase5FakeConnection responds to whatever fetchone is asked
+            # since there's no actual DB. We just need 1 cycle-collision
+            # response + 6 submarket-name returns (one per UPSERT).
+            fake = Phase5FakeConnection(fetchone_queue=[
+                (0,),  # cycle-id collision
+                # submarket_stats
+                ("South Fulton",), ("West Atlanta / I-20",), ("Clayton County",),
+                # leasing_comps (same 3 submarkets but each calls _ensure_submarket)
+                ("South Fulton",), ("West Atlanta / I-20",), ("Clayton County",),
+            ])
+            with self._patch_get_connection(fake):
+                summary = research.run_ingestion_cycle()
+            self.assertEqual(
+                summary["per_export_type"]["submarket_stats"]["files_loaded"], 1,
+            )
+            self.assertEqual(
+                summary["per_export_type"]["leasing_comps"]["files_loaded"], 1,
+            )
+            for empty_type in ("land_sales_comps", "building_sales_comps", "land_listings"):
+                self.assertEqual(
+                    summary["per_export_type"][empty_type]["files_loaded"], 0,
+                )
+
+    def test_all_loaders_report_status_loaded_with_no_files(self) -> None:
+        with _temp_costar_base():
+            fake = Phase5FakeConnection(fetchone_queue=[(0,)])
+            with self._patch_get_connection(fake):
+                summary = research.run_ingestion_cycle()
+            for export_type in (
+                "submarket_stats", "land_sales_comps", "building_sales_comps",
+                "leasing_comps", "land_listings",
+            ):
+                self.assertEqual(
+                    summary["per_export_type"][export_type]["status"], "loaded",
+                )
+                self.assertEqual(
+                    summary["per_export_type"][export_type]["files_loaded"], 0,
+                )
+
+
+class TestPhase61SqlConstantsStaticChecks(unittest.TestCase):
+    """R-419, R-420 — Phase 6.1 SQL constants and print-forbidden helpers."""
+
+    def test_phase6_1_sql_constants_present_and_parameterized(self) -> None:
+        for const in (
+            "_SQL_DELETE_LAND_SALES_FOR_REINGEST",
+            "_SQL_INSERT_LAND_SALES",
+            "_SQL_DELETE_BUILDING_SALES_FOR_REINGEST",
+            "_SQL_INSERT_BUILDING_SALES",
+            "_SQL_DELETE_LEASING_COMPS_FOR_REINGEST",
+            "_SQL_INSERT_LEASING_COMP",
+            "_SQL_DELETE_LAND_LISTINGS_FOR_REINGEST",
+            "_SQL_INSERT_LAND_LISTING",
+        ):
+            self.assertTrue(hasattr(research, const), f"missing {const}")
+            sql = getattr(research, const)
+            self.assertNotIn("{", sql, f"f-string brace in {const}: {sql}")
+
+    def test_no_print_in_phase6_1_helpers(self) -> None:
+        tree = ast.parse(RESEARCH_PY_SRC)
+        forbidden_names = {
+            "_resolve_market_from_county",
+            "_validate_headers_against_required",
+            "_validate_land_sales_comps_row",
+            "_validate_building_sales_comps_row",
+            "_validate_leasing_comps_row",
+            "_validate_land_listings_row",
+            "_load_land_sales_comps_file",
+            "_load_building_sales_comps_file",
+            "_load_leasing_comps_file",
+            "_load_land_listings_file",
+            "_load_land_sales_comps",
+            "_load_building_sales_comps",
+            "_load_leasing_comps",
+            "_load_land_listings",
+            "_ingest_one_comp_file",
+            "_market_resolver_with_county",
+            "_market_resolver_default",
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name not in forbidden_names:
+                    continue
+                for inner in ast.walk(node):
+                    if (isinstance(inner, ast.Call)
+                            and isinstance(inner.func, ast.Name)
+                            and inner.func.id == "print"):
+                        self.fail(f"print() in {node.name} at line {inner.lineno}")
+
+    def test_placeholder_helpers_removed(self) -> None:
+        # Phase 6.1 deletes the Phase 6 placeholder loader scaffold.
+        for name in (
+            "_load_placeholder",
+            "_load_land_sales_comps_placeholder",
+            "_load_building_sales_comps_placeholder",
+            "_load_leasing_comps_placeholder",
+            "_load_land_listings_placeholder",
+        ):
+            self.assertFalse(
+                hasattr(research, name),
+                f"placeholder {name!r} should have been removed in Phase 6.1",
+            )
+
+    def test_county_to_market_lookup_constant(self) -> None:
+        self.assertTrue(hasattr(research, "_COUNTY_TO_MARKET"))
+        self.assertEqual(
+            research._DEFAULT_INGESTION_MARKET, "Atlanta",
+        )
+

@@ -1,0 +1,4 @@
+address,parcel_id,county,submarket,acres,sale_date,sale_price,price_per_acre,buyer_name,seller_name,zoning,intended_use,cap_rate
+1234 Industrial Blvd,09F-1234-0001,Fulton,South Fulton,12.5,2026-03-14,1875000,150000,Acme Logistics LLC,Smith Family Trust,M-2,distribution,
+5678 Dogwood Pkwy,12C-5678-0002,Clayton,Clayton County,8.2,2026-02-18,1066000,130000,XYZ Holdings Inc,Jones Estate,M-1,industrial,
+9012 South Ridge Rd,15H-9012-0003,Henry,Henry County / I-75 South,22.8,2026-01-22,3192000,140000,Big Box REIT,ABC Industrial LLC,M-2,distribution,
