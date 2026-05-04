@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -4562,3 +4563,939 @@ class TestPhase9GitignorePresence(unittest.TestCase):
         self.assertIn("rankings/*.md", content)
         # snapshots/*.md was already there from before; double-check.
         self.assertIn("snapshots/*.md", content)
+
+
+# ===========================================================================
+# Phase 10 — experiment loop, setup phase, and TSV I/O
+# ===========================================================================
+# Per Agent 1 risk review at reviews/12_phase10_experiment_loop/01_risk_review.md
+# (R-701..R-733).  Test classes named TestPhase10<Topic> per the precedent.
+
+
+class TestPhase10TsvSchemaValidation(unittest.TestCase):
+    """R-719 — every rejection branch in _validate_log_row."""
+
+    def _base_row(self) -> dict:
+        return {
+            "commit": "abcdef0",
+            "metric": 5,
+            "confidence": 4.2,
+            "api_calls": 100,
+            "wall_clock_min": 12.3,
+            "status": "keep",
+            "description": "ok",
+        }
+
+    def test_valid_row_passes(self) -> None:
+        out = research._validate_log_row(self._base_row())
+        self.assertEqual(out["commit"], "abcdef0")
+        self.assertEqual(out["metric"], "5")
+        self.assertEqual(out["confidence"], "4.20")
+        self.assertEqual(out["status"], "keep")
+
+    def test_rejects_short_commit_sha(self) -> None:
+        row = self._base_row()
+        row["commit"] = "abc"
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_accepts_pending_commit(self) -> None:
+        row = self._base_row()
+        row["commit"] = "pending"
+        out = research._validate_log_row(row)
+        self.assertEqual(out["commit"], "pending")
+
+    def test_rejects_uppercase_sha(self) -> None:
+        row = self._base_row()
+        row["commit"] = "ABCDEF0"
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_float_metric(self) -> None:
+        row = self._base_row()
+        row["metric"] = 5.0
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_bool_metric(self) -> None:
+        row = self._base_row()
+        row["metric"] = True  # bool is a subclass of int
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_negative_metric(self) -> None:
+        row = self._base_row()
+        row["metric"] = -1
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_nan_confidence(self) -> None:
+        row = self._base_row()
+        row["confidence"] = float("nan")
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_inf_confidence(self) -> None:
+        row = self._base_row()
+        row["confidence"] = float("inf")
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_negative_confidence(self) -> None:
+        row = self._base_row()
+        row["confidence"] = -0.1
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_negative_wall_clock(self) -> None:
+        row = self._base_row()
+        row["wall_clock_min"] = -1.0
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_rejects_unknown_status(self) -> None:
+        row = self._base_row()
+        row["status"] = "approved"
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+    def test_accepts_each_known_status(self) -> None:
+        for status in ("baseline", "keep", "discard", "crash", "timeout", "halt"):
+            row = self._base_row()
+            row["status"] = status
+            out = research._validate_log_row(row)
+            self.assertEqual(out["status"], status)
+
+    def test_rejects_negative_api_calls(self) -> None:
+        row = self._base_row()
+        row["api_calls"] = -1
+        with self.assertRaises(ValueError):
+            research._validate_log_row(row)
+
+
+class TestPhase10DescriptionSanitization(unittest.TestCase):
+    """R-718 — tabs, newlines, NULs, length cap."""
+
+    def test_strips_tabs(self) -> None:
+        self.assertEqual(research._sanitize_description("a\tb"), "a b")
+
+    def test_strips_newlines(self) -> None:
+        self.assertEqual(research._sanitize_description("a\nb\r\nc"), "a b c")
+
+    def test_strips_null_bytes(self) -> None:
+        self.assertEqual(research._sanitize_description("a\x00b"), "a b")
+
+    def test_collapses_whitespace_runs(self) -> None:
+        self.assertEqual(research._sanitize_description("a   \t\n  b"), "a b")
+
+    def test_truncates_to_cap(self) -> None:
+        s = "x" * 500
+        out = research._sanitize_description(s)
+        self.assertLessEqual(len(out), research._TSV_DESCRIPTION_MAX_LEN)
+        self.assertTrue(out.endswith("…"))
+
+    def test_keeps_commas_unlike_csv(self) -> None:
+        self.assertEqual(
+            research._sanitize_description("added a,b,c"), "added a,b,c"
+        )
+
+    def test_handles_empty(self) -> None:
+        self.assertEqual(research._sanitize_description(""), "")
+
+    def test_handles_none(self) -> None:
+        self.assertEqual(research._sanitize_description(None), "")
+
+
+class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
+    """R-717 — header bootstrap on first write."""
+
+    def test_writes_header_when_file_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "experiment_log.tsv"
+            research.append_experiment_log_row(
+                {
+                    "commit": "abcdef0",
+                    "metric": 0,
+                    "confidence": 0.0,
+                    "api_calls": 0,
+                    "wall_clock_min": 0.0,
+                    "status": "baseline",
+                    "description": "first",
+                },
+                path=path,
+            )
+            content = path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            self.assertEqual(
+                lines[0],
+                "\t".join(research._TSV_COLUMNS),
+            )
+            self.assertEqual(len(lines), 2)
+
+    def test_writes_header_when_file_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "experiment_log.tsv"
+            path.touch()
+            research.append_experiment_log_row(
+                {
+                    "commit": "abcdef0",
+                    "metric": 1,
+                    "confidence": 0.0,
+                    "api_calls": 0,
+                    "wall_clock_min": 0.0,
+                    "status": "baseline",
+                    "description": "after empty",
+                },
+                path=path,
+            )
+            content = path.read_text(encoding="utf-8")
+            self.assertTrue(content.startswith("\t".join(research._TSV_COLUMNS)))
+
+    def test_skips_header_when_file_already_has_one(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "experiment_log.tsv"
+            research.append_experiment_log_row(
+                {
+                    "commit": "abcdef0",
+                    "metric": 0,
+                    "confidence": 0.0,
+                    "api_calls": 0,
+                    "wall_clock_min": 0.0,
+                    "status": "baseline",
+                    "description": "first",
+                },
+                path=path,
+            )
+            research.append_experiment_log_row(
+                {
+                    "commit": "1234567",
+                    "metric": 1,
+                    "confidence": 0.5,
+                    "api_calls": 10,
+                    "wall_clock_min": 1.0,
+                    "status": "keep",
+                    "description": "second",
+                },
+                path=path,
+            )
+            lines = path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 3)
+            self.assertEqual(lines[0], "\t".join(research._TSV_COLUMNS))
+
+
+class TestPhase10TsvAppendOnly(unittest.TestCase):
+    """R-716 — append-only semantics."""
+
+    def test_multiple_appends_preserve_prior_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "x.tsv"
+            for i in range(5):
+                research.append_experiment_log_row(
+                    {
+                        "commit": f"{i:07x}",
+                        "metric": i,
+                        "confidence": float(i),
+                        "api_calls": i * 10,
+                        "wall_clock_min": float(i),
+                        "status": "baseline" if i == 0 else "keep",
+                        "description": f"row {i}",
+                    },
+                    path=path,
+                )
+            rows = research.read_experiment_log(path)
+            self.assertEqual(len(rows), 5)
+            self.assertEqual(rows[0]["status"], "baseline")
+            self.assertEqual(rows[4]["metric"], "4")
+            self.assertEqual(
+                [r["description"] for r in rows],
+                ["row 0", "row 1", "row 2", "row 3", "row 4"],
+            )
+
+    def test_read_returns_empty_for_missing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "does_not_exist.tsv"
+            self.assertEqual(research.read_experiment_log(path), [])
+
+    def test_read_skips_only_exact_header(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "x.tsv"
+            # Manually write a fake "header-like" row that differs from the
+            # canonical header by one column; the reader must NOT skip it.
+            with path.open("w", encoding="utf-8") as fh:
+                fh.write("\t".join(research._TSV_COLUMNS) + "\n")
+                fh.write("commit\tmetric\tconfidence\tapi_calls\twall_clock_min\t"
+                         "status\twrong_desc\n")
+                fh.write("abcdef0\t1\t0.0\t0\t0.0\tbaseline\treal row\n")
+            rows = research.read_experiment_log(path)
+            # Only the canonical header is skipped; the second row (which
+            # has 7 columns but value "wrong_desc" in the description col)
+            # is parsed as data.
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0]["description"], "wrong_desc")
+            self.assertEqual(rows[1]["description"], "real row")
+
+
+class TestPhase10DecisionMatrix(unittest.TestCase):
+    """R-713 — every cell of the keep/discard/baseline/crash/timeout matrix."""
+
+    def test_first_row_is_baseline(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=None, prior_confidence=None,
+            new_metric=5, new_confidence=2.0, status="ok",
+        )
+        self.assertEqual(out, "baseline")
+
+    def test_strict_improvement_keeps(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=6, new_confidence=2.0, status="ok",
+        )
+        self.assertEqual(out, "keep")
+
+    def test_regression_discards(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=4, new_confidence=10.0, status="ok",
+        )
+        self.assertEqual(out, "discard")
+
+    def test_tied_metric_higher_confidence_keeps(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=5, new_confidence=3.0, status="ok",
+        )
+        self.assertEqual(out, "keep")
+
+    def test_tied_metric_equal_confidence_discards(self) -> None:
+        # R-714: simplicity criterion -- equal confidence on tied metric
+        # is a discard, not a keep.
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=5, new_confidence=2.0, status="ok",
+        )
+        self.assertEqual(out, "discard")
+
+    def test_tied_metric_lower_confidence_discards(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=5, new_confidence=1.99, status="ok",
+        )
+        self.assertEqual(out, "discard")
+
+    def test_tied_metric_isclose_confidence_discards(self) -> None:
+        # R-715: float tolerance absorbs ULP noise -- treated as equal.
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=5, new_confidence=2.0 + 1e-12, status="ok",
+        )
+        self.assertEqual(out, "discard")
+
+    def test_crash_short_circuits(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=999, new_confidence=999.0, status="crash",
+        )
+        self.assertEqual(out, "crash")
+
+    def test_timeout_short_circuits(self) -> None:
+        out = research.apply_keep_or_revert_decision(
+            prior_metric=5, prior_confidence=2.0,
+            new_metric=999, new_confidence=999.0, status="timeout",
+        )
+        self.assertEqual(out, "timeout")
+
+    def test_unknown_status_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            research.apply_keep_or_revert_decision(
+                prior_metric=5, prior_confidence=2.0,
+                new_metric=5, new_confidence=2.0, status="banana",
+            )
+
+
+class TestPhase10ParseTagFromBranch(unittest.TestCase):
+    """R-704 / Setup Step 1 -- branch name parsing."""
+
+    def test_extracts_tag_from_autoresearch_branch(self) -> None:
+        self.assertEqual(
+            research._parse_tag_from_branch("autoresearch/atl-2026-05-04"),
+            "atl-2026-05-04",
+        )
+
+    def test_returns_none_for_main(self) -> None:
+        self.assertIsNone(research._parse_tag_from_branch("main"))
+
+    def test_returns_none_for_dev_branch(self) -> None:
+        self.assertIsNone(research._parse_tag_from_branch("claude/foo-123"))
+
+    def test_rejects_uppercase_tag(self) -> None:
+        # Branch regex is lowercase-only.
+        self.assertIsNone(
+            research._parse_tag_from_branch("autoresearch/ATL-2026")
+        )
+
+    def test_accepts_dotted_tag(self) -> None:
+        self.assertEqual(
+            research._parse_tag_from_branch("autoresearch/v1.2.3"),
+            "v1.2.3",
+        )
+
+
+class TestPhase10HaltDetection(unittest.TestCase):
+    """R-725, R-728 -- halt sentinel."""
+
+    def setUp(self) -> None:
+        self._original_env = os.environ.pop(research._HALT_ENV_VAR, None)
+
+    def tearDown(self) -> None:
+        os.environ.pop(research._HALT_ENV_VAR, None)
+        if self._original_env is not None:
+            os.environ[research._HALT_ENV_VAR] = self._original_env
+
+    def test_no_halt_by_default(self) -> None:
+        # Sandbox may or may not have a real .halt; just check env-var path.
+        if not research._HALT_SENTINEL_PATH.exists():
+            self.assertFalse(research._halted())
+
+    def test_env_var_halts(self) -> None:
+        os.environ[research._HALT_ENV_VAR] = "1"
+        self.assertTrue(research._halted())
+
+    def test_env_var_empty_string_does_not_halt(self) -> None:
+        os.environ[research._HALT_ENV_VAR] = ""
+        # Empty env var is falsy in our check -- only set means halt.
+        # Hold the test: "" is treated as truthy by os.environ.get() because
+        # it's still set; our code uses `if os.environ.get(...):` which is
+        # falsy for "".
+        if not research._HALT_SENTINEL_PATH.exists():
+            self.assertFalse(research._halted())
+
+
+class TestPhase10LastBaselineOrKeep(unittest.TestCase):
+    """The prior-anchor selector that powers the next decision."""
+
+    def test_picks_last_keep_over_earlier_baseline(self) -> None:
+        rows = [
+            {"status": "baseline", "metric": "1", "confidence": "1.0"},
+            {"status": "keep", "metric": "2", "confidence": "1.5"},
+            {"status": "discard", "metric": "0", "confidence": "0.0"},
+        ]
+        anchor = research._last_baseline_or_keep(rows)
+        self.assertEqual(anchor["status"], "keep")
+        self.assertEqual(anchor["metric"], "2")
+
+    def test_returns_baseline_when_no_keeps_yet(self) -> None:
+        rows = [
+            {"status": "baseline", "metric": "5", "confidence": "1.0"},
+            {"status": "discard", "metric": "0", "confidence": "0.0"},
+            {"status": "crash", "metric": "0", "confidence": "0.0"},
+        ]
+        anchor = research._last_baseline_or_keep(rows)
+        self.assertEqual(anchor["status"], "baseline")
+        self.assertEqual(anchor["metric"], "5")
+
+    def test_returns_none_for_empty_log(self) -> None:
+        self.assertIsNone(research._last_baseline_or_keep([]))
+
+    def test_skips_crash_and_timeout(self) -> None:
+        rows = [
+            {"status": "baseline", "metric": "1", "confidence": "1.0"},
+            {"status": "crash", "metric": "0", "confidence": "0.0"},
+            {"status": "timeout", "metric": "0", "confidence": "0.0"},
+        ]
+        anchor = research._last_baseline_or_keep(rows)
+        self.assertEqual(anchor["status"], "baseline")
+
+
+class TestPhase10AssertAutoresearchBranch(unittest.TestCase):
+    """R-703 -- branch invariant."""
+
+    def test_refuses_main(self) -> None:
+        with mock.patch.object(research, "_git_current_branch", return_value="main"):
+            with self.assertRaises(research.SetupError) as cm:
+                research._assert_autoresearch_branch()
+            self.assertIn("autoresearch", str(cm.exception))
+
+    def test_refuses_dev_branch(self) -> None:
+        with mock.patch.object(
+            research, "_git_current_branch",
+            return_value="claude/setup-research-loop-ZUuA6",
+        ):
+            with self.assertRaises(research.SetupError):
+                research._assert_autoresearch_branch()
+
+    def test_refuses_detached_head(self) -> None:
+        with mock.patch.object(research, "_git_current_branch", return_value="HEAD"):
+            with self.assertRaises(research.SetupError):
+                research._assert_autoresearch_branch()
+
+    def test_accepts_autoresearch(self) -> None:
+        with mock.patch.object(
+            research, "_git_current_branch",
+            return_value="autoresearch/atl-2026-05-04",
+        ):
+            out = research._assert_autoresearch_branch()
+            self.assertEqual(out, "autoresearch/atl-2026-05-04")
+
+
+class TestPhase10VerifySetupComposite(unittest.TestCase):
+    """verify_setup composite status -- ok / warning / fail aggregation."""
+
+    def test_non_autoresearch_branch_makes_overall_fail(self) -> None:
+        with mock.patch.object(research, "_git_current_branch", return_value="main"), \
+             mock.patch.object(research, "_check_db_connection",
+                               return_value={"status": "ok", "postgis_version": "3.3"}), \
+             mock.patch.object(research, "_check_harness_for_market",
+                               return_value={"status": "ok", "per_county": {"fulton": "healthy"}}), \
+             mock.patch.object(research, "_check_corridor_bbox",
+                               return_value={"status": "ok", "seeded_count": 1}), \
+             mock.patch.object(research, "_check_costar_freshness",
+                               return_value={"status": "ok", "fresh_files": 5}):
+            out = research.verify_setup("atlanta")
+            self.assertEqual(out["status"], "fail")
+            self.assertFalse(out["is_autoresearch_branch"])
+
+    def test_all_ok_returns_ok(self) -> None:
+        with mock.patch.object(
+            research, "_git_current_branch",
+            return_value="autoresearch/atl-2026-05-04",
+        ), \
+            mock.patch.object(research, "_check_db_connection",
+                              return_value={"status": "ok", "postgis_version": "3.3"}), \
+            mock.patch.object(research, "_check_harness_for_market",
+                              return_value={"status": "ok", "per_county": {"fulton": "healthy"}}), \
+            mock.patch.object(research, "_check_corridor_bbox",
+                              return_value={"status": "ok", "seeded_count": 1}), \
+            mock.patch.object(research, "_check_costar_freshness",
+                              return_value={"status": "ok", "fresh_files": 5}):
+            out = research.verify_setup("atlanta")
+            self.assertEqual(out["status"], "ok")
+            self.assertEqual(out["tag"], "atl-2026-05-04")
+            self.assertTrue(out["is_autoresearch_branch"])
+
+    def test_costar_warning_with_otherwise_ok_returns_warning(self) -> None:
+        with mock.patch.object(
+            research, "_git_current_branch",
+            return_value="autoresearch/atl-2026-05-04",
+        ), \
+            mock.patch.object(research, "_check_db_connection",
+                              return_value={"status": "ok", "postgis_version": "3.3"}), \
+            mock.patch.object(research, "_check_harness_for_market",
+                              return_value={"status": "ok", "per_county": {"fulton": "healthy"}}), \
+            mock.patch.object(research, "_check_corridor_bbox",
+                              return_value={"status": "warning", "seeded_count": 0,
+                                            "note": "no bbox"}), \
+            mock.patch.object(research, "_check_costar_freshness",
+                              return_value={"status": "warning", "fresh_files": 0,
+                                            "note": "no exports"}):
+            out = research.verify_setup("atlanta")
+            self.assertEqual(out["status"], "warning")
+
+    def test_db_fail_returns_fail(self) -> None:
+        with mock.patch.object(
+            research, "_git_current_branch",
+            return_value="autoresearch/atl-2026-05-04",
+        ), \
+            mock.patch.object(research, "_check_db_connection",
+                              return_value={"status": "fail", "error": "no host"}), \
+            mock.patch.object(research, "_check_harness_for_market",
+                              return_value={"status": "ok", "per_county": {}}), \
+            mock.patch.object(research, "_check_costar_freshness",
+                              return_value={"status": "ok", "fresh_files": 1}):
+            out = research.verify_setup("atlanta")
+            self.assertEqual(out["status"], "fail")
+            # Bbox check was skipped because DB was down.
+            self.assertEqual(out["checks"]["corridor_bbox"]["status"], "skipped")
+
+
+class TestPhase10EvaluateMetricRouting(unittest.TestCase):
+    """R-701 -- evaluate() routes through prepare.calculate_* exclusively."""
+
+    def test_metric_value_comes_from_prepare(self) -> None:
+        # Sentinel: replace prepare.calculate_actionable_pipeline_count with
+        # a function returning a sentinel value, and confirm evaluate()
+        # surfaces it verbatim.
+        sentinel_metric = 7
+        sentinel_confidence = 6.5
+
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        with mock.patch.object(research, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", return_value={}), \
+             mock.patch.object(research, "run_scoring_cycle", return_value={}), \
+             mock.patch.object(research, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               return_value=sentinel_metric), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               return_value=sentinel_confidence), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = research.evaluate("atlanta")
+
+        self.assertEqual(result["metric"], sentinel_metric)
+        self.assertEqual(result["confidence"], sentinel_confidence)
+        self.assertEqual(result["status"], "ok")
+
+    def test_evaluate_calls_sub_cycles_in_order(self) -> None:
+        order: list[str] = []
+
+        def _track(name):
+            def _fn(*a, **kw):
+                order.append(name)
+                if name == "memo":
+                    return Path("/tmp/memo.md")
+                return {}
+            return _fn
+
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        with mock.patch.object(research, "run_ingestion_cycle", _track("ingestion")), \
+             mock.patch.object(research, "run_discovery_cycle", _track("discovery")), \
+             mock.patch.object(research, "run_scoring_cycle", _track("scoring")), \
+             mock.patch.object(research, "generate_strategy_memo", _track("memo")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               return_value=0), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               return_value=0.0), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            research.evaluate("atlanta")
+
+        self.assertEqual(order, ["ingestion", "discovery", "scoring", "memo"])
+
+    def test_evaluate_catches_crash_and_returns_status(self) -> None:
+        with mock.patch.object(research, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle",
+                               side_effect=RuntimeError("boom")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"):
+            result = research.evaluate("atlanta")
+        self.assertEqual(result["status"], "crash")
+        self.assertEqual(result["metric"], 0)
+        self.assertEqual(result["confidence"], 0.0)
+        self.assertIn("RuntimeError", result["error"])
+
+    def test_evaluate_catches_budget_exceeded(self) -> None:
+        with mock.patch.object(research, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle",
+                               side_effect=research.prepare.BudgetExceeded("90 min")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"):
+            result = research.evaluate("atlanta")
+        self.assertEqual(result["status"], "timeout")
+
+    def test_evaluate_calls_verify_parameters_unchanged(self) -> None:
+        called: list[bool] = []
+
+        def _fake_verify():
+            called.append(True)
+
+        with mock.patch.object(research.prepare, "verify_parameters_unchanged",
+                               _fake_verify), \
+             mock.patch.object(research, "run_ingestion_cycle",
+                               side_effect=RuntimeError("stop")):
+            research.evaluate("atlanta")
+        self.assertEqual(called, [True])
+
+
+class TestPhase10ExperimentLoopBaselineBootstrap(unittest.TestCase):
+    """Loop on empty TSV writes a baseline first."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        self.lock_path = Path(self.tmp.name) / ".lock"
+        self._old_tsv = os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        self._old_lock = os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(self.lock_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        if self._old_tsv is not None:
+            os.environ["EXPERIMENT_LOG_PATH"] = self._old_tsv
+        if self._old_lock is not None:
+            os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = self._old_lock
+        self.tmp.cleanup()
+
+    def _patch_setup_ok(self):
+        return mock.patch.object(
+            research, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        )
+
+    def _patch_evaluate(self, sequence):
+        it = iter(sequence)
+        return mock.patch.object(
+            research, "evaluate",
+            side_effect=lambda market, **kw: next(it),
+        )
+
+    def _make_eval(self, metric, confidence, status="ok"):
+        return {
+            "market": "atlanta", "status": status,
+            "metric": metric, "confidence": confidence,
+            "api_calls": 0, "wall_clock_min": 0.1,
+            "sub_summaries": {},
+        }
+
+    def test_refuses_without_baseline_and_unconfirmed(self) -> None:
+        with self._patch_setup_ok():
+            with self.assertRaises(research.SetupError) as cm:
+                research.experiment_loop("atlanta", max_iterations=0)
+            self.assertIn("baseline", str(cm.exception))
+
+    def test_bootstraps_baseline_when_confirmed(self) -> None:
+        evals = [self._make_eval(0, 0.0)]  # baseline-only, then exit
+        with self._patch_setup_ok(), \
+             self._patch_evaluate(evals), \
+             mock.patch.object(research, "_git_head_commit", return_value="abcdef0"):
+            summary = research.experiment_loop(
+                "atlanta", max_iterations=0, confirmed=True,
+            )
+        rows = research.read_experiment_log(self.tsv_path)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["status"], "baseline")
+        self.assertEqual(summary["iterations"], 0)
+
+
+class TestPhase10ExperimentLoopIterations(unittest.TestCase):
+    """Loop iteration semantics with explicit baseline."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        self.lock_path = Path(self.tmp.name) / ".lock"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(self.lock_path)
+        # Pre-seed a baseline row so the loop bootstraps cleanly.
+        research.append_experiment_log_row({
+            "commit": "0000000",
+            "metric": 5,
+            "confidence": 4.0,
+            "api_calls": 0,
+            "wall_clock_min": 0.0,
+            "status": "baseline",
+            "description": "baseline | market=atlanta",
+        }, path=self.tsv_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        self.tmp.cleanup()
+
+    def _patch_setup_ok(self):
+        return mock.patch.object(
+            research, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        )
+
+    def test_max_iterations_caps_loop(self) -> None:
+        evals = [
+            {"market": "atlanta", "status": "ok", "metric": 6, "confidence": 4.5,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
+            {"market": "atlanta", "status": "ok", "metric": 5, "confidence": 3.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
+            {"market": "atlanta", "status": "ok", "metric": 7, "confidence": 5.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
+        ]
+        with self._patch_setup_ok(), \
+             mock.patch.object(research, "evaluate", side_effect=evals), \
+             mock.patch.object(research, "_git_head_commit",
+                               side_effect=["1111111", "2222222", "3333333"]):
+            summary = research.experiment_loop("atlanta", max_iterations=2)
+        rows = research.read_experiment_log(self.tsv_path)
+        # baseline + 2 iterations.
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(summary["iterations"], 2)
+        # First iteration improved -> keep.  Second regressed -> discard.
+        self.assertEqual(rows[1]["status"], "keep")
+        self.assertEqual(rows[2]["status"], "discard")
+
+    def test_decision_uses_last_keep_anchor(self) -> None:
+        evals = [
+            # first iter: 6 > baseline(5) -> keep; anchor becomes 6.
+            {"market": "atlanta", "status": "ok", "metric": 6, "confidence": 5.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
+            # second iter: 5 == baseline(5) but anchor is now 6, so 5<6 -> discard.
+            {"market": "atlanta", "status": "ok", "metric": 5, "confidence": 9.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
+        ]
+        with self._patch_setup_ok(), \
+             mock.patch.object(research, "evaluate", side_effect=evals), \
+             mock.patch.object(research, "_git_head_commit",
+                               side_effect=["1111111", "2222222"]):
+            research.experiment_loop("atlanta", max_iterations=2)
+        rows = research.read_experiment_log(self.tsv_path)
+        self.assertEqual(rows[1]["status"], "keep")
+        self.assertEqual(rows[2]["status"], "discard")
+
+    def test_crash_isolated_loop_continues(self) -> None:
+        evals = [
+            {"market": "atlanta", "status": "crash", "metric": 0, "confidence": 0.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "error": "boom",
+             "sub_summaries": {}},
+            {"market": "atlanta", "status": "ok", "metric": 6, "confidence": 5.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
+        ]
+        with self._patch_setup_ok(), \
+             mock.patch.object(research, "evaluate", side_effect=evals), \
+             mock.patch.object(research, "_git_head_commit",
+                               side_effect=["1111111", "2222222"]):
+            research.experiment_loop("atlanta", max_iterations=2)
+        rows = research.read_experiment_log(self.tsv_path)
+        self.assertEqual(rows[1]["status"], "crash")
+        self.assertEqual(rows[2]["status"], "keep")
+
+    def test_halt_via_env_exits_loop_cleanly(self) -> None:
+        # First iteration sets the halt env var; loop exits before iter 2.
+        def _evaluate(market, **kw):
+            os.environ[research._HALT_ENV_VAR] = "1"
+            return {"market": "atlanta", "status": "ok", "metric": 6,
+                    "confidence": 5.0, "api_calls": 0, "wall_clock_min": 0.1,
+                    "sub_summaries": {}}
+
+        try:
+            with self._patch_setup_ok(), \
+                 mock.patch.object(research, "evaluate", side_effect=_evaluate), \
+                 mock.patch.object(research, "_git_head_commit",
+                                   return_value="1111111"):
+                summary = research.experiment_loop("atlanta", max_iterations=10)
+        finally:
+            os.environ.pop(research._HALT_ENV_VAR, None)
+        self.assertEqual(summary["iterations"], 1)
+        rows = research.read_experiment_log(self.tsv_path)
+        # baseline + 1 keep + halt row
+        statuses = [r["status"] for r in rows]
+        self.assertIn("halt", statuses)
+
+
+class TestPhase10ExperimentLoopAdvisoryLock(unittest.TestCase):
+    """R-729 -- second concurrent invocation fails with LoopLockError."""
+
+    def test_second_acquire_raises(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            lock_path = Path(tmp) / ".lock"
+            os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(lock_path)
+            try:
+                with research._acquire_loop_lock():
+                    with self.assertRaises(research.LoopLockError):
+                        with research._acquire_loop_lock():
+                            pass
+            finally:
+                os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+
+    def test_lock_releases_on_normal_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            lock_path = Path(tmp) / ".lock"
+            os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(lock_path)
+            try:
+                with research._acquire_loop_lock():
+                    pass
+                # Should be acquirable again.
+                with research._acquire_loop_lock():
+                    pass
+            finally:
+                os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+
+
+class TestPhase10ExperimentLoopReadOnlyVsImmutables(unittest.TestCase):
+    """G2/G6/G11 -- import-level checks that Phase 10 cannot mutate the
+    immutable layer."""
+
+    def test_no_writes_to_immutable_layer(self) -> None:
+        # research.py legitimately READS sources.json and parameters.json
+        # in many places (json.loads / .read_text), and uses json.dumps for
+        # research_log notes + cache files + JSONB columns.  The Five-File
+        # Contract ban is on WRITING parameters.json or sources.json, which
+        # would require either ``open(... "w")`` or ``write_text`` on the
+        # immutable paths.  Verify both forms are absent.
+        src = RESEARCH_PY_SRC
+        for path_const in ("_PARAMETERS_PATH", "_SOURCES_PATH"):
+            for forbidden in ('"w"', "'w'", '"w+"', "'w+'", '"a"', "'a'"):
+                bad = f"{path_const}.open({forbidden}"
+                self.assertNotIn(
+                    bad, src,
+                    f"research.py must not open {path_const} with {forbidden}",
+                )
+            self.assertNotIn(
+                f"{path_const}.write_text", src,
+                f"research.py must not write_text to {path_const}",
+            )
+            self.assertNotIn(
+                f"{path_const}.write_bytes", src,
+                f"research.py must not write_bytes to {path_const}",
+            )
+
+    def test_experiment_loop_is_callable_not_notimplemented(self) -> None:
+        # G9 -- the stub is gone.
+        import inspect
+        src = inspect.getsource(research.experiment_loop)
+        self.assertNotIn("NotImplementedError", src)
+        self.assertIn("Karpathy", src)
+
+
+class TestPhase10TsvCommitFormat(unittest.TestCase):
+    """R-719 -- commit shape acceptance."""
+
+    def _row_with_commit(self, commit):
+        return {
+            "commit": commit, "metric": 0, "confidence": 0.0, "api_calls": 0,
+            "wall_clock_min": 0.0, "status": "baseline", "description": "x",
+        }
+
+    def test_seven_char_sha(self) -> None:
+        out = research._validate_log_row(self._row_with_commit("0123abc"))
+        self.assertEqual(out["commit"], "0123abc")
+
+    def test_forty_char_sha(self) -> None:
+        sha = "0" * 40
+        out = research._validate_log_row(self._row_with_commit(sha))
+        self.assertEqual(out["commit"], sha)
+
+    def test_empty_commit_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            research._validate_log_row(self._row_with_commit(""))
+
+    def test_special_chars_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            research._validate_log_row(self._row_with_commit("abcd!ef"))
+
+
+class TestPhase10ConstantsContract(unittest.TestCase):
+    """G1 / G3 -- module-level constants exist and have the right shape."""
+
+    def test_columns_are_seven(self) -> None:
+        self.assertEqual(len(research._TSV_COLUMNS), 7)
+
+    def test_columns_match_spec(self) -> None:
+        self.assertEqual(
+            research._TSV_COLUMNS,
+            ("commit", "metric", "confidence", "api_calls",
+             "wall_clock_min", "status", "description"),
+        )
+
+    def test_status_set_matches_spec(self) -> None:
+        # AUTORESEARCH_MECHANICS.md L309 specifies five statuses; we add
+        # 'halt' as a Phase 10 extension for clean exit accounting.
+        expected = {"baseline", "keep", "discard", "crash", "timeout", "halt"}
+        self.assertEqual(research._TSV_STATUSES, frozenset(expected))
+
+    def test_branch_regex_lowercase_only(self) -> None:
+        self.assertIsNotNone(
+            research._AUTORESEARCH_BRANCH_RE.match("autoresearch/atl-2026")
+        )
+        self.assertIsNone(
+            research._AUTORESEARCH_BRANCH_RE.match("autoresearch/ATL-2026")
+        )
+
+    def test_budget_is_ninety_minutes(self) -> None:
+        # AUTORESEARCH_MECHANICS.md L153 says 90 minutes.
+        self.assertEqual(research._PHASE10_BUDGET_SECONDS, 90 * 60)
