@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -35,9 +37,27 @@ class TestImportSafety(unittest.TestCase):
     """R-01/R-02: module imports without DATABASE_URL or any DB activity."""
 
     def test_no_prepare_or_psycopg_imports(self):
-        # The module must NOT have imported prepare or psycopg at load time.
-        self.assertNotIn("prepare", sys.modules)
-        self.assertNotIn("psycopg", sys.modules)
+        # Verify the import boundary of connector_harness in a CLEAN process —
+        # checking sys.modules in this process is brittle because any other
+        # test that imports research/prepare (e.g. test_discovery, test_prepare)
+        # leaves prepare/psycopg in sys.modules regardless of what
+        # connector_harness itself imports.
+        probe = textwrap.dedent(
+            """
+            import sys
+            sys.path.insert(0, %r)
+            import connector_harness  # noqa: F401
+            assert "prepare" not in sys.modules, "connector_harness imports prepare"
+            assert "psycopg" not in sys.modules, "connector_harness imports psycopg"
+            """ % str(REPO_ROOT)
+        )
+        env = {k: v for k, v in os.environ.items() if k != "DATABASE_URL"}
+        result = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True, text=True, env=env, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0,
+                         msg=f"stdout={result.stdout!r} stderr={result.stderr!r}")
 
     def test_module_has_no_db_globals(self):
         for name in ("DATABASE_URL", "engine", "_pool", "session_factory"):

@@ -251,14 +251,20 @@ def load_registry(
             optional_fields=tuple(ovl.get("optional_fields") or ()),
         )
 
-    # Validate overlay keys exist in sources.json (risk review 9.j).
-    for key in overlay:
-        if key.startswith("_"):
-            continue
-        if key not in parcel_block:
-            logger.warning(
-                "connector_registry.json key %r has no matching entry in sources.json", key
-            )
+    # Validate overlay keys exist in sources.json (risk review 9.j). A typo
+    # in connector_registry.json would otherwise drop a connector silently
+    # and only surface as a KeyError later when someone runs
+    # `--county <typo>`. Fail loudly at load time instead.
+    orphans = [
+        key for key in overlay
+        if not key.startswith("_") and key not in parcel_block
+    ]
+    if orphans:
+        raise ValueError(
+            "connector_registry.json has overlay keys with no matching "
+            f"entry in sources.json: {sorted(orphans)}. Either add the "
+            "source to sources.json or remove the overlay key."
+        )
 
     return out
 
@@ -461,6 +467,14 @@ def check_field_mapping(
     schema. R-07: report case-difference hint when names differ only by case."""
     if not layer_schema:
         return CheckResult("field_mapping", "skipped", {"reason": "no layer schema"})
+    # An empty or all-null field_mapping is an invalid configuration: nothing
+    # would be ingested from this layer. Treat as a hard fail so the
+    # misconfiguration surfaces during harness runs instead of silently
+    # passing.
+    non_null = [v for v in connector.field_mapping.values() if v]
+    if not non_null:
+        return CheckResult("field_mapping", "fail",
+                           {"reason": "field_mapping is empty or all-null"})
     server_fields = {f.get("name") for f in layer_schema.get("fields") or []}
     server_fields_lower = {n.lower(): n for n in server_fields if n}
     missing: List[str] = []
@@ -738,7 +752,11 @@ def check_geometry_validation(
             empty += 1
             continue
         # Check first ring's first coordinate as a representative.
-        x, y = rings[0][0][0], rings[0][0][1]
+        first_coord = rings[0][0]
+        if not first_coord or len(first_coord) < 2:
+            empty += 1
+            continue
+        x, y = first_coord[0], first_coord[1]
         # WGS84 sanity: longitude in [-180, 180], latitude in [-90, 90].
         if not (-180 <= x <= 180 and -90 <= y <= 90):
             out_of_range += 1
@@ -941,32 +959,81 @@ def _run_all_checks(connector: Connector, quick: bool = False) -> Dict[str, Any]
     results: List[CheckResult] = []
     errors: List[str] = []
 
-    r1 = check_service_alive(connector, session); results.append(r1)
-    r2_pair = check_layer_schema(connector, session); r2, layer_schema = r2_pair
+    def _safe(name: str, fn, *args, **kwargs) -> CheckResult:
+        """Run a check; convert any unhandled exception into a fail result.
+        Without this, a NoneType/KeyError in one check would crash the whole
+        connector run instead of being recorded as a single failed check."""
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:  # noqa: BLE001 — intentional broad catch
+            errors.append(f"{name} crashed: {e.__class__.__name__}: {e}")
+            return CheckResult(name, "fail",
+                               {"crash": f"{e.__class__.__name__}: {e}"})
+
+    def _safe_pair(name: str, fn, *args, **kwargs):
+        """Variant for checks that return (CheckResult, payload). On crash
+        return a fail CheckResult and an empty payload of the appropriate
+        shape (None for schema, [] for features)."""
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{name} crashed: {e.__class__.__name__}: {e}")
+            payload: Any = [] if name == "known_good_query" else None
+            return CheckResult(name, "fail",
+                               {"crash": f"{e.__class__.__name__}: {e}"}), payload
+
+    results.append(_safe("service_alive", check_service_alive, connector, session))
+    r2, layer_schema = _safe_pair("layer_schema", check_layer_schema, connector, session)
     results.append(r2)
-    r3 = check_field_mapping(connector, layer_schema); results.append(r3)
-    r4_pair = check_known_good_query(connector, session); r4, features = r4_pair
+    results.append(_safe("field_mapping", check_field_mapping, connector, layer_schema))
+    r4, features = _safe_pair("known_good_query", check_known_good_query, connector, session)
     results.append(r4)
-    r5 = check_field_population(features, connector.field_mapping,
-                                optional_fields=connector.optional_fields)
-    results.append(r5)
-    r6 = check_owner_data_sanity(features, connector.owner_field
-                                 or connector.field_mapping.get("owner_name")); results.append(r6)
-    r7 = check_address_parsing(features, connector.field_mapping); results.append(r7)
+    results.append(_safe(
+        "field_population", check_field_population, features,
+        connector.field_mapping, optional_fields=connector.optional_fields,
+    ))
+    results.append(_safe(
+        "owner_data_sanity", check_owner_data_sanity, features,
+        connector.owner_field or connector.field_mapping.get("owner_name"),
+    ))
+    results.append(_safe(
+        "address_parsing", check_address_parsing, features, connector.field_mapping,
+    ))
     if quick:
         results.append(CheckResult("geometry_validation", "skipped", {"reason": "quick mode"}))
-        results.append(check_pagination(connector, session))
+        results.append(_safe("pagination", check_pagination, connector, session))
         results.append(CheckResult("performance_baseline", "skipped", {"reason": "quick mode"}))
     else:
-        results.append(check_geometry_validation(features, connector.expected_bbox))
-        results.append(check_pagination(connector, session))
-        results.append(check_performance_baseline(connector, session))
+        results.append(_safe(
+            "geometry_validation", check_geometry_validation,
+            features, connector.expected_bbox,
+        ))
+        results.append(_safe("pagination", check_pagination, connector, session))
+        results.append(_safe(
+            "performance_baseline", check_performance_baseline, connector, session,
+        ))
 
     # Redact sample features (max 3 for the report) before any serialization.
     sample = features[:3]
     redacted = [_redact_feature(f, connector.field_mapping) for f in sample]
     sanitized, fs_warnings = _failsafe_check(redacted)
     return _build_report(connector, results, sanitized, fs_warnings, errors)
+
+
+def _safe_run_checks(connector: Connector, quick: bool) -> Dict[str, Any]:
+    """Wrap _run_all_checks so an unexpected crash becomes a failing report
+    instead of propagating up and aborting a multi-connector run."""
+    try:
+        return _run_all_checks(connector, quick=quick)
+    except Exception as e:
+        return {
+            "county": connector.county, "market": connector.market,
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "overall_health": "failing",
+            "checks": {}, "sample_features": [], "warnings": [],
+            "errors": [f"harness crash: {e.__class__.__name__}: {e}"],
+            "connector_config_snapshot": {"access": connector.access},
+        }
 
 
 def run_harness_for_county(name: str, quick: bool = False) -> Dict[str, Any]:
@@ -980,7 +1047,7 @@ def run_harness_for_county(name: str, quick: bool = False) -> Dict[str, Any]:
         else:
             raise KeyError(f"connector {name!r} not in registry "
                            f"(known: {sorted(registry)})")
-    report = _run_all_checks(registry[name], quick=quick)
+    report = _safe_run_checks(registry[name], quick=quick)
     _write_report(report)
     return report
 
@@ -990,17 +1057,7 @@ def run_harness_for_all_counties(quick: bool = False) -> List[Dict[str, Any]]:
     registry = load_registry()
     out: List[Dict[str, Any]] = []
     for name, connector in registry.items():
-        try:
-            report = _run_all_checks(connector, quick=quick)
-        except Exception as e:  # surface as failing report rather than crash
-            report = {
-                "county": connector.county, "market": connector.market,
-                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                "overall_health": "failing",
-                "checks": {}, "sample_features": [], "warnings": [],
-                "errors": [f"harness crash: {e.__class__.__name__}: {e}"],
-                "connector_config_snapshot": {"access": connector.access},
-            }
+        report = _safe_run_checks(connector, quick=quick)
         _write_report(report)
         out.append(report)
     _write_dashboard(out)
@@ -1123,7 +1180,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             for name, conn in registry.items():
                 if conn.market != args.market:
                     continue
-                reports.append(_run_all_checks(conn, quick=args.quick))
+                reports.append(_safe_run_checks(conn, quick=args.quick))
                 _write_report(reports[-1])
             _write_dashboard(reports)
         else:
