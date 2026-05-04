@@ -652,23 +652,40 @@ _SQL_COUNT_LOG_FOR_CYCLE = (
     "SELECT COUNT(*) FROM research_log WHERE cycle_id = %s"
 )
 
+# Phase 7+8 (R-501): _SQL_INSERT_PARCEL_SCORE writes 10 columns into the
+# parcel_scores DDL block defined in prepare.py:317-332. The DDL itself is
+# untouched; only the INSERT projection is extended. Columns added vs.
+# Phase 5: actionability_blockers (JSONB), strategy_fit (JSONB),
+# primary_strategy (TEXT). The static-check test
+# TestPhase78SqlConstantsStaticChecks asserts each named column in this
+# string also appears in prepare._DDL_PARCEL_SCORES.
 _SQL_INSERT_PARCEL_SCORE = (
     "INSERT INTO parcel_scores ("
     "parcel_id, composite_score, confidence_score, "
-    "actionability, sub_scores, notes"
-    ") VALUES (%s, %s, %s, %s, %s::jsonb, %s) "
+    "actionability, actionability_blockers, "
+    "sub_scores, strategy_fit, primary_strategy, notes"
+    ") VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s) "
     "RETURNING score_id"
 )
 
 _SQL_INSERT_RESEARCH_LOG_SCORING = (
     "INSERT INTO research_log "
     "(cycle_id, action_type, market, parcel_id, "
-    "composite_score, actionability, notes) "
-    "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    "composite_score, actionability, strategy_fit, notes) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
 )
 
+# Phase 7+8 (R-526, R-527, R-535..R-539, R-544): _SQL_FETCH_PARCEL is
+# extended with submarket, state, acreage, last_sale_date,
+# last_sale_price, and assessed_value_total. These feed the S4/S5/S6
+# market_context join (submarket), the S8 basis proxy ladder
+# (last_sale_*, assessed_value_total, acreage), the GA assessed-value
+# 2.5x inflation rule (state), and the BTS/ground-lease minimum-acreage
+# strategy-fit branches. Phase 5 tests that queued the 4-column tuple
+# are updated to queue the 9-column tuple.
 _SQL_FETCH_PARCEL = (
-    "SELECT parcel_id, market, "
+    "SELECT parcel_id, market, submarket, state, acreage, "
+    "last_sale_date, last_sale_price, assessed_value_total, "
     "ST_X(centroid)::float AS centroid_lng, "
     "ST_Y(centroid)::float AS centroid_lat "
     "FROM parcels WHERE parcel_id = %s"
@@ -690,18 +707,77 @@ _SQL_S2_GEOMETRY = (
     "FROM g WHERE geom IS NOT NULL"
 )
 
-_SQL_LIST_UNSCORED_PARCELS = (
-    "SELECT parcel_id FROM parcels p "
-    "WHERE market = %s "
-    "AND NOT EXISTS ("
-    "  SELECT 1 FROM parcel_scores ps WHERE ps.parcel_id = p.parcel_id"
+# Phase 7+8 (R-507, R-510): include parcels whose LATEST parcel_scores
+# row has actionability='PENDING'. Phase 5 left every scored parcel at
+# PENDING; Phase 7+8 must re-score those so the metric SQL in prepare.py
+# (which selects MAX(scored_at)) sees a PASS verdict on a fresh row.
+# The new row is APPENDED — we never UPDATE in place.
+_SQL_LIST_PARCELS_FOR_SCORING = (
+    "SELECT p.parcel_id FROM parcels p "
+    "WHERE p.market = %s "
+    "AND ("
+    "  NOT EXISTS ("
+    "    SELECT 1 FROM parcel_scores ps WHERE ps.parcel_id = p.parcel_id"
+    "  )"
+    "  OR ("
+    "    SELECT ps.actionability FROM parcel_scores ps "
+    "    WHERE ps.parcel_id = p.parcel_id "
+    "    ORDER BY ps.scored_at DESC LIMIT 1"
+    "  ) = 'PENDING'"
     ") "
-    "ORDER BY parcel_id"
+    "ORDER BY p.parcel_id"
 )
+
+# Backwards-compat alias retained for the AST scanner test that walks
+# module-level SQL constants. New callers use _SQL_LIST_PARCELS_FOR_SCORING.
+_SQL_LIST_UNSCORED_PARCELS = _SQL_LIST_PARCELS_FOR_SCORING
 
 _SQL_COUNT_LOG_FOR_SCORING_CYCLE = (
     "SELECT COUNT(*) FROM research_log "
     "WHERE cycle_id = %s AND action_type = 'scoring'"
+)
+
+# Phase 7 (R-511..R-515, R-516..R-518, R-519..R-522): latest market_context
+# row per submarket, with CoStar preferred when sources tie on as_of_date.
+# Returns vacancy/absorption/under_construction/proposed/asking_rent and the
+# as_of_date so the caller can apply the staleness flag (R-514).
+_SQL_LATEST_MARKET_CONTEXT = (
+    "SELECT vacancy_rate_pct, net_absorption_t12_sf, "
+    "under_construction_sf, proposed_sf, asking_rent_nnn_psf, "
+    "as_of_date, source "
+    "FROM market_context "
+    "WHERE submarket_id = %s "
+    "ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END), "
+    "         as_of_date DESC "
+    "LIMIT 1"
+)
+
+# Phase 7 (R-523..R-526): submarket land-only median price-per-acre
+# computed over comp_type='land' rows in the last 36 months. The
+# minimum sample size of 3 (R-524) is enforced in code, not SQL — we
+# return both the median AND the count so the caller can decide.
+_SQL_SUBMARKET_LAND_MEDIAN = (
+    "SELECT "
+    "  COUNT(*) AS n, "
+    "  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre) "
+    "    AS median_price_per_acre "
+    "FROM sales_comps "
+    "WHERE submarket_id = %s "
+    "  AND comp_type = 'land' "
+    "  AND price_per_acre IS NOT NULL "
+    "  AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')"
+)
+
+# Phase 8 (R-533): synthetic deal-killer evidence comes from open
+# flagged_items rows of flag_type='actionability_block' attached to the
+# parcel. Phase 11+ adds richer signals (PACER, lis pendens, etc.); for
+# now this is the single channel the agent honours.
+_SQL_FLAGGED_ACTIONABILITY_BLOCK = (
+    "SELECT description FROM flagged_items "
+    "WHERE parcel_id = %s "
+    "  AND flag_type = 'actionability_block' "
+    "  AND status = 'open' "
+    "ORDER BY flagged_at DESC LIMIT 1"
 )
 
 # Phase 6 — CoStar ingestion (R-321, R-326). All statements use %s
@@ -1749,10 +1825,534 @@ def _compute_confidence(sub_scores: Mapping[str, int | None]) -> float:
     return min(1.0, max(0.0, populated / len(_SUB_SCORE_NAMES)))
 
 
+# ===========================================================================
+# Phase 7 — CoStar-dependent sub-scores (S4, S5, S6, refined S8)
+# ===========================================================================
+# Per reviews/10_phase7_8_combined/01_risk_review.md §3.3-§3.6 (R-511..R-528).
+# All four helpers are pure-function score mappings; the conn-bound
+# orchestrators below call them after a single market_context fetch (R-518)
+# and a separate sales_comps fetch for S8.
+
+# R-514: market_context staleness flag threshold. program.md L743 mandates
+# refresh every 30 days; a stale row still scores but emits a data_gap flag.
+_MARKET_CONTEXT_STALENESS_DAYS: int = 30
+
+# R-524, R-525: S8 sample-size minimum and lookback window.
+_S8_MIN_LAND_COMPS: int = 3
+_S8_LOOKBACK_MONTHS: int = 36
+
+# R-527: GA assesses at 40% of FMV. When falling back to assessed_value_total
+# as a basis proxy, inflate by 1/0.4 = 2.5 to compare apples-to-apples
+# against sale comps. Phase 14+ multi-state expansion will need a state-keyed
+# table.
+_GA_ASSESSMENT_RATIO: float = 0.40
+_GA_BASIS_INFLATION_FACTOR: float = 1.0 / _GA_ASSESSMENT_RATIO  # = 2.5
+
+
+def _score_vacancy(vacancy_rate_pct: float | None) -> int | None:
+    """S4 — submarket vacancy. program.md L189 cuts:
+
+        10 = <3%; 8 = 3-5%; 6 = 5-7%; 3 = 7-10%; 0 = >10%.
+
+    Boundaries are STRICT inequalities at the lower edge (R-515): exactly
+    3.0% maps to 8, exactly 5.0% maps to 6, exactly 7.0% maps to 3,
+    exactly 10.0% maps to 3 (NOT 0 — '>10%' is strict).
+    """
+    if vacancy_rate_pct is None:
+        return None
+    v = float(vacancy_rate_pct)
+    if v < 3.0:
+        return 10
+    if v < 5.0:
+        return 8
+    if v < 7.0:
+        return 6
+    if v <= 10.0:
+        return 3
+    return 0
+
+
+def _score_absorption(net_absorption_t12_sf: float | None) -> int | None:
+    """S5 — submarket net absorption (T12). program.md L191 cuts:
+
+        10 = strong positive (>2M SF); 7 = positive (500K-2M);
+        4 = flat (±500K); 0 = negative.
+
+    The "negative" band per program.md is '< -500K' (so the flat ±500K
+    band covers -500K..+500K) — see risk review R-516.
+    """
+    if net_absorption_t12_sf is None:
+        return None
+    a = float(net_absorption_t12_sf)
+    if a > 2_000_000:
+        return 10
+    if a >= 500_000:
+        return 7
+    if a >= -500_000:
+        return 4
+    return 0
+
+
+def _score_pipeline(under_construction_sf: float | None) -> int | None:
+    """S6 — competing pipeline (submarket-grain approximation).
+
+    program.md L192 specifies a 5-mile radius; we approximate at submarket
+    grain (R-519) and emit a data_gap flag in the orchestrator. Cuts:
+
+        10 = no spec construction; 7 = <500K SF; 4 = 500K-1.5M; 0 = >1.5M.
+
+    Null pipeline → 10 (R-521: absence of evidence in a curated CoStar
+    export is treated as no competing supply on file).
+    """
+    if under_construction_sf is None:
+        return 10
+    p = float(under_construction_sf)
+    if p <= 0:
+        return 10
+    if p < 500_000:
+        return 7
+    if p <= 1_500_000:
+        return 4
+    return 0
+
+
+def _score_basis(
+    parcel_basis_per_acre: float | None,
+    submarket_median_per_acre: float | None,
+) -> int | None:
+    """S8 — refined land basis vs. submarket median. program.md L193 cuts:
+
+        10 = below submarket median; 7 = at median;
+        4 = 10-25% above; 0 = >25% above.
+
+    Bands are explicit (R-528): basis < 0.95*median → 10;
+    0.95*median <= basis <= 1.10*median → 7;
+    1.10*median < basis <= 1.25*median → 4;
+    basis > 1.25*median → 0.
+    """
+    if parcel_basis_per_acre is None or submarket_median_per_acre is None:
+        return None
+    if submarket_median_per_acre <= 0:
+        return None
+    ratio = float(parcel_basis_per_acre) / float(submarket_median_per_acre)
+    if ratio < 0.95:
+        return 10
+    if ratio <= 1.10:
+        return 7
+    if ratio <= 1.25:
+        return 4
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 conn-bound score orchestrators
+# ---------------------------------------------------------------------------
+def _compute_market_context_scores(
+    conn: Any,
+    submarket: str | None,
+) -> dict[str, Any]:
+    """Fetch the latest market_context row and produce S4/S5/S6 + flags.
+
+    Returns a dict with keys S4, S5, S6 (each int | None), plus
+    `staleness_days` (int | None) and `provenance` (str | None) for the
+    caller to thread into the data_gap flag emission.
+    """
+    out: dict[str, Any] = {
+        "S4": None,
+        "S5": None,
+        "S6": None,
+        "staleness_days": None,
+        "provenance": None,
+        "as_of_date": None,
+        "source": None,
+    }
+    if not submarket:
+        return out
+    with conn.cursor() as cur:
+        cur.execute(_SQL_LATEST_MARKET_CONTEXT, (submarket,))
+        row = cur.fetchone()
+    if not row:
+        return out
+    vacancy, absorption, under_constr, _proposed, _rent, as_of, source = (
+        row[0], row[1], row[2], row[3], row[4], row[5], row[6],
+    )
+    out["S4"] = _score_vacancy(vacancy)
+    out["S5"] = _score_absorption(absorption)
+    out["S6"] = _score_pipeline(under_constr)
+    out["as_of_date"] = as_of
+    out["source"] = source
+    if as_of is not None:
+        try:
+            from datetime import date as _date  # local to avoid module-level churn
+            today = _date.today()
+            delta = (today - as_of).days if hasattr(as_of, "year") else None
+            out["staleness_days"] = delta
+        except Exception:
+            out["staleness_days"] = None
+    out["provenance"] = (
+        f"market_context source={source} as_of={as_of} submarket={submarket}"
+    )
+    return out
+
+
+def _compute_parcel_basis_per_acre(parcel: Mapping[str, Any]) -> tuple[float | None, str]:
+    """Resolve the parcel's $/acre basis using the R-526 fallback ladder.
+
+    Returns (basis, provenance). provenance is one of:
+    - 'recent_sale' — last_sale_date within 24 months and last_sale_price > 0
+    - 'assessed_inflated_ga' — assessed_value_total / acreage * 2.5 (state=GA)
+    - 'assessed_raw' — assessed_value_total / acreage (non-GA)
+    - 'unavailable' — no usable proxy
+    """
+    acreage = parcel.get("acreage")
+    if not acreage or float(acreage) <= 0:
+        return None, "unavailable"
+    last_sale_price = parcel.get("last_sale_price")
+    last_sale_date = parcel.get("last_sale_date")
+    # Recent-sale branch.
+    if last_sale_price and last_sale_date is not None:
+        try:
+            from datetime import date as _date
+            today = _date.today()
+            cutoff_days = 24 * 30  # ~24 months
+            age = (today - last_sale_date).days if hasattr(last_sale_date, "year") else None
+            if age is not None and 0 <= age <= cutoff_days and float(last_sale_price) > 0:
+                return float(last_sale_price) / float(acreage), "recent_sale"
+        except Exception:
+            pass
+    assessed = parcel.get("assessed_value_total")
+    if assessed and float(assessed) > 0:
+        per_acre = float(assessed) / float(acreage)
+        state = (parcel.get("state") or "").upper()
+        if state == "GA":
+            return per_acre * _GA_BASIS_INFLATION_FACTOR, "assessed_inflated_ga"
+        return per_acre, "assessed_raw"
+    return None, "unavailable"
+
+
+def _compute_s8(
+    conn: Any,
+    parcel: Mapping[str, Any],
+) -> tuple[int | None, dict[str, Any]]:
+    """S8 — refined land basis. Returns (score, provenance dict).
+
+    Provenance dict keys: basis_per_acre, basis_provenance, median,
+    median_n, n_below_min (bool — true when < _S8_MIN_LAND_COMPS comps).
+    """
+    basis, basis_prov = _compute_parcel_basis_per_acre(parcel)
+    submarket = parcel.get("submarket")
+    median: float | None = None
+    n: int = 0
+    if submarket:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_SUBMARKET_LAND_MEDIAN, (submarket,))
+            row = cur.fetchone()
+        if row:
+            n = int(row[0]) if row[0] is not None else 0
+            median = float(row[1]) if row[1] is not None else None
+    n_below_min = n < _S8_MIN_LAND_COMPS
+    if n_below_min or median is None or basis is None:
+        return None, {
+            "basis_per_acre": basis,
+            "basis_provenance": basis_prov,
+            "median": median,
+            "median_n": n,
+            "n_below_min": n_below_min,
+        }
+    score = _score_basis(basis, median)
+    return score, {
+        "basis_per_acre": basis,
+        "basis_provenance": basis_prov,
+        "median": median,
+        "median_n": n,
+        "n_below_min": False,
+    }
+
+
+# ===========================================================================
+# Phase 8 — Strategy Fit Assessment Engine
+# ===========================================================================
+# Per reviews/10_phase7_8_combined/01_risk_review.md §3.8 (R-535..R-540).
+# Five strategy-fit functions, each returning one of {STRONG, MODERATE,
+# WEAK, N/A}. Multi-parcel assemblage is OUT OF SCOPE per R-540 (Phase 11+).
+#
+# All five functions consume sub-scores S1..S12 + the parcel acreage. They
+# do NOT consume database state — they are pure functions of the scoring
+# context. This makes them trivially unit-testable.
+
+_STRATEGY_RATINGS: tuple[str, ...] = ("STRONG", "MODERATE", "WEAK", "N/A")
+_STRATEGY_KEYS: tuple[str, ...] = (
+    "bts", "spec", "land_bank", "ground_lease", "flip",
+)
+
+# R-535 / R-538: BTS minimum acreage from program.md "150K SF footprint at
+# 40% coverage" → 150_000 / 0.40 = 375_000 SF land = 8.6 acres (43560 SF/ac).
+_BTS_MIN_ACRES: float = 150_000.0 / 0.40 / 43_560.0  # ≈ 8.61
+
+
+def _ge(score: int | None, threshold: int) -> bool:
+    """True iff sub-score is non-null and >= threshold."""
+    return score is not None and score >= threshold
+
+
+def _lt(score: int | None, threshold: int) -> bool:
+    """True iff sub-score is non-null and < threshold. Null returns False."""
+    return score is not None and score < threshold
+
+
+def _assess_strategy_bts(
+    sub_scores: Mapping[str, int | None],
+    acreage: float | None,
+) -> str:
+    """BTS Development fit. R-535. STRONG unreachable while S9 is the
+    moderate stub (=5). MODERATE: S9>=4 AND S4>=6 AND S5>=7 AND
+    acreage>=8.6. Otherwise WEAK. N/A: acreage<8.6."""
+    if not acreage or float(acreage) < _BTS_MIN_ACRES:
+        return "N/A"
+    s4 = sub_scores.get("S4_submarket_vacancy")
+    s5 = sub_scores.get("S5_submarket_absorption")
+    s9 = sub_scores.get("S9_entitlement_complexity")
+    # STRONG branch (program.md: by-right S9>=7 + utilities + tenant signal +
+    # >=150K SF footprint). Tenant signal not wired; S9 stub=5 blocks. Kept
+    # for forward compatibility when Phase 11+ raises S9.
+    if _ge(s9, 7) and _ge(s4, 8) and _ge(s5, 8):
+        return "STRONG"
+    if _ge(s9, 4) and _ge(s4, 6) and _ge(s5, 7):
+        return "MODERATE"
+    return "WEAK"
+
+
+def _assess_strategy_spec(
+    sub_scores: Mapping[str, int | None],
+    acreage: float | None,
+) -> str:
+    """Spec Development fit. R-536. STRONG unreachable in Phase 7+8 (S9
+    stub=5). N/A when S4<3 (vacancy >= 7%, oversupplied)."""
+    s4 = sub_scores.get("S4_submarket_vacancy")
+    s5 = sub_scores.get("S5_submarket_absorption")
+    s6 = sub_scores.get("S6_competing_pipeline")
+    s9 = sub_scores.get("S9_entitlement_complexity")
+    if s4 is not None and s4 < 3:
+        return "N/A"
+    if _ge(s4, 8) and _ge(s5, 7) and _ge(s6, 7) and _ge(s9, 7):
+        return "STRONG"
+    if _ge(s4, 6) and _ge(s5, 7) and _ge(s9, 4):
+        return "MODERATE"
+    return "WEAK"
+
+
+def _assess_strategy_land_bank(
+    sub_scores: Mapping[str, int | None],
+    acreage: float | None,
+) -> str:
+    """Land Bank fit. R-537. Mapped to S8 (basis advantage)."""
+    s8 = sub_scores.get("S8_land_basis")
+    if s8 is None:
+        return "N/A"
+    if s8 == 10:
+        return "STRONG"
+    if s8 == 7:
+        return "MODERATE"
+    if s8 == 4:
+        return "WEAK"
+    # s8 == 0 — basis is materially above median, no land-bank thesis.
+    return "N/A"
+
+
+def _assess_strategy_ground_lease(
+    sub_scores: Mapping[str, int | None],
+    acreage: float | None,
+) -> str:
+    """Ground Lease fit. R-538. STRONG unreachable in Phase 7+8 (S9 stub
+    blocks). N/A when location is too soft or scale is sub-institutional."""
+    if not acreage or float(acreage) < _BTS_MIN_ACRES:
+        return "N/A"
+    s1 = sub_scores.get("S1_interstate_proximity")
+    s4 = sub_scores.get("S4_submarket_vacancy")
+    s9 = sub_scores.get("S9_entitlement_complexity")
+    # S1 is null in Phase 7+8 (still pending Phase 11+ wiring); _lt(None,4)
+    # is False, so the N/A guard only fires when S1 is populated AND weak.
+    if _lt(s1, 4):
+        return "N/A"
+    if _ge(s1, 8) and _ge(s4, 8) and _ge(s9, 7):
+        return "STRONG"
+    if _ge(s1, 6) and _ge(s4, 6):
+        return "MODERATE"
+    return "WEAK"
+
+
+def _assess_strategy_flip(
+    sub_scores: Mapping[str, int | None],
+    acreage: float | None,
+) -> str:
+    """Land Flip / Disposition fit. R-539. Mapped to S8 cross S4."""
+    s4 = sub_scores.get("S4_submarket_vacancy")
+    s8 = sub_scores.get("S8_land_basis")
+    if s8 is None:
+        return "N/A"
+    if s8 == 10 and _ge(s4, 6):
+        return "STRONG"
+    if s8 == 10:
+        return "MODERATE"
+    if s8 == 7:
+        return "MODERATE"
+    if s8 == 4:
+        return "WEAK"
+    return "N/A"
+
+
+def _compute_strategy_fit(
+    sub_scores: Mapping[str, int | None],
+    acreage: float | None,
+) -> dict[str, str]:
+    """Aggregate the five strategy assessments into a JSONB-shaped dict."""
+    return {
+        "bts": _assess_strategy_bts(sub_scores, acreage),
+        "spec": _assess_strategy_spec(sub_scores, acreage),
+        "land_bank": _assess_strategy_land_bank(sub_scores, acreage),
+        "ground_lease": _assess_strategy_ground_lease(sub_scores, acreage),
+        "flip": _assess_strategy_flip(sub_scores, acreage),
+    }
+
+
+# R-542: priority order when multiple strategies tie at the same rating.
+# BTS > spec > land_bank > flip > ground_lease — this matches the deal-flow
+# urgency a development team would prioritise (a tenant-led BTS is more
+# valuable than a passive ground lease at the same rating).
+_PRIMARY_STRATEGY_PRIORITY: tuple[str, ...] = (
+    "bts", "spec", "land_bank", "flip", "ground_lease",
+)
+
+
+def _select_primary_strategy(strategy_fit: Mapping[str, str]) -> str | None:
+    """First STRONG (in priority order), else first MODERATE, else None."""
+    for tier in ("STRONG", "MODERATE"):
+        for key in _PRIMARY_STRATEGY_PRIORITY:
+            if strategy_fit.get(key) == tier:
+                return key
+    return None
+
+
+# ===========================================================================
+# Phase 8 — Actionability screen (4 gates)
+# ===========================================================================
+# Per reviews/10_phase7_8_combined/01_risk_review.md §3.7 (R-529..R-534).
+# Gate ordering is FIXED: control → entitlement → strategy → deal-killer.
+# First failing gate wins (R-534). Path-to-control gate is informational
+# (R-530) and always PASSes — owner identity goes into the snapshot, not
+# the actionability decision.
+
+_ACTIONABILITY_PASS = "PASS"
+_ACTIONABILITY_FAIL_CONTROL = "FAIL:control"
+_ACTIONABILITY_FAIL_ENTITLEMENT = "FAIL:entitlement"
+_ACTIONABILITY_FAIL_STRATEGY = "FAIL:strategy"
+_ACTIONABILITY_FAIL_DEAL_KILLER = "FAIL:deal_killer"
+_ACTIONABILITY_PENDING = "PENDING"
+
+_ACTIONABILITY_VALUES: frozenset[str] = frozenset({
+    _ACTIONABILITY_PASS,
+    _ACTIONABILITY_FAIL_CONTROL,
+    _ACTIONABILITY_FAIL_ENTITLEMENT,
+    _ACTIONABILITY_FAIL_STRATEGY,
+    _ACTIONABILITY_FAIL_DEAL_KILLER,
+    _ACTIONABILITY_PENDING,
+})
+
+
+def _gate_control() -> tuple[bool, str | None]:
+    """Gate 1 — path to control. Always PASS (informational, R-530)."""
+    return True, None
+
+
+def _gate_entitlement(
+    sub_scores: Mapping[str, int | None],
+    flag_block: str | None,
+) -> tuple[bool, str | None]:
+    """Gate 2 — plausible entitlement (R-531). Default-PASS unless an
+    open actionability_block flag mentions 'entitlement'."""
+    if flag_block and "entitlement" in flag_block.lower():
+        return False, f"actionability_block: {flag_block[:160]}"
+    # No affirmative evidence of a block — program.md L86 says FAIL only
+    # on affirmative evidence, so PASS here. Real entitlement signal lands
+    # in Phase 11+.
+    return True, None
+
+
+def _gate_strategy(strategy_fit: Mapping[str, str]) -> tuple[bool, str | None]:
+    """Gate 3 — viable strategy with next step (R-532). PASS iff at least
+    one strategy is STRONG or MODERATE."""
+    for key in _STRATEGY_KEYS:
+        rating = strategy_fit.get(key)
+        if rating in ("STRONG", "MODERATE"):
+            return True, None
+    return False, "no strategy rated STRONG or MODERATE"
+
+
+def _gate_deal_killer(flag_block: str | None) -> tuple[bool, str | None]:
+    """Gate 4 — no deal-killers (R-533). Default-PASS unless an open
+    actionability_block flag mentions a non-entitlement blocker."""
+    if flag_block and "entitlement" not in flag_block.lower():
+        return False, f"actionability_block: {flag_block[:160]}"
+    return True, None
+
+
+def _fetch_actionability_block(conn: Any, parcel_id: str) -> str | None:
+    """Return the description of an open actionability_block flag, if any."""
+    with conn.cursor() as cur:
+        cur.execute(_SQL_FLAGGED_ACTIONABILITY_BLOCK, (parcel_id,))
+        row = cur.fetchone()
+    if not row:
+        return None
+    return str(row[0]) if row[0] is not None else None
+
+
+def _run_actionability_screen(
+    sub_scores: Mapping[str, int | None],
+    strategy_fit: Mapping[str, str],
+    flag_block: str | None,
+) -> tuple[str, dict[str, Any]]:
+    """Apply the 4 gates in order; return (verdict, blockers_dict).
+
+    First-failing-gate-wins (R-534): we short-circuit at the first FAIL
+    so the verdict is single-valued and matches the program.md
+    `actionability` enum (PASS / FAIL:control / FAIL:entitlement /
+    FAIL:strategy / FAIL:deal_killer).
+    """
+    blockers: dict[str, Any] = {}
+
+    ok, blocker = _gate_control()
+    if not ok:
+        blockers["control"] = blocker
+        return _ACTIONABILITY_FAIL_CONTROL, blockers
+
+    ok, blocker = _gate_entitlement(sub_scores, flag_block)
+    if not ok:
+        blockers["entitlement"] = blocker
+        return _ACTIONABILITY_FAIL_ENTITLEMENT, blockers
+
+    ok, blocker = _gate_strategy(strategy_fit)
+    if not ok:
+        blockers["strategy"] = blocker
+        return _ACTIONABILITY_FAIL_STRATEGY, blockers
+
+    ok, blocker = _gate_deal_killer(flag_block)
+    if not ok:
+        blockers["deal_killer"] = blocker
+        return _ACTIONABILITY_FAIL_DEAL_KILLER, blockers
+
+    return _ACTIONABILITY_PASS, blockers
+
+
 # ---------------------------------------------------------------------------
 # Per-parcel scoring orchestrator (R-201, R-204, R-211)
 # ---------------------------------------------------------------------------
 def _fetch_parcel_for_scoring(conn: Any, parcel_id: str) -> dict[str, Any] | None:
+    """Fetch the parcel attributes Phase 7+8 scoring needs.
+
+    Returns 9 fields (R-526, R-527, R-535..R-539, R-544): parcel_id,
+    market, submarket, state, acreage, last_sale_date, last_sale_price,
+    assessed_value_total, plus centroid lng/lat.
+    """
     with conn.cursor() as cur:
         cur.execute(_SQL_FETCH_PARCEL, (parcel_id,))
         row = cur.fetchone()
@@ -1761,8 +2361,14 @@ def _fetch_parcel_for_scoring(conn: Any, parcel_id: str) -> dict[str, Any] | Non
     return {
         "parcel_id": row[0],
         "market": row[1],
-        "centroid_lng": row[2],
-        "centroid_lat": row[3],
+        "submarket": row[2],
+        "state": row[3],
+        "acreage": row[4],
+        "last_sale_date": row[5],
+        "last_sale_price": row[6],
+        "assessed_value_total": row[7],
+        "centroid_lng": row[8],
+        "centroid_lat": row[9],
     }
 
 
@@ -1773,12 +2379,18 @@ def score_parcel(
     cycle_id: str | None = None,
     params: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compute sub-scores S1..S12 for one parcel and persist.
+    """Compute sub-scores S1..S12, strategy fit, and actionability for one
+    parcel; persist all of it in a single transaction.
 
-    Phase 5 — Option B per BUILD_PHASES.md L84-L91. S2 and S10 are real,
-    S9 is a moderate stub, all others are null with data_gap flag rows.
-    Returns a status dict {parcel_id, composite_score, confidence_score,
-    sub_scores, status}. ``actionability`` is set to 'PENDING' (Phase 8).
+    Phase 7+8 wires the CoStar-dependent S4/S5/S6 + refined S8 on top of
+    the Phase 5 S2/S9/S10 core, then runs the strategy fit engine and
+    the four-gate actionability screen (R-501..R-545). The persisted
+    parcel_scores row carries actionability, actionability_blockers,
+    strategy_fit, and primary_strategy in addition to the Phase 5 fields.
+
+    Returns: {parcel_id, status, composite_score, confidence_score,
+    sub_scores, actionability, actionability_blockers, strategy_fit,
+    primary_strategy}.
     """
     own_conn = False
     if conn is None:
@@ -1803,6 +2415,10 @@ def score_parcel(
                 "composite_score": None,
                 "confidence_score": None,
                 "sub_scores": {},
+                "actionability": None,
+                "actionability_blockers": {},
+                "strategy_fit": {},
+                "primary_strategy": None,
             }
 
         sub_scores: dict[str, int | None] = {n: None for n in _SUB_SCORE_NAMES}
@@ -1812,14 +2428,40 @@ def score_parcel(
             parcel.get("centroid_lng"), parcel.get("centroid_lat"),
         )
 
+        # R-518: single market_context fetch, three sub-scores derived.
+        mc = _compute_market_context_scores(conn, parcel.get("submarket"))
+        sub_scores["S4_submarket_vacancy"] = mc["S4"]
+        sub_scores["S5_submarket_absorption"] = mc["S5"]
+        sub_scores["S6_competing_pipeline"] = mc["S6"]
+
+        # R-523..R-528: refined S8 from sales_comps + parcel basis proxy.
+        s8_score, s8_prov = _compute_s8(conn, parcel)
+        sub_scores["S8_land_basis"] = s8_score
+
         composite = _compute_composite(sub_scores, weights)
         confidence = _compute_confidence(sub_scores)
 
+        # R-529: strategy fit before actionability — gate 3 consumes it.
+        strategy_fit = _compute_strategy_fit(sub_scores, parcel.get("acreage"))
+        primary_strategy = _select_primary_strategy(strategy_fit)
+
+        # R-533: synthetic deal-killer evidence from flagged_items.
+        flag_block = _fetch_actionability_block(conn, parcel_id)
+        actionability, blockers = _run_actionability_screen(
+            sub_scores, strategy_fit, flag_block,
+        )
+
         notes = (
-            f"phase5 mvp: S2={sub_scores['S2_parcel_geometry']} "
+            f"phase78: composite={composite} actionability={actionability} "
+            f"primary_strategy={primary_strategy} "
+            f"S2={sub_scores['S2_parcel_geometry']} "
+            f"S4={sub_scores['S4_submarket_vacancy']} "
+            f"S5={sub_scores['S5_submarket_absorption']} "
+            f"S6={sub_scores['S6_competing_pipeline']} "
+            f"S8={sub_scores['S8_land_basis']} "
             f"S9={sub_scores['S9_entitlement_complexity']} "
             f"S10={sub_scores['S10_incentives']}"
-        )
+        )[:480]
 
         try:
             with conn.transaction():
@@ -1830,8 +2472,11 @@ def score_parcel(
                             parcel_id,
                             composite,
                             confidence,
-                            "PENDING",
+                            actionability,
+                            json.dumps(blockers),
                             json.dumps(sub_scores),
+                            json.dumps(strategy_fit),
+                            primary_strategy,
                             notes,
                         ),
                     )
@@ -1840,7 +2485,8 @@ def score_parcel(
                         _SQL_INSERT_RESEARCH_LOG_SCORING,
                         (
                             cycle_id, "scoring", parcel.get("market"), parcel_id,
-                            composite, "PENDING", notes,
+                            composite, actionability,
+                            json.dumps(strategy_fit), notes,
                         ),
                     )
                 # One data_gap flag per null sub-score (R-220).
@@ -1851,8 +2497,39 @@ def score_parcel(
                     _flag(
                         conn, cycle_id, parcel_id, parcel.get("market") or "",
                         "data_gap",
-                        f"{name} ({pretty}) unjoined: pending Phase 5+ data wiring ({source})",
-                        f"Phase 5+: wire {source} for parcel_id={parcel_id}",
+                        f"{name} ({pretty}) unjoined: pending later-phase data wiring ({source})",
+                        f"wire {source} for parcel_id={parcel_id}",
+                    )
+                # R-514: market_context staleness flag (informational only).
+                staleness = mc.get("staleness_days")
+                if staleness is not None and staleness > _MARKET_CONTEXT_STALENESS_DAYS:
+                    _flag(
+                        conn, cycle_id, parcel_id, parcel.get("market") or "",
+                        "data_gap",
+                        f"market_context stale by {staleness}d ({mc.get('provenance')})",
+                        "trigger CoStar submarket_stats refresh",
+                    )
+                # R-519: S6 submarket-grain approximation flag.
+                if sub_scores["S6_competing_pipeline"] is not None:
+                    _flag(
+                        conn, cycle_id, parcel_id, parcel.get("market") or "",
+                        "data_gap",
+                        "S6 approximated at submarket grain; program.md spec is 5-mi radius",
+                        "Phase 11+: implement radius-search facility for S6",
+                    )
+                # R-524: S8 sample-size shortfall flag. Only meaningful when the
+                # parcel actually has a submarket — otherwise S8's null is
+                # already covered by the per-subscore data_gap flag above.
+                if s8_prov.get("n_below_min") and parcel.get("submarket"):
+                    _flag(
+                        conn, cycle_id, parcel_id, parcel.get("market") or "",
+                        "data_gap",
+                        (
+                            f"S8 land-basis median has only {s8_prov.get('median_n')} "
+                            f"comps in submarket={parcel.get('submarket')} "
+                            f"(< {_S8_MIN_LAND_COMPS} required)"
+                        ),
+                        "wait for additional CoStar land sales comps in submarket",
                     )
         except Exception:
             log.exception("scoring transaction failed for parcel %s", parcel_id)
@@ -1866,6 +2543,10 @@ def score_parcel(
                 "composite_score": None,
                 "confidence_score": None,
                 "sub_scores": sub_scores,
+                "actionability": None,
+                "actionability_blockers": {},
+                "strategy_fit": {},
+                "primary_strategy": None,
             }
 
         return {
@@ -1874,6 +2555,10 @@ def score_parcel(
             "composite_score": composite,
             "confidence_score": confidence,
             "sub_scores": sub_scores,
+            "actionability": actionability,
+            "actionability_blockers": blockers,
+            "strategy_fit": strategy_fit,
+            "primary_strategy": primary_strategy,
         }
     finally:
         if own_conn:
@@ -1887,10 +2572,14 @@ def score_parcel(
 # Scoring cycle driver (R-213)
 # ---------------------------------------------------------------------------
 def run_scoring_cycle(market: str) -> dict[str, Any]:
-    """Score every unscored parcel in the given market.
+    """Score every unscored OR PENDING-latest-row parcel in the given market.
 
-    Phase 5 — selects parcels with no parcel_scores row at all (no
-    re-scoring in MVP). Returns a summary dict with per-status counts.
+    Phase 7+8 (R-507, R-510): _SQL_LIST_PARCELS_FOR_SCORING returns
+    parcels with no parcel_scores rows AND parcels whose latest row has
+    actionability='PENDING' (the Phase 5 default). Each scoring run
+    APPENDS a new parcel_scores row — never UPDATEs in place — so
+    prepare.calculate_actionable_pipeline_count's MAX(scored_at) selector
+    sees the freshest verdict.
     """
     if market not in _MARKET_TO_COUNTIES:
         raise NotImplementedError(
@@ -1920,7 +2609,7 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
             return summary
 
         with conn.cursor() as cur:
-            cur.execute(_SQL_LIST_UNSCORED_PARCELS, (market,))
+            cur.execute(_SQL_LIST_PARCELS_FOR_SCORING, (market,))
             parcel_ids = [r[0] for r in cur.fetchall()]
 
         for pid in parcel_ids:
@@ -3328,20 +4017,65 @@ def run_ingestion_cycle() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Phase 8: actionability and strategy fit
+# Phase 8: actionability and strategy fit — public wrappers around the
+# orchestration helpers above. These thin wrappers exist so the rest of
+# the agent (snapshot generator in Phase 9, the experiment loop in
+# Phase 10) can call a stable public API without poking at the private
+# helpers. They are NOT how score_parcel reaches them — score_parcel
+# inlines the helpers because it already holds the conn + sub_scores +
+# parcel context inside its transaction.
 # ---------------------------------------------------------------------------
-def run_actionability_screen(parcel_id: str) -> dict[str, Any]:
-    """Apply the four-gate actionability screen. Phase 8."""
-    raise NotImplementedError(
-        "Actionability screen is not implemented at Phase 3; see BUILD_PHASES.md Phase 8"
+def run_actionability_screen(
+    parcel_id: str,
+    *,
+    conn: Any = None,
+    sub_scores: Mapping[str, int | None] | None = None,
+    strategy_fit: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Apply the four-gate actionability screen for a parcel.
+
+    Pure-function path: callers pass sub_scores + strategy_fit and we
+    skip the database hop entirely (used by tests). Database path:
+    callers pass conn and we look up the open actionability_block flag
+    for the parcel; sub_scores and strategy_fit must still be provided
+    by the caller (typically from a freshly computed score_parcel run).
+    """
+    if sub_scores is None or strategy_fit is None:
+        raise ValueError(
+            "run_actionability_screen requires sub_scores and strategy_fit; "
+            "call score_parcel for the full database-backed pipeline."
+        )
+    flag_block: str | None = None
+    if conn is not None:
+        flag_block = _fetch_actionability_block(conn, parcel_id)
+    actionability, blockers = _run_actionability_screen(
+        sub_scores, strategy_fit, flag_block,
     )
+    return {
+        "parcel_id": parcel_id,
+        "actionability": actionability,
+        "actionability_blockers": blockers,
+    }
 
 
-def assess_strategy_fit(parcel_id: str) -> dict[str, Any]:
-    """Tag a parcel with strategy fit ratings. Phase 8."""
-    raise NotImplementedError(
-        "Strategy fit is not implemented at Phase 3; see BUILD_PHASES.md Phase 8"
-    )
+def assess_strategy_fit(
+    parcel_id: str,
+    *,
+    sub_scores: Mapping[str, int | None] | None = None,
+    acreage: float | None = None,
+) -> dict[str, Any]:
+    """Tag a parcel with strategy fit ratings + a primary strategy."""
+    if sub_scores is None:
+        raise ValueError(
+            "assess_strategy_fit requires sub_scores; call score_parcel "
+            "for the full database-backed pipeline."
+        )
+    fit = _compute_strategy_fit(sub_scores, acreage)
+    return {
+        "parcel_id": parcel_id,
+        "strategy_fit": fit,
+        "primary_strategy": _select_primary_strategy(fit),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -3379,9 +4113,11 @@ def _print_phase1_status() -> None:
     params = prepare.get_parameters()
     threshold = params["composite_threshold"]
     print(
-        "research.py — Phase 5 scoring MVP + Phase 6.1 CoStar ingestion "
-        "(all 5 recurring export types wired); "
-        "experiment loop not yet implemented."
+        "research.py — Phase 7+8 combined: scoring engine complete "
+        "(S4/S5/S6 from market_context, refined S8 from sales_comps), "
+        "4-gate actionability screen, 5-strategy fit assessment engine, "
+        "and Phase 6.1 CoStar ingestion (all 5 recurring export types). "
+        "Experiment loop (Phase 10) not yet implemented."
     )
     print(f"composite_threshold (from parameters.json, frozen): {threshold}")
 
