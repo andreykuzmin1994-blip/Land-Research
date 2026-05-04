@@ -50,6 +50,8 @@ experiment_log.tsv     # Karpathy AutoResearch experiment log — never commit
 costar_exports/
 *.xlsx
 *.csv
+# Phase 6 test fixtures are synthetic, not licensed CoStar data — commit them.
+!tests/fixtures/costar/*.csv
 
 # Database backups
 *.sql
