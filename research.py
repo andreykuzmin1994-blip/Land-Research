@@ -751,6 +751,85 @@ _SQL_COUNT_LOG_FOR_INGESTION_CYCLE = (
     "WHERE cycle_id = %s AND action_type = 'ingestion'"
 )
 
+# Phase 6.1 — comps and listings idempotent re-ingest (R-402, R-422).
+# `sales_comps` shares one table for land + building rows; the DELETE
+# clauses include `comp_type = %s` so a building re-ingest doesn't blow
+# away land rows for the same (submarket, address, sale_date) tuple.
+_SQL_DELETE_LAND_SALES_FOR_REINGEST = (
+    "DELETE FROM sales_comps "
+    "WHERE comp_type = 'land' "
+    "AND submarket_id = %s AND address = %s AND sale_date = %s"
+)
+
+_SQL_INSERT_LAND_SALES = (
+    "INSERT INTO sales_comps ("
+    "address, parcel_id, county, submarket_id, comp_type, acres, "
+    "sale_date, sale_price, price_per_acre, cap_rate, "
+    "buyer_name, seller_name, zoning, raw"
+    ") VALUES ("
+    "%s, %s, %s, %s, 'land', %s, "
+    "%s, %s, %s, %s, "
+    "%s, %s, %s, %s::jsonb"
+    ")"
+)
+
+_SQL_DELETE_BUILDING_SALES_FOR_REINGEST = (
+    "DELETE FROM sales_comps "
+    "WHERE comp_type = 'building' "
+    "AND submarket_id = %s AND address = %s AND sale_date = %s"
+)
+
+_SQL_INSERT_BUILDING_SALES = (
+    "INSERT INTO sales_comps ("
+    "address, submarket_id, comp_type, building_sf, "
+    "sale_date, sale_price, price_psf, cap_rate, "
+    "buyer_name, seller_name, raw"
+    ") VALUES ("
+    "%s, %s, 'building', %s, "
+    "%s, %s, %s, %s, "
+    "%s, %s, %s::jsonb"
+    ")"
+)
+
+_SQL_DELETE_LEASING_COMPS_FOR_REINGEST = (
+    "DELETE FROM leasing_comps "
+    "WHERE submarket_id = %s AND address = %s "
+    "AND tenant_name = %s AND lease_start_date = %s"
+)
+
+_SQL_INSERT_LEASING_COMP = (
+    "INSERT INTO leasing_comps ("
+    "address, submarket_id, tenant_name, tenant_industry, naics_code, "
+    "lease_start_date, lease_term_months, building_sf_leased, "
+    "starting_rent_psf_nnn, rent_escalation_pct, lease_type, raw"
+    ") VALUES ("
+    "%s, %s, %s, %s, %s, "
+    "%s, %s, %s, "
+    "%s, %s, %s, %s::jsonb"
+    ")"
+)
+
+# Snapshot semantics for land_listings (R-426): re-ingest of the same
+# weekly snapshot replaces ALL rows with that snapshot_date.
+_SQL_DELETE_LAND_LISTINGS_FOR_REINGEST = (
+    "DELETE FROM land_listings "
+    "WHERE snapshot_date = %s AND address = %s"
+)
+
+_SQL_INSERT_LAND_LISTING = (
+    "INSERT INTO land_listings ("
+    "address, parcel_id, county, submarket_id, acres, zoning, "
+    "asking_price, asking_price_per_acre, listing_date, days_on_market, "
+    "listing_broker, listing_broker_firm, utilities_status, "
+    "entitlement_status, raw, snapshot_date, is_active"
+    ") VALUES ("
+    "%s, %s, %s, %s, %s, %s, "
+    "%s, %s, %s, %s, "
+    "%s, %s, %s, "
+    "%s, %s::jsonb, %s, TRUE"
+    ")"
+)
+
 
 _SQL_UPSERT_PARCEL = (
     "INSERT INTO parcels ("
@@ -1863,10 +1942,73 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
 
 _COSTAR_SOURCE = "costar"
 
+# R-401 / R-404 / R-405: county→market lookup. Atlanta is the only Phase
+# 6.1 target market; Phase 11+ multi-market expansion adds more counties
+# here. Loaders for the comps export types that have a `county` column
+# (land_sales_comps, land_listings) use this lookup; loaders without a
+# `county` column (building_sales_comps, leasing_comps) fall back to
+# _DEFAULT_INGESTION_MARKET.
+_COUNTY_TO_MARKET: dict[str, str] = {
+    "fulton": "Atlanta",
+    "dekalb": "Atlanta",
+    "cobb": "Atlanta",
+    "gwinnett": "Atlanta",
+    "clayton": "Atlanta",
+    "henry": "Atlanta",
+    "spalding": "Atlanta",
+    "fayette": "Atlanta",
+}
+_DEFAULT_INGESTION_MARKET = "Atlanta"
+
 # R-302 / R-307: filename pattern for the weekly submarket_stats export per
 # COSTAR_INGESTION_CONTRACT.md §Export 1.
 _SUBMARKET_STATS_FILENAME_RE = re.compile(
     r"^submarket_stats_(\d{8})\.csv$", re.IGNORECASE,
+)
+
+# Phase 6.1: filename patterns for the four other recurring CoStar export
+# types. Monthly exports use YYYYMM, weekly exports use YYYYMMDD.
+_LAND_SALES_COMPS_FILENAME_RE = re.compile(
+    r"^land_sales_comps_(\d{6})\.csv$", re.IGNORECASE,
+)
+_BUILDING_SALES_COMPS_FILENAME_RE = re.compile(
+    r"^building_sales_comps_(\d{6})\.csv$", re.IGNORECASE,
+)
+_LEASING_COMPS_FILENAME_RE = re.compile(
+    r"^leasing_comps_(\d{6})\.csv$", re.IGNORECASE,
+)
+_LAND_LISTINGS_FILENAME_RE = re.compile(
+    r"^land_listings_(\d{8})\.csv$", re.IGNORECASE,
+)
+
+# Required columns per COSTAR_INGESTION_CONTRACT.md §Export 2..5.
+_LAND_SALES_COMPS_REQUIRED_COLUMNS: tuple[str, ...] = (
+    "address", "parcel_id", "county", "submarket", "acres",
+    "sale_date", "sale_price", "price_per_acre",
+    "buyer_name", "seller_name", "zoning", "intended_use", "cap_rate",
+)
+_BUILDING_SALES_COMPS_REQUIRED_COLUMNS: tuple[str, ...] = (
+    "address", "submarket", "building_sf", "year_built", "clear_height_ft",
+    "sale_date", "sale_price", "price_psf",
+    "cap_rate", "noi_at_sale",
+    "buyer_name", "seller_name",
+    "tenant_at_sale", "lease_term_remaining_years",
+)
+_LEASING_COMPS_REQUIRED_COLUMNS: tuple[str, ...] = (
+    "address", "submarket",
+    "tenant_name", "tenant_industry",
+    "lease_start_date", "lease_term_months",
+    "building_sf_leased",
+    "starting_rent_psf_nnn", "rent_escalation_pct",
+    "lease_type",
+)
+_LAND_LISTINGS_REQUIRED_COLUMNS: tuple[str, ...] = (
+    "address", "parcel_id", "county", "submarket",
+    "acres", "zoning", "topography_notes",
+    "asking_price", "asking_price_per_acre",
+    "listing_date", "days_on_market",
+    "listing_broker", "listing_broker_firm",
+    "utilities_status", "entitlement_status",
 )
 
 # Required column set per COSTAR_INGESTION_CONTRACT.md §Export 1. Order is
@@ -1914,6 +2056,20 @@ def _slugify(value: str) -> str:
     if not slug:
         raise ValueError(f"_slugify produced empty slug from {value!r}")
     return slug[:60]
+
+
+def _resolve_market_from_county(
+    county: str | None, default_market: str = _DEFAULT_INGESTION_MARKET,
+) -> tuple[str, bool]:
+    """Look up market for a county. Returns (market, used_default) (R-401, R-404)."""
+    if not county or not isinstance(county, str):
+        return default_market, True
+    key = county.strip().lower()
+    if not key:
+        return default_market, True
+    if key in _COUNTY_TO_MARKET:
+        return _COUNTY_TO_MARKET[key], False
+    return default_market, True
 
 
 def _resolve_costar_subdir(subdir: str) -> Path:
@@ -2170,6 +2326,278 @@ def _validate_submarket_stats_row(
 
 
 # ---------------------------------------------------------------------------
+# Phase 6.1 — per-export-type row validators
+# ---------------------------------------------------------------------------
+def _require_field(value: Any, name: str) -> tuple[str | None, str | None]:
+    """Return (cleaned_str, None) or (None, error). Used for required text fields."""
+    if value is None:
+        return None, f"{name} is empty"
+    s = str(value).strip()
+    if not s:
+        return None, f"{name} is empty"
+    return s, None
+
+
+def _validate_land_sales_comps_row(
+    row: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate one land_sales_comps row. R-406, R-407."""
+    norm = {_normalize_header(k): v for k, v in row.items()}
+
+    submarket_name, e = _require_field(norm.get("submarket"), "submarket")
+    if e:
+        return None, e
+    address, e = _require_field(norm.get("address"), "address")
+    if e:
+        return None, e
+
+    sale_date, e = _parse_report_date(norm.get("sale_date"))
+    if e:
+        return None, f"sale_date: {e}"
+
+    sale_price, e = _coerce_optional_int(norm.get("sale_price"))
+    if e:
+        return None, f"sale_price: {e}"
+    if sale_price is None or sale_price <= 0:
+        return None, f"sale_price must be > 0: {sale_price}"
+
+    acres, e = _coerce_optional_decimal(norm.get("acres"))
+    if e:
+        return None, f"acres: {e}"
+    if acres is None or acres <= 0:
+        return None, f"acres must be > 0: {acres}"
+
+    price_per_acre, e = _coerce_optional_decimal(norm.get("price_per_acre"))
+    if e:
+        return None, f"price_per_acre: {e}"
+    cap_rate, e = _coerce_optional_decimal(norm.get("cap_rate"))
+    if e:
+        return None, f"cap_rate: {e}"
+
+    return (
+        {
+            "submarket_name": submarket_name,
+            "address": address,
+            "parcel_id": (str(norm.get("parcel_id") or "").strip() or None),
+            "county": (str(norm.get("county") or "").strip() or None),
+            "acres": acres,
+            "sale_date": sale_date,
+            "sale_price": sale_price,
+            "price_per_acre": price_per_acre,
+            "cap_rate": cap_rate,
+            "buyer_name": (str(norm.get("buyer_name") or "").strip() or None),
+            "seller_name": (str(norm.get("seller_name") or "").strip() or None),
+            "zoning": (str(norm.get("zoning") or "").strip() or None),
+            "intended_use": (str(norm.get("intended_use") or "").strip() or None),
+            "raw": {k: norm.get(k) for k in norm},
+        },
+        None,
+    )
+
+
+def _validate_building_sales_comps_row(
+    row: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate one building_sales_comps row. R-406, R-408."""
+    norm = {_normalize_header(k): v for k, v in row.items()}
+
+    submarket_name, e = _require_field(norm.get("submarket"), "submarket")
+    if e:
+        return None, e
+    address, e = _require_field(norm.get("address"), "address")
+    if e:
+        return None, e
+
+    sale_date, e = _parse_report_date(norm.get("sale_date"))
+    if e:
+        return None, f"sale_date: {e}"
+
+    sale_price, e = _coerce_optional_int(norm.get("sale_price"))
+    if e:
+        return None, f"sale_price: {e}"
+    if sale_price is None or sale_price <= 0:
+        return None, f"sale_price must be > 0: {sale_price}"
+
+    building_sf, e = _coerce_optional_decimal(norm.get("building_sf"))
+    if e:
+        return None, f"building_sf: {e}"
+    if building_sf is None or building_sf <= 0:
+        return None, f"building_sf must be > 0: {building_sf}"
+
+    price_psf, e = _coerce_optional_decimal(norm.get("price_psf"))
+    if e:
+        return None, f"price_psf: {e}"
+    cap_rate, e = _coerce_optional_decimal(norm.get("cap_rate"))
+    if e:
+        return None, f"cap_rate: {e}"
+    year_built, e = _coerce_optional_int(norm.get("year_built"))
+    if e:
+        return None, f"year_built: {e}"
+    if year_built is not None and not (1850 <= year_built <= datetime.now(timezone.utc).year + 2):
+        return None, f"year_built out of range [1850, current+2]: {year_built}"
+    clear_height_ft, e = _coerce_optional_decimal(norm.get("clear_height_ft"))
+    if e:
+        return None, f"clear_height_ft: {e}"
+    if clear_height_ft is not None and not (8 <= clear_height_ft <= 80):
+        return None, f"clear_height_ft out of range [8, 80]: {clear_height_ft}"
+
+    return (
+        {
+            "submarket_name": submarket_name,
+            "address": address,
+            "building_sf": building_sf,
+            "sale_date": sale_date,
+            "sale_price": sale_price,
+            "price_psf": price_psf,
+            "cap_rate": cap_rate,
+            "buyer_name": (str(norm.get("buyer_name") or "").strip() or None),
+            "seller_name": (str(norm.get("seller_name") or "").strip() or None),
+            "raw": {k: norm.get(k) for k in norm},
+        },
+        None,
+    )
+
+
+def _validate_leasing_comps_row(
+    row: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate one leasing_comps row. R-409, R-410."""
+    norm = {_normalize_header(k): v for k, v in row.items()}
+
+    submarket_name, e = _require_field(norm.get("submarket"), "submarket")
+    if e:
+        return None, e
+    address, e = _require_field(norm.get("address"), "address")
+    if e:
+        return None, e
+    tenant_name, e = _require_field(norm.get("tenant_name"), "tenant_name")
+    if e:
+        return None, e
+
+    lease_start_date, e = _parse_report_date(norm.get("lease_start_date"))
+    if e:
+        return None, f"lease_start_date: {e}"
+
+    lease_term_months, e = _coerce_optional_int(norm.get("lease_term_months"))
+    if e:
+        return None, f"lease_term_months: {e}"
+    if lease_term_months is None or lease_term_months <= 0:
+        return None, f"lease_term_months must be > 0: {lease_term_months}"
+
+    building_sf_leased, e = _coerce_optional_decimal(norm.get("building_sf_leased"))
+    if e:
+        return None, f"building_sf_leased: {e}"
+    if building_sf_leased is None or building_sf_leased <= 0:
+        return None, f"building_sf_leased must be > 0: {building_sf_leased}"
+
+    starting_rent_psf_nnn, e = _coerce_optional_decimal(
+        norm.get("starting_rent_psf_nnn"),
+    )
+    if e:
+        return None, f"starting_rent_psf_nnn: {e}"
+    if starting_rent_psf_nnn is None or starting_rent_psf_nnn <= 0:
+        return None, (
+            f"starting_rent_psf_nnn must be > 0: {starting_rent_psf_nnn}"
+        )
+
+    rent_escalation_pct, e = _coerce_optional_decimal(
+        norm.get("rent_escalation_pct"),
+    )
+    if e:
+        return None, f"rent_escalation_pct: {e}"
+
+    naics_code = (str(norm.get("naics_code") or "").strip() or None)
+    if naics_code is not None and not naics_code.isdigit():
+        return None, f"naics_code must be all digits: {naics_code!r}"
+
+    return (
+        {
+            "submarket_name": submarket_name,
+            "address": address,
+            "tenant_name": tenant_name,
+            "tenant_industry": (str(norm.get("tenant_industry") or "").strip() or None),
+            "naics_code": naics_code,
+            "lease_start_date": lease_start_date,
+            "lease_term_months": lease_term_months,
+            "building_sf_leased": building_sf_leased,
+            "starting_rent_psf_nnn": starting_rent_psf_nnn,
+            "rent_escalation_pct": rent_escalation_pct,
+            "lease_type": (str(norm.get("lease_type") or "").strip() or None),
+            "raw": {k: norm.get(k) for k in norm},
+        },
+        None,
+    )
+
+
+def _validate_land_listings_row(
+    row: Mapping[str, Any],
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Validate one land_listings row. R-411, R-412."""
+    norm = {_normalize_header(k): v for k, v in row.items()}
+
+    submarket_name, e = _require_field(norm.get("submarket"), "submarket")
+    if e:
+        return None, e
+    address, e = _require_field(norm.get("address"), "address")
+    if e:
+        return None, e
+
+    listing_date, e = _parse_report_date(norm.get("listing_date"))
+    if e:
+        return None, f"listing_date: {e}"
+
+    acres, e = _coerce_optional_decimal(norm.get("acres"))
+    if e:
+        return None, f"acres: {e}"
+    if acres is None or acres <= 0:
+        return None, f"acres must be > 0: {acres}"
+
+    asking_price, e = _coerce_optional_int(norm.get("asking_price"))
+    if e:
+        return None, f"asking_price: {e}"
+    if asking_price is not None and asking_price <= 0:
+        return None, f"asking_price must be > 0 if populated: {asking_price}"
+
+    asking_price_per_acre, e = _coerce_optional_decimal(
+        norm.get("asking_price_per_acre"),
+    )
+    if e:
+        return None, f"asking_price_per_acre: {e}"
+    if asking_price_per_acre is not None and asking_price_per_acre <= 0:
+        return None, (
+            f"asking_price_per_acre must be > 0 if populated: "
+            f"{asking_price_per_acre}"
+        )
+
+    days_on_market, e = _coerce_optional_int(norm.get("days_on_market"))
+    if e:
+        return None, f"days_on_market: {e}"
+    if days_on_market is not None and days_on_market < 0:
+        return None, f"days_on_market must be >= 0: {days_on_market}"
+
+    return (
+        {
+            "submarket_name": submarket_name,
+            "address": address,
+            "parcel_id": (str(norm.get("parcel_id") or "").strip() or None),
+            "county": (str(norm.get("county") or "").strip() or None),
+            "acres": acres,
+            "zoning": (str(norm.get("zoning") or "").strip() or None),
+            "asking_price": asking_price,
+            "asking_price_per_acre": asking_price_per_acre,
+            "listing_date": listing_date,
+            "days_on_market": days_on_market,
+            "listing_broker": (str(norm.get("listing_broker") or "").strip() or None),
+            "listing_broker_firm": (str(norm.get("listing_broker_firm") or "").strip() or None),
+            "utilities_status": (str(norm.get("utilities_status") or "").strip() or None),
+            "entitlement_status": (str(norm.get("entitlement_status") or "").strip() or None),
+            "raw": {k: norm.get(k) for k in norm},
+        },
+        None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # markets / submarkets reference upsert (R-301)
 # ---------------------------------------------------------------------------
 def _ensure_submarket(
@@ -2380,59 +2808,440 @@ def _load_submarket_stats_file(
 
 
 # ---------------------------------------------------------------------------
-# Placeholder loaders for the four deferred export types (Option A scope).
-# Phase 6.1+ replaces each with a real loader following the same pattern as
-# _load_submarket_stats_file (R-322).
+# Phase 6.1 — per-export-type loaders (R-402, R-422)
 # ---------------------------------------------------------------------------
-def _load_placeholder(
-    export_type: str,
+def _ingest_one_comp_file(
     conn: Any,
     cycle_id: str,
-    files: Sequence[tuple[Path, str]],
+    path: Path,
+    *,
+    export_type: str,
+    required_columns: tuple[str, ...],
+    row_validator,
+    market_resolver,                 # row -> (market, used_default, county)
+    insert_sql: str,
+    insert_params_builder,           # (row, submarket_id) -> tuple
+    delete_sql: str,
+    delete_params_builder,           # (row, submarket_id) -> tuple
 ) -> dict[str, Any]:
-    """Report files seen but take no destructive action (R-322)."""
-    return {
-        "status": "not_implemented",
-        "export_type": export_type,
-        "files_seen": [p.name for p, _ in files],
+    """Generic per-file ingest for the four comp/listing export types.
+
+    Mirrors the shape of _load_submarket_stats_file but is parameterised
+    over: (a) the validator, (b) per-row market resolution, (c) the
+    INSERT and DELETE SQL constants and their per-row parameter builders.
+    All loaders flow through this helper so the transaction shape, the
+    archive/quarantine logic, the data_gap flag emission, and the
+    research_log row are identical across export types.
+    """
+    summary: dict[str, Any] = {
+        "file": path.name,
+        "status": "loaded",
+        "rows_loaded": 0,
+        "rows_failed": 0,
+        "row_errors": [],
+        "submarkets_auto_created": [],
+        "submarket_name_drifts": [],
+        "default_market_used_for": [],
     }
 
+    try:
+        raw_headers, raw_rows = _read_csv_with_bom(path)
+    except OSError as exc:
+        summary["status"] = "failed"
+        summary["error"] = f"read failed: {exc}"
+        _fail_file(path, {"errors": [summary["error"]]})
+        return summary
 
-def _load_land_sales_comps_placeholder(
-    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+    header_error = _validate_headers_against_required(raw_headers, required_columns)
+    if header_error is not None:
+        summary["status"] = "failed"
+        summary["error"] = header_error
+        dest, error_path = _fail_file(
+            path, {"errors": [header_error], "headers": raw_headers},
+        )
+        summary["moved_to"] = str(dest)
+        summary["error_path"] = str(error_path)
+        return summary
+
+    parsed_rows: list[dict[str, Any]] = []
+    for line_num, raw_row in enumerate(raw_rows, start=2):
+        parsed, err = row_validator(raw_row)
+        if err is not None:
+            summary["rows_failed"] += 1
+            summary["row_errors"].append({"line": line_num, "error": err})
+            continue
+        parsed_rows.append(parsed)
+
+    try:
+        with conn.transaction():
+            ensured: dict[str, str] = {}
+            for row in parsed_rows:
+                market, used_default, county = market_resolver(row)
+                key = f"{market}__{row['submarket_name']}"
+                if key in ensured:
+                    submarket_id = ensured[key]
+                else:
+                    submarket_id, created, drift_msg = _ensure_submarket(
+                        conn, market, row["submarket_name"],
+                    )
+                    ensured[key] = submarket_id
+                    if created:
+                        summary["submarkets_auto_created"].append(submarket_id)
+                        _flag(
+                            conn, cycle_id, None, market, "data_gap",
+                            (
+                                f"ingestion ({export_type}): auto-created "
+                                f"submarket submarket_id={submarket_id} from "
+                                f"{path.name}; bbox is NULL — backfill from "
+                                f"STORAGE_ARCHITECTURE.md corridor bounding boxes"
+                            ),
+                            (
+                                f"Phase 6+: human seed submarkets.bbox for "
+                                f"{submarket_id}"
+                            ),
+                        )
+                    if drift_msg is not None:
+                        summary["submarket_name_drifts"].append(drift_msg)
+                        _flag(
+                            conn, cycle_id, None, market, "conflict",
+                            f"ingestion ({export_type}): {drift_msg}",
+                            "review CoStar saved-search submarket naming",
+                        )
+                    if used_default and county:
+                        summary["default_market_used_for"].append(county)
+                        _flag(
+                            conn, cycle_id, None, market, "data_gap",
+                            (
+                                f"ingestion ({export_type}): county={county!r} "
+                                f"not in _COUNTY_TO_MARKET; defaulted to "
+                                f"{market}"
+                            ),
+                            "expand _COUNTY_TO_MARKET when adding new markets",
+                        )
+                row["submarket_id"] = submarket_id
+
+            with conn.cursor() as cur:
+                seen_dedup_keys: set[tuple] = set()
+                for row in parsed_rows:
+                    dkey = delete_params_builder(row, row["submarket_id"])
+                    if dkey in seen_dedup_keys:
+                        continue
+                    seen_dedup_keys.add(dkey)
+                    cur.execute(delete_sql, dkey)
+
+            with conn.cursor() as cur:
+                for row in parsed_rows:
+                    cur.execute(
+                        insert_sql,
+                        insert_params_builder(row, row["submarket_id"]),
+                    )
+                    summary["rows_loaded"] += 1
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    _SQL_INSERT_RESEARCH_LOG_INGESTION,
+                    (
+                        cycle_id, "ingestion", None, None,
+                        (
+                            f"{export_type}: file={path.name} "
+                            f"rows_loaded={summary['rows_loaded']} "
+                            f"rows_failed={summary['rows_failed']}"
+                        ),
+                    ),
+                )
+
+            for err in summary["row_errors"]:
+                _flag(
+                    conn, cycle_id, None, "",
+                    "data_gap",
+                    (
+                        f"ingestion ({export_type}): row-level validation "
+                        f"failure in {path.name} line {err['line']}: "
+                        f"{err['error']}"
+                    ),
+                    "fix CoStar saved-search filter or re-deliver corrected file",
+                )
+    except Exception as exc:
+        log.exception("ingestion transaction failed for %s (%s)", path.name, export_type)
+        summary["status"] = "failed"
+        summary["error"] = f"db transaction failed: {exc}"
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            dest, error_path = _fail_file(
+                path, {"errors": [summary["error"]]},
+            )
+            summary["moved_to"] = str(dest)
+            summary["error_path"] = str(error_path)
+        except Exception:
+            log.exception("ingestion: failed to quarantine %s", path)
+        return summary
+
+    archived = _archive_file(path)
+    summary["moved_to"] = str(archived)
+    return summary
+
+
+def _validate_headers_against_required(
+    headers: Sequence[str], required_columns: tuple[str, ...],
+) -> str | None:
+    """Generalised header validator (mirrors _validate_submarket_stats_headers)."""
+    if not headers:
+        return "empty header row"
+    normalized = [_normalize_header(h) for h in headers]
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for h in normalized:
+        if h in seen:
+            duplicates.append(h)
+        seen.add(h)
+    if duplicates:
+        return f"duplicate column header(s): {sorted(set(duplicates))}"
+    missing = [c for c in required_columns if c not in seen]
+    if missing:
+        return f"missing required column(s): {missing}"
+    return None
+
+
+def _market_resolver_with_county(
+    row: Mapping[str, Any],
+) -> tuple[str, bool, str | None]:
+    """Resolve market from row's county field (used by land sales + listings)."""
+    county = row.get("county")
+    market, used_default = _resolve_market_from_county(county)
+    return market, used_default, county if used_default and county else None
+
+
+def _market_resolver_default(
+    row: Mapping[str, Any],
+) -> tuple[str, bool, str | None]:
+    """Resolve market via default (used by building sales + leasing comps)."""
+    return _DEFAULT_INGESTION_MARKET, False, None
+
+
+def _land_sales_insert_params(row, submarket_id):
+    return (
+        row["address"], row["parcel_id"], row["county"], submarket_id,
+        row["acres"],
+        row["sale_date"], row["sale_price"], row["price_per_acre"],
+        row["cap_rate"],
+        row["buyer_name"], row["seller_name"], row["zoning"],
+        json.dumps(row["raw"]),
+    )
+
+
+def _land_sales_delete_params(row, submarket_id):
+    return (submarket_id, row["address"], row["sale_date"])
+
+
+def _building_sales_insert_params(row, submarket_id):
+    return (
+        row["address"], submarket_id, row["building_sf"],
+        row["sale_date"], row["sale_price"], row["price_psf"], row["cap_rate"],
+        row["buyer_name"], row["seller_name"],
+        json.dumps(row["raw"]),
+    )
+
+
+def _building_sales_delete_params(row, submarket_id):
+    return (submarket_id, row["address"], row["sale_date"])
+
+
+def _leasing_insert_params(row, submarket_id):
+    return (
+        row["address"], submarket_id, row["tenant_name"],
+        row["tenant_industry"], row["naics_code"],
+        row["lease_start_date"], row["lease_term_months"],
+        row["building_sf_leased"],
+        row["starting_rent_psf_nnn"], row["rent_escalation_pct"],
+        row["lease_type"],
+        json.dumps(row["raw"]),
+    )
+
+
+def _leasing_delete_params(row, submarket_id):
+    return (
+        submarket_id, row["address"], row["tenant_name"],
+        row["lease_start_date"],
+    )
+
+
+def _land_listings_insert_params(row, submarket_id):
+    return (
+        row["address"], row["parcel_id"], row["county"], submarket_id,
+        row["acres"], row["zoning"],
+        row["asking_price"], row["asking_price_per_acre"],
+        row["listing_date"], row["days_on_market"],
+        row["listing_broker"], row["listing_broker_firm"],
+        row["utilities_status"], row["entitlement_status"],
+        json.dumps(row["raw"]),
+        row["snapshot_date"],
+    )
+
+
+def _land_listings_delete_params(row, submarket_id):
+    # Snapshot semantics (R-426) — keyed on snapshot_date + address, not
+    # submarket_id (a listing's submarket assignment can change between
+    # snapshots if CoStar re-classifies; we still want the prior row gone).
+    return (row["snapshot_date"], row["address"])
+
+
+def _load_land_sales_comps_file(
+    conn: Any, cycle_id: str, path: Path,
 ) -> dict[str, Any]:
-    return _load_placeholder("land_sales_comps", conn, cycle_id, files)
+    return _ingest_one_comp_file(
+        conn, cycle_id, path,
+        export_type="land_sales_comps",
+        required_columns=_LAND_SALES_COMPS_REQUIRED_COLUMNS,
+        row_validator=_validate_land_sales_comps_row,
+        market_resolver=_market_resolver_with_county,
+        insert_sql=_SQL_INSERT_LAND_SALES,
+        insert_params_builder=_land_sales_insert_params,
+        delete_sql=_SQL_DELETE_LAND_SALES_FOR_REINGEST,
+        delete_params_builder=_land_sales_delete_params,
+    )
 
 
-def _load_building_sales_comps_placeholder(
-    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+def _load_building_sales_comps_file(
+    conn: Any, cycle_id: str, path: Path,
 ) -> dict[str, Any]:
-    return _load_placeholder("building_sales_comps", conn, cycle_id, files)
+    return _ingest_one_comp_file(
+        conn, cycle_id, path,
+        export_type="building_sales_comps",
+        required_columns=_BUILDING_SALES_COMPS_REQUIRED_COLUMNS,
+        row_validator=_validate_building_sales_comps_row,
+        market_resolver=_market_resolver_default,
+        insert_sql=_SQL_INSERT_BUILDING_SALES,
+        insert_params_builder=_building_sales_insert_params,
+        delete_sql=_SQL_DELETE_BUILDING_SALES_FOR_REINGEST,
+        delete_params_builder=_building_sales_delete_params,
+    )
 
 
-def _load_leasing_comps_placeholder(
-    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+def _load_leasing_comps_file(
+    conn: Any, cycle_id: str, path: Path,
 ) -> dict[str, Any]:
-    return _load_placeholder("leasing_comps", conn, cycle_id, files)
+    return _ingest_one_comp_file(
+        conn, cycle_id, path,
+        export_type="leasing_comps",
+        required_columns=_LEASING_COMPS_REQUIRED_COLUMNS,
+        row_validator=_validate_leasing_comps_row,
+        market_resolver=_market_resolver_default,
+        insert_sql=_SQL_INSERT_LEASING_COMP,
+        insert_params_builder=_leasing_insert_params,
+        delete_sql=_SQL_DELETE_LEASING_COMPS_FOR_REINGEST,
+        delete_params_builder=_leasing_delete_params,
+    )
 
 
-def _load_land_listings_placeholder(
-    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+def _load_land_listings_file(
+    conn: Any, cycle_id: str, path: Path, snapshot_date: str,
 ) -> dict[str, Any]:
-    return _load_placeholder("land_listings", conn, cycle_id, files)
+    """Load one weekly land_listings snapshot. snapshot_date comes from filename."""
+    # Wrap the row validator to stamp snapshot_date on each parsed row.
+    def _validator_with_snapshot(raw_row):
+        parsed, err = _validate_land_listings_row(raw_row)
+        if err is None and parsed is not None:
+            parsed["snapshot_date"] = snapshot_date
+        return parsed, err
+
+    return _ingest_one_comp_file(
+        conn, cycle_id, path,
+        export_type="land_listings",
+        required_columns=_LAND_LISTINGS_REQUIRED_COLUMNS,
+        row_validator=_validator_with_snapshot,
+        market_resolver=_market_resolver_with_county,
+        insert_sql=_SQL_INSERT_LAND_LISTING,
+        insert_params_builder=_land_listings_insert_params,
+        delete_sql=_SQL_DELETE_LAND_LISTINGS_FOR_REINGEST,
+        delete_params_builder=_land_listings_delete_params,
+    )
+
+
+def _make_simple_loader(file_loader):
+    """Wrap a per-file loader into the (conn, cycle_id, files) -> summary signature."""
+    def _driver(conn, cycle_id, files):
+        per_file: list[dict[str, Any]] = []
+        rows_loaded = 0
+        rows_failed = 0
+        files_loaded = 0
+        files_failed = 0
+        for path, _date in files:
+            result = file_loader(conn, cycle_id, path)
+            per_file.append(result)
+            rows_loaded += result.get("rows_loaded", 0)
+            rows_failed += result.get("rows_failed", 0)
+            if result.get("status") == "loaded":
+                files_loaded += 1
+            else:
+                files_failed += 1
+        return {
+            "status": "loaded",
+            "files_loaded": files_loaded,
+            "files_failed": files_failed,
+            "rows_loaded": rows_loaded,
+            "rows_failed": rows_failed,
+            "per_file": per_file,
+        }
+    return _driver
 
 
 def _load_submarket_stats(
     conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
 ) -> dict[str, Any]:
     """Driver-side wrapper that iterates files for the wired loader."""
+    out = _make_simple_loader(_load_submarket_stats_file)(conn, cycle_id, files)
+    out["export_type"] = "submarket_stats"
+    return out
+
+
+def _load_land_sales_comps(
+    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+) -> dict[str, Any]:
+    out = _make_simple_loader(_load_land_sales_comps_file)(conn, cycle_id, files)
+    out["export_type"] = "land_sales_comps"
+    return out
+
+
+def _load_building_sales_comps(
+    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+) -> dict[str, Any]:
+    out = _make_simple_loader(_load_building_sales_comps_file)(conn, cycle_id, files)
+    out["export_type"] = "building_sales_comps"
+    return out
+
+
+def _load_leasing_comps(
+    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+) -> dict[str, Any]:
+    out = _make_simple_loader(_load_leasing_comps_file)(conn, cycle_id, files)
+    out["export_type"] = "leasing_comps"
+    return out
+
+
+def _load_land_listings(
+    conn: Any, cycle_id: str, files: Sequence[tuple[Path, str]],
+) -> dict[str, Any]:
+    """Land listings driver — passes the filename's parsed date as snapshot_date."""
     per_file: list[dict[str, Any]] = []
     rows_loaded = 0
     rows_failed = 0
     files_loaded = 0
     files_failed = 0
-    for path, _date in files:
-        result = _load_submarket_stats_file(conn, cycle_id, path)
+    for path, date_str in files:
+        # Filename pattern is YYYYMMDD; convert to ISO YYYY-MM-DD for snapshot_date.
+        try:
+            snapshot_date = datetime.strptime(date_str, "%Y%m%d").date().isoformat()
+        except ValueError:
+            files_failed += 1
+            per_file.append({
+                "file": path.name, "status": "failed",
+                "error": f"unparseable filename date: {date_str}",
+            })
+            continue
+        result = _load_land_listings_file(conn, cycle_id, path, snapshot_date)
         per_file.append(result)
         rows_loaded += result.get("rows_loaded", 0)
         rows_failed += result.get("rows_failed", 0)
@@ -2442,7 +3251,7 @@ def _load_submarket_stats(
             files_failed += 1
     return {
         "status": "loaded",
-        "export_type": "submarket_stats",
+        "export_type": "land_listings",
         "files_loaded": files_loaded,
         "files_failed": files_failed,
         "rows_loaded": rows_loaded,
@@ -2451,28 +3260,29 @@ def _load_submarket_stats(
     }
 
 
-# Registry-style dispatch so Phase 6.1+ adds an export type by replacing
-# one placeholder with a real loader (R-322).
+# Registry-style dispatch — Phase 6.1 wires all 5 recurring export types
+# end-to-end. Tenant intel (Export 6) is on-demand and remains
+# unregistered until Phase 8+.
 _INGESTION_LOADERS: dict[str, dict[str, Any]] = {
     "submarket_stats": {
         "pattern": _SUBMARKET_STATS_FILENAME_RE,
         "loader": _load_submarket_stats,
     },
     "land_sales_comps": {
-        "pattern": re.compile(r"^land_sales_comps_(\d{6})\.csv$", re.IGNORECASE),
-        "loader": _load_land_sales_comps_placeholder,
+        "pattern": _LAND_SALES_COMPS_FILENAME_RE,
+        "loader": _load_land_sales_comps,
     },
     "building_sales_comps": {
-        "pattern": re.compile(r"^building_sales_comps_(\d{6})\.csv$", re.IGNORECASE),
-        "loader": _load_building_sales_comps_placeholder,
+        "pattern": _BUILDING_SALES_COMPS_FILENAME_RE,
+        "loader": _load_building_sales_comps,
     },
     "leasing_comps": {
-        "pattern": re.compile(r"^leasing_comps_(\d{6})\.csv$", re.IGNORECASE),
-        "loader": _load_leasing_comps_placeholder,
+        "pattern": _LEASING_COMPS_FILENAME_RE,
+        "loader": _load_leasing_comps,
     },
     "land_listings": {
-        "pattern": re.compile(r"^land_listings_(\d{8})\.csv$", re.IGNORECASE),
-        "loader": _load_land_listings_placeholder,
+        "pattern": _LAND_LISTINGS_FILENAME_RE,
+        "loader": _load_land_listings,
     },
 }
 
@@ -2569,7 +3379,8 @@ def _print_phase1_status() -> None:
     params = prepare.get_parameters()
     threshold = params["composite_threshold"]
     print(
-        "research.py — Phase 5 scoring MVP + Phase 6 CoStar ingestion (submarket_stats); "
+        "research.py — Phase 5 scoring MVP + Phase 6.1 CoStar ingestion "
+        "(all 5 recurring export types wired); "
         "experiment loop not yet implemented."
     )
     print(f"composite_threshold (from parameters.json, frozen): {threshold}")

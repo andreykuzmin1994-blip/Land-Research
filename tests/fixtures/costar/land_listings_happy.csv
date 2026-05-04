@@ -1,0 +1,4 @@
+address,parcel_id,county,submarket,acres,zoning,topography_notes,asking_price,asking_price_per_acre,listing_date,days_on_market,listing_broker,listing_broker_firm,utilities_status,entitlement_status
+1500 Industrial Pkwy,09F-1500-0007,Fulton,South Fulton,18.5,M-2,gentle slope west to east,2775000,150000,2026-04-01,42,Jane Doe,CBRE,water+sewer to site,zoned ready
+2700 Highway 81,15H-2700-0009,Henry,Henry County / I-75 South,25.0,M-1,flat,3500000,140000,2026-04-15,28,John Smith,JLL,utilities at street,rezoning required
+4900 South Park,12C-4900-0011,Clayton,Clayton County,9.7,A-R,floodplain corner,,,2026-04-08,35,Sara Lee,Cushman,no utilities,unentitled

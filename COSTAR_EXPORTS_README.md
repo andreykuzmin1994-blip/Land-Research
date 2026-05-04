@@ -14,12 +14,12 @@
 
 ```
 costar_exports/                 (gitignored — created on demand)
-├── submarket_stats/            (Export 1, weekly, WIRED in Phase 6 Option A)
-├── land_sales_comps/           (Export 2, monthly, deferred)
-├── building_sales_comps/       (Export 3, monthly, deferred)
-├── leasing_comps/              (Export 4, monthly, deferred)
-├── land_listings/              (Export 5, weekly, deferred)
-├── tenant_intel/               (Export 6, on-demand, deferred)
+├── submarket_stats/            (Export 1, weekly, WIRED in Phase 6)
+├── land_sales_comps/           (Export 2, monthly, WIRED in Phase 6.1)
+├── building_sales_comps/       (Export 3, monthly, WIRED in Phase 6.1)
+├── leasing_comps/              (Export 4, monthly, WIRED in Phase 6.1)
+├── land_listings/              (Export 5, weekly, WIRED in Phase 6.1)
+├── tenant_intel/               (Export 6, on-demand, deferred to Phase 8+)
 ├── ARCHIVED/
 │   └── {export_type}/          (files moved here after successful load)
 └── FAILED/
@@ -44,18 +44,50 @@ skipped — they don't fail the cycle, they just don't ingest. Hidden files
 
 ---
 
-## Phase 6 scope (Option A)
+## Phase 6.1 scope
 
-Phase 6 wires `submarket_stats` end-to-end. The four other recurring
-export types (`land_sales_comps`, `building_sales_comps`, `leasing_comps`,
-`land_listings`) are accepted by the pipeline but report
-`status='not_implemented'` in the cycle summary. **The agent does not
-move, archive, or modify files for the deferred export types** — they
-remain in their intake directory until the matching loader is wired in
-a future phase. This is intentional so the human can stage files in
-advance.
+Phase 6 Option A wired `submarket_stats` end-to-end. Phase 6.1 wires the
+four other recurring export types: `land_sales_comps`,
+`building_sales_comps`, `leasing_comps`, and `land_listings`. All five
+recurring exports are now real loaders — files dropped into the matching
+intake directory get validated, loaded into Postgres, and archived (or
+quarantined to `FAILED/` on validation failure) within one
+`run_ingestion_cycle()` call.
 
-The on-demand `tenant_intel` export is not yet registered at all.
+Each comp/listing loader follows the same shape as the submarket_stats
+loader: header validation, per-row validation with locale-tolerant
+number parsing and multi-format date parsing, idempotent
+DELETE-then-INSERT inside one transaction, markets/submarkets
+auto-UPSERT, archive/fail movement, research_log + flagged_items
+emission. Per-export differences are limited to required-column sets,
+range checks (e.g. building clear height in [8, 80] ft), dedup keys,
+and target tables.
+
+Idempotent dedup keys per export type:
+
+| Table              | Dedup key                                                       |
+|--------------------|-----------------------------------------------------------------|
+| `market_context`   | `(submarket_id, as_of_date, source='costar')`                   |
+| `sales_comps` land | `(submarket_id, address, sale_date, comp_type='land')`          |
+| `sales_comps` bldg | `(submarket_id, address, sale_date, comp_type='building')`      |
+| `leasing_comps`    | `(submarket_id, address, tenant_name, lease_start_date)`        |
+| `land_listings`    | `(snapshot_date, address)` — snapshot semantics                 |
+
+Land listings use snapshot semantics: `snapshot_date` comes from the
+filename (`land_listings_{YYYYMMDD}.csv`); re-delivering the same
+weekly file replaces all rows for that snapshot_date; new weeks
+accumulate as new snapshot_date-keyed rows. Cross-snapshot
+`is_active=FALSE` flipping for listings that disappear is a Phase 7+
+join — not part of Phase 6.1.
+
+For comp/listing types that don't ship a `market` column (per CoStar
+contract), the loader resolves market from `county` via
+`_COUNTY_TO_MARKET` (8 Atlanta counties seeded for Phase 6.1) or
+defaults to `Atlanta` when the column is absent (`building_sales_comps`,
+`leasing_comps`). A `data_gap` flag fires once per file when an unknown
+county defaults.
+
+The on-demand `tenant_intel` export is not yet registered (Phase 8+).
 
 ---
 
@@ -154,19 +186,39 @@ review; archived files stay in `ARCHIVED/` for audit.
 
 ---
 
-## What lives in Postgres after a successful submarket_stats ingest
+## What lives in Postgres after a successful ingestion cycle
 
-- One row per (submarket, report_date, source='costar') in
-  `market_context`, with vacancy / availability / absorption /
-  under_construction / proposed / asking_rent populated.
-- A `markets` row per unique market name and a `submarkets` row per
-  unique (market, submarket_name) pair. Both auto-created on first
-  encounter; submarket `bbox` is NULL until human backfill.
-- One `research_log` row per ingested file with
-  `action_type='ingestion'`.
-- Zero or more `flagged_items` rows for row-level failures, name drifts,
-  and auto-created submarkets pending bbox backfill.
+For each successfully loaded file:
+
+- One `research_log` row with `action_type='ingestion'` and a notes
+  string of the form `"<export_type>: file=<name> rows_loaded=<N>
+  rows_failed=<M>"`.
+- Zero or more `flagged_items` rows for row-level failures, submarket
+  name drifts, auto-created submarkets pending bbox backfill, and
+  unknown-county-defaulted-to-Atlanta cases.
+
+Per export type the row destinations are:
+
+- **submarket_stats** → `market_context` (one row per
+  (submarket_id, as_of_date, source='costar'))
+- **land_sales_comps** → `sales_comps` with `comp_type='land'`
+- **building_sales_comps** → `sales_comps` with `comp_type='building'`
+- **leasing_comps** → `leasing_comps`
+- **land_listings** → `land_listings` (with snapshot_date set from
+  the filename; `is_active=TRUE` until Phase 7+ cross-snapshot diff)
+
+Plus, on first encounter, a `markets` row and a `submarkets` row per
+unique (market, submarket_name). Both auto-created with `bbox=NULL`
+until human backfill.
+
+The full original CSV row is preserved in the `raw JSONB` column on
+`sales_comps`, `leasing_comps`, and `land_listings` so unmapped CoStar
+fields (e.g. `tenant_at_sale`, `topography_notes`,
+`lease_term_remaining_years`, `intended_use`) are available to Phase 9
+snapshot generation without schema changes.
 
 Phase 7 will read `market_context` for parameters S4 (submarket
-vacancy), S5 (absorption), and S6 (competing pipeline). Until Phase 7
-lands, the data sits in the table waiting.
+vacancy), S5 (absorption), and S6 (competing pipeline), and read
+`sales_comps` for refined S8 (land basis). Phase 8+ will read
+`leasing_comps` for BTS / spec-development strategy fit and
+`land_listings` for on-market discovery.
