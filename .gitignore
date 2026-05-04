@@ -38,6 +38,7 @@ markets/*/rejected/
 markets/*/flagged/
 markets/*/market_context.json
 rankings/*.json
+rankings/*.md
 snapshots/*.md
 harness_reports/*.json
 harness_reports/markets_dashboard.md
