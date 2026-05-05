@@ -11,7 +11,46 @@ The agent supports five investment strategies (BTS development, spec development
 
 ## Status
 
-This is a **specification repository**. The `.md` files define what the agent should do, how it should be structured, and how the data sources should be connected. Implementation has not started.
+Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop runs end-to-end against Fulton County, with the full Karpathy-pattern infrastructure: setup-phase verifier, evaluator, append-only TSV experiment log, keep-or-revert decision logic, halt sentinel, advisory locking. Atlanta is the only configured market; Phase 11+ adds the remaining counties.
+
+## Quick Start (Operator)
+
+This codebase is operated through `make`. Open the repo in a Codespace and run:
+
+```bash
+make daily              # ONE COMMAND: cuts/resumes today's autoresearch branch,
+                        # verifies Supabase, kicks the loop in a detached tmux
+                        # session, prints attach + tail commands.
+
+# In a second terminal:
+make tail               # live-stream experiment_log.tsv as rows land
+make status             # verify_setup + last 10 TSV rows
+make db-stats           # per-table row counts (parcels, parcel_scores, etc.)
+
+# To stop the loop cleanly:
+make halt               # creates .halt sentinel; loop exits on next iteration
+
+# To reattach to the running loop:
+make loop-attach        # tmux attach -t loop  (Ctrl-B d to detach again)
+```
+
+**One-time setup per Codespace** (the devcontainer handles this for new Codespaces):
+
+1. Add `DATABASE_URL` to your User-level Codespaces secrets at https://github.com/settings/codespaces — Supabase Session pooler DSN, format `postgresql://postgres.<ref>:<URL_ENCODED_PASSWORD>@aws-<n>-<region>.pooler.supabase.com:5432/postgres`. Grant the secret access to this repo.
+2. Open the Codespace. The devcontainer's `post-start.sh` materializes `.env` from the secret automatically.
+3. Verify: `make db-check` should print PostGIS version + `actionable_pipeline_count: 0`.
+
+**Karpathy iteration loop** (what the agent does between `make loop` runs):
+
+1. Read `experiment_log.tsv`. The most recent `baseline` or `keep` row is the prior anchor.
+2. Form a hypothesis. Edit `research.py` (the only file the agent edits). One focused change.
+3. `git commit -m "exp: <description>"` on the active `autoresearch/<tag>` branch.
+4. `make loop MAX=1` — runs one full cycle, appends a row to `experiment_log.tsv` with the keep-or-revert decision.
+5. Read the new row. If `status=keep`, branch advances. If `status=discard`, `git reset --hard HEAD~1`. If `status=crash` or `timeout`, diagnose and retry.
+
+Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) drives the iteration; `make loop` provides the evaluator + decision recording. Auto-revert is intentionally NOT in `make loop` — that's the agent's responsibility (R-723 / D1).
+
+`make help` shows every available target with descriptions.
 
 ## Repository Structure
 
@@ -28,9 +67,11 @@ land-site-selector/
 ├── BUILD_PHASES.md                    — Implementation roadmap
 ├── parameters.json                    — Scoring weights and filter thresholds (IMMUTABLE during run)
 ├── sources.json                       — Registry of data source URLs (locked during run)
-├── prepare.py                         — IMMUTABLE: metric calculation and evaluation (TO BE BUILT)
-├── research.py                        — Agent sandbox — only file the agent modifies (TO BE BUILT)
-├── connector_harness.py               — Connector validation framework (TO BE BUILT)
+├── prepare.py                         — IMMUTABLE: metric calculation and evaluation
+├── research.py                        — Agent sandbox — only file the agent modifies
+├── connector_harness.py               — Connector validation framework
+├── Makefile                           — Operator targets (make help)
+├── .devcontainer/                     — Codespaces config: secret -> .env hydration
 ├── experiment_log.tsv                 — AutoResearch experiment log (UNTRACKED, runtime-only)
 ├── markets/                           — Per-market discovered candidates and context
 ├── rankings/                          — Current ranked shortlists per market

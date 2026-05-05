@@ -46,12 +46,18 @@ help:  ## Show this help (default target).
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z][a-zA-Z0-9_-]*:.*##/ \
 	  { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@echo ""
-	@echo "Typical first-run sequence:"
+	@echo "DAILY OPERATOR FLOW (use this):"
+	@echo "  make daily          # one command: branch + verify + tmux loop"
+	@echo "  make loop-attach    # see the running loop"
+	@echo "  make tail           # live TSV stream from a 2nd terminal"
+	@echo "  make status         # verify_setup + last 10 TSV rows"
+	@echo "  make db-stats       # per-table row counts"
+	@echo "  make halt           # exit the loop cleanly"
+	@echo ""
+	@echo "First-run-only:"
 	@echo "  make db-check       # sanity-check Supabase + PostGIS"
 	@echo "  make setup          # cut autoresearch/$(TAG) from main"
-	@echo "  make loop MAX=2     # bootstrap baseline + 2 iterations"
-	@echo "  make status         # verify_setup + last 10 TSV rows"
-	@echo "  make halt           # exit the loop on next iteration boundary"
+	@echo "  make loop MAX=2     # bootstrap baseline + 2 iterations (foreground)"
 
 # ---------------------------------------------------------------------
 # Setup phase (AUTORESEARCH_MECHANICS.md "Setup Sequence")
@@ -173,6 +179,99 @@ tail:  ## tail -f experiment_log.tsv for live monitoring (Ctrl-C to exit).
 	  while [ ! -f experiment_log.tsv ]; do sleep 1; done; \
 	fi
 	@tail -f experiment_log.tsv
+
+.PHONY: db-stats
+db-stats:  ## Per-table row counts (parcels, parcel_scores, research_log, flagged_items).
+	@python -c "\
+import prepare; \
+conn_ctx = prepare.get_connection(); conn = conn_ctx.__enter__(); \
+cur = conn.cursor(); \
+queries = [ \
+    ('parcels',                  'SELECT COUNT(*) FROM parcels'), \
+    ('parcel_scores',            'SELECT COUNT(*) FROM parcel_scores'), \
+    ('parcel_scores actionable', \"SELECT COUNT(*) FROM parcel_scores WHERE actionability='PASS' AND composite_score >= 70\"), \
+    ('research_log',             'SELECT COUNT(*) FROM research_log'), \
+    ('flagged_items',            'SELECT COUNT(*) FROM flagged_items'), \
+    ('submarkets',               'SELECT COUNT(*) FROM submarkets'), \
+]; \
+[print(f'{n:30s}{cur.execute(q) or cur.fetchone()[0]}') for n, q in queries]; \
+print(); \
+cur.execute(\"SELECT action_type, COUNT(*) FROM research_log GROUP BY action_type ORDER BY 2 DESC\"); \
+print('research_log by action_type:'); \
+[print(f'  {a:25s}{n}') for a, n in cur.fetchall()]; \
+conn_ctx.__exit__(None, None, None)"
+
+# ---------------------------------------------------------------------
+# Background / tmux loop control (R-733 ergonomic)
+# ---------------------------------------------------------------------
+.PHONY: loop-bg
+loop-bg: _assert-autoresearch-branch  ## Start the loop in a detached tmux session named 'loop'.
+	@if ! command -v tmux >/dev/null; then \
+	  echo "==> tmux not installed. Run: sudo apt-get install -y tmux"; \
+	  exit 1; \
+	fi
+	@if tmux has-session -t loop 2>/dev/null; then \
+	  echo "==> tmux session 'loop' already exists. Attach with 'make loop-attach' or kill with 'tmux kill-session -t loop'."; \
+	  exit 1; \
+	fi
+	@if [ -f .halt ]; then \
+	  echo "==> WARNING: .halt sentinel exists. Run 'make unhalt' first."; \
+	  exit 1; \
+	fi
+	@tmux new-session -d -s loop \
+	  "cd $(CURDIR) && make loop $(if $(MAX),MAX=$(MAX),) 2>&1 | tee /tmp/loop-$$$$.log; echo; echo 'loop ended -- press any key'; read -n 1"
+	@echo "==> loop started in detached tmux session 'loop'"
+	@echo "==> attach:  make loop-attach"
+	@echo "==> tail:    make tail"
+	@echo "==> halt:    make halt"
+
+.PHONY: loop-attach
+loop-attach:  ## Attach to the running 'loop' tmux session (Ctrl-B d to detach).
+	@if ! tmux has-session -t loop 2>/dev/null; then \
+	  echo "==> no tmux session named 'loop'. Start one with 'make loop-bg'."; \
+	  exit 1; \
+	fi
+	@tmux attach -t loop
+
+# ---------------------------------------------------------------------
+# Higher-level recipes
+# ---------------------------------------------------------------------
+.PHONY: resume
+resume:  ## Switch to today's autoresearch branch (or the most recent) and pull.
+	@set -euo pipefail; \
+	target=$$(git branch --list 'autoresearch/*' --sort=-committerdate --format='%(refname:short)' | head -1); \
+	if [ -z "$$target" ]; then \
+	  echo "==> no autoresearch/* branches exist locally. Did you run 'make setup'?"; \
+	  exit 1; \
+	fi; \
+	echo "==> resuming on $$target"; \
+	git checkout "$$target"; \
+	git pull origin "$$target"
+	@$(MAKE) --no-print-directory db-stats
+
+.PHONY: daily
+daily:  ## ONE COMMAND: cut/resume autoresearch/<TAG>, verify infra, kick loop in tmux.
+	@set -euo pipefail; \
+	branch=$$(git rev-parse --abbrev-ref HEAD); \
+	target="autoresearch/$(TAG)"; \
+	if [ "$$branch" != "$$target" ]; then \
+	  if git show-ref --verify --quiet "refs/heads/$$target"; then \
+	    echo "==> autoresearch/$(TAG) already exists locally; switching"; \
+	    git checkout "$$target"; \
+	    git pull --ff-only origin "$$target" || true; \
+	  else \
+	    echo "==> cutting autoresearch/$(TAG) from main"; \
+	    $(MAKE) --no-print-directory setup; \
+	  fi; \
+	else \
+	  echo "==> already on $$target"; \
+	  git pull --ff-only origin "$$target" || true; \
+	fi
+	@if [ -f .devcontainer/post-start.sh ] && [ -n "$${DATABASE_URL:-}" ] && [ ! -f .env ]; then \
+	  bash .devcontainer/post-start.sh; \
+	fi
+	@$(MAKE) --no-print-directory db-check
+	@$(MAKE) --no-print-directory loop-bg
 
 # ---------------------------------------------------------------------
 # Tests + dev hygiene
