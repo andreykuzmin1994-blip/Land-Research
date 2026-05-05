@@ -1,0 +1,20 @@
+{
+  "name": "Land-Research",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+
+  "secrets": {
+    "DATABASE_URL": {
+      "description": "Supabase Session pooler DSN. Required for prepare.py and the experiment loop. Set as a User secret at https://github.com/settings/codespaces or as a Repo secret in the GitHub repo settings. Format: postgresql://postgres.<ref>:<URL_ENCODED_PASSWORD>@aws-<n>-<region>.pooler.supabase.com:5432/postgres",
+      "documentationUrl": "https://docs.github.com/en/codespaces/managing-codespaces-for-your-organization/managing-development-environment-secrets-for-your-repository-or-organization"
+    },
+    "ANTHROPIC_API_KEY": {
+      "description": "Optional. Required only when the AI fallback layer is wired (Phase 12). Leave unset for Phases 1-10."
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspaces/Land-Research"
+}
