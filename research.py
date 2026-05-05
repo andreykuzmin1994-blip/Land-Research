@@ -696,9 +696,16 @@ _SQL_FETCH_PARCEL = (
 
 # S2 PostGIS query — returns area, bbox area, and aspect ratio in one shot.
 # NULLIF guards the divide-by-zero in degenerate (zero-extent) bbox cases.
+# ST_MakeValid + ST_CollectionExtract(_, 3) repairs malformed polygons
+# before the spheroid area calc -- otherwise a single self-intersecting
+# parcel raises lwgeom_area_spher() returned area < 0.0 and crashes the
+# entire scoring cycle. CollectionExtract type=3 keeps only the Polygon /
+# MultiPolygon component of whatever ST_MakeValid produces, so the
+# geography cast is unambiguous.
 _SQL_S2_GEOMETRY = (
     "WITH g AS ("
-    "  SELECT geometry AS geom, ST_Envelope(geometry) AS bbox "
+    "  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom, "
+    "         ST_Envelope(geometry) AS bbox "
     "  FROM parcels WHERE parcel_id = %s"
     ") "
     "SELECT "
@@ -707,7 +714,7 @@ _SQL_S2_GEOMETRY = (
     "  GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox)) "
     "  / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox), "
     "                 ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio "
-    "FROM g WHERE geom IS NOT NULL"
+    "FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)"
 )
 
 # Phase 7+8 (R-507, R-510): include parcels whose LATEST parcel_scores
@@ -1525,7 +1532,20 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
                     log.exception("failed to log KeyboardInterrupt abort")
                 summary["aborted"] = True
                 summary["abort_reason"] = "keyboard_interrupt"
+                # exp: commit work-so-far before re-raising. prepare.get_connection()
+                # opens conn with autocommit=False and does not commit on close, so
+                # without this the SAVEPOINT releases inside _process_parcel would
+                # be rolled back when the connection closes.
+                conn.commit()
                 raise
+            # exp: commit at the end of the cycle. The first DB op inside this
+            # with-block is _count_log_rows (a SELECT) which starts an implicit
+            # transaction under autocommit=False; subsequent `with conn.transaction()`
+            # calls in _process_parcel become SAVEPOINTs whose RELEASE does not
+            # commit until the outer transaction commits. prepare.get_connection()
+            # does not commit on close, so without this explicit commit the entire
+            # cycle's work is rolled back.
+            conn.commit()
     finally:
         session.close()
 
@@ -2630,6 +2650,11 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
             status = result.get("status", "error")
             summary["counts"][status] = summary["counts"].get(status, 0) + 1
             summary["parcels"].append(result)
+
+        # exp: see run_discovery_cycle for the full rationale. Commit the
+        # outer transaction explicitly so SAVEPOINTs from score_parcel
+        # actually persist when the connection closes.
+        conn.commit()
 
     return summary
 
@@ -4025,6 +4050,12 @@ def run_ingestion_cycle() -> dict[str, Any]:
             summary["per_export_type"][export_type] = spec["loader"](
                 conn, cycle_id, files,
             )
+
+        # exp: see run_discovery_cycle for the full rationale. Commit the
+        # outer transaction explicitly. The individual loaders do their own
+        # `with conn.transaction()` blocks, but those become SAVEPOINTs once
+        # the cycle_id-collision SELECT has started the outer transaction.
+        conn.commit()
 
     return summary
 
