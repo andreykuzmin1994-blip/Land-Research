@@ -61,3 +61,7 @@ backups/
 
 # Playwright browser binaries
 playwright/.local-browsers/
+
+# Phase 10 runtime sentinels — local to a checkout, never committed.
+.halt
+.experiment_loop.lock
