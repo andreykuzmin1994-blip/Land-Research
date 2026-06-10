@@ -118,6 +118,76 @@ def main() -> int:
             )
         print("OK: no deprecated '(none)' sentinels in flagged_items")
 
+    # Step 5 (Phase 13, R-1323): exercise the metric's DISTINCT ON tie-break
+    # for real. The fake-cursor offline suite cannot run SQL, so the live DB is
+    # the only place the latest-per-parcel selection is validated. Insert THREE
+    # parcel_scores rows for ONE parcel: two PASS rows at the IDENTICAL
+    # scored_at (the tie case) and one PASS row at an EARLIER scored_at. The old
+    # MAX(scored_at) correlated subquery would have counted the parcel TWICE
+    # (both tied rows pass); the DISTINCT ON (parcel_id) ORDER BY parcel_id,
+    # scored_at DESC, score_id DESC selects EXACTLY ONE row — the highest
+    # score_id among the tie — so the count is 1.
+    threshold = prepare.get_parameters()["composite_threshold"]
+    pass_score = threshold + 5  # comfortably over the PASS threshold
+    with psycopg.connect(dsn, autocommit=False, connect_timeout=10) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT parcel_id FROM parcels WHERE parcel_id LIKE %s LIMIT 1",
+                ("fulton-%",),
+            )
+            row = cur.fetchone()
+        if not row:
+            _fail("no fulton-% parcel available for the tie-break test")
+        tie_parcel = row[0]
+        with conn.cursor() as cur:
+            # Earlier (loser) PASS row.
+            cur.execute(
+                "INSERT INTO parcel_scores "
+                "(parcel_id, scored_at, composite_score, confidence_score, actionability) "
+                "VALUES (%s, NOW() - INTERVAL '1 hour', %s, %s, 'PASS')",
+                (tie_parcel, pass_score, 1.0),
+            )
+            # Two rows tied at the SAME scored_at; the higher score_id (the
+            # SECOND insert) must win. Distinct confidence so we can confirm
+            # which row DISTINCT ON picked.
+            cur.execute(
+                "INSERT INTO parcel_scores "
+                "(parcel_id, scored_at, composite_score, confidence_score, actionability) "
+                "VALUES (%s, NOW(), %s, %s, 'PASS'), (%s, NOW(), %s, %s, 'PASS')",
+                (tie_parcel, pass_score, 3.0, tie_parcel, pass_score, 9.0),
+            )
+        conn.commit()
+
+        # Determine the highest score_id among the tied (latest) rows — that is
+        # the row DISTINCT ON must select.
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT score_id, confidence_score FROM parcel_scores "
+                "WHERE parcel_id = %s ORDER BY scored_at DESC, score_id DESC LIMIT 1",
+                (tie_parcel,),
+            )
+            winner_score_id, winner_conf = cur.fetchone()
+
+        count = prepare.calculate_actionable_pipeline_count(conn)
+        if count != 1:
+            _fail(
+                f"DISTINCT ON tie-break: expected count==1 for one parcel with "
+                f"two tied PASS rows, got {count} (double-count regression?)"
+            )
+        # The confidence-weighted sum must reflect the SINGLE winning row, i.e.
+        # the highest-score_id tied row's confidence (9.0), not a double count.
+        weighted = prepare.calculate_confidence_weighted_pipeline(conn)
+        if abs(weighted - float(winner_conf)) > 1e-9:
+            _fail(
+                f"DISTINCT ON tie-break: confidence_weighted={weighted} did not "
+                f"match the winning row's confidence {winner_conf} "
+                f"(score_id={winner_score_id})"
+            )
+        print(
+            f"OK: DISTINCT ON tie-break selects exactly one row "
+            f"(score_id={winner_score_id}, confidence={winner_conf}); count=1"
+        )
+
     print("OK: live-PostGIS smoke test complete")
     return 0
 

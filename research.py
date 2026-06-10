@@ -157,6 +157,22 @@ _DISCOVERY_HTTP_TIMEOUT_S = 30
 # Polite-scrape minimum spacing per host (R-17, mirrors harness §1.3).
 _MIN_REQUEST_SPACING_S = 1.0
 
+# Discovery retry policy (Phase 13 R-1301..R-1305). INTENTIONALLY divergent
+# from connector_harness.py's MAX_RETRIES=3 / BACKOFF_SCHEDULE_S=(1,2,4): the
+# discovery cycle runs UNDER the Karpathy 90-min OS kill (AUTORESEARCH_MECHANICS
+# L153) and its own 30-min soft ceiling (_CYCLE_BUDGET_SECONDS), so a smaller
+# retry budget caps worst-case wall time per flapping endpoint. We recreate the
+# retry pattern here rather than importing connector_harness (R-1306 / Phase 3
+# R-17: contractual isolation — research.py must not import the harness's
+# private HTTP helper). 2 retries = 3 total attempts (matches Phase 3 R-18).
+_DISCOVERY_MAX_RETRIES = 2
+_DISCOVERY_BACKOFF_SCHEDULE_S = (1.0, 2.0)
+# Cap on an honored 429 Retry-After so a pathological header (e.g.
+# "Retry-After: 3600") cannot blow the cycle budget (R-1304). Beyond the cap we
+# fall back to the scheduled backoff; persistent rate-limiting then exhausts the
+# retries and the corridor-level handler flags it (R-1302).
+_DISCOVERY_RETRY_AFTER_CAP_S = 10.0
+
 # Module-level mapping cache so we re-read sources.json once per cycle.
 _SOURCES_PATH = _REPO_ROOT / "sources.json"
 
@@ -296,18 +312,105 @@ class _DiscoverySession:
         if wait > 0:
             time.sleep(wait)
 
+    def _retry_after_delay(
+        self, resp: "requests.Response", scheduled_backoff: float
+    ) -> float:
+        """Resolve the inter-attempt sleep for a retryable HTTP response.
+
+        R-1304: when a 429 carries a ``Retry-After`` header longer than the
+        scheduled backoff, honor it (capped at _DISCOVERY_RETRY_AFTER_CAP_S so a
+        pathological value cannot blow the cycle budget). Otherwise use the
+        schedule. Only the integer-seconds form of Retry-After is parsed (pure
+        stdlib, no new dependency); an HTTP-date form or a missing/garbage
+        header falls back to the scheduled backoff. A header value ABOVE the cap
+        does NOT extend the wait — we cap and let retry-exhaustion hand off to
+        the corridor handler rather than stall for minutes.
+        """
+        raw = resp.headers.get("Retry-After", "")
+        try:
+            retry_after = int(raw)
+        except (TypeError, ValueError):
+            return scheduled_backoff
+        if retry_after <= 0:
+            return scheduled_backoff
+        return max(scheduled_backoff, min(float(retry_after), _DISCOVERY_RETRY_AFTER_CAP_S))
+
     def get(
         self,
         url: str,
         params: Mapping[str, Any] | None = None,
         timeout: float = _DISCOVERY_HTTP_TIMEOUT_S,
     ) -> dict[str, Any]:
-        """GET with rate limit + JSON parse. Raises on HTTP error."""
+        """GET with rate limit + JSON parse. Raises on HTTP error.
+
+        Phase 13 (R-1301..R-1305): up to _DISCOVERY_MAX_RETRIES retries on
+        connection errors, timeouts, HTTP 5xx, and 429. Other 4xx fail-fast
+        (no retry — they will not recover). Per-host polite spacing
+        (``_spacing_sleep``) is respected on EVERY attempt, BEFORE the request;
+        the backoff sleep happens AFTER a failed attempt and before the next
+        loop iteration (ordering mirrors connector_harness._http_get
+        L338-364 for consistency — spacing at top, backoff at bottom). On
+        exhaustion the original exception class propagates unchanged (R-1302),
+        so the existing corridor-level handler still aborts the corridor and
+        continues the cycle rather than mistaking a dead endpoint for an empty
+        one. The retry is safe because this session issues only GETs (R-1307).
+        """
         host = urlparse(url).hostname or ""
-        self._spacing_sleep(host)
-        resp = self._session.get(url, params=dict(params or {}), timeout=timeout)
-        resp.raise_for_status()
-        return resp.json()
+        # NOTE: do NOT log the full URL with query params on retry — Fulton is
+        # public today but Phase 11 / Regrid endpoints may carry an API key
+        # (R-1308). We log only host + status, never the query string.
+        for attempt in range(_DISCOVERY_MAX_RETRIES + 1):
+            self._spacing_sleep(host)
+            retryable = False
+            backoff = _DISCOVERY_BACKOFF_SCHEDULE_S[
+                min(attempt, len(_DISCOVERY_BACKOFF_SCHEDULE_S) - 1)
+            ]
+            try:
+                resp = self._session.get(
+                    url, params=dict(params or {}), timeout=timeout
+                )
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout) as exc:
+                # Transient transport failures retry. Other RequestException
+                # subclasses (InvalidURL, TooManyRedirects, ...) are NOT
+                # transient and are deliberately NOT caught here, so they
+                # propagate immediately (fail-fast) — more correct and faster
+                # than retrying something that cannot recover (R-1305).
+                if attempt >= _DISCOVERY_MAX_RETRIES:
+                    raise
+                retryable = True
+                reason = exc.__class__.__name__
+                sleep_s = backoff
+            else:
+                status = resp.status_code
+                if 200 <= status < 400:
+                    return resp.json()
+                if status == 429 or 500 <= status < 600:
+                    # 429 is the one 4xx that is genuinely transient, so we
+                    # retry it (unlike the harness, which fail-fasts all 4xx);
+                    # honor Retry-After when present (R-1304). 5xx retries on
+                    # the fixed schedule.
+                    if attempt >= _DISCOVERY_MAX_RETRIES:
+                        resp.raise_for_status()  # re-raise the SAME HTTPError (R-1302)
+                    retryable = True
+                    reason = f"http_{status}"
+                    sleep_s = (
+                        self._retry_after_delay(resp, backoff)
+                        if status == 429 else backoff
+                    )
+                else:
+                    # Other 4xx — fail-fast, no retry (won't recover) (R-1305).
+                    resp.raise_for_status()
+            if retryable:
+                log.info(
+                    "discovery GET host=%s failed (%s), retrying in %.1fs "
+                    "(attempt %d/%d)",
+                    host, reason, sleep_s, attempt + 1, _DISCOVERY_MAX_RETRIES,
+                )
+                time.sleep(sleep_s)
+        # Unreachable: the final attempt either returns or raises above. Guard
+        # against a logic change silently returning None.
+        raise RuntimeError("discovery retry loop exited without return/raise")
 
     def close(self) -> None:
         self._session.close()
@@ -762,6 +865,25 @@ _SQL_LATEST_MARKET_CONTEXT = (
     "LIMIT 1"
 )
 
+# Phase 13 (R-1310): set-based form of _SQL_LATEST_MARKET_CONTEXT for the
+# per-cycle prefetch. DISTINCT ON (submarket_id) reproduces the single-key
+# LIMIT 1 by leading the ORDER BY with submarket_id and then carrying the
+# EXACT same CoStar-preference CASE + as_of_date DESC tail, so the chosen row
+# per submarket is bit-identical to the per-parcel query. A GROUP BY/MAX
+# rewrite is WRONG here — it cannot reproduce the CoStar tie-break. submarket_id
+# is bound as a single text[] via ANY(%s) (R-1316: pass as a 1-tuple).
+_SQL_LATEST_MARKET_CONTEXT_BATCH = (
+    "SELECT DISTINCT ON (submarket_id) submarket_id, "
+    "vacancy_rate_pct, net_absorption_t12_sf, "
+    "under_construction_sf, proposed_sf, asking_rent_nnn_psf, "
+    "as_of_date, source "
+    "FROM market_context "
+    "WHERE submarket_id = ANY(%s) "
+    "ORDER BY submarket_id, "
+    "(CASE WHEN source = 'costar' THEN 0 ELSE 1 END), "
+    "as_of_date DESC"
+)
+
 # Phase 7 (R-523..R-526): submarket land-only median price-per-acre
 # computed over comp_type='land' rows in the last 36 months. The
 # minimum sample size of 3 (R-524) is enforced in code, not SQL — we
@@ -778,6 +900,29 @@ _SQL_SUBMARKET_LAND_MEDIAN = (
     "  AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')"
 )
 
+# Phase 13 (R-1310): set-based form of _SQL_SUBMARKET_LAND_MEDIAN for the
+# per-cycle prefetch. GROUP BY submarket_id is correct here (an aggregate, not
+# a latest-row pick) and the WHERE filters (comp_type='land', price_per_acre
+# IS NOT NULL, 36-month window) are byte-identical to the single-key query, so
+# each submarket's (n, median) is bit-identical. CURRENT_DATE is evaluated once
+# per cycle instead of once per parcel — a consistency improvement that is
+# identical in practice except for a cycle straddling UTC midnight (R-1314),
+# which cannot occur in the fake-cursor offline tests. submarket_id is bound as
+# a single text[] via ANY(%s) (R-1316).
+_SQL_SUBMARKET_LAND_MEDIAN_BATCH = (
+    "SELECT "
+    "  submarket_id, "
+    "  COUNT(*) AS n, "
+    "  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre) "
+    "    AS median_price_per_acre "
+    "FROM sales_comps "
+    "WHERE submarket_id = ANY(%s) "
+    "  AND comp_type = 'land' "
+    "  AND price_per_acre IS NOT NULL "
+    "  AND sale_date >= (CURRENT_DATE - INTERVAL '36 months') "
+    "GROUP BY submarket_id"
+)
+
 # Phase 8 (R-533): synthetic deal-killer evidence comes from open
 # flagged_items rows of flag_type='actionability_block' attached to the
 # parcel. Phase 11+ adds richer signals (PACER, lis pendens, etc.); for
@@ -788,6 +933,32 @@ _SQL_FLAGGED_ACTIONABILITY_BLOCK = (
     "  AND flag_type = 'actionability_block' "
     "  AND status = 'open' "
     "ORDER BY flagged_at DESC LIMIT 1"
+)
+
+# Phase 13 (R-1310, R-1311): set-based form of _SQL_FLAGGED_ACTIONABILITY_BLOCK
+# for the per-cycle prefetch. DISTINCT ON (parcel_id) leads the ORDER BY with
+# parcel_id, then flagged_at DESC (matching the single-key query), then a
+# flag_id DESC tie-break for DETERMINISM. The single-key query above keeps NO
+# tie-break, so on the vanishingly rare two-open-blocks-same-microsecond case
+# the batch path is strictly MORE deterministic than the per-parcel path. This
+# micro-divergence is documented and unobservable in practice (the deal-killer
+# gate only asks whether ANY open block mentions a non-entitlement keyword); see
+# Agent 2 response R-1311. parcel_id is bound as a single text[] via ANY(%s).
+_SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH = (
+    "SELECT DISTINCT ON (parcel_id) parcel_id, description FROM flagged_items "
+    "WHERE parcel_id = ANY(%s) "
+    "  AND flag_type = 'actionability_block' "
+    "  AND status = 'open' "
+    "ORDER BY parcel_id, flagged_at DESC, flag_id DESC"
+)
+
+# Phase 13 (R-1317): the distinct non-null submarkets for the cycle's parcel
+# set, used to bound the market-context and land-median prefetch arrays. Keyed
+# off the SAME parcel_ids the scoring loop iterates so the cache never misses a
+# scored parcel's submarket. Raw submarket strings (no normalization, R-1315).
+_SQL_DISTINCT_SUBMARKETS_FOR_PARCELS = (
+    "SELECT DISTINCT submarket FROM parcels "
+    "WHERE parcel_id = ANY(%s) AND submarket IS NOT NULL"
 )
 
 # Phase 6 — CoStar ingestion (R-321, R-326). All statements use %s
@@ -1966,17 +2137,120 @@ def _score_basis(
 
 
 # ---------------------------------------------------------------------------
+# Phase 13 — per-cycle prefetch cache (R-1310..R-1320)
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class _CycleCache:
+    """Per-scoring-cycle batch lookups, prefetched ONCE before the parcel loop.
+
+    Replaces 3 of the 5 per-parcel DB round-trips (market_context, land-median,
+    actionability-block) with 3 set-based queries (R-1310). Threaded into
+    ``score_parcel`` / its helpers as an optional ``cache`` kwarg; when None the
+    helpers fall back to their per-parcel queries (R-1312), so every existing
+    direct caller of ``score_parcel`` / the helpers is unaffected.
+
+    Each value is the SAME row shape the corresponding single-key query returns,
+    so the per-parcel decode logic is byte-identical whether the row came from a
+    ``fetchone()`` or from these dicts (the bit-identical guarantee):
+      - ``market_context``: submarket -> 7-col latest row tuple
+        (vacancy, absorption, under_constr, proposed, rent, as_of, source).
+      - ``land_median``: submarket -> (n, median) tuple.
+      - ``actionability_block``: parcel_id -> open-block description (str).
+        Absent key == no open block == None (R-1311).
+
+    Staleness/validity (R-1313): scoring NEVER writes ``market_context`` or
+    ``sales_comps`` (only ``run_ingestion_cycle`` does), and ``score_parcel``
+    writes ONLY ``flag_type='data_gap'`` flags — never ``actionability_block``
+    rows — so a cycle-start prefetch is safe against the cycle's own writes.
+    """
+
+    market_context: dict[str, tuple]
+    land_median: dict[str, tuple]
+    actionability_block: dict[str, str]
+
+
+def _prefetch_cycle_cache(
+    conn: Any,
+    market: str,
+    parcel_ids: Sequence[str],
+) -> _CycleCache:
+    """Build the per-cycle batch cache for ``parcel_ids`` (R-1317).
+
+    Keyed off the EXACT ``parcel_ids`` list the scoring loop iterates so the
+    cache never misses a scored parcel's submarket/block. Short-circuits the
+    submarket-keyed queries when the cycle has no non-null submarkets (R-1315,
+    R-1318). ``ANY(%s)`` parameters are passed as a single-element tuple
+    wrapping the Python list, which psycopg3 adapts to a Postgres array
+    (R-1316).
+    """
+    market_context: dict[str, tuple] = {}
+    land_median: dict[str, tuple] = {}
+    actionability_block: dict[str, str] = {}
+
+    pid_list = list(parcel_ids)
+    if not pid_list:
+        # Degenerate empty cycle — issue no queries (R-1318).
+        return _CycleCache(market_context, land_median, actionability_block)
+
+    # Distinct non-null submarkets for this cycle's parcels (R-1317). Raw
+    # strings — NO case/whitespace normalization, so the dict keys match the
+    # DB's `=` semantics exactly (R-1315).
+    with conn.cursor() as cur:
+        cur.execute(_SQL_DISTINCT_SUBMARKETS_FOR_PARCELS, (pid_list,))
+        submarkets = [r[0] for r in cur.fetchall() if r[0] is not None]
+
+    if submarkets:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_LATEST_MARKET_CONTEXT_BATCH, (submarkets,))
+            for row in cur.fetchall():
+                # row[0] is submarket_id; the remaining 7 columns are the SAME
+                # tuple _SQL_LATEST_MARKET_CONTEXT returns.
+                market_context[row[0]] = tuple(row[1:])
+        with conn.cursor() as cur:
+            cur.execute(_SQL_SUBMARKET_LAND_MEDIAN_BATCH, (submarkets,))
+            for row in cur.fetchall():
+                # row[0] is submarket_id; (n, median) matches the single-key
+                # _SQL_SUBMARKET_LAND_MEDIAN row.
+                land_median[row[0]] = (row[1], row[2])
+
+    # Actionability blocks are parcel-keyed, so they always run for a non-empty
+    # cycle regardless of submarket coverage (R-1313: safe — scoring never
+    # writes actionability_block rows mid-cycle).
+    with conn.cursor() as cur:
+        cur.execute(_SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH, (pid_list,))
+        for row in cur.fetchall():
+            # row[0] parcel_id, row[1] description. Mirror the per-parcel
+            # decode: a NULL description maps to None (skip — absent key reads
+            # back as None via dict.get).
+            if row[1] is not None:
+                actionability_block[row[0]] = str(row[1])
+
+    return _CycleCache(market_context, land_median, actionability_block)
+
+
+# ---------------------------------------------------------------------------
 # Phase 7 conn-bound score orchestrators
 # ---------------------------------------------------------------------------
 def _compute_market_context_scores(
     conn: Any,
     submarket: str | None,
+    *,
+    cache: "_CycleCache | None" = None,
 ) -> dict[str, Any]:
     """Fetch the latest market_context row and produce S4/S5/S6 + flags.
 
     Returns a dict with keys S4, S5, S6 (each int | None), plus
     `staleness_days` (int | None) and `provenance` (str | None) for the
     caller to thread into the data_gap flag emission.
+
+    Phase 13 (R-1312): when ``cache`` is provided (per-cycle prefetch), the
+    latest market_context row is read from ``cache.market_context`` instead of
+    issuing a per-parcel query; the row tuple is the SAME shape the single-key
+    ``_SQL_LATEST_MARKET_CONTEXT`` returns, so the score/flag/provenance logic
+    below is byte-identical. When ``cache`` is None the original per-parcel
+    query path runs verbatim. The ``if not submarket`` guard fires BEFORE any
+    cache/dict lookup so NULL/empty submarkets hit the same empty branch as
+    today (R-1315: no KeyError, no spurious match).
     """
     out: dict[str, Any] = {
         "S4": None,
@@ -1989,9 +2263,12 @@ def _compute_market_context_scores(
     }
     if not submarket:
         return out
-    with conn.cursor() as cur:
-        cur.execute(_SQL_LATEST_MARKET_CONTEXT, (submarket,))
-        row = cur.fetchone()
+    if cache is not None:
+        row = cache.market_context.get(submarket)
+    else:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_LATEST_MARKET_CONTEXT, (submarket,))
+            row = cur.fetchone()
     if not row:
         return out
     vacancy, absorption, under_constr, _proposed, _rent, as_of, source = (
@@ -2054,20 +2331,34 @@ def _compute_parcel_basis_per_acre(parcel: Mapping[str, Any]) -> tuple[float | N
 def _compute_s8(
     conn: Any,
     parcel: Mapping[str, Any],
+    *,
+    cache: "_CycleCache | None" = None,
 ) -> tuple[int | None, dict[str, Any]]:
     """S8 — refined land basis. Returns (score, provenance dict).
 
     Provenance dict keys: basis_per_acre, basis_provenance, median,
     median_n, n_below_min (bool — true when < _S8_MIN_LAND_COMPS comps).
+
+    Phase 13 (R-1312, R-1319): the parcel ``basis`` stays PER-PARCEL (it is a
+    function of parcel attributes, not the submarket). Only the submarket
+    ``(n, median)`` aggregate is prefetched; when ``cache`` is provided it is
+    read from ``cache.land_median`` as the SAME ``(n, median)`` row the
+    single-key ``_SQL_SUBMARKET_LAND_MEDIAN`` returns, so the decode and the
+    n_below_min/score logic are byte-identical. None ``cache`` runs the
+    per-parcel query verbatim. The ``if submarket`` guard precedes any lookup
+    (R-1315).
     """
     basis, basis_prov = _compute_parcel_basis_per_acre(parcel)
     submarket = parcel.get("submarket")
     median: float | None = None
     n: int = 0
     if submarket:
-        with conn.cursor() as cur:
-            cur.execute(_SQL_SUBMARKET_LAND_MEDIAN, (submarket,))
-            row = cur.fetchone()
+        if cache is not None:
+            row = cache.land_median.get(submarket)
+        else:
+            with conn.cursor() as cur:
+                cur.execute(_SQL_SUBMARKET_LAND_MEDIAN, (submarket,))
+                row = cur.fetchone()
         if row:
             n = int(row[0]) if row[0] is not None else 0
             median = float(row[1]) if row[1] is not None else None
@@ -2326,8 +2617,26 @@ def _gate_deal_killer(flag_block: str | None) -> tuple[bool, str | None]:
     return True, None
 
 
-def _fetch_actionability_block(conn: Any, parcel_id: str) -> str | None:
-    """Return the description of an open actionability_block flag, if any."""
+def _fetch_actionability_block(
+    conn: Any,
+    parcel_id: str,
+    *,
+    cache: "_CycleCache | None" = None,
+) -> str | None:
+    """Return the description of an open actionability_block flag, if any.
+
+    Phase 13 (R-1312, R-1320): the signature is unchanged for the existing
+    positional callers — ``score_parcel`` and the public
+    ``run_actionability_screen`` (L4094) both call
+    ``_fetch_actionability_block(conn, parcel_id)`` and keep working. When
+    ``cache`` is provided (per-cycle prefetch from ``run_scoring_cycle``) the
+    open-block description is read from ``cache.actionability_block``: a parcel
+    absent from the dict has no open block and returns None, exactly matching
+    the per-parcel "no row" branch (R-1311). None ``cache`` runs the per-parcel
+    query verbatim, so ``run_actionability_screen`` is untouched.
+    """
+    if cache is not None:
+        return cache.actionability_block.get(parcel_id)
     with conn.cursor() as cur:
         cur.execute(_SQL_FLAGGED_ACTIONABILITY_BLOCK, (parcel_id,))
         row = cur.fetchone()
@@ -2408,6 +2717,7 @@ def score_parcel(
     conn: Any = None,
     cycle_id: str | None = None,
     params: Mapping[str, Any] | None = None,
+    cache: "_CycleCache | None" = None,
 ) -> dict[str, Any]:
     """Compute sub-scores S1..S12, strategy fit, and actionability for one
     parcel; persist all of it in a single transaction.
@@ -2417,6 +2727,14 @@ def score_parcel(
     the four-gate actionability screen (R-501..R-545). The persisted
     parcel_scores row carries actionability, actionability_blockers,
     strategy_fit, and primary_strategy in addition to the Phase 5 fields.
+
+    Phase 13 (R-1312): ``cache`` is an OPTIONAL per-cycle prefetch threaded in
+    by ``run_scoring_cycle``. When provided, the market_context, land-median,
+    and actionability-block lookups read from it instead of issuing per-parcel
+    queries; the produced sub-scores, composite, confidence, actionability,
+    strategy_fit, notes, and all DB rows are bit-identical to the cache=None
+    path. When None (every existing caller, incl. the ad-hoc and direct-test
+    paths) the original per-parcel queries run verbatim.
 
     Returns: {parcel_id, status, composite_score, confidence_score,
     sub_scores, actionability, actionability_blockers, strategy_fit,
@@ -2462,13 +2780,16 @@ def score_parcel(
         )
 
         # R-518: single market_context fetch, three sub-scores derived.
-        mc = _compute_market_context_scores(conn, parcel.get("submarket"))
+        # R-1310: served from the per-cycle prefetch when cache is present.
+        mc = _compute_market_context_scores(
+            conn, parcel.get("submarket"), cache=cache,
+        )
         sub_scores["S4_submarket_vacancy"] = mc["S4"]
         sub_scores["S5_submarket_absorption"] = mc["S5"]
         sub_scores["S6_competing_pipeline"] = mc["S6"]
 
         # R-523..R-528: refined S8 from sales_comps + parcel basis proxy.
-        s8_score, s8_prov = _compute_s8(conn, parcel)
+        s8_score, s8_prov = _compute_s8(conn, parcel, cache=cache)
         sub_scores["S8_land_basis"] = s8_score
 
         composite = _compute_composite(sub_scores, weights)
@@ -2479,7 +2800,8 @@ def score_parcel(
         primary_strategy = _select_primary_strategy(strategy_fit)
 
         # R-533: synthetic deal-killer evidence from flagged_items.
-        flag_block = _fetch_actionability_block(conn, parcel_id)
+        # R-1310: served from the per-cycle prefetch when cache is present.
+        flag_block = _fetch_actionability_block(conn, parcel_id, cache=cache)
         actionability, blockers = _run_actionability_screen(
             sub_scores, strategy_fit, flag_block,
         )
@@ -2645,8 +2967,20 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
             cur.execute(_SQL_LIST_PARCELS_FOR_SCORING, (market,))
             parcel_ids = [r[0] for r in cur.fetchall()]
 
+        # Phase 13 (R-1310, R-1317): prefetch the per-cycle market_context,
+        # land-median, and actionability-block lookups ONCE — replacing 3 of the
+        # 5 per-parcel DB round-trips with set-based queries. Keyed off the
+        # SAME parcel_ids the loop iterates, run AFTER the collision guard and
+        # BEFORE the loop. Short-circuits to empty dicts for a 0-parcel cycle
+        # (R-1318). score_parcel(cache=...) produces bit-identical rows to the
+        # cache=None path (the bit-identical guarantee, proven by the
+        # cache-vs-no-cache equivalence tests).
+        cache = _prefetch_cycle_cache(conn, market, parcel_ids)
+
         for pid in parcel_ids:
-            result = score_parcel(pid, conn=conn, cycle_id=cycle_id, params=params)
+            result = score_parcel(
+                pid, conn=conn, cycle_id=cycle_id, params=params, cache=cache,
+            )
             status = result.get("status", "error")
             summary["counts"][status] = summary["counts"].get(status, 0) + 1
             summary["parcels"].append(result)
@@ -4201,7 +4535,14 @@ _SQL_FETCH_PARCEL_FOR_SNAPSHOT = (
     "FROM parcels WHERE parcel_id = %s"
 )
 
-# R-608: same latest-row predicate the metric uses (prepare._LATEST_SCORE_WHERE).
+# R-608: latest-row-per-parcel for the Phase 9 snapshot. NOTE (Phase 13
+# R-1329): the metric's latest-row selector in prepare.py now uses a
+# deterministic DISTINCT ON ... ORDER BY parcel_id, scored_at DESC, score_id
+# DESC tie-break, whereas this snapshot read keeps ORDER BY scored_at DESC
+# LIMIT 1 (no score_id tie-break). On the (in-practice-nonexistent) tied-
+# scored_at case the metric and the snapshot could pick different rows.
+# Aligning this read-path selector is a documented OUT-OF-SCOPE follow-up
+# (R-1328/R-1329) — research.py reads are not the immutable metric layer.
 _SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT = (
     "SELECT composite_score, confidence_score, actionability, "
     "actionability_blockers, sub_scores, strategy_fit, primary_strategy, "
