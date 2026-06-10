@@ -1513,20 +1513,27 @@ class TestPhase5RunScoringCycle(unittest.TestCase):
     def test_iterates_unscored_parcels(self) -> None:
         params = _passing_params()
         params["scoring_weights"] = TestPhase5Composite.WEIGHTS
-        # Cycle: collision check (None default → 0), unscored list (2 parcels),
-        # then per-parcel: fetch (10 cols, submarket=None so no S4-S8 fetches) +
-        # S2 + actionability_block (returns None — no open block flag).
+        # Phase 13: cycle now PREFETCHES the per-cycle cache after the parcel
+        # list and before the loop. Sequence:
+        #   fetchone: collision check (0).
+        #   fetchall: unscored list (2 parcels), then prefetch distinct-submarkets
+        #             (empty — both parcels submarket=None), then actionability
+        #             block batch (empty — no open blocks).
+        #   per-parcel fetchone: fetch (10 cols, submarket=None so no S4-S8
+        #             query) + S2. The actionability_block is served from the
+        #             (empty) cache → None, so NO per-parcel block fetchone.
         fake = Phase5FakeConnection(
             fetchone_queue=[
                 (0,),                                                                       # collision check
                 ("fulton-001", "atlanta", None, "GA", None, None, None, None, -84.55, 33.55), # parcel 1 fetch
                 (1000.0, 1100.0, 1.5),                                                       # parcel 1 S2
-                None,                                                                        # parcel 1 actionability_block
                 ("fulton-002", "atlanta", None, "GA", None, None, None, None, -83.0, 35.0),  # parcel 2 fetch (outside OZ)
                 (500.0, 1000.0, 4.0),                                                        # parcel 2 S2 (compactness 0.5 → 0)
             ],
             fetchall_queue=[
-                [("fulton-001",), ("fulton-002",)],
+                [("fulton-001",), ("fulton-002",)],  # unscored parcel list
+                [],                                   # prefetch: distinct submarkets (none)
+                [],                                   # prefetch: actionability block batch (none)
             ],
         )
 
@@ -5499,3 +5506,603 @@ class TestPhase10ConstantsContract(unittest.TestCase):
     def test_budget_is_ninety_minutes(self) -> None:
         # AUTORESEARCH_MECHANICS.md L153 says 90 minutes.
         self.assertEqual(research._PHASE10_BUDGET_SECONDS, 90 * 60)
+
+
+# ===========================================================================
+# Phase 13 — performance / robustness pass (R-1301..R-1335)
+# See reviews/13_perf_optimization/01_risk_review.md and 02_code_writer_response.md.
+# ===========================================================================
+class _FakeResponse:
+    """Minimal requests.Response stand-in for retry tests.
+
+    status_code drives raise_for_status (4xx/5xx raise requests.HTTPError,
+    mirroring requests' real behavior so _DiscoverySession.get's
+    raise_for_status path re-raises the SAME exception class on exhaustion).
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        json_body: Any = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        self.status_code = status_code
+        self._json = json_body if json_body is not None else {"ok": True}
+        self.headers = headers or {}
+
+    def json(self) -> Any:
+        return self._json
+
+    def raise_for_status(self) -> None:
+        if 400 <= self.status_code < 600:
+            raise research.requests.exceptions.HTTPError(
+                f"{self.status_code} Error", response=self
+            )
+
+
+class _ScriptedSession:
+    """requests.Session stand-in: pops a scripted outcome per get() call.
+
+    Each outcome is either a _FakeResponse (returned) or an Exception
+    instance (raised) — lets a test script "500 then 200", "timeout then 200",
+    "404 once", etc. Records the number of get() calls.
+    """
+
+    def __init__(self, outcomes: list[Any]) -> None:
+        self._outcomes = list(outcomes)
+        self.calls = 0
+        self.headers: dict[str, str] = {}
+
+    def get(self, url: str, params: Any = None, timeout: Any = None) -> Any:
+        self.calls += 1
+        if not self._outcomes:
+            raise AssertionError("scripted session exhausted")
+        outcome = self._outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    def close(self) -> None:
+        pass
+
+
+@contextmanager
+def _patched_discovery_session(outcomes: list[Any]):
+    """Build a _DiscoverySession backed by a _ScriptedSession, with time.sleep
+    and time.monotonic patched so retries/spacing run instantly and we can
+    record every sleep() the retry path performs.
+
+    Yields (session, sleeps) where sleeps is the list of sleep durations.
+    """
+    sess = research._DiscoverySession()
+    scripted = _ScriptedSession(outcomes)
+    sess._session = scripted  # type: ignore[assignment]
+    sleeps: list[float] = []
+    # Monotonic clock that advances by a large step each call so _spacing_sleep
+    # never *itself* blocks (we only care that it is CALLED on each attempt;
+    # spacing-induced sleeps are captured separately and asserted by count).
+    clock = {"t": 0.0}
+
+    def _fake_sleep(secs: float) -> None:
+        sleeps.append(secs)
+
+    def _fake_monotonic() -> float:
+        clock["t"] += 1000.0
+        return clock["t"]
+
+    with mock.patch.object(research.time, "sleep", _fake_sleep), \
+            mock.patch.object(research.time, "monotonic", _fake_monotonic):
+        yield sess, sleeps, scripted
+
+
+class TestDiscoveryRetry(unittest.TestCase):
+    """Item 1 — retry-with-backoff in _DiscoverySession.get (R-1301..R-1308)."""
+
+    def test_retry_on_500_then_200(self) -> None:
+        with _patched_discovery_session(
+            [_FakeResponse(500), _FakeResponse(200, {"features": []})]
+        ) as (sess, sleeps, scripted):
+            out = sess.get("https://example.org/q")
+        self.assertEqual(out, {"features": []})
+        self.assertEqual(scripted.calls, 2)  # one retry consumed
+
+    def test_retry_on_timeout_then_200(self) -> None:
+        with _patched_discovery_session(
+            [research.requests.exceptions.Timeout("read timed out"),
+             _FakeResponse(200, {"features": [1]})]
+        ) as (sess, sleeps, scripted):
+            out = sess.get("https://example.org/q")
+        self.assertEqual(out, {"features": [1]})
+        self.assertEqual(scripted.calls, 2)
+
+    def test_retry_on_connection_error_then_200(self) -> None:
+        with _patched_discovery_session(
+            [research.requests.exceptions.ConnectionError("conn reset"),
+             _FakeResponse(200)]
+        ) as (sess, sleeps, scripted):
+            out = sess.get("https://example.org/q")
+        self.assertTrue(out["ok"])
+        self.assertEqual(scripted.calls, 2)
+
+    def test_retry_on_429_then_200(self) -> None:
+        # 429 IS retried (the one transient 4xx). R-1304.
+        with _patched_discovery_session(
+            [_FakeResponse(429), _FakeResponse(200, {"v": 1})]
+        ) as (sess, sleeps, scripted):
+            out = sess.get("https://example.org/q")
+        self.assertEqual(out, {"v": 1})
+        self.assertEqual(scripted.calls, 2)
+
+    def test_no_retry_on_404(self) -> None:
+        # 4xx != 429 fail-fast: exactly one call, HTTPError propagates. R-1305.
+        with _patched_discovery_session([_FakeResponse(404)]) as (sess, sleeps, scripted):
+            with self.assertRaises(research.requests.exceptions.HTTPError):
+                sess.get("https://example.org/q")
+        self.assertEqual(scripted.calls, 1)
+
+    def test_no_retry_on_403(self) -> None:
+        with _patched_discovery_session([_FakeResponse(403)]) as (sess, sleeps, scripted):
+            with self.assertRaises(research.requests.exceptions.HTTPError):
+                sess.get("https://example.org/q")
+        self.assertEqual(scripted.calls, 1)
+
+    def test_no_retry_on_400(self) -> None:
+        with _patched_discovery_session([_FakeResponse(400)]) as (sess, sleeps, scripted):
+            with self.assertRaises(research.requests.exceptions.HTTPError):
+                sess.get("https://example.org/q")
+        self.assertEqual(scripted.calls, 1)
+
+    def test_retries_exhausted_reraises_http_error(self) -> None:
+        # 3 consecutive 500s (1 initial + 2 retries) → HTTPError propagates,
+        # NOT a sentinel. R-1302: the corridor-level handler must still fire.
+        with _patched_discovery_session(
+            [_FakeResponse(500), _FakeResponse(500), _FakeResponse(500)]
+        ) as (sess, sleeps, scripted):
+            with self.assertRaises(research.requests.exceptions.HTTPError):
+                sess.get("https://example.org/q")
+        self.assertEqual(scripted.calls, 3)  # capped at MAX_RETRIES + 1
+
+    def test_retries_exhausted_reraises_timeout(self) -> None:
+        # Transport exception class is preserved on exhaustion (R-1302).
+        with _patched_discovery_session(
+            [research.requests.exceptions.Timeout("t"),
+             research.requests.exceptions.Timeout("t"),
+             research.requests.exceptions.Timeout("t")]
+        ) as (sess, sleeps, scripted):
+            with self.assertRaises(research.requests.exceptions.Timeout):
+                sess.get("https://example.org/q")
+        self.assertEqual(scripted.calls, 3)
+
+    def test_retry_cap_is_two(self) -> None:
+        # Module constants pin the divergence from the harness (R-1301).
+        self.assertEqual(research._DISCOVERY_MAX_RETRIES, 2)
+        self.assertEqual(research._DISCOVERY_BACKOFF_SCHEDULE_S, (1.0, 2.0))
+
+    def test_backoff_schedule_used_in_order(self) -> None:
+        # Two 500s then success → backoff sleeps of 1.0 then 2.0 appear among
+        # the recorded sleeps (spacing sleeps do not fire because the patched
+        # monotonic clock makes elapsed huge). R-1301.
+        with _patched_discovery_session(
+            [_FakeResponse(500), _FakeResponse(500), _FakeResponse(200)]
+        ) as (sess, sleeps, scripted):
+            sess.get("https://example.org/q")
+        self.assertEqual(sleeps, [1.0, 2.0])
+
+    def test_spacing_invoked_on_every_attempt(self) -> None:
+        # _spacing_sleep must run BEFORE the request on every attempt (R-1303).
+        # Spy on it; with 2 failures + 1 success it must be called 3 times.
+        sess = research._DiscoverySession()
+        sess._session = _ScriptedSession(  # type: ignore[assignment]
+            [_FakeResponse(500), _FakeResponse(500), _FakeResponse(200)]
+        )
+        calls: list[str] = []
+        real_spacing = sess._spacing_sleep
+
+        def _spy(host: str) -> None:
+            calls.append(host)
+
+        with mock.patch.object(sess, "_spacing_sleep", _spy), \
+                mock.patch.object(research.time, "sleep", lambda s: None):
+            sess.get("https://example.org/q")
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(h == "example.org" for h in calls))
+
+    def test_429_retry_after_honored_with_cap(self) -> None:
+        # Retry-After: 5 (> scheduled 1.0) → sleep 5.0 on the first backoff.
+        with _patched_discovery_session(
+            [_FakeResponse(429, headers={"Retry-After": "5"}), _FakeResponse(200)]
+        ) as (sess, sleeps, scripted):
+            sess.get("https://example.org/q")
+        self.assertEqual(sleeps, [5.0])
+
+    def test_429_retry_after_capped(self) -> None:
+        # Pathological Retry-After: 3600 is capped at _DISCOVERY_RETRY_AFTER_CAP_S.
+        with _patched_discovery_session(
+            [_FakeResponse(429, headers={"Retry-After": "3600"}), _FakeResponse(200)]
+        ) as (sess, sleeps, scripted):
+            sess.get("https://example.org/q")
+        self.assertEqual(sleeps, [research._DISCOVERY_RETRY_AFTER_CAP_S])
+
+    def test_429_retry_after_shorter_than_backoff_uses_backoff(self) -> None:
+        # Retry-After: 0 (or shorter than scheduled) falls back to the schedule.
+        with _patched_discovery_session(
+            [_FakeResponse(429, headers={"Retry-After": "0"}), _FakeResponse(200)]
+        ) as (sess, sleeps, scripted):
+            sess.get("https://example.org/q")
+        self.assertEqual(sleeps, [1.0])
+
+    def test_429_garbage_retry_after_uses_backoff(self) -> None:
+        # Non-integer Retry-After (HTTP-date form / garbage) → scheduled backoff.
+        with _patched_discovery_session(
+            [_FakeResponse(429, headers={"Retry-After": "Wed, 21 Oct 2025 07:28:00 GMT"}),
+             _FakeResponse(200)]
+        ) as (sess, sleeps, scripted):
+            sess.get("https://example.org/q")
+        self.assertEqual(sleeps, [1.0])
+
+    def test_no_call_to_connector_harness_http_helper(self) -> None:
+        # R-1306: research.py must NOT import-from connector_harness nor CALL
+        # its private HTTP retry helper — the retry pattern is recreated inline.
+        # AST scan (not a substring scan, which would false-positive on the
+        # explanatory comments/docstrings that legitimately reference the
+        # harness). The ONLY permitted connector_harness call is the public
+        # harness-gate run_harness_for_county.
+        tree = ast.parse(RESEARCH_PY_SRC)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                self.assertNotEqual(
+                    node.module, "connector_harness",
+                    f"forbidden `from connector_harness import` at line {node.lineno}",
+                )
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                val = node.func.value
+                if isinstance(val, ast.Name) and val.id == "connector_harness":
+                    self.assertEqual(
+                        node.func.attr, "run_harness_for_county",
+                        f"unexpected connector_harness.{node.func.attr}() call "
+                        f"at line {node.lineno}",
+                    )
+
+    def test_no_print_in_get_retry_path(self) -> None:
+        # R-1308: the retry path logs via `log`, never print(). Scan the
+        # _DiscoverySession.get method AST for print() calls.
+        tree = ast.parse(RESEARCH_PY_SRC)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == "get":
+                for inner in ast.walk(node):
+                    if (isinstance(inner, ast.Call)
+                            and isinstance(inner.func, ast.Name)
+                            and inner.func.id == "print"):
+                        self.fail(f"print() in get() at line {inner.lineno}")
+
+
+# ---------------------------------------------------------------------------
+# Items 2-4 — per-cycle prefetch cache (R-1310..R-1320)
+# ---------------------------------------------------------------------------
+class TestPhase13BatchSqlConstants(unittest.TestCase):
+    """R-1310, R-1316, R-1325/gate 28 — the new batch SQL constants are
+    module-level, parameterised, and use the right set-based shape."""
+
+    BATCH_CONSTS = (
+        "_SQL_LATEST_MARKET_CONTEXT_BATCH",
+        "_SQL_SUBMARKET_LAND_MEDIAN_BATCH",
+        "_SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH",
+        "_SQL_DISTINCT_SUBMARKETS_FOR_PARCELS",
+    )
+
+    def test_constants_present_and_no_format_braces(self) -> None:
+        for const in self.BATCH_CONSTS:
+            self.assertTrue(hasattr(research, const), f"missing {const}")
+            sql = getattr(research, const)
+            self.assertIsInstance(sql, str)
+            self.assertNotIn("{", sql, f"f-string brace in {const}")
+
+    def test_each_batch_const_has_exactly_one_any_placeholder(self) -> None:
+        # R-1316: each batch query binds a single list via ANY(%s).
+        for const in self.BATCH_CONSTS:
+            sql = getattr(research, const)
+            self.assertEqual(sql.count("%s"), 1, f"{const} must have one %s")
+            self.assertIn("ANY(%s)", sql, f"{const} must use ANY(%s)")
+
+    def test_market_context_batch_preserves_costar_case_tail(self) -> None:
+        # R-1310: DISTINCT ON (submarket_id) led, then the EXACT CoStar CASE +
+        # as_of_date DESC tail. A GROUP BY/MAX rewrite would be wrong.
+        sql = research._SQL_LATEST_MARKET_CONTEXT_BATCH
+        self.assertIn("DISTINCT ON (submarket_id)", sql)
+        self.assertIn(
+            "ORDER BY submarket_id, "
+            "(CASE WHEN source = 'costar' THEN 0 ELSE 1 END), "
+            "as_of_date DESC",
+            sql,
+        )
+        self.assertNotIn("MAX(", sql)
+        self.assertNotIn("GROUP BY", sql)
+
+    def test_land_median_batch_preserves_filters_and_groups(self) -> None:
+        # R-1310: identical filters to the single-key median; GROUP BY submarket.
+        sql = research._SQL_SUBMARKET_LAND_MEDIAN_BATCH
+        self.assertIn("comp_type = 'land'", sql)
+        self.assertIn("price_per_acre IS NOT NULL", sql)
+        self.assertIn("sale_date >= (CURRENT_DATE - INTERVAL '36 months')", sql)
+        self.assertIn("PERCENTILE_CONT(0.5)", sql)
+        self.assertIn("GROUP BY submarket_id", sql)
+
+    def test_actionability_batch_distinct_on_with_flag_id_tiebreak(self) -> None:
+        # R-1311: DISTINCT ON (parcel_id), parcel_id-led ORDER BY, flagged_at
+        # DESC then flag_id DESC tie-break for determinism.
+        sql = research._SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH
+        self.assertIn("DISTINCT ON (parcel_id)", sql)
+        self.assertIn("ORDER BY parcel_id, flagged_at DESC, flag_id DESC", sql)
+        # The single-key query keeps NO tie-break (documented micro-divergence).
+        self.assertNotIn("flag_id", research._SQL_FLAGGED_ACTIONABILITY_BLOCK)
+
+
+class TestPhase13PrefetchCache(unittest.TestCase):
+    """R-1315, R-1316, R-1317, R-1318 — _prefetch_cycle_cache behavior."""
+
+    def test_empty_parcel_list_issues_no_queries(self) -> None:
+        # R-1318: degenerate 0-parcel cycle → no queries, empty cache.
+        fake = Phase5FakeConnection()
+        cache = research._prefetch_cycle_cache(fake, "atlanta", [])
+        self.assertEqual(fake.all_executes, [])
+        self.assertEqual(cache.market_context, {})
+        self.assertEqual(cache.land_median, {})
+        self.assertEqual(cache.actionability_block, {})
+
+    def test_no_submarkets_skips_submarket_queries(self) -> None:
+        # R-1315: when no parcel has a non-null submarket, the market_context
+        # and land-median batch queries are skipped (only distinct-submarkets +
+        # actionability-block queries run).
+        fake = Phase5FakeConnection(
+            fetchall_queue=[
+                [],   # distinct submarkets: none
+                [],   # actionability-block batch: none
+            ],
+        )
+        cache = research._prefetch_cycle_cache(fake, "atlanta", ["p1", "p2"])
+        sqls = [s for s, _ in fake.all_executes]
+        self.assertIn(research._SQL_DISTINCT_SUBMARKETS_FOR_PARCELS, sqls)
+        self.assertIn(research._SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH, sqls)
+        self.assertNotIn(research._SQL_LATEST_MARKET_CONTEXT_BATCH, sqls)
+        self.assertNotIn(research._SQL_SUBMARKET_LAND_MEDIAN_BATCH, sqls)
+        self.assertEqual(cache.market_context, {})
+
+    def test_any_params_passed_as_single_tuple_wrapping_list(self) -> None:
+        # R-1316: every ANY(%s) query is called with (list,) — NOT the list
+        # spread across placeholders. This is the mistake the fake-conn cannot
+        # otherwise catch, so assert on the recorded (sql, params) shape.
+        fake = Phase5FakeConnection(
+            fetchall_queue=[
+                [("South Fulton",)],                       # distinct submarkets
+                [("South Fulton", 5.0, 100.0, 200.0, 0.0, 0.0, "2026-01-01", "costar")],  # mc batch
+                [("South Fulton", 4, 250000.0)],           # median batch
+                [("p1", "control block")],                 # actionability batch
+            ],
+        )
+        research._prefetch_cycle_cache(fake, "atlanta", ["p1", "p2"])
+        for sql, params in fake.all_executes:
+            if "ANY(%s)" in sql:
+                self.assertEqual(len(params), 1, f"ANY query must get a 1-tuple: {sql}")
+                self.assertIsInstance(params[0], list, f"ANY param must be a list: {sql}")
+
+    def test_cache_keyed_on_exact_parcel_ids(self) -> None:
+        # R-1317: the parcel-id list passed to the actionability batch is the
+        # exact list given, in order.
+        fake = Phase5FakeConnection(
+            fetchall_queue=[[], []],  # no submarkets, no blocks
+        )
+        research._prefetch_cycle_cache(fake, "atlanta", ["a", "b", "c"])
+        block_calls = [
+            params for sql, params in fake.all_executes
+            if sql == research._SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH
+        ]
+        self.assertEqual(block_calls, [(["a", "b", "c"],)])
+
+    def test_cache_decodes_rows_into_expected_shapes(self) -> None:
+        fake = Phase5FakeConnection(
+            fetchall_queue=[
+                [("South Fulton",)],
+                [("South Fulton", 5.0, 100.0, 200.0, 0.0, 0.0, "2026-01-01", "costar")],
+                [("South Fulton", 4, 250000.0)],
+                [("p1", "deal killer here")],
+            ],
+        )
+        cache = research._prefetch_cycle_cache(fake, "atlanta", ["p1"])
+        # market_context value is the 7-col tail (submarket stripped).
+        self.assertEqual(
+            cache.market_context["South Fulton"],
+            (5.0, 100.0, 200.0, 0.0, 0.0, "2026-01-01", "costar"),
+        )
+        # land_median value is (n, median).
+        self.assertEqual(cache.land_median["South Fulton"], (4, 250000.0))
+        self.assertEqual(cache.actionability_block["p1"], "deal killer here")
+
+
+def _phase78_full_parcel_tuple(
+    parcel_id: str, submarket: str | None, lng: float, lat: float,
+    state: str = "GA", acreage: Any = None,
+    last_sale_date: Any = None, last_sale_price: Any = None,
+    assessed: Any = None,
+) -> tuple:
+    """_SQL_FETCH_PARCEL 10-col row builder for the equivalence tests."""
+    return (
+        parcel_id, "atlanta", submarket, state, acreage,
+        last_sale_date, last_sale_price, assessed, lng, lat,
+    )
+
+
+class TestPhase13CacheEquivalence(unittest.TestCase):
+    """R-1310, R-1312, R-1319 — bit-identical proof: score_parcel(cache=...)
+    produces IDENTICAL results AND identical recorded INSERT params to the
+    cache=None per-parcel path."""
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def _params(self) -> dict[str, Any]:
+        p = _passing_params()
+        p["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        return p
+
+    # Shared fixture rows for a parcel WITH a submarket so S4/S5/S6/S8 fire.
+    SUBMARKET = "South Fulton"
+    MC_ROW = (3.0, 60000.0, 100000.0, 50000.0, 12.0, "2026-05-01", "costar")
+    MEDIAN_ROW = (5, 200000.0)  # n=5 (>= min), median 200k
+    PARCEL = _phase78_full_parcel_tuple(
+        "fulton-eq", SUBMARKET, -84.55, 33.55, state="GA", acreage=10.0,
+        assessed=2000000.0,
+    )
+    S2_ROW = (1000.0, 1100.0, 1.5)
+
+    def _score_no_cache(self) -> tuple[dict, list]:
+        # Per-parcel queue: fetch, S2, market_context, land_median, block.
+        fake = Phase5FakeConnection(
+            fetchone_queue=[
+                self.PARCEL,
+                self.S2_ROW,
+                self.MC_ROW,          # _SQL_LATEST_MARKET_CONTEXT
+                self.MEDIAN_ROW,      # _SQL_SUBMARKET_LAND_MEDIAN
+                ("control: condemned",),  # _SQL_FLAGGED_ACTIONABILITY_BLOCK
+            ],
+        )
+        result = research.score_parcel(
+            "fulton-eq", conn=fake, cycle_id="score-atlanta-eq-0001",
+            params=self._params(),
+        )
+        return result, fake.all_executes
+
+    def _score_with_cache(self) -> tuple[dict, list]:
+        cache = research._CycleCache(
+            market_context={self.SUBMARKET: self.MC_ROW},
+            land_median={self.SUBMARKET: self.MEDIAN_ROW},
+            actionability_block={"fulton-eq": "control: condemned"},
+        )
+        # Cached queue: only fetch + S2 (the other three are served from cache).
+        fake = Phase5FakeConnection(
+            fetchone_queue=[self.PARCEL, self.S2_ROW],
+        )
+        result = research.score_parcel(
+            "fulton-eq", conn=fake, cycle_id="score-atlanta-eq-0001",
+            params=self._params(), cache=cache,
+        )
+        return result, fake.all_executes
+
+    def test_result_dict_is_bit_identical(self) -> None:
+        no_cache, _ = self._score_no_cache()
+        with_cache, _ = self._score_with_cache()
+        self.assertEqual(no_cache, with_cache)
+
+    def test_parcel_scores_insert_params_identical(self) -> None:
+        _, ex_nc = self._score_no_cache()
+        _, ex_c = self._score_with_cache()
+
+        def _score_insert(executes: list) -> tuple:
+            return next(
+                params for sql, params in executes
+                if "INSERT INTO parcel_scores" in sql
+            )
+        self.assertEqual(_score_insert(ex_nc), _score_insert(ex_c))
+
+    def test_research_log_and_flag_params_identical(self) -> None:
+        _, ex_nc = self._score_no_cache()
+        _, ex_c = self._score_with_cache()
+
+        def _rows(executes: list, needle: str) -> list:
+            return [params for sql, params in executes if needle in sql]
+        self.assertEqual(
+            _rows(ex_nc, "INSERT INTO research_log"),
+            _rows(ex_c, "INSERT INTO research_log"),
+        )
+        # Match only flag WRITES — the no-cache path additionally issues a
+        # SELECT ... FROM flagged_items (the per-parcel block lookup) that the
+        # cache path skips; that recorded-query difference is expected and is
+        # NOT a row-content difference.
+        self.assertEqual(
+            _rows(ex_nc, "INSERT INTO flagged_items"),
+            _rows(ex_c, "INSERT INTO flagged_items"),
+        )
+
+    def test_cache_path_issues_no_lookup_queries(self) -> None:
+        # The cache path must NOT execute the three batched single-key queries.
+        _, ex_c = self._score_with_cache()
+        sqls = [s for s, _ in ex_c]
+        self.assertNotIn(research._SQL_LATEST_MARKET_CONTEXT, sqls)
+        self.assertNotIn(research._SQL_SUBMARKET_LAND_MEDIAN, sqls)
+        self.assertNotIn(research._SQL_FLAGGED_ACTIONABILITY_BLOCK, sqls)
+
+
+class TestPhase13CacheGuards(unittest.TestCase):
+    """R-1311, R-1313, R-1315, R-1320 — null-submarket, missing-key, and the
+    data_gap-vs-actionability_block isolation."""
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def test_null_submarket_hits_empty_branch_no_keyerror(self) -> None:
+        # R-1315: a parcel with NULL submarket must return the empty
+        # market_context / S8 None result even with a populated cache, never a
+        # KeyError or spurious match.
+        cache = research._CycleCache(
+            market_context={"South Fulton": (1.0, 2.0, 3.0, 4.0, 5.0, "2026-01-01", "costar")},
+            land_median={"South Fulton": (9, 123.0)},
+            actionability_block={},
+        )
+        mc = research._compute_market_context_scores(None, None, cache=cache)
+        self.assertEqual(mc["S4"], None)
+        self.assertEqual(mc["S6"], None)
+        s8, prov = research._compute_s8(None, {"submarket": None, "acreage": 10.0}, cache=cache)
+        self.assertIsNone(s8)
+
+    def test_submarket_keys_case_sensitive_no_normalization(self) -> None:
+        # R-1315: keys are raw strings; a case-mismatched submarket misses.
+        cache = research._CycleCache(
+            market_context={"South Fulton": (3.0, 1.0, 1.0, 1.0, 1.0, "2026-01-01", "costar")},
+            land_median={},
+            actionability_block={},
+        )
+        # Exact key hits.
+        hit = research._compute_market_context_scores(None, "South Fulton", cache=cache)
+        self.assertIsNotNone(hit["S4"])
+        # Different case misses → empty result (NOT a spurious match).
+        miss = research._compute_market_context_scores(None, "south fulton", cache=cache)
+        self.assertIsNone(miss["S4"])
+
+    def test_actionability_block_absent_key_returns_none(self) -> None:
+        # R-1311: a parcel with no open block (absent from the dict) returns
+        # None — exactly the per-parcel "no row" behavior.
+        cache = research._CycleCache(
+            market_context={}, land_median={},
+            actionability_block={"other": "blocked"},
+        )
+        self.assertIsNone(
+            research._fetch_actionability_block(None, "fulton-x", cache=cache)
+        )
+
+    def test_prefetch_actionability_ignores_data_gap_flags(self) -> None:
+        # R-1313: the actionability-block batch query filters
+        # flag_type='actionability_block', so a data_gap flag written by
+        # score_parcel mid-cycle can never enter the cache. Assert the batch
+        # SQL carries the actionability_block filter and not data_gap.
+        sql = research._SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH
+        self.assertIn("flag_type = 'actionability_block'", sql)
+        self.assertIn("status = 'open'", sql)
+        self.assertNotIn("data_gap", sql)
+
+    def test_run_actionability_screen_second_caller_unchanged(self) -> None:
+        # R-1320: the public run_actionability_screen still calls
+        # _fetch_actionability_block(conn, parcel_id) with NO cache and works.
+        # A passing strategy_fit (one MODERATE) clears gate 3 so the deal_killer
+        # gate (gate 4) is the one that fires on the open block.
+        passing_strategy = {k: "WEAK" for k in research._STRATEGY_KEYS}
+        passing_strategy[research._STRATEGY_KEYS[0]] = "MODERATE"
+        fake = Phase5FakeConnection(fetchone_queue=[("zoning moratorium",)])
+        out = research.run_actionability_screen(
+            "fulton-001", conn=fake,
+            sub_scores={n: None for n in research._SUB_SCORE_NAMES},
+            strategy_fit=passing_strategy,
+        )
+        # The single-key block query ran (per-parcel path, not the batch).
+        sqls = [s for s, _ in fake.all_executes]
+        self.assertIn(research._SQL_FLAGGED_ACTIONABILITY_BLOCK, sqls)
+        # 'zoning moratorium' has no 'entitlement' keyword → deal_killer fails.
+        self.assertEqual(out["actionability"], research._ACTIONABILITY_FAIL_DEAL_KILLER)
