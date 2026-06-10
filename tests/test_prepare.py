@@ -112,9 +112,16 @@ class TestActionablePipelineCount(unittest.TestCase):
         self.assertIn("parcel_scores", sql)
         self.assertIn("actionability = 'PASS'", sql)
         self.assertIn("composite_score >= %s", sql)
-        # Latest-score selector — the metric must not double-count a parcel
-        # that was rescored.
-        self.assertIn("MAX(scored_at)", sql)
+        # Phase 13 mutation: latest-score selector is now a DISTINCT ON
+        # (parcel_id) CTE (replacing the old MAX(scored_at) correlated
+        # subquery), so the metric selects EXACTLY ONE deterministic row per
+        # parcel and cannot double-count a rescored parcel. Assert the new
+        # mechanism with equal strictness — the parcel_id-led ORDER BY with the
+        # scored_at DESC, score_id DESC tie-break is mandatory (R-1322, R-1324).
+        self.assertIn("DISTINCT ON (parcel_id)", sql)
+        self.assertIn("ORDER BY parcel_id, scored_at DESC, score_id DESC", sql)
+        # The old correlated-subquery form must be gone.
+        self.assertNotIn("MAX(scored_at)", sql)
 
 
 class TestConfidenceWeightedPipeline(unittest.TestCase):
@@ -133,24 +140,106 @@ class TestConfidenceWeightedPipeline(unittest.TestCase):
         conn = FakeConnection(fetchone_returns=[None])
         self.assertEqual(prepare.calculate_confidence_weighted_pipeline(conn), 0.0)
 
-    def test_uses_same_where_clause_as_count(self) -> None:
-        # The two metric functions share _LATEST_SCORE_WHERE — keep them
-        # in lock-step so the secondary metric never disagrees about which
-        # parcels are in the pipeline.
+    def test_uses_same_latest_score_cte_and_filter(self) -> None:
+        # Phase 13 mutation: the two metric functions now compose the SAME
+        # shared _LATEST_SCORE_CTE (latest row per parcel) and the SAME
+        # _LATEST_SCORE_FILTER (PASS + threshold), so they can never disagree
+        # about which parcels are in the pipeline. Assert BOTH emitted SQLs
+        # embed both shared constants verbatim — this fails if either function's
+        # parcel-selection CTE or its PASS/threshold filter drifts from the
+        # other's (R-1322). Replaces the old split-on-first-WHERE comparison,
+        # which is structurally invalid once a CTE owns the leading clause.
         conn_a = FakeConnection(fetchone_returns=[(0,)])
         conn_b = FakeConnection(fetchone_returns=[(0,)])
         prepare.calculate_actionable_pipeline_count(conn_a)
         prepare.calculate_confidence_weighted_pipeline(conn_b)
-        where_a = _last_sql(conn_a)[0].split("WHERE", 1)[1]
-        where_b = _last_sql(conn_b)[0].split("WHERE", 1)[1]
-        self.assertEqual(where_a.strip(), where_b.strip())
+        sql_a = _last_sql(conn_a)[0]
+        sql_b = _last_sql(conn_b)[0]
+        for sql in (sql_a, sql_b):
+            self.assertIn(prepare._LATEST_SCORE_CTE, sql)
+            self.assertIn(prepare._LATEST_SCORE_FILTER, sql)
+        # Both must select latest-per-parcel rows from the shared `latest` CTE.
+        self.assertIn("FROM latest", sql_a)
+        self.assertIn("FROM latest", sql_b)
 
     def test_threshold_is_bound_parameter(self) -> None:
         conn = FakeConnection(fetchone_returns=[(0,)])
         prepare.calculate_confidence_weighted_pipeline(conn)
         sql, params = _last_sql(conn)
+        # Single bound threshold param preserved across the Phase 13 mutation —
+        # the CTE adds NO new placeholder (the filter stays the one %s).
         self.assertEqual(params, (prepare.get_parameters()["composite_threshold"],))
-        self.assertIn("SUM(ps.confidence_score)", sql)
+        # Projection is SUM(confidence_score) over the shared `latest` CTE rows
+        # (the `ps.` alias is gone now the SUM reads from the CTE, not the base
+        # table).
+        self.assertIn("SUM(confidence_score)", sql)
+
+
+class TestPhase13MetricMutationShape(unittest.TestCase):
+    """Phase 13 prepare-mutation (R-1321, R-1324, R-1327): the latest-score
+    selection is a DISTINCT ON (parcel_id) CTE with a deterministic,
+    parcel_id-led tie-break, shared verbatim by both metric functions."""
+
+    def test_latest_score_cte_uses_distinct_on_with_exact_order_by(self) -> None:
+        # The fake cursor cannot execute SQL, so the offline guard is an exact
+        # substring assertion. parcel_id MUST lead the ORDER BY (a DISTINCT ON
+        # requirement; without it Postgres errors), then scored_at DESC
+        # (latest), then score_id DESC (deterministic tie-break). Dropping any
+        # term is a correctness bug (R-1324).
+        cte = prepare._LATEST_SCORE_CTE
+        self.assertIn("DISTINCT ON (parcel_id)", cte)
+        self.assertIn("ORDER BY parcel_id, scored_at DESC, score_id DESC", cte)
+        self.assertNotIn("MAX(scored_at)", cte)
+
+    def test_latest_score_cte_projects_all_needed_columns(self) -> None:
+        # The CTE must project every column either metric function needs:
+        # composite_score + actionability for the filter, confidence_score for
+        # the SUM projection. A missing confidence_score would make the
+        # confidence-weighted metric reference a column not in `latest` (R-1327).
+        cte = prepare._LATEST_SCORE_CTE
+        for col in ("parcel_id", "composite_score", "confidence_score", "actionability"):
+            self.assertIn(col, cte)
+
+    def test_filter_carries_pass_and_single_threshold_placeholder(self) -> None:
+        flt = prepare._LATEST_SCORE_FILTER
+        self.assertIn("actionability = 'PASS'", flt)
+        self.assertIn("composite_score >= %s", flt)
+        # Exactly ONE bound placeholder in the filter (the threshold) so the
+        # single-bound-param invariant holds (R-1322).
+        self.assertEqual(flt.count("%s"), 1)
+
+    def test_no_runtime_format_braces_in_metric_constants(self) -> None:
+        # The shared constants are composed with f-strings at call time, but the
+        # constants themselves must carry no `{` runtime-format markers — only
+        # %s for psycopg (mirrors the research.py SQL-constant static checks).
+        for const in (prepare._LATEST_SCORE_CTE, prepare._LATEST_SCORE_FILTER):
+            self.assertNotIn("{", const)
+
+
+class TestPhase13IndexDDL(unittest.TestCase):
+    """Phase 13 (R-1325): the composite latest-score index is a PLAIN
+    CREATE INDEX (apply_schema runs all DDL in one transaction, so
+    CONCURRENTLY would be illegal)."""
+
+    def test_index_present_in_all_ddl(self) -> None:
+        joined = "\n".join(prepare._ALL_DDL)
+        self.assertIn(
+            "idx_scores_parcel_scored_at ON parcel_scores"
+            "(parcel_id, scored_at DESC, score_id DESC)",
+            joined,
+        )
+
+    def test_index_is_not_concurrent(self) -> None:
+        # CREATE INDEX CONCURRENTLY cannot run inside a transaction block;
+        # apply_schema wraps all of _ALL_DDL in one transaction. Assert NO DDL
+        # statement uses CONCURRENTLY (R-1325).
+        for stmt in prepare._ALL_DDL:
+            self.assertNotIn("CONCURRENTLY", stmt.upper())
+
+    def test_index_is_idempotent(self) -> None:
+        # IF NOT EXISTS keeps re-running apply_schema safe (R-1335).
+        idx = next(s for s in prepare._ALL_DDL if "idx_scores_parcel_scored_at" in s)
+        self.assertIn("IF NOT EXISTS", idx)
 
 
 class TestParametersImmutabilityContract(unittest.TestCase):

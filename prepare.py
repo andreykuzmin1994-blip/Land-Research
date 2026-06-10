@@ -494,6 +494,17 @@ _DDL_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_scores_parcel ON parcel_scores(parcel_id);",
     "CREATE INDEX IF NOT EXISTS idx_scores_actionability ON parcel_scores(actionability);",
     "CREATE INDEX IF NOT EXISTS idx_scores_composite ON parcel_scores(composite_score);",
+    # Phase 13 (R-1325, R-1326): composite index matching the metric's
+    # DISTINCT ON (parcel_id) ORDER BY parcel_id, scored_at DESC, score_id DESC,
+    # so Postgres can satisfy the latest-row pick via an index scan instead of a
+    # sort. The DESC index direction must match the query's DESC ordering to be
+    # usable. PLAIN CREATE INDEX (never CONCURRENTLY): apply_schema runs all DDL
+    # in ONE transaction, and CREATE INDEX CONCURRENTLY is illegal inside a
+    # transaction block. The build takes an ACCESS EXCLUSIVE lock on
+    # parcel_scores, negligible at current (sub-second) data volumes; the
+    # additive cost is modest storage. This index is a pure perf hint — the
+    # metric is correct without it (R-1326).
+    "CREATE INDEX IF NOT EXISTS idx_scores_parcel_scored_at ON parcel_scores(parcel_id, scored_at DESC, score_id DESC);",
     "CREATE INDEX IF NOT EXISTS idx_context_submarket_date ON market_context(submarket_id, as_of_date DESC);",
     "CREATE INDEX IF NOT EXISTS idx_comps_submarket_date ON sales_comps(submarket_id, sale_date DESC);",
     "CREATE INDEX IF NOT EXISTS idx_comps_type ON sales_comps(comp_type);",
@@ -550,19 +561,47 @@ def apply_schema(conn: "psycopg.Connection") -> None:
 # Metric calculations — the immutable measurement layer
 # ---------------------------------------------------------------------------
 # The metric is the Karpathy-immutable "is the system getting better?" signal.
-# Both functions filter to the LATEST score per parcel via a correlated
-# subquery; for production volumes a window function (`ROW_NUMBER() OVER
-# PARTITION BY parcel_id ORDER BY scored_at DESC`) or `DISTINCT ON` may be
-# preferable. That refactor is a between-runs `prepare.py` mutation event,
-# so it is deliberately deferred — see Agent 2 response doc and Phase 5+.
+# Both functions filter to the LATEST score per parcel.
+#
+# Phase 13 MUTATION (prepare-mutation commit; was the deferred refactor noted
+# here previously): the latest-row selection moved from a correlated subquery
+# (`scored_at = (SELECT MAX(scored_at) ...)`) to a `DISTINCT ON (parcel_id)`
+# CTE ordered `parcel_id, scored_at DESC, score_id DESC`. The two forms differ
+# on `scored_at` TIES: the old subquery counted ALL rows tied at the maximum
+# `scored_at` for a parcel (a latent DOUBLE-COUNT if two such rows both pass the
+# PASS/threshold filter), whereas the CTE selects EXACTLY ONE deterministic row
+# per parcel — the highest `score_id` among the tie (last insert wins). This is
+# a metric DEFINITION change: values computed before this commit are NOT
+# comparable to values after, and the next run must re-establish a fresh
+# baseline (AUTORESEARCH_MECHANICS.md "When Mutating prepare.py"). In practice
+# the current write path inserts one row per parcel per cycle in its own
+# transaction, so same-parcel same-microsecond `scored_at` rows do not occur and
+# the observed value is unlikely to move — but the definition changed, so the
+# protocol is followed regardless (R-1321). See reviews/13_perf_optimization/
+# 02_code_writer_response.md.
+#
+# Both metric functions compose the SAME `_LATEST_SCORE_CTE` (latest row per
+# parcel) and the SAME `_LATEST_SCORE_FILTER` (PASS + threshold), so they can
+# never disagree about which parcels are in the pipeline (R-1322, R-1327). The
+# CTE projects every column either function needs: composite_score and
+# actionability for the filter, confidence_score for the SUM projection.
 
-_LATEST_SCORE_WHERE = (
-    "ps.actionability = 'PASS' "
-    "AND ps.composite_score >= %s "
-    "AND ps.scored_at = ("
-    "    SELECT MAX(scored_at) FROM parcel_scores "
-    "    WHERE parcel_id = ps.parcel_id"
+# ORDER BY MUST lead with parcel_id (required for DISTINCT ON (parcel_id)),
+# then scored_at DESC (latest), then score_id DESC (deterministic tie-break).
+# Dropping any term is a correctness bug — see R-1324.
+_LATEST_SCORE_CTE = (
+    "WITH latest AS ("
+    "    SELECT DISTINCT ON (parcel_id) "
+    "        parcel_id, composite_score, confidence_score, actionability "
+    "    FROM parcel_scores "
+    "    ORDER BY parcel_id, scored_at DESC, score_id DESC"
     ")"
+)
+
+# Applied to the `latest` CTE rows (outside the CTE), so the threshold stays the
+# single bound parameter and the latest-row pick is independent of the filter.
+_LATEST_SCORE_FILTER = (
+    "actionability = 'PASS' AND composite_score >= %s"
 )
 
 
@@ -574,8 +613,8 @@ def calculate_actionable_pipeline_count(conn: "psycopg.Connection") -> int:
     """
     threshold = _PARAMETERS["composite_threshold"]
     sql = (
-        "SELECT COUNT(*) FROM parcel_scores ps "
-        f"WHERE {_LATEST_SCORE_WHERE}"
+        f"{_LATEST_SCORE_CTE} "
+        f"SELECT COUNT(*) FROM latest WHERE {_LATEST_SCORE_FILTER}"
     )
     with conn.cursor() as cur:
         cur.execute(sql, (threshold,))
@@ -586,13 +625,15 @@ def calculate_actionable_pipeline_count(conn: "psycopg.Connection") -> int:
 def calculate_confidence_weighted_pipeline(conn: "psycopg.Connection") -> float:
     """Sum confidence_score across the actionable pipeline.
 
-    Returns 0.0 against an empty database. Same WHERE clause as
-    :func:`calculate_actionable_pipeline_count`; only the projection differs.
+    Returns 0.0 against an empty database. Same latest-row CTE and PASS +
+    threshold filter as :func:`calculate_actionable_pipeline_count`; only the
+    projection differs (SUM of confidence_score).
     """
     threshold = _PARAMETERS["composite_threshold"]
     sql = (
-        "SELECT COALESCE(SUM(ps.confidence_score), 0) FROM parcel_scores ps "
-        f"WHERE {_LATEST_SCORE_WHERE}"
+        f"{_LATEST_SCORE_CTE} "
+        f"SELECT COALESCE(SUM(confidence_score), 0) FROM latest "
+        f"WHERE {_LATEST_SCORE_FILTER}"
     )
     with conn.cursor() as cur:
         cur.execute(sql, (threshold,))
