@@ -423,7 +423,7 @@ These count as part of the same experiment. They don't get logged as separate ro
 ### Non-Trivial Crashes — Skip and Move On
 
 - The experimental idea itself is fundamentally broken (e.g., trying to query a service that doesn't exist with no plausible alternative)
-- A dependency is missing (the agent cannot install dependencies — it can only use what's in `pyproject.toml`)
+- A dependency is missing (the agent cannot install dependencies — it can only use what's in `requirements.txt`, three pinned lines per SR-10)
 - A database constraint violation that suggests the agent's understanding of the schema is wrong
 
 Log as `crash` in TSV with a brief description, revert to baseline, move on to a different idea. Do not spend more than ~3 fix attempts before giving up.

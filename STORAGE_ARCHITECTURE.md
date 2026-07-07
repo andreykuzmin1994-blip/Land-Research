@@ -257,6 +257,12 @@ CREATE INDEX idx_log_timestamp ON research_log(timestamp DESC);
 
 **harness_reports**
 Connector health reports from the test harness.
+Status: the DDL ships (`prepare.apply_schema` creates it) but nothing
+writes this table yet — `connector_harness.py` persists reports as JSON
+files under `harness_reports/` plus the markdown dashboard. Wire the
+table up when connector-health trend analysis needs SQL (the appendix's
+90-day archive cadence); until then it is a future-locked extension
+point, kept in the DDL so adding it later is not a schema migration.
 ```sql
 CREATE TABLE harness_reports (
     report_id SERIAL PRIMARY KEY,

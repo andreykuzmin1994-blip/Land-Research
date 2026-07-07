@@ -87,7 +87,7 @@ land-site-selector/
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)
 ├── data/                              — Bundled reference data (OZ tract stub, etc.)
-├── tests/                             — Offline suite (600 tests, ~1s) + fixtures
+├── tests/                             — Offline suite (`make tests`, ~1s) + fixtures
 ├── reviews/                           — Review artifacts per change (decision notes; historical 3-agent docs)
 ├── .devcontainer/                     — Codespaces config: secret -> .env hydration
 ├── .githooks/ + .github/workflows/    — Credential guard, offline+live CI, harness CI

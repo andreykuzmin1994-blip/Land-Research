@@ -31,20 +31,18 @@ package-lock.json
 *.swo
 .DS_Store
 
-# Agent runtime artifacts (generated, not source)
-markets/*/candidates.json
-markets/*/scored/
-markets/*/rejected/
-markets/*/flagged/
-markets/*/market_context.json
+# Agent runtime artifacts (generated, not source).
+# Structured data lives in Postgres (STORAGE_ARCHITECTURE.md); the only
+# on-disk runtime outputs are rendered markdown (reporting.py), harness
+# reports, and the raw API response cache. The pre-Postgres file-based
+# design's markets/ and flagged/ trees no longer exist.
 rankings/*.json
 rankings/*.md
 snapshots/*.md
 harness_reports/*.json
 harness_reports/markets_dashboard.md
 sources/*/
-flagged/*.json
-results.tsv
+results.tsv            # Karpathy's original log name — same never-commit rule
 experiment_log.tsv     # Karpathy AutoResearch experiment log — never commit
 
 # CoStar exports (not committed - contains licensed data)
