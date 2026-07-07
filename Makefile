@@ -1,6 +1,6 @@
 # Makefile — operator targets for the Land Research autoresearch loop.
 #
-# Wraps the Python public API in research.py (Phase 10) so the human
+# Wraps the Python public API in runner.py (Phase 10 loop) and research.py so the human
 # operator does not have to type `python -c "..."` ceremonies. Pure
 # ergonomic sugar — does not modify the Five-File Contract layer
 # (prepare.py, parameters.json, sources.json, program.md), does not
@@ -22,7 +22,7 @@ SHELL          := /bin/bash
 # ---------------------------------------------------------------------
 # Variables (override via `make TARGET VAR=value`)
 # ---------------------------------------------------------------------
-# Today's UTC date, lowercase, matches research._AUTORESEARCH_BRANCH_RE.
+# Today's UTC date, lowercase, matches runner._AUTORESEARCH_BRANCH_RE.
 TAG     ?= atl-$(shell date -u +%Y-%m-%d)
 MARKET  ?= atlanta
 # Empty MAX means NEVER STOP. `make loop MAX=2` caps at 2 iterations.
@@ -88,8 +88,8 @@ setup:  ## Cut autoresearch/<TAG> from clean main, push, run verify.
 
 .PHONY: verify
 verify:  ## Run verify_setup(MARKET) and pretty-print the result.
-	@python -c "import json, research; \
-	print(json.dumps(research.verify_setup('$(MARKET)'), indent=2, default=str))"
+	@python -c "import json, runner; \
+	print(json.dumps(runner.verify_setup('$(MARKET)'), indent=2, default=str))"
 
 .PHONY: db-check
 db-check:  ## Run python prepare.py — Supabase + PostGIS sanity ping.
@@ -110,8 +110,8 @@ _assert-autoresearch-branch:
 .PHONY: baseline
 baseline: _assert-autoresearch-branch  ## Run the baseline experiment for MARKET.
 	@echo "==> running baseline experiment for market=$(MARKET)"
-	@python -c "import json, research; \
-	row = research.run_baseline_experiment('$(MARKET)'); \
+	@python -c "import json, runner; \
+	row = runner.run_baseline_experiment('$(MARKET)'); \
 	print(json.dumps(row, indent=2, default=str))"
 	@echo ""
 	@echo "==> baseline row appended to experiment_log.tsv:"
@@ -126,10 +126,10 @@ loop: _assert-autoresearch-branch  ## Run experiment_loop. NEVER STOP unless MAX
 	fi
 	@echo "==> starting experiment_loop(market=$(MARKET), max_iterations=$(if $(MAX),$(MAX),None))"
 	@echo "==> halt with: 'make halt' from another shell, or set EXPERIMENT_LOOP_HALT=1"
-	@MAX="$(MAX)" python -c "import os, research; \
+	@MAX="$(MAX)" python -c "import os, runner; \
 m = os.environ.get('MAX', '').strip(); \
 mi = int(m) if m else None; \
-summary = research.experiment_loop('$(MARKET)', max_iterations=mi, confirmed=True); \
+summary = runner.experiment_loop('$(MARKET)', max_iterations=mi, confirmed=True); \
 print(summary)"
 
 .PHONY: halt
@@ -152,8 +152,8 @@ unhalt:  ## Remove .halt — required before starting a new loop run.
 .PHONY: status
 status:  ## Print verify_setup + last 10 rows of experiment_log.tsv.
 	@echo "==> verify_setup(market=$(MARKET))"
-	@python -c "import json, research; \
-	print(json.dumps(research.verify_setup('$(MARKET)'), indent=2, default=str))"
+	@python -c "import json, runner; \
+	print(json.dumps(runner.verify_setup('$(MARKET)'), indent=2, default=str))"
 	@echo ""
 	@if [ -f experiment_log.tsv ]; then \
 	  echo "==> last 10 rows of experiment_log.tsv:"; \
