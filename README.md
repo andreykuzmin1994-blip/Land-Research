@@ -63,8 +63,8 @@ Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) d
 
 ```
 land-site-selector/
-├── START_HERE.md                      — Claude Code orientation chain (READ FIRST if you are an agent)
-├── CLAUDE.md                          — Pointer to START_HERE.md
+├── CLAUDE.md                          — Contract card: invariants + orientation tiers (agents read FIRST)
+├── START_HERE.md                      — Full orientation chain (required before code/loop work)
 ├── README.md                          — This file
 ├── AUTORESEARCH_MECHANICS.md          — CANONICAL: how the Karpathy pattern is implemented
 ├── program.md                         — The agent's autonomous loop instructions
@@ -98,11 +98,11 @@ land-site-selector/
 
 ## For Claude Code (and any AI coding agent)
 
-**Read `START_HERE.md` first.** It walks you through a 6-step orientation chain with explicit confirmation gates. Do not skip it — this repo implements the Karpathy AutoResearch pattern and skipping orientation silently corrupts the experimental log.
+**Read `CLAUDE.md` first** — a one-screen contract card with the always-on file mutability invariants and a tier table telling you how much orientation the session needs. Read-only, diagnostic, and docs-only sessions proceed on the card alone (light orientation). Any session touching code, config, tests, the canonical spec, or the experiment loop must then complete the 6-step chain in `START_HERE.md` before acting — skipping it silently corrupts the experimental log.
 
 ## For Humans
 
-Read in this order:
+`CLAUDE.md` is the one-screen version of the rules everything below justifies — start there. Then read in this order:
 
 1. `README.md` (this file)
 2. `AUTORESEARCH_MECHANICS.md` — Canonical specification of how the pattern is implemented. If anything else in this repo conflicts with this document, this document wins.

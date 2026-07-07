@@ -1,7 +1,7 @@
 # START_HERE.md — Orientation Chain for Claude Code
 
-> **If you are Claude Code, this is your first read. Do not skip steps. Do not skim.**
-> **Do not write code, modify files, or take any action until you reach Step 6.**
+> **You arrived here from `CLAUDE.md` (the contract card). This file is the FULL orientation chain.**
+> **Within it: do not skip steps, do not skim, and do not write code, modify files, or take any action until you reach Step 6.**
 
 ---
 
@@ -9,7 +9,31 @@
 
 This repo is a Karpathy AutoResearch implementation for industrial real estate land sourcing. The pattern depends on strict file mutability rules, a metric integrity contract, and a setup phase you complete BEFORE the experiment loop begins. Skipping any of this silently corrupts the entire system.
 
-You are about to walk through a 6-step orientation chain. Each step produces evidence that you completed it. Steps are gated — you confirm completion before proceeding to the next.
+The full chain below is a 6-step orientation. Each step produces evidence that you completed it. Steps are gated — you confirm completion before proceeding to the next.
+
+---
+
+## Step 0: Confirm This Session Needs the Full Chain
+
+Orientation is tiered by blast radius, the same way code review is
+(`STANDING_RISKS.md` § "Change tiers", adopted 2026-07-07 after the process
+audit in `reviews/14_streamlining_review/` showed uniform heavyweight
+process adds no protection for low-risk changes). The tier table lives in
+`CLAUDE.md`; in short:
+
+- **Light orientation** suffices when the session will only read, inspect,
+  diagnose, or edit documentation (`.md` files other than `program.md` —
+  never editable — and other than `AUTORESEARCH_MECHANICS.md` /
+  `STANDING_RISKS.md` / this file). Light = the `CLAUDE.md` contract card +
+  `README.md` § Status + `make status` (offline fallback:
+  `git branch --list 'autoresearch/*'` + tail of `experiment_log.tsv`),
+  then a one-paragraph confirmation of session type, invariants, and
+  branch/run state. You do not need the rest of this file.
+- **Full chain (Steps 1–6 below)** is required before touching any
+  `.py`/`.json` file, tests, or CI; before running setup, an experiment,
+  or the loop; and before editing the canonical spec docs named above.
+- **Escalation rule**: a light session that drifts into full-chain
+  territory stops and completes Steps 1–6 before acting on it.
 
 ---
 
@@ -86,7 +110,7 @@ If you cannot confirm any of these points after reading, re-read the document. D
 
 **Action**: Based on the repo state from Step 4 and what the human said in their initial message, articulate your understanding of what they want this session to accomplish. Be specific. Common session types:
 
-- **Specification refinement** — the human wants to discuss or modify the spec documents. No code yet. Skip Step 6.
+- **Specification refinement** — the human wants to discuss or modify the spec documents. No code. Most such sessions qualify for light orientation (Step 0) and never reach this step; you are here when the change touches `AUTORESEARCH_MECHANICS.md` or `STANDING_RISKS.md`.
 - **Setup phase** — the human wants you to walk through the AutoResearch setup phase (per AUTORESEARCH_MECHANICS.md → "The Setup Phase"). This includes proposing a run tag, creating a branch, verifying infrastructure, and establishing a baseline.
 - **Build a specific phase** — the human wants you to implement a specific phase from BUILD_PHASES.md (e.g., "build the connector harness," "build the Fulton County connector"). This requires the three-agent coding workflow.
 - **Run an experiment** — the human wants you to execute one experiment in an existing experiment loop. This requires that setup is already complete and an autoresearch/<tag> branch exists.
@@ -96,7 +120,9 @@ If you cannot confirm any of these points after reading, re-read the document. D
 **Confirm Step 5 by stating**:
 > "Step 5 complete. My understanding of this session: [specific session type from above]. Specifically, the human wants me to: [concrete description]. Before I proceed, please confirm or correct this understanding."
 
-**STOP HERE and wait for the human's confirmation.** Do not proceed to Step 6 without it.
+**For mutation-capable session types — Setup phase, Build a specific phase, Run an experiment, Continuous loop — STOP HERE and wait for the human's confirmation. Do not proceed to Step 6 without it.** A wrong guess in those session types writes to production code or the experiment record.
+
+For the read-only and docs-only session types (Specification refinement, Debug or diagnose): if the human's initial message already states the session goal unambiguously, state your understanding and proceed — these sessions often run asynchronously (remote, mobile, CI-triggered) where a mid-session round-trip costs hours, and their output is reviewable text, not experiment history. If there is ANY ambiguity about what the human wants, stop and wait exactly as above.
 
 ---
 
