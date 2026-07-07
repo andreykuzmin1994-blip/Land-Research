@@ -169,10 +169,16 @@ def _git_current_branch() -> str:
     return proc.stdout.strip()
 
 
-def _git_head_commit() -> str:
-    """Return the 7-char short SHA at HEAD, or ``"pending"`` if HEAD has
-    no commits yet (e.g., fresh repo).  Used in ``status=crash`` rows where
-    no experiment commit was produced."""
+def _git_head_commit(*, allow_pending: bool = False) -> str:
+    """Return the 7-char short SHA at HEAD.
+
+    Streamlining cleanup (2026-07-07): the old behavior silently returned
+    ``"pending"`` on ANY git failure, writing ratchet rows that cannot be
+    mapped back to a revision. Now a git failure raises ``SetupError`` on
+    the experiment/baseline paths (fail loudly, keep the ratchet
+    auditable); only best-effort accounting rows (``_record_halt_row``)
+    pass ``allow_pending=True`` to keep the old fallback.
+    """
     try:
         proc = subprocess.run(
             ["git", "rev-parse", "--short=7", "HEAD"],
@@ -182,10 +188,20 @@ def _git_head_commit() -> str:
             check=True,
             timeout=10,
         )
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+        sha = proc.stdout.strip()
+        if _TSV_COMMIT_RE.match(sha) and sha != "pending":
+            return sha
+        failure = f"unparseable git HEAD sha: {sha!r}"
+    except (
+        subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired,
+    ) as exc:
+        failure = f"git rev-parse HEAD failed: {exc}"
+    if allow_pending:
         return "pending"
-    sha = proc.stdout.strip()
-    return sha if _TSV_COMMIT_RE.match(sha) else "pending"
+    raise SetupError(
+        f"{failure} — refusing to write an experiment row that cannot be "
+        "mapped to a commit (the git ratchet depends on it)"
+    )
 
 
 def _parse_tag_from_branch(branch: str) -> str | None:
@@ -524,6 +540,12 @@ def _check_costar_freshness() -> dict[str, Any]:
     }
 
 
+# Streamlining cleanup (2026-07-07): verify_setup runs every loop iteration;
+# serve positive harness verdicts from a 15-minute cache instead of live-
+# probing county endpoints each time (failing verdicts always re-probe).
+_HARNESS_HEALTH_TTL_SECONDS = 15 * 60
+
+
 def _check_harness_for_market(market: str) -> dict[str, Any]:
     """R-708 / Setup Step 4b -- harness gate for at least one county."""
     counties = research._MARKET_TO_COUNTIES.get(market, [])
@@ -536,7 +558,9 @@ def _check_harness_for_market(market: str) -> dict[str, Any]:
     overall = "ok"
     for county in counties:
         try:
-            harness_status, _ = research._harness_gate(county)
+            harness_status, _ = research._harness_gate(
+                county, cache_ttl_seconds=_HARNESS_HEALTH_TTL_SECONDS,
+            )
         except Exception as exc:
             per_county[county] = f"error: {exc}"
             overall = "fail"
@@ -650,6 +674,7 @@ def evaluate(
         experiment_id = _make_experiment_id()
 
     started = time.monotonic()
+    api_calls_before = research.get_api_call_count()
     started_iso = datetime.now(timezone.utc).isoformat()
     log.info(
         "evaluate.start market=%s started_at=%s run_tag=%s experiment_id=%s "
@@ -717,7 +742,9 @@ def evaluate(
         "status": status,
         "metric": int(metric),
         "confidence": float(confidence),
-        "api_calls": 0,  # R-712: placeholder, populate in Phase 11+.
+        # R-712 closed (2026-07-07): real count of outbound discovery HTTP
+        # attempts during this evaluate (soft-constraint signal for the log).
+        "api_calls": research.get_api_call_count() - api_calls_before,
         "wall_clock_min": float(elapsed_min),
         "sub_summaries": sub_summaries,
         "error": error,
@@ -1069,7 +1096,7 @@ def _record_halt_row(market: str, reason: str) -> None:
     """Append a synthetic ``status=halt`` row for accounting (R-725)."""
     try:
         append_experiment_log_row({
-            "commit": _git_head_commit(),
+            "commit": _git_head_commit(allow_pending=True),
             "metric": 0,
             "confidence": 0.0,
             "api_calls": 0,

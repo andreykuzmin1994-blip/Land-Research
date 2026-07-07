@@ -4257,7 +4257,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
         """R-608: snapshot describes the latest scored_at row, not earlier
         ones. We assert the SQL contains ORDER BY scored_at DESC LIMIT 1."""
         self.assertIn(
-            "ORDER BY scored_at DESC LIMIT 1",
+            "ORDER BY scored_at DESC, score_id DESC LIMIT 1",
             reporting._SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT,
         )
 
@@ -6442,3 +6442,109 @@ class TestLoopPurgeWiring(unittest.TestCase):
         rows = runner.read_experiment_log(self.tsv_path)
         self.assertEqual(rows[1]["status"], "discard")
         self.assertEqual(rows[2]["status"], "keep")
+
+
+# ===========================================================================
+# Streamlining cleanups (2026-07-07) — harness TTL cache, api_calls signal,
+# strict git-head resolution.
+# ===========================================================================
+class TestHarnessGateTTLCache(unittest.TestCase):
+    def setUp(self) -> None:
+        research._HARNESS_GATE_CACHE.clear()
+
+    tearDown = setUp
+
+    def test_positive_verdict_served_from_cache_within_ttl(self) -> None:
+        calls: list[str] = []
+
+        def fake_harness(county):
+            calls.append(county)
+            return {"overall_health": "healthy"}
+
+        with mock.patch.object(
+            research.connector_harness, "run_harness_for_county", fake_harness,
+        ):
+            first = research._harness_gate("fulton", cache_ttl_seconds=900)
+            second = research._harness_gate("fulton", cache_ttl_seconds=900)
+        self.assertEqual(first[0], "healthy")
+        self.assertEqual(second[0], "healthy")
+        # One live probe, one cache hit.
+        self.assertEqual(calls, ["fulton"])
+
+    def test_failing_verdict_is_never_cached(self) -> None:
+        calls: list[str] = []
+
+        def fake_harness(county):
+            calls.append(county)
+            return {"overall_health": "failing"}
+
+        with mock.patch.object(
+            research.connector_harness, "run_harness_for_county", fake_harness,
+        ):
+            research._harness_gate("fulton", cache_ttl_seconds=900)
+            research._harness_gate("fulton", cache_ttl_seconds=900)
+        # Failing always re-probes so recovery is detected immediately.
+        self.assertEqual(calls, ["fulton", "fulton"])
+
+    def test_default_call_bypasses_cache(self) -> None:
+        calls: list[str] = []
+
+        def fake_harness(county):
+            calls.append(county)
+            return {"overall_health": "healthy"}
+
+        with mock.patch.object(
+            research.connector_harness, "run_harness_for_county", fake_harness,
+        ):
+            research._harness_gate("fulton")
+            research._harness_gate("fulton")
+        # No TTL requested -> probe every call (discovery production gate
+        # semantics, and every pre-existing test's expectation).
+        self.assertEqual(calls, ["fulton", "fulton"])
+
+
+class TestApiCallsSignal(unittest.TestCase):
+    def test_evaluate_reports_api_call_delta(self) -> None:
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        def fake_discovery(market):
+            research._API_CALL_COUNT += 7
+            return {}
+
+        before = research.get_api_call_count()
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", fake_discovery), \
+             mock.patch.object(research, "run_scoring_cycle", return_value={}), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               return_value=0), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               return_value=0.0), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate("atlanta")
+        self.assertEqual(result["api_calls"], 7)
+        # Counter is global-monotonic; evaluate reports only its own delta.
+        self.assertEqual(research.get_api_call_count(), before + 7)
+
+
+class TestStrictGitHeadCommit(unittest.TestCase):
+    def test_git_failure_raises_setup_error_by_default(self) -> None:
+        with mock.patch.object(
+            runner.subprocess, "run",
+            side_effect=FileNotFoundError("no git"),
+        ):
+            with self.assertRaises(runner.SetupError):
+                runner._git_head_commit()
+
+    def test_allow_pending_preserves_best_effort_fallback(self) -> None:
+        with mock.patch.object(
+            runner.subprocess, "run",
+            side_effect=FileNotFoundError("no git"),
+        ):
+            self.assertEqual(
+                runner._git_head_commit(allow_pending=True), "pending",
+            )

@@ -112,20 +112,16 @@ _SQL_FETCH_PARCEL_FOR_SNAPSHOT = (
     "FROM parcels WHERE parcel_id = %s"
 )
 
-# R-608: latest-row-per-parcel for the Phase 9 snapshot. NOTE (Phase 13
-# R-1329): the metric's latest-row selector in prepare.py now uses a
-# deterministic DISTINCT ON ... ORDER BY parcel_id, scored_at DESC, score_id
-# DESC tie-break, whereas this snapshot read keeps ORDER BY scored_at DESC
-# LIMIT 1 (no score_id tie-break). On the (in-practice-nonexistent) tied-
-# scored_at case the metric and the snapshot could pick different rows.
-# Aligning this read-path selector is a documented OUT-OF-SCOPE follow-up
-# (R-1328/R-1329) — research.py reads are not the immutable metric layer.
+# R-608: latest-row-per-parcel for the Phase 9 snapshot. Streamlining
+# cleanup (2026-07-07, closing the R-1328/R-1329 follow-up): the score_id
+# DESC tie-break now matches prepare.py's DISTINCT ON metric selector, so
+# on a tied scored_at the snapshot renders the SAME row the metric counted.
 _SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT = (
     "SELECT composite_score, confidence_score, actionability, "
     "actionability_blockers, sub_scores, strategy_fit, primary_strategy, "
     "investment_thesis, notes, scored_at "
     "FROM parcel_scores WHERE parcel_id = %s "
-    "ORDER BY scored_at DESC LIMIT 1"
+    "ORDER BY scored_at DESC, score_id DESC LIMIT 1"
 )
 
 # R-637: bounded sales comps for the thesis's basis clause.

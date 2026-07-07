@@ -182,6 +182,18 @@ _DISCOVERY_RETRY_AFTER_CAP_S = 10.0
 # Module-level mapping cache so we re-read sources.json once per cycle.
 _SOURCES_PATH = _REPO_ROOT / "sources.json"
 
+# Streamlining cleanup (2026-07-07): outbound discovery HTTP attempts are
+# counted so the experiment log's api_calls column carries real signal
+# (R-712 closed). Single-threaded increment from _DiscoverySession.get;
+# harness HTTP is not counted (it has its own reports). The runner reads
+# the counter delta around each evaluate() — see runner.evaluate.
+_API_CALL_COUNT = 0
+
+
+def get_api_call_count() -> int:
+    """Monotonic count of outbound discovery HTTP attempts this process."""
+    return _API_CALL_COUNT
+
 # Markets dispatch — Phase 11 will add more counties under "atlanta".
 _MARKET_TO_COUNTIES: dict[str, list[str]] = {
     "atlanta": ["fulton"],
@@ -365,8 +377,10 @@ class _DiscoverySession:
         # NOTE: do NOT log the full URL with query params on retry — Fulton is
         # public today but Phase 11 / Regrid endpoints may carry an API key
         # (R-1308). We log only host + status, never the query string.
+        global _API_CALL_COUNT
         for attempt in range(_DISCOVERY_MAX_RETRIES + 1):
             self._spacing_sleep(host)
+            _API_CALL_COUNT += 1
             retryable = False
             backoff = _DISCOVERY_BACKOFF_SCHEDULE_S[
                 min(attempt, len(_DISCOVERY_BACKOFF_SCHEDULE_S) - 1)
@@ -1634,8 +1648,24 @@ def _run_for_counties(
     return out
 
 
-def _harness_gate(county: str) -> tuple[str, dict[str, Any] | None]:
+# Streamlining cleanup (2026-07-07): positive harness verdicts can be served
+# from a short-lived cache so the experiment loop's per-iteration
+# verify_setup does not hammer county endpoints under NEVER STOP. Policy:
+# only 'healthy'/'degraded' results are cached; 'failing' is ALWAYS
+# re-probed so recovery is detected immediately. Callers opt in by passing
+# cache_ttl_seconds (the default None preserves probe-every-call semantics
+# for the discovery production gate and for every existing test).
+_HARNESS_GATE_CACHE: dict[str, tuple[float, str, dict[str, Any] | None]] = {}
+
+
+def _harness_gate(
+    county: str, *, cache_ttl_seconds: float | None = None
+) -> tuple[str, dict[str, Any] | None]:
     """Call the harness; return (status, report). Harness raise → 'failing' (R-34)."""
+    if cache_ttl_seconds is not None:
+        cached = _HARNESS_GATE_CACHE.get(county)
+        if cached is not None and time.monotonic() - cached[0] < cache_ttl_seconds:
+            return cached[1], cached[2]
     try:
         report = connector_harness.run_harness_for_county(county)
     except Exception as exc:
@@ -1645,6 +1675,8 @@ def _harness_gate(county: str) -> tuple[str, dict[str, Any] | None]:
     if status not in {"healthy", "degraded", "failing"}:
         log.warning("unknown harness status %r; treating as failing", status)
         return "failing", report
+    if status in {"healthy", "degraded"}:
+        _HARNESS_GATE_CACHE[county] = (time.monotonic(), status, report)
     return status, report
 
 
