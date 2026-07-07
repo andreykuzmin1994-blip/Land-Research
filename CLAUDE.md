@@ -44,7 +44,7 @@ experiment run.
 
 | This session will… | Required orientation |
 |--------------------|----------------------|
-| Only read, inspect, diagnose, or answer questions; or edit docs (`.md`) — except `program.md` (never editable) and the canonical spec docs below | **Light**: this card → `README.md` § Status → `make status` (offline fallback: `git branch --list 'autoresearch/*'` + tail `experiment_log.tsv`). Confirm by stating the session type, the invariants you are bound by, and the current branch/run state. Then work. |
+| Only read, inspect, diagnose, or answer questions; or edit docs (`.md`) — except `program.md` (never editable) and the canonical spec docs below | **Light**: this card → `README.md` § Status → `make status` (offline fallback: `make orient` — no DB needed). Confirm by stating the session type, the invariants you are bound by, and the current branch/run state. Then work. |
 | Touch ANY `.py`/`.json` file, tests, or CI; run setup, an experiment, or the loop; or edit `AUTORESEARCH_MECHANICS.md` / `STANDING_RISKS.md` / `START_HERE.md` (the canonical spec, the risk register, and the orientation chain itself) | **Full**: the 6-step orientation chain in `START_HERE.md`, completed before acting. Not optional — skipping it silently corrupts the system. |
 
 **Escalation rule**: if a light session drifts into full-tier territory

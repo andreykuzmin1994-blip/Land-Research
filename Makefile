@@ -149,6 +149,25 @@ unhalt:  ## Remove .halt — required before starting a new loop run.
 # ---------------------------------------------------------------------
 # Inspection (read-only)
 # ---------------------------------------------------------------------
+.PHONY: orient
+orient:  ## Offline orientation snapshot: contract card + branch/run/TSV state (no DB).
+	@echo "==> contract card: CLAUDE.md (invariants + how much orientation this session needs)"
+	@echo ""
+	@echo "==> current branch: $$(git rev-parse --abbrev-ref HEAD)"
+	@echo ""
+	@echo "==> autoresearch branches (most recent first):"
+	@branches=$$(git branch --list 'autoresearch/*' --sort=-committerdate --format='  %(refname:short)  (%(committerdate:relative))'); \
+	if [ -n "$$branches" ]; then echo "$$branches"; else echo "  (none — no runs started yet)"; fi
+	@echo ""
+	@if [ -f experiment_log.tsv ]; then \
+	  echo "==> last 5 rows of experiment_log.tsv:"; \
+	  (head -1 experiment_log.tsv; tail -5 experiment_log.tsv | grep -v '^commit\b' || true) \
+	    | column -t -s "$$(printf '\t')"; \
+	else \
+	  echo "==> no experiment_log.tsv yet (no baseline recorded — run 'make baseline' or 'make loop')"; \
+	fi
+	@if [ -f .halt ]; then echo ""; echo "==> NOTE: .halt sentinel is set"; fi
+
 .PHONY: status
 status:  ## Print verify_setup + last 10 rows of experiment_log.tsv.
 	@echo "==> verify_setup(market=$(MARKET))"

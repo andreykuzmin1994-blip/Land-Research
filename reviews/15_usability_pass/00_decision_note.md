@@ -60,6 +60,22 @@ not from applying maximum weight everywhere.
 - The NEVER STOP rule, the setup phase, keep-or-revert, the review tiers.
 - Zero `.py`/`.json`/test/CI changes.
 
+## Follow-up (same session, operator said "proceed")
+
+- **`make orient`** (Makefile — ops tooling, Tier 0): offline orientation
+  snapshot (card pointer, current branch, `autoresearch/*` branches, TSV
+  tail, `.halt` note). No DB, no Python deps — it is exactly the light
+  tier's state check, so the card and Step 0 now name it as the offline
+  fallback.
+- **README "For Humans"** reading list → need-based table ("if you want
+  to… read…"); top-to-bottom still doubles as the onboarding order.
+- **CoStar docs**: did NOT merge `COSTAR_EXPORTS_README.md` into the
+  contract (considered and rejected — the contract is the frozen spec
+  `costar_ingest.py` is held to; folding living ops content into it would
+  churn a frozen reference). Added the missing back-link from the contract
+  to the ops companion and labeled the spec/ops split in both README table
+  and contract header.
+
 ## Verification
 
 - Offline suite green after the change (`make tests`), and grep confirms no

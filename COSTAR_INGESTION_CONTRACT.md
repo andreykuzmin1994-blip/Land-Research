@@ -2,6 +2,7 @@
 
 > How CoStar exports feed the Land Site Selector agent.
 > CoStar does not expose a public REST API to standard subscribers. This document defines the manual export workflow that delivers CoStar data to the agent.
+> Operational companion: [`COSTAR_EXPORTS_README.md`](COSTAR_EXPORTS_README.md) — the on-disk folder layout, loader behavior, and one-time email-to-folder setup that implement this contract. This file is the frozen spec (`costar_ingest.py` is held to it); day-to-day ops details live in the companion.
 
 ---
 

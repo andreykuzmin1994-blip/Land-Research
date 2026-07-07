@@ -25,10 +25,9 @@ process adds no protection for low-risk changes). The tier table lives in
   diagnose, or edit documentation (`.md` files other than `program.md` —
   never editable — and other than `AUTORESEARCH_MECHANICS.md` /
   `STANDING_RISKS.md` / this file). Light = the `CLAUDE.md` contract card +
-  `README.md` § Status + `make status` (offline fallback:
-  `git branch --list 'autoresearch/*'` + tail of `experiment_log.tsv`),
-  then a one-paragraph confirmation of session type, invariants, and
-  branch/run state. You do not need the rest of this file.
+  `README.md` § Status + `make status` (offline fallback: `make orient` —
+  no DB needed), then a one-paragraph confirmation of session type,
+  invariants, and branch/run state. You do not need the rest of this file.
 - **Full chain (Steps 1–6 below)** is required before touching any
   `.py`/`.json` file, tests, or CI; before running setup, an experiment,
   or the loop; and before editing the canonical spec docs named above.

@@ -102,16 +102,18 @@ land-site-selector/
 
 ## For Humans
 
-`CLAUDE.md` is the one-screen version of the rules everything below justifies — start there. Then read in this order:
+`CLAUDE.md` is the one-screen version of the rules everything below justifies — start there. Then read for your need; new to the repo entirely, read the table top to bottom (it doubles as the onboarding order):
 
-1. `README.md` (this file)
-2. `AUTORESEARCH_MECHANICS.md` — Canonical specification of how the pattern is implemented. If anything else in this repo conflicts with this document, this document wins.
-3. `program.md` — The agent's strategic instructions
-4. `appendix_a_county_connectors.md` — Data source specs, tiered review workflow, connector harness
-5. `STANDING_RISKS.md` — Recurring risk checklist and review tiers
-6. `STORAGE_ARCHITECTURE.md` — Postgres + PostGIS schema
-7. `COSTAR_INGESTION_CONTRACT.md` — CoStar workflow (no scraping)
-8. `BUILD_PHASES.md` — Implementation roadmap
+| If you want to… | Read |
+|-----------------|------|
+| Operate the loop day-to-day | This README § Quick Start, then `make help` |
+| Understand how the Karpathy pattern is implemented — canonical, wins all conflicts | `AUTORESEARCH_MECHANICS.md` |
+| See what the agent optimizes, how parcels are scored, and redirect it between runs | `program.md` |
+| Add a county, fix a connector, or read the coding workflow spec | `appendix_a_county_connectors.md` |
+| Review a code change (change tiers + recurring risk checklist) | `STANDING_RISKS.md` |
+| Understand the database schema and storage decisions | `STORAGE_ARCHITECTURE.md` |
+| Set up or debug CoStar exports | `COSTAR_EXPORTS_README.md` (ops) + `COSTAR_INGESTION_CONTRACT.md` (spec) |
+| See the roadmap and how each phase was built and reviewed | `BUILD_PHASES.md` + `reviews/` |
 
 ## The Tiered Review Workflow
 
