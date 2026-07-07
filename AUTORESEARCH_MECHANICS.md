@@ -209,6 +209,28 @@ earlier (data progression), not only by being a better `research.py`. The
 tertiary `discovery_rate` / `conversion_rate` tracking exists for the human
 to spot this pattern; treat single-experiment deltas as evidence, not proof.
 
+**Purge scope and known residue paths** (Tier-2 review, 2026-07-07):
+
+- The purge covers **`parcel_scores` only**. A discarded experiment's
+  `research_log` rows, `flagged_items` rows, and `parcels` UPSERTs are NOT
+  reverted — logs are append-only history by design, and discovery is
+  idempotent (any later cycle would re-discover the same parcels). Expect
+  those side tables to grow across discarded experiments.
+- A process killed mid-experiment (SIGKILL/OOM/Ctrl-C) can leave rows whose
+  `experiment_id` no purge will target. Every experiment's id is stamped
+  into its TSV description (`exp=<id>`) so orphans are discoverable:
+  reconcile by deleting run rows whose id is absent from the TSV's
+  baseline/keep rows before re-baselining.
+- Failed purges are retried at each iteration boundary; five consecutive
+  crash/timeout iterations trip a breaker and halt the loop rather than
+  purging and repeating the identical workload forever.
+- Snapshots and memos (`reporting.py`) read UNSCOPED latest scores — they
+  describe the firm's full accumulated pipeline, not the run-scoped ratchet
+  number, so a memo's counts and the TSV metric can legitimately differ.
+- Two clones on the same branch against the same database share a `run_tag`
+  and will see each other's rows and purges. The loop lock is per-clone
+  (flock); one loop per run tag is an operator responsibility.
+
 ### Why This Metric Is Karpathy-Compliant
 
 Karpathy chose `val_bpb` because it's vocabulary-size-independent. The agent can change tokenization, vocabulary, or model architecture and still get a fair comparison. The metric is meaningful in absolute terms (compression rate) and stable across the kinds of changes the agent will make.

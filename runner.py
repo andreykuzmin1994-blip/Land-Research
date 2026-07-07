@@ -16,7 +16,11 @@ experiments by editing research.py ONLY. If the loop, evaluator, or TSV
 logic needs to change, halt the run, change it between runs under the
 tiered review process, and start a fresh run. An agent that can edit the
 code that evaluates its own experiments can silently corrupt the
-experiment log — that is the exact failure mode this split removes.
+experiment log — this split removes the FILE-LEVEL version of that
+failure mode. Runtime rebinding from sandbox code executing in the same
+interpreter remains possible and is an ACCEPTED, monitored risk: see
+STANDING_RISKS.md SR-16 (stamp audit in evaluate; subprocess-isolated
+metric read is the earmarked hardening if it ever fires).
 
 Review history: reviews/12_phase10_experiment_loop/.
 """
@@ -100,8 +104,9 @@ _TSV_COMMIT_RE = re.compile(r"^([0-9a-f]{7,40}|pending)$")
 # R-718 — description sanitization caps.
 _TSV_DESCRIPTION_MAX_LEN = 200
 
-# R-703, R-704 — branch invariant.
-_AUTORESEARCH_BRANCH_RE = re.compile(r"^autoresearch/[a-z0-9._-]+$")
+# R-703, R-704 — branch invariant. Single-sourced from prepare so the
+# runner and the metric layer can never disagree on branch grammar (F9).
+_AUTORESEARCH_BRANCH_RE = re.compile(prepare._AUTORESEARCH_BRANCH_RE)
 
 # R-725, R-728 — halt sentinel.
 _HALT_SENTINEL_PATH = _REPO_ROOT / ".halt"
@@ -120,6 +125,10 @@ _PHASE10_BUDGET_SECONDS = 90 * 60
 
 # R-731 — catastrophic failure detection.
 _INFRA_FAILURE_THRESHOLD = 3
+
+# Tier-2 review F5 — consecutive crash/timeout iterations before the loop
+# halts instead of purging and repeating the identical workload forever.
+_TERMINAL_STATUS_BREAKER = 5
 
 # R-732 — long-run graceful conclusion.
 _LONG_RUN_GRACEFUL_EXIT_SECONDS = 7 * 24 * 60 * 60
@@ -451,12 +460,40 @@ def apply_keep_or_revert_decision(
     return "discard"
 
 
-def _last_baseline_or_keep(rows: Sequence[Mapping[str, str]]) -> dict[str, str] | None:
+_DESCRIPTION_RUN_RE = re.compile(r"(?:^|\s)run=([a-z0-9._-]+)")
+
+
+def _row_run_tag(row: Mapping[str, str]) -> str | None:
+    """Extract the ``run=<tag>`` marker from a TSV row's description.
+
+    Tier-2 review F1: the TSV accumulates across runs by design
+    (AUTORESEARCH_MECHANICS.md "Cross-Run Aggregation"), so baseline
+    detection and anchor selection must be scoped to the CURRENT run or a
+    new run silently anchors against a prior, non-comparable run's metric
+    and never establishes its own baseline. Rows written before this fix
+    carry no marker and return ``None`` — they belong to no current run,
+    which forces a fresh baseline exactly as the mutation protocol
+    requires.
+    """
+    match = _DESCRIPTION_RUN_RE.search(row.get("description", "") or "")
+    return match.group(1) if match else None
+
+
+def _last_baseline_or_keep(
+    rows: Sequence[Mapping[str, str]], run_tag: str | None = None
+) -> dict[str, str] | None:
     """Find the most recent ``baseline`` or ``keep`` row (the prior
     metric anchor for the next decision).  Returns ``None`` if no anchor
-    exists yet (i.e., we have not even baselined)."""
+    exists yet (i.e., we have not even baselined).
+
+    With ``run_tag`` set, only rows stamped ``run=<tag>`` anchor — a
+    prior run's rows are not comparable (F1). ``run_tag=None`` keeps the
+    legacy unscoped scan for ad-hoc/direct callers.
+    """
     for r in reversed(rows):
         if r.get("status") in {"baseline", "keep"}:
+            if run_tag is not None and _row_run_tag(r) != run_tag:
+                continue
             return dict(r)
     return None
 
@@ -710,6 +747,29 @@ def evaluate(
                 sub_summaries["memo"] = {"path": None, "failed": True}
 
         with prepare.get_connection() as conn:
+            # Tier-2 review F3(b) — stamp audit. The purge trusts
+            # experiment_id stamps written by the sandbox; a research.py
+            # edit that mis-stamps rows would make a discarded experiment's
+            # rows survive the purge. Count rows written during THIS
+            # evaluate that carry the wrong stamp and surface the number
+            # loudly (log + TSV description). Nonzero means the sandbox is
+            # drifting from the contract — halt and inspect the exp commits.
+            stamp_violations = 0
+            if run_tag is not None:
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(_SQL_STAMP_AUDIT, (run_tag, started_iso, experiment_id))
+                        audit_row = cur.fetchone()
+                    stamp_violations = int(audit_row[0]) if audit_row and audit_row[0] else 0
+                except Exception:
+                    log.exception("stamp audit query failed; continuing")
+                if stamp_violations:
+                    log.error(
+                        "STAMP AUDIT: %d parcel_scores rows written during "
+                        "experiment %s carry a different/NULL experiment_id — "
+                        "possible purge evasion; inspect the exp commit diff",
+                        stamp_violations, experiment_id,
+                    )
             metric = prepare.calculate_actionable_pipeline_count(
                 conn, run_tag=run_tag,
             )
@@ -720,12 +780,14 @@ def evaluate(
         status = "timeout"
         metric = 0
         confidence = 0.0
+        stamp_violations = 0
         error = "budget_exceeded"
         log.exception("evaluate.timeout market=%s", market)
     except Exception as exc:  # pylint: disable=broad-except
         status = "crash"
         metric = 0
         confidence = 0.0
+        stamp_violations = 0
         error = f"{type(exc).__name__}: {exc}"
         log.exception("evaluate.crash market=%s", market)
 
@@ -751,6 +813,7 @@ def evaluate(
         "started_at": started_iso,
         "run_tag": run_tag,
         "experiment_id": experiment_id,
+        "stamp_audit_violations": stamp_violations,
     }
 
 
@@ -759,6 +822,14 @@ def evaluate(
 # ---------------------------------------------------------------------------
 _SQL_DELETE_SCORES_FOR_EXPERIMENT = (
     "DELETE FROM parcel_scores WHERE experiment_id = %s"
+)
+
+# F3(b): rows written to this run during the current evaluate window whose
+# experiment_id is not the one this evaluate stamped (NULL included).
+_SQL_STAMP_AUDIT = (
+    "SELECT COUNT(*) FROM parcel_scores "
+    "WHERE run_tag = %s AND scored_at >= %s "
+    "AND experiment_id IS DISTINCT FROM %s"
 )
 
 _SQL_INSERT_RESEARCH_LOG_PURGE = (
@@ -809,18 +880,32 @@ def _purge_experiment_scores(
 # ---------------------------------------------------------------------------
 # Baseline experiment (Setup Step 5)
 # ---------------------------------------------------------------------------
-def run_baseline_experiment(market: str) -> dict[str, Any]:
+def run_baseline_experiment(
+    market: str, *, run_tag: str | None = None
+) -> dict[str, Any]:
     """Run the baseline experiment per AUTORESEARCH_MECHANICS.md L108.
 
     The baseline is ONE complete evaluate() against unmodified research.py.
-    The result is written to the TSV with ``status=baseline``.  The
+    The result is written to the TSV with ``status=baseline`` and a
+    ``run=<tag>`` marker so baseline detection is per-run (F1).  The
     composite of the baseline metric and the head commit are returned.
 
     Caller is responsible for invoking this ONCE per autoresearch branch
     before the experiment loop begins.  ``experiment_loop`` calls this
-    automatically when no baseline row exists in the TSV.
+    automatically when no baseline row FOR THE CURRENT RUN exists in the
+    TSV (the file accumulates across runs by design).
     """
-    result = evaluate(market)
+    if run_tag is None:
+        # Derive cwd-pinned from THIS repo's branch (F2); off-branch direct
+        # calls proceed unscoped with a loud warning.
+        run_tag = _parse_tag_from_branch(_git_current_branch())
+        if run_tag is None:
+            log.warning(
+                "run_baseline_experiment called outside an autoresearch/<tag> "
+                "branch; the baseline row will carry no run marker and the "
+                "metric read is UNSCOPED (informational only)"
+            )
+    result = evaluate(market, run_tag=run_tag)
     decision = apply_keep_or_revert_decision(
         prior_metric=None,
         prior_confidence=None,
@@ -837,6 +922,12 @@ def run_baseline_experiment(market: str) -> dict[str, Any]:
             log.exception(
                 "purge failed for baseline attempt %s", result["experiment_id"],
             )
+    description = f"baseline | market={market}"
+    if run_tag:
+        description += f" | run={run_tag}"
+    if result.get("experiment_id"):
+        # F4: record the id so orphaned rows are discoverable from the TSV.
+        description += f" | exp={result['experiment_id']}"
     row = {
         "commit": _git_head_commit(),
         "metric": result["metric"],
@@ -844,7 +935,7 @@ def run_baseline_experiment(market: str) -> dict[str, Any]:
         "api_calls": result["api_calls"],
         "wall_clock_min": result["wall_clock_min"],
         "status": decision,
-        "description": f"baseline | market={market}",
+        "description": description,
     }
     append_experiment_log_row(row)
     return row
@@ -958,11 +1049,25 @@ def experiment_loop(
             raise SetupError(
                 f"verify_setup failed: {json.dumps(setup, default=str)}"
             )
+        run_tag = setup.get("tag")
+        if not run_tag:
+            # F2: the ratchet must never run unscoped. verify_setup derives
+            # the tag cwd-pinned from the branch; no tag means no run.
+            raise SetupError(
+                "experiment_loop requires an autoresearch/<tag> branch; "
+                f"current branch is {setup.get('branch')!r} (no run tag)"
+            )
 
         # Setup Step 6 -- explicit confirmation gate.
         log_path = _experiment_log_path()
         rows = read_experiment_log(log_path)
-        has_baseline = any(r.get("status") == "baseline" for r in rows)
+        # F1: the TSV accumulates across runs; only a baseline stamped with
+        # THIS run's tag counts. A prior run's baseline must not suppress
+        # re-baselining (its metric is not comparable under the new tag).
+        has_baseline = any(
+            r.get("status") == "baseline" and _row_run_tag(r) == run_tag
+            for r in rows
+        )
 
         if not has_baseline:
             # Setup Step 5 -- establish baseline.  The first call to
@@ -970,21 +1075,24 @@ def experiment_loop(
             # baseline before iterating.  AUTORESEARCH_MECHANICS.md L114
             # requires the human to confirm the baseline before the loop
             # begins; we honour this by requiring ``confirmed=True`` OR a
-            # pre-existing baseline row.
+            # pre-existing baseline row FOR THIS RUN.
             if not confirmed:
                 raise SetupError(
-                    "no baseline row in experiment_log.tsv and confirmed=False. "
+                    "no baseline row for run "
+                    f"'{run_tag}' in experiment_log.tsv and confirmed=False. "
                     "Per AUTORESEARCH_MECHANICS.md Setup Step 6, the human must "
                     "confirm the baseline before the loop begins. Either run "
                     "run_baseline_experiment(market) and review the result, then "
                     "call experiment_loop(market, confirmed=True), OR call "
                     "experiment_loop(market, confirmed=True) directly to bootstrap."
                 )
-            baseline = run_baseline_experiment(market)
+            baseline = run_baseline_experiment(market, run_tag=run_tag)
             log.info("baseline established: %s", baseline)
             rows = read_experiment_log(log_path)
 
         # Main loop.
+        pending_purges: list[tuple[str, str]] = []  # F4: (experiment_id, decision)
+        consecutive_terminal = 0  # F5: consecutive crash/timeout iterations
         while True:
             if _halted():
                 log.info("experiment_loop halt sentinel detected; exiting cleanly")
@@ -996,6 +1104,18 @@ def experiment_loop(
                 log.info("experiment_loop graceful 7-day exit")
                 _record_halt_row(market, "graceful 7-day exit")
                 break
+
+            # F4: retry purges that failed at their own iteration boundary —
+            # unpurged residue contaminates every later metric read, so keep
+            # trying until the DB accepts the delete.
+            still_pending: list[tuple[str, str]] = []
+            for exp_id, exp_decision in pending_purges:
+                try:
+                    _purge_experiment_scores(exp_id, market, exp_decision)
+                except Exception:
+                    log.exception("purge retry failed for experiment %s", exp_id)
+                    still_pending.append((exp_id, exp_decision))
+            pending_purges = still_pending
 
             # Per-iteration setup re-check (R-731).
             iter_setup = verify_setup(market)
@@ -1016,10 +1136,11 @@ def experiment_loop(
                 continue
             consecutive_setup_failures = 0
 
-            # Run one experiment.
+            # Run one experiment. F2: the tag is threaded explicitly — the
+            # ratchet path never depends on process cwd for its scope.
             iter_started = time.monotonic()
             try:
-                result = evaluate(market)
+                result = evaluate(market, run_tag=run_tag)
             except Exception as exc:  # pylint: disable=broad-except
                 # R-726: a crash inside evaluate is caught and recorded; the
                 # loop keeps going.  evaluate() already catches its own
@@ -1033,6 +1154,8 @@ def experiment_loop(
                     "api_calls": 0,
                     "wall_clock_min": (time.monotonic() - iter_started) / 60.0,
                     "error": f"{type(exc).__name__}: {exc}",
+                    "run_tag": run_tag,
+                    "experiment_id": None,
                 }
 
             # R-733: soft per-iteration budget check.
@@ -1043,7 +1166,7 @@ def experiment_loop(
                     result["status"] = "timeout"
 
             # Decide.
-            prior = _last_baseline_or_keep(rows)
+            prior = _last_baseline_or_keep(rows, run_tag=run_tag)
             decision = apply_keep_or_revert_decision(
                 prior_metric=int(prior["metric"]) if prior else None,
                 prior_confidence=float(prior["confidence"]) if prior else None,
@@ -1064,12 +1187,40 @@ def experiment_loop(
                     )
                 except Exception:
                     # A failed purge contaminates later metric reads; make it
-                    # loud in the log but keep the loop alive (NEVER STOP).
+                    # loud, queue a retry for the next iteration boundary
+                    # (F4), and keep the loop alive (NEVER STOP).
                     log.exception(
-                        "purge failed for experiment %s; metric residue may "
-                        "inflate subsequent reads",
+                        "purge failed for experiment %s; queued for retry",
                         result["experiment_id"],
                     )
+                    pending_purges.append((result["experiment_id"], decision))
+
+            # F5: consecutive crash/timeout breaker. A workload that
+            # deterministically exceeds the budget would otherwise purge and
+            # repeat the identical run forever; treat N in a row as the
+            # catastrophic-failure halt AUTORESEARCH_MECHANICS.md allows.
+            if result["status"] in {"crash", "timeout"}:
+                consecutive_terminal += 1
+                if consecutive_terminal >= _TERMINAL_STATUS_BREAKER:
+                    _record_halt_row(
+                        market,
+                        f"{consecutive_terminal} consecutive "
+                        f"crash/timeout iterations — breaker tripped",
+                    )
+                    row = {
+                        "commit": _git_head_commit(allow_pending=True),
+                        "metric": result["metric"],
+                        "confidence": result["confidence"],
+                        "api_calls": result.get("api_calls", 0),
+                        "wall_clock_min": result["wall_clock_min"],
+                        "status": decision,
+                        "description": _format_loop_description(result, run_tag),
+                    }
+                    append_experiment_log_row(row, log_path)
+                    iters += 1
+                    break
+            else:
+                consecutive_terminal = 0
 
             row = {
                 "commit": _git_head_commit(),
@@ -1078,7 +1229,7 @@ def experiment_loop(
                 "api_calls": result["api_calls"],
                 "wall_clock_min": result["wall_clock_min"],
                 "status": decision,
-                "description": _format_loop_description(result),
+                "description": _format_loop_description(result, run_tag),
             }
             append_experiment_log_row(row, log_path)
             rows.append({k: str(v) for k, v in row.items()})
@@ -1108,8 +1259,16 @@ def _record_halt_row(market: str, reason: str) -> None:
         log.exception("failed to record halt row; continuing exit")
 
 
-def _format_loop_description(result: Mapping[str, Any]) -> str:
-    """Compose the TSV description column for a non-baseline iteration."""
+def _format_loop_description(
+    result: Mapping[str, Any], run_tag: str | None = None
+) -> str:
+    """Compose the TSV description column for a non-baseline iteration.
+
+    F1/F4: the trailing ``run=<tag>`` and ``exp=<experiment_id>`` tokens
+    make baseline/anchor selection run-aware and make every experiment's
+    rows discoverable (and purgeable) from the TSV alone, even after the
+    writing process is gone.
+    """
     pieces = [f"market={result.get('market', '?')}"]
     if result.get("status") in {"crash", "timeout"} and result.get("error"):
         pieces.append(str(result["error"]))
@@ -1127,6 +1286,16 @@ def _format_loop_description(result: Mapping[str, Any]) -> str:
         if counts:
             scored = counts.get("scored", 0)
             pieces.append(f"scored={scored}")
+    if result.get("stamp_audit_violations"):
+        pieces.append(f"stamp_audit_violations={result['stamp_audit_violations']}")
+    effective_run_tag = run_tag if run_tag is not None else result.get("run_tag")
+    if effective_run_tag:
+        # The loop passes its authoritative tag explicitly so every row it
+        # writes carries the marker even when the result dict (e.g. the
+        # outer-crash fallback) lacks one.
+        pieces.append(f"run={effective_run_tag}")
+    if result.get("experiment_id"):
+        pieces.append(f"exp={result['experiment_id']}")
     return " | ".join(pieces)
 
 

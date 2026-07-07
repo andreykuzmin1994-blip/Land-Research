@@ -3612,7 +3612,10 @@ class TestPhase8MetricEndToEnd(unittest.TestCase):
 
         import prepare
         fake_one = _MetricFake(1)
-        n = prepare.calculate_actionable_pipeline_count(fake_one)
+        # Tier-2 review F6: pin the run scope — without this the assertion
+        # flips when the suite runs from an autoresearch/<tag> checkout.
+        with mock.patch.object(prepare, "current_run_tag", return_value=None):
+            n = prepare.calculate_actionable_pipeline_count(fake_one)
         self.assertEqual(n, 1)
         # Threshold is bound to the SQL via parameters.json.
         sql_executed = fake_one._executes[0][1]
@@ -3631,7 +3634,8 @@ class TestPhase8MetricEndToEnd(unittest.TestCase):
                 return _Cur()
 
         import prepare
-        n = prepare.calculate_actionable_pipeline_count(_MetricFake())
+        with mock.patch.object(prepare, "current_run_tag", return_value=None):
+            n = prepare.calculate_actionable_pipeline_count(_MetricFake())
         self.assertEqual(n, 0)
 
 
@@ -5315,7 +5319,7 @@ class TestPhase10ExperimentLoopIterations(unittest.TestCase):
             "api_calls": 0,
             "wall_clock_min": 0.0,
             "status": "baseline",
-            "description": "baseline | market=atlanta",
+            "description": "baseline | market=atlanta | run=test",
         }, path=self.tsv_path)
 
     def tearDown(self) -> None:
@@ -6380,7 +6384,7 @@ class TestLoopPurgeWiring(unittest.TestCase):
             "api_calls": 0,
             "wall_clock_min": 0.0,
             "status": "baseline",
-            "description": "baseline | market=atlanta",
+            "description": "baseline | market=atlanta | run=test",
         }, path=self.tsv_path)
 
     def tearDown(self) -> None:
@@ -6548,3 +6552,276 @@ class TestStrictGitHeadCommit(unittest.TestCase):
             self.assertEqual(
                 runner._git_head_commit(allow_pending=True), "pending",
             )
+
+
+# ===========================================================================
+# Tier-2 review fixes (2026-07-07) — F1 run-aware baseline/anchor, F2 explicit
+# tag threading, F3b stamp audit, F4 purge retry, F5 terminal breaker.
+# See reviews/14_streamlining_review/01_tier2_review_decision.md.
+# ===========================================================================
+class TestRunAwareBaseline(unittest.TestCase):
+    """F1: a prior run's TSV rows must not anchor or satisfy a new run."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        self.lock_path = Path(self.tmp.name) / ".lock"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(self.lock_path)
+        # A PRIOR run's baseline + keep rows (run=old), metric anchor 40.
+        for status, metric, desc in (
+            ("baseline", 35, "baseline | market=atlanta | run=old"),
+            ("keep", 40, "market=atlanta | run=old | exp=exp-old-1"),
+        ):
+            runner.append_experiment_log_row({
+                "commit": "0000000", "metric": metric, "confidence": float(metric),
+                "api_calls": 0, "wall_clock_min": 0.0,
+                "status": status, "description": desc,
+            }, path=self.tsv_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        self.tmp.cleanup()
+
+    def _patch_setup_ok(self, tag: str):
+        return mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": f"autoresearch/{tag}",
+                          "tag": tag, "is_autoresearch_branch": True,
+                          "checks": {}},
+        )
+
+    def test_new_run_requires_its_own_baseline_and_confirmation(self) -> None:
+        # The old run's baseline row must NOT satisfy the new run's gate.
+        with self._patch_setup_ok("new"):
+            with self.assertRaises(runner.SetupError):
+                runner.experiment_loop("atlanta", max_iterations=1)
+
+    def test_new_run_rebaselines_and_anchors_within_run(self) -> None:
+        baseline_calls: list[tuple] = []
+
+        def fake_baseline(market, *, run_tag=None):
+            baseline_calls.append((market, run_tag))
+            row = {
+                "commit": "1111111", "metric": 38, "confidence": 30.0,
+                "api_calls": 0, "wall_clock_min": 0.1,
+                "status": "baseline",
+                "description": f"baseline | market={market} | run={run_tag}",
+            }
+            runner.append_experiment_log_row(row, path=self.tsv_path)
+            return row
+
+        evals = [
+            # 39 vs THIS run's baseline 38 -> keep. Against the stale old-run
+            # anchor (40) this would have been the F1 livelock discard.
+            {"market": "atlanta", "status": "ok", "metric": 39,
+             "confidence": 31.0, "api_calls": 0, "wall_clock_min": 0.1,
+             "sub_summaries": {}, "run_tag": "new", "experiment_id": "exp-n1"},
+        ]
+        with self._patch_setup_ok("new"), \
+             mock.patch.object(runner, "run_baseline_experiment", fake_baseline), \
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_git_head_commit", return_value="2222222"):
+            runner.experiment_loop("atlanta", max_iterations=1, confirmed=True)
+
+        self.assertEqual(baseline_calls, [("atlanta", "new")])
+        rows = runner.read_experiment_log(self.tsv_path)
+        self.assertEqual(rows[-1]["status"], "keep")
+        self.assertIn("run=new", rows[-1]["description"])
+        self.assertIn("exp=exp-n1", rows[-1]["description"])
+
+    def test_loop_refuses_without_run_tag(self) -> None:
+        with mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": "main", "tag": None,
+                          "is_autoresearch_branch": False, "checks": {}},
+        ):
+            with self.assertRaises(runner.SetupError):
+                runner.experiment_loop("atlanta", max_iterations=1, confirmed=True)
+
+
+class TestExplicitTagThreading(unittest.TestCase):
+    """F2: the ratchet path passes the tag explicitly; derivation is pinned."""
+
+    def test_current_run_tag_pins_repo_root_cwd(self) -> None:
+        import prepare
+        captured: dict[str, Any] = {}
+
+        def fake_run(cmd, **kwargs):
+            captured.update(kwargs)
+            class _P:
+                returncode = 0
+                stdout = "autoresearch/atl-x\n"
+            return _P()
+
+        with mock.patch.object(prepare.subprocess, "run", fake_run):
+            tag = prepare.current_run_tag()
+        self.assertEqual(tag, "atl-x")
+        self.assertEqual(captured.get("cwd"), str(prepare._REPO_ROOT))
+
+    def test_loop_threads_tag_into_evaluate(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        tsv = Path(tmp.name) / "experiment_log.tsv"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(tsv)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(Path(tmp.name) / ".lock")
+        self.addCleanup(lambda: os.environ.pop("EXPERIMENT_LOG_PATH", None))
+        self.addCleanup(lambda: os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None))
+        runner.append_experiment_log_row({
+            "commit": "0000000", "metric": 5, "confidence": 4.0,
+            "api_calls": 0, "wall_clock_min": 0.0,
+            "status": "baseline", "description": "baseline | run=test",
+        }, path=tsv)
+        seen: list[Any] = []
+
+        def fake_evaluate(market, *, run_tag=None, **kw):
+            seen.append(run_tag)
+            return {"market": market, "status": "ok", "metric": 6,
+                    "confidence": 5.0, "api_calls": 0, "wall_clock_min": 0.1,
+                    "sub_summaries": {}, "run_tag": run_tag,
+                    "experiment_id": "exp-t"}
+
+        with mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        ), mock.patch.object(runner, "evaluate", fake_evaluate), \
+             mock.patch.object(runner, "_git_head_commit", return_value="1111111"):
+            runner.experiment_loop("atlanta", max_iterations=1)
+        self.assertEqual(seen, ["test"])
+
+
+class TestPurgeRetry(unittest.TestCase):
+    """F4: a failed purge is retried at the next iteration boundary."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(Path(self.tmp.name) / ".lock")
+        runner.append_experiment_log_row({
+            "commit": "0000000", "metric": 5, "confidence": 4.0,
+            "api_calls": 0, "wall_clock_min": 0.0,
+            "status": "baseline", "description": "baseline | run=test",
+        }, path=self.tsv_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        self.tmp.cleanup()
+
+    def test_failed_purge_retries_next_iteration(self) -> None:
+        evals = [
+            {"market": "atlanta", "status": "ok", "metric": 4, "confidence": 3.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {},
+             "run_tag": "test", "experiment_id": "exp-a"},   # discard
+            {"market": "atlanta", "status": "ok", "metric": 6, "confidence": 5.0,
+             "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {},
+             "run_tag": "test", "experiment_id": "exp-b"},   # keep
+        ]
+        purge_calls: list[str] = []
+
+        def fake_purge(exp_id, market, decision):
+            purge_calls.append(exp_id)
+            if len(purge_calls) == 1:
+                raise RuntimeError("db down")
+            return 0
+
+        with mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        ), mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_purge_experiment_scores", fake_purge), \
+             mock.patch.object(runner, "_git_head_commit",
+                               side_effect=["1111111", "2222222"]):
+            runner.experiment_loop("atlanta", max_iterations=2)
+        # First attempt failed at iteration 1's boundary; retried and
+        # succeeded at the START of iteration 2. No purge for the keep.
+        self.assertEqual(purge_calls, ["exp-a", "exp-a"])
+
+
+class TestTerminalStatusBreaker(unittest.TestCase):
+    """F5: N consecutive crash/timeout iterations halt the loop."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(Path(self.tmp.name) / ".lock")
+        runner.append_experiment_log_row({
+            "commit": "0000000", "metric": 5, "confidence": 4.0,
+            "api_calls": 0, "wall_clock_min": 0.0,
+            "status": "baseline", "description": "baseline | run=test",
+        }, path=self.tsv_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        self.tmp.cleanup()
+
+    def test_breaker_trips_after_threshold(self) -> None:
+        def crash_eval(market, *, run_tag=None, **kw):
+            return {"market": market, "status": "crash", "metric": 0,
+                    "confidence": 0.0, "api_calls": 0, "wall_clock_min": 0.1,
+                    "sub_summaries": {}, "error": "boom",
+                    "run_tag": run_tag, "experiment_id": None}
+
+        with mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        ), mock.patch.object(runner, "evaluate", crash_eval), \
+             mock.patch.object(runner, "_git_head_commit", return_value="1111111"):
+            summary = runner.experiment_loop("atlanta", max_iterations=50)
+        # Loop stopped at the breaker, far short of max_iterations.
+        self.assertEqual(summary["iterations"], runner._TERMINAL_STATUS_BREAKER)
+        rows = runner.read_experiment_log(self.tsv_path)
+        halt_rows = [r for r in rows if r["status"] == "halt"]
+        self.assertEqual(len(halt_rows), 1)
+        self.assertIn("breaker", halt_rows[0]["description"])
+
+
+class TestStampAudit(unittest.TestCase):
+    """F3(b): evaluate counts wrong-stamp rows written during its window."""
+
+    def test_violations_surfaced_in_result_and_description(self) -> None:
+        class _AuditFake(Phase5FakeConnection):
+            pass
+
+        fake = Phase5FakeConnection(fetchone_queue=[(3,)])
+
+        @contextmanager
+        def fake_get_connection():
+            yield fake
+
+        def fake_metric(conn, run_tag=None):
+            return 1
+
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", return_value={}), \
+             mock.patch.object(research, "run_scoring_cycle", return_value={}), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               fake_metric), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               lambda conn, run_tag=None: 0.5), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate(
+                "atlanta", run_tag="test", experiment_id="exp-good",
+            )
+        self.assertEqual(result["stamp_audit_violations"], 3)
+        audit_executes = [
+            (s, p) for s, p in fake.all_executes if "IS DISTINCT FROM" in s
+        ]
+        self.assertEqual(len(audit_executes), 1)
+        self.assertEqual(audit_executes[0][1][0], "test")
+        self.assertEqual(audit_executes[0][1][2], "exp-good")
+        desc = runner._format_loop_description(result, "test")
+        self.assertIn("stamp_audit_violations=3", desc)

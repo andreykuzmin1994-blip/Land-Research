@@ -652,17 +652,22 @@ _AUTORESEARCH_BRANCH_RE = r"^autoresearch/([a-z0-9._-]+)$"
 def current_run_tag() -> str | None:
     """Return the active run tag, or ``None`` when not inside a run.
 
-    Derived from the current git branch: ``autoresearch/<tag>`` -> ``<tag>``.
-    Any other branch (main, feature branches, detached HEAD) or any git
-    failure returns ``None`` — callers then fall back to the UNSCOPED
-    (informational) metric. The runner passes the tag explicitly on the
-    ratchet path, so this helper is a convenience for CLI/ad-hoc callers,
-    not a security boundary.
+    Derived from THIS repository's current git branch (``cwd`` pinned to
+    the repo root — Tier-2 review F2: an unpinned call answered for
+    whatever repo the process happened to be launched from, silently
+    unscoping the metric or adopting a foreign repo's tag):
+    ``autoresearch/<tag>`` -> ``<tag>``. Any other branch (main, feature
+    branches, detached HEAD) or any git failure returns ``None`` — callers
+    then fall back to the UNSCOPED (informational) metric. The runner
+    passes the tag explicitly on the ratchet path (loop -> evaluate ->
+    scoring + metric), so this helper is a convenience for CLI/ad-hoc
+    callers, not a security boundary.
     """
     try:
         proc = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             capture_output=True, text=True, timeout=10, check=False,
+            cwd=str(_REPO_ROOT),
         )
     except (OSError, subprocess.TimeoutExpired):  # pragma: no cover — no git
         return None
