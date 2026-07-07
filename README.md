@@ -13,6 +13,13 @@ The agent supports five investment strategies (BTS development, spec development
 
 Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop runs end-to-end against Fulton County, with the full Karpathy-pattern infrastructure: setup-phase verifier, evaluator, append-only TSV experiment log, keep-or-revert decision logic, halt sentinel, advisory locking. Atlanta is the only configured market; Phase 11+ adds the remaining counties.
 
+2026-07-07 restructure (see `reviews/14_streamlining_review/`):
+- `research.py` was split — the experiment loop now lives in `runner.py`, CoStar ETL in `costar_ingest.py`, rendering in `reporting.py` (all immutable during a run); `research.py` holds only the agent's experiment surface.
+- The metric is **run-scoped** (`prepare-mutation`): `parcel_scores` rows carry `run_tag` + `experiment_id`, the metric counts only the active run's rows, and the runner purges a discarded experiment's rows so the data ratchet mirrors the git ratchet. Pre-mutation metric values are not comparable to post-mutation values; the next run starts fresh.
+- The review process is **tiered** (`STANDING_RISKS.md`): tests+CI for low-risk changes, one independent fresh-context reviewer for ordinary logic, the full three-agent workflow for metric/contract-touching work.
+
+For live repo state, run `make status` (setup checks + last TSV rows) — prose snapshots of state in documents go stale; the command does not.
+
 ## Quick Start (Operator)
 
 This codebase is operated through `make`. Open the repo in a Codespace and run:
@@ -61,26 +68,32 @@ land-site-selector/
 ├── README.md                          — This file
 ├── AUTORESEARCH_MECHANICS.md          — CANONICAL: how the Karpathy pattern is implemented
 ├── program.md                         — The agent's autonomous loop instructions
-├── appendix_a_county_connectors.md    — County data source specifications and harness design
+├── appendix_a_county_connectors.md    — County data source specs, tiered review workflow, harness design
+├── STANDING_RISKS.md                  — Recurring risk checklist + review tiers (cited by ID in reviews)
 ├── COSTAR_INGESTION_CONTRACT.md       — How CoStar exports feed the agent
+├── COSTAR_EXPORTS_README.md           — Operator guide for the CoStar saved-search setup
 ├── STORAGE_ARCHITECTURE.md            — Postgres + PostGIS schema decisions
 ├── BUILD_PHASES.md                    — Implementation roadmap
 ├── parameters.json                    — Scoring weights and filter thresholds (IMMUTABLE during run)
-├── sources.json                       — Registry of data source URLs (locked during run)
-├── prepare.py                         — IMMUTABLE: metric calculation and evaluation
-├── research.py                        — Agent sandbox — only file the agent modifies
+├── sources.json                       — Registry of data source URLs (LOCKED — agent never writes)
+├── connector_registry.json            — Harness-only config overlay (test bboxes, expected extents)
+├── prepare.py                         — IMMUTABLE: metric calculation, DDL, frozen parameters
+├── research.py                        — Agent sandbox — the ONLY file the agent modifies in a run
+├── runner.py                          — IMMUTABLE during run: experiment loop, setup checks, TSV I/O
+├── costar_ingest.py                   — IMMUTABLE during run: CoStar export ETL
+├── reporting.py                       — Snapshot + strategy memo rendering
+├── pipeline_common.py                 — Shared paths/helpers/SQL for the pipeline modules
 ├── connector_harness.py               — Connector validation framework
+├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)
+├── data/                              — Bundled reference data (OZ tract stub, etc.)
+├── tests/                             — Offline suite (600 tests, ~1s) + fixtures
+├── reviews/                           — Review artifacts per change (decision notes; historical 3-agent docs)
 ├── .devcontainer/                     — Codespaces config: secret -> .env hydration
+├── .githooks/ + .github/workflows/    — Credential guard, offline+live CI, harness CI
 ├── experiment_log.tsv                 — AutoResearch experiment log (UNTRACKED, runtime-only)
-├── markets/                           — Per-market discovered candidates and context
-├── rankings/                          — Current ranked shortlists per market
-├── snapshots/                         — One-page parcel snapshots for human review
-├── harness_reports/                   — Connector health reports
-├── sources/                           — Cached raw API responses per parcel
-├── flagged/                           — Items requiring human review
-└── docs/
-    └── diligence_program.md           — Companion: post-LOI diligence agent spec (separate scope)
+└── snapshots/ rankings/ harness_reports/ sources/
+                                       — Generated runtime artifacts (gitignored, created on demand)
 ```
 
 ## For Claude Code (and any AI coding agent)
@@ -94,20 +107,23 @@ Read in this order:
 1. `README.md` (this file)
 2. `AUTORESEARCH_MECHANICS.md` — Canonical specification of how the pattern is implemented. If anything else in this repo conflicts with this document, this document wins.
 3. `program.md` — The agent's strategic instructions
-4. `appendix_a_county_connectors.md` — Data source specs, three-agent coding workflow, connector harness
-5. `STORAGE_ARCHITECTURE.md` — Postgres + PostGIS schema
-6. `COSTAR_INGESTION_CONTRACT.md` — CoStar workflow (no scraping)
-7. `BUILD_PHASES.md` — Implementation roadmap
+4. `appendix_a_county_connectors.md` — Data source specs, tiered review workflow, connector harness
+5. `STANDING_RISKS.md` — Recurring risk checklist and review tiers
+6. `STORAGE_ARCHITECTURE.md` — Postgres + PostGIS schema
+7. `COSTAR_INGESTION_CONTRACT.md` — CoStar workflow (no scraping)
+8. `BUILD_PHASES.md` — Implementation roadmap
 
-## The Three-Agent Coding Workflow
+## The Tiered Review Workflow
 
-All production code in this project must be developed using a three-agent code team running Claude Opus 4.7:
+Code changes are reviewed by blast radius (full definition:
+`STANDING_RISKS.md` § "Change tiers"; process spec:
+`appendix_a_county_connectors.md` → "Coding Workflow"):
 
-- **Agent 1: Risk and Architecture Reviewer** — Surfaces failure modes and architectural concerns before code is written
-- **Agent 2: Code Writer** — Writes code that addresses every risk Agent 1 identified
-- **Agent 3: Reviewer and Implementer** — Critically analyzes both prior outputs, has sole commit authority
+- **Tier 0** — docs, config, stubs, ops tooling: tests + CI only.
+- **Tier 1** — ordinary `research.py` logic: ONE independent fresh-context reviewer + a short decision note.
+- **Tier 2** — metric layer, runner decision logic, harness internals, credentials, external integrations: the full three-agent adversarial workflow (risk reviewer → code writer → reviewer-implementer with sole commit authority), each role in a genuinely separate context on the strongest available model.
 
-See `appendix_a_county_connectors.md` → "Coding Workflow: Three-Agent Code Team" for the full specification.
+The recurring risk checklist all tiers verify against lives in `STANDING_RISKS.md` (SR-1 … SR-15) — reviews cite IDs instead of restating it.
 
 ## Operating Cost (Estimated)
 
@@ -129,7 +145,7 @@ Initial build targets Atlanta only.
 ## Key Decisions Made
 
 - **Storage**: Postgres + PostGIS (Supabase free tier acceptable for initial build)
-- **Coding workflow**: Three-agent code team with Opus 4.7
+- **Coding workflow**: Tiered review (`STANDING_RISKS.md`); three-agent team at Tier 2, strongest available model
 - **Data approach**: API-first (Approach 3) with AI-assisted fallback (Approach 2)
 - **CoStar**: Manual scheduled export ingestion, no scraping (legal risk)
 - **Primary metric**: `actionable_pipeline_count` (not just qualified — must pass actionability screen)

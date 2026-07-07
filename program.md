@@ -27,34 +27,23 @@ You operate in a loop. You do not stop. You do not ask for confirmation. You run
 
 ## Repository Structure
 
-```
-land-site-selector/
-├── program.md                  — YOU ARE HERE. Agent instructions. Do not modify.
-├── prepare.py                  — One-time setup: initializes market directories, seeds
-│                                 source registry, creates results log. Do not modify.
-├── research.py                 — The file you modify. Contains discovery logic, source
-│                                 connectors, scoring engine, filter functions, and
-│                                 ranking algorithms.
-├── parameters.json             — Scoring weights and filter thresholds (human-editable).
-│                                 Agent reads but does not modify.
-├── markets/                    — One directory per target market.
-│   └── {market_id}/
-│       ├── candidates.json     — All discovered parcels for this market.
-│       ├── scored/             — Fully scored parcel profiles.
-│       │   └── {parcel_id}.json
-│       ├── rejected/           — Parcels that failed hard filters (with rejection reason).
-│       │   └── {parcel_id}.json
-│       ├── flagged/            — Parcels with incomplete data or anomalies needing human review.
-│       │   └── {parcel_id}.json
-│       └── market_context.json — Cached submarket stats (vacancy, absorption, pipeline, rents).
-├── sources.json                — Registry of data source URLs, APIs, and access patterns.
-│                                 Agent may ADD new sources. Do not remove existing ones.
-├── rankings/                   — Current ranked shortlists per market.
-│   └── {market_id}_ranked.json
-├── results.tsv                 — Experiment log. Agent appends here. Do not commit.
-└── snapshots/                  — One-page parcel snapshots for human review.
-    └── {parcel_id}_snapshot.md
-```
+> Storage is **PostgreSQL + PostGIS**, not files — see `STORAGE_ARCHITECTURE.md`
+> (canonical) and `README.md` for the full repository tree. The summary below
+> covers only what this document's instructions rely on.
+
+| Artifact | Role | Agent permissions |
+|----------|------|-------------------|
+| `program.md` | YOU ARE HERE. Strategic instructions. | READ only |
+| `prepare.py` | Immutable metric layer: DDL, metric calculation, frozen parameters, budget enforcement. | READ only |
+| `parameters.json` | Scoring weights and filter thresholds, human-tuned. | READ only |
+| `sources.json` | Registry of data source URLs and field mappings. Humans add sources between experiments; the agent NEVER writes it (see AUTORESEARCH_MECHANICS.md File 5). | READ only |
+| `research.py` | **The file you modify.** Discovery heuristics, hard-filter predicates, S1–S12 scoring, strategy fit, actionability gates. | FULL EDIT during a run |
+| `runner.py` | Experiment loop, setup verification, `experiment_log.tsv` I/O, keep-or-revert recording + purge. | READ only — immutable during a run |
+| `costar_ingest.py` | CoStar export ETL (frozen to `COSTAR_INGESTION_CONTRACT.md`). | READ only during a run |
+| `reporting.py` | Snapshot + strategy memo rendering into `snapshots/` and `rankings/`. | READ only during a run |
+| Postgres tables | `parcels`, `parcel_scores`, `research_log`, `flagged_items`, `market_context`, comps/listings — see `STORAGE_ARCHITECTURE.md`. | READ/WRITE via the pipeline code |
+| `experiment_log.tsv` | Per-experiment Karpathy log (7 columns, untracked). | Appended by `runner.py` |
+| `snapshots/`, `rankings/`, `harness_reports/`, `sources/` | Generated runtime artifacts (gitignored, created on demand). | WRITE via `reporting.py` / harness |
 
 ---
 
@@ -117,15 +106,21 @@ Percentage of qualified parcels (score ≥ 70) that also pass the actionability 
 conversion_rate = (actionable_parcels / qualified_parcels) × 100
 ```
 
-After each cycle, record to `results.tsv`:
+After each action, the pipeline records a row to the **`research_log` Postgres
+table** (the per-action log; schema in `STORAGE_ARCHITECTURE.md`):
 
 ```
-cycle | timestamp | action_type | market | parcel_id | composite_score | actionability | strategy_fit | actionable_pipeline_count | discovery_rate_24h | scoring_completeness | conversion_rate | notes
+cycle_id | timestamp | action_type | market | parcel_id | composite_score | actionability | strategy_fit | actionable_pipeline_count | discovery_rate_24h | scoring_completeness | conversion_rate | notes
 ```
 
-Where `action_type` is one of: `discovery`, `discovery_empty`, `scoring`, `rescore`, `rejection`, `flag`, `abort`.
+Where `action_type` is one of: `discovery`, `discovery_empty`, `scoring`, `rescore`, `rejection`, `flag`, `abort`, `ingestion`, `experiment_purge`.
 Where `actionability` is one of: `PASS`, `FAIL:control`, `FAIL:entitlement`, `FAIL:strategy`, `FAIL:deal_killer`, `PENDING`.
 Where `strategy_fit` is a comma-separated list of strategies rated STRONG or MODERATE (e.g., `land_bank,spec_dev`).
+
+Per-EXPERIMENT results (one row per Karpathy experiment, not per action) go to
+`experiment_log.tsv` with the 7-column schema defined in
+`AUTORESEARCH_MECHANICS.md` — the two logs serve different granularities and
+neither replaces the other.
 
 ---
 
@@ -730,17 +725,17 @@ Be specific. Reference actual data points, comparable transactions, market stats
 ## Constraints
 
 1. **Do not modify `program.md`** — this file is your instructions. The human iterates on it.
-2. **Do not modify `prepare.py`** — it handles setup and is considered fixed infrastructure.
-3. **Do not modify `parameters.json`** — scoring weights are human-tuned. Read only.
-4. **Only modify `research.py`** — all logic changes (new source connectors, scoring improvements, discovery heuristics, filter refinements) go here.
+2. **Do not modify the immutable layer** — `prepare.py` (metric), `runner.py` (loop), `costar_ingest.py` (ETL), `reporting.py` (rendering), `pipeline_common.py`. Changes there happen between runs under the tiered review process.
+3. **Do not modify `parameters.json` or `sources.json`** — scoring weights and the source registry are human-tuned. Read only.
+4. **Only modify `research.py`** — all experiment-surface changes (scoring improvements, discovery heuristics, filter refinements) go here.
 5. **Never fabricate data** — if a data point is unavailable, leave it `null` and flag it. A missing score is infinitely better than a wrong score. Never estimate acreage, never guess zoning, never assume utilities exist.
 6. **Respect source tiers** — county assessor data (Tier 1) always overrides CoStar or LandGlide (Tier 2) when they conflict on acreage, zoning, or ownership.
-7. **Flag conflicts** — if two sources disagree on acreage by >5%, zoning classification, or flood zone designation, write to `flagged/` with both values and sources. Do not silently pick one.
-8. **Time budget** — 10 minutes per parcel for scoring. 5 minutes per parcel for discovery (initial filter). If data sources are slow, score what you can and flag the rest.
-9. **Git discipline** — commit after every scored parcel or discovery batch. Commit messages must include market, parcel_id, composite_score, actionability status, and current actionable_pipeline_count.
+7. **Flag conflicts** — if two sources disagree on acreage by >5%, zoning classification, or flood zone designation, write a `flagged_items` row with both values and sources. Do not silently pick one.
+8. **Time budget** — 10 minutes per parcel for scoring. 5 minutes per parcel for discovery (initial filter). If data sources are slow, score what you can and flag the rest. 90 minutes hard ceiling per experiment (enforced by the immutable layer).
+9. **Git discipline** — ONE commit per experiment (`exp: <description>`), per AUTORESEARCH_MECHANICS.md. The per-action record is the `research_log` table, not git history.
 10. **Snapshot every qualifier** — every parcel that scores ≥ threshold gets a one-page snapshot. No exceptions.
 11. **Off-market priority** — at least 30% of discovery cycles must use the mismatched use engine (county GIS searches for absentee owners, ag-adjacent-to-industrial, estates/trusts). Do not rely solely on listed inventory.
-12. **Market context freshness** — refresh `market_context.json` for each market at least every 30 days. Stale vacancy/absorption data degrades scoring accuracy.
+12. **Market context freshness** — refresh the `market_context` table for each market at least every 30 days (CoStar weekly exports cover this). Stale vacancy/absorption data degrades scoring accuracy.
 
 ---
 
@@ -826,7 +821,7 @@ The memo is generated:
 
 ## Notes for Human Iterating on This File
 
-This `program.md` is version 1.1. Areas to iterate on:
+This `program.md` is version 1.2 (2026-07-07: storage/log references aligned with the Postgres implementation, sources.json permissions corrected, immutable-module list expanded). Areas to iterate on:
 
 1. **Acreage range**: Currently 5–50 acres. Adjust based on your typical deal size. For big-box spec or BTS you may need 15–30 acres minimum at 40% coverage. For land banking on emerging corridors, you may want to include larger parcels (50–100+ acres) that can be subdivided or phased. For assemblage plays, the agent already considers smaller parcels in combination.
 

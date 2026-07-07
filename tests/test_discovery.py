@@ -26,11 +26,34 @@ from unittest import mock
 # Importing research is import-safe — it uses lazy DB connection. The
 # psycopg dependency is required for module load.
 import research
+import runner
+import reporting
+import costar_ingest
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "discovery"
 COSTAR_FIXTURES_DIR = Path(__file__).parent / "fixtures" / "costar"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESEARCH_PY_SRC = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
+COSTAR_INGEST_PY_SRC = (REPO_ROOT / "costar_ingest.py").read_text(encoding="utf-8")
+REPORTING_PY_SRC = (REPO_ROOT / "reporting.py").read_text(encoding="utf-8")
+RUNNER_PY_SRC = (REPO_ROOT / "runner.py").read_text(encoding="utf-8")
+PIPELINE_COMMON_PY_SRC = (REPO_ROOT / "pipeline_common.py").read_text(encoding="utf-8")
+ALL_PIPELINE_PY_SRC = "\n".join(
+    (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC, REPORTING_PY_SRC,
+     RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC)
+)
+# Merged module AST spanning every pipeline module, for whole-surface
+# static checks (each file is parsed separately, then bodies spliced,
+# because `from __future__` lines block naive source concatenation).
+ALL_PIPELINE_AST = ast.Module(
+    body=[
+        node
+        for source in (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC,
+                       REPORTING_PY_SRC, RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC)
+        for node in ast.parse(source).body
+    ],
+    type_ignores=[],
+)
 
 
 def _load_fixture(name: str) -> dict[str, Any]:
@@ -138,10 +161,10 @@ class TestStaticChecks(unittest.TestCase):
     """Gate items 1, 2, 13, 18, 19 — AST/source-level guarantees."""
 
     def test_no_immutable_writes(self) -> None:
-        """R-01: research.py never writes parameters.json / sources.json / program.md."""
+        """R-01: no pipeline module writes parameters.json / sources.json / program.md."""
         forbidden_paths = ("parameters.json", "program.md")
         # sources.json is read; just ensure no open(..., 'w') against any of these.
-        tree = ast.parse(RESEARCH_PY_SRC)
+        tree = ALL_PIPELINE_AST
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "open":
                 if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
@@ -160,7 +183,7 @@ class TestStaticChecks(unittest.TestCase):
 
     def test_no_string_interpolated_sql(self) -> None:
         """R-05: every cursor.execute() first arg is a Constant or Name (module-level SQL)."""
-        tree = ast.parse(RESEARCH_PY_SRC)
+        tree = ALL_PIPELINE_AST
         violations = []
         for node in ast.walk(tree):
             if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
@@ -741,7 +764,7 @@ class TestPhase31ImmutableWritesStrict(unittest.TestCase):
     FORBIDDEN = ("parameters.json", "program.md", "sources.json")
 
     def test_strict_no_immutable_writes(self) -> None:
-        tree = ast.parse(RESEARCH_PY_SRC)
+        tree = ALL_PIPELINE_AST
         violations: list[tuple[int, str]] = []
 
         def _string_constants_in(node: ast.AST) -> list[str]:
@@ -1629,13 +1652,17 @@ class TestPhase5SqlConstantsStaticChecks(unittest.TestCase):
 # ===========================================================================
 @contextmanager
 def _temp_costar_base():
-    """Monkey-patch research._COSTAR_BASE_DIR to a tempdir for the test scope (R-329)."""
-    original = research._COSTAR_BASE_DIR
+    """Monkey-patch _COSTAR_BASE_DIR (every module binding) to a tempdir (R-329)."""
+    original = costar_ingest._COSTAR_BASE_DIR
     with tempfile.TemporaryDirectory() as td:
+        costar_ingest._COSTAR_BASE_DIR = Path(td)
+        runner._COSTAR_BASE_DIR = Path(td)
         research._COSTAR_BASE_DIR = Path(td)
         try:
             yield Path(td)
         finally:
+            costar_ingest._COSTAR_BASE_DIR = original
+            runner._COSTAR_BASE_DIR = original
             research._COSTAR_BASE_DIR = original
 
 
@@ -1652,40 +1679,40 @@ class TestPhase6Slugify(unittest.TestCase):
     """R-301, R-315 — slug derivation rules."""
 
     def test_simple_lowercase(self) -> None:
-        self.assertEqual(research._slugify("Atlanta"), "atlanta")
+        self.assertEqual(costar_ingest._slugify("Atlanta"), "atlanta")
 
     def test_punctuation_collapses_to_underscore(self) -> None:
         self.assertEqual(
-            research._slugify("West Atlanta / I-20"),
+            costar_ingest._slugify("West Atlanta / I-20"),
             "west_atlanta_i_20",
         )
 
     def test_strips_edges(self) -> None:
-        self.assertEqual(research._slugify("  South Fulton  "), "south_fulton")
+        self.assertEqual(costar_ingest._slugify("  South Fulton  "), "south_fulton")
 
     def test_truncates_long_inputs(self) -> None:
         long = "x" * 200
-        self.assertEqual(len(research._slugify(long)), 60)
+        self.assertEqual(len(costar_ingest._slugify(long)), 60)
 
     def test_empty_raises(self) -> None:
         with self.assertRaises(ValueError):
-            research._slugify("")
+            costar_ingest._slugify("")
 
     def test_punctuation_only_raises(self) -> None:
         with self.assertRaises(ValueError):
-            research._slugify("///---")
+            costar_ingest._slugify("///---")
 
 
 class TestPhase6IngestionCycleId(unittest.TestCase):
     """R-321 — cycle id format and uniqueness."""
 
     def test_format(self) -> None:
-        cid = research._make_ingestion_cycle_id()
-        self.assertRegex(cid, research._INGESTION_CYCLE_ID_RE)
+        cid = costar_ingest._make_ingestion_cycle_id()
+        self.assertRegex(cid, costar_ingest._INGESTION_CYCLE_ID_RE)
 
     def test_uniqueness(self) -> None:
-        a = research._make_ingestion_cycle_id()
-        b = research._make_ingestion_cycle_id()
+        a = costar_ingest._make_ingestion_cycle_id()
+        b = costar_ingest._make_ingestion_cycle_id()
         self.assertNotEqual(a, b)
 
 
@@ -1694,12 +1721,12 @@ class TestPhase6ScanExportDir(unittest.TestCase):
 
     def test_empty_dir_returns_empty(self) -> None:
         with _temp_costar_base():
-            self.assertEqual(research._scan_export_dir("submarket_stats"), [])
+            self.assertEqual(costar_ingest._scan_export_dir("submarket_stats"), [])
 
     def test_missing_dir_returns_empty(self) -> None:
         with _temp_costar_base() as base:
             self.assertFalse((base / "submarket_stats").exists())
-            self.assertEqual(research._scan_export_dir("submarket_stats"), [])
+            self.assertEqual(costar_ingest._scan_export_dir("submarket_stats"), [])
 
     def test_returns_matching_files_sorted_by_date(self) -> None:
         with _temp_costar_base() as base:
@@ -1710,7 +1737,7 @@ class TestPhase6ScanExportDir(unittest.TestCase):
             (d / "submarket_stats_20260413.csv").write_text("x", encoding="utf-8")
             (d / "ignore_me.txt").write_text("x", encoding="utf-8")
             (d / ".hidden.csv").write_text("x", encoding="utf-8")
-            results = research._scan_export_dir("submarket_stats")
+            results = costar_ingest._scan_export_dir("submarket_stats")
             dates = [d for _, d in results]
             self.assertEqual(dates, ["20260413", "20260420", "20260427"])
 
@@ -1724,16 +1751,16 @@ class TestPhase6ScanExportDir(unittest.TestCase):
             (archived / "submarket_stats_20260101.csv").write_text(
                 "x", encoding="utf-8",
             )
-            results = research._scan_export_dir("submarket_stats")
+            results = costar_ingest._scan_export_dir("submarket_stats")
             names = [p.name for p, _ in results]
             self.assertEqual(names, ["submarket_stats_20260427.csv"])
 
     def test_directory_traversal_rejected(self) -> None:
         with _temp_costar_base():
             with self.assertRaises(ValueError):
-                research._scan_export_dir("../etc")
+                costar_ingest._scan_export_dir("../etc")
             with self.assertRaises(ValueError):
-                research._scan_export_dir("/abs/path")
+                costar_ingest._scan_export_dir("/abs/path")
 
 
 class TestPhase6ArchiveAndFailMovement(unittest.TestCase):
@@ -1743,7 +1770,7 @@ class TestPhase6ArchiveAndFailMovement(unittest.TestCase):
         with _temp_costar_base() as base:
             staged = _stage_fixture(base, "submarket_stats", "submarket_stats_happy.csv",
                                     dest_name="submarket_stats_20260427.csv")
-            archived = research._archive_file(staged)
+            archived = costar_ingest._archive_file(staged)
             self.assertFalse(staged.exists())
             self.assertTrue(archived.exists())
             self.assertEqual(archived.parent.name, "submarket_stats")
@@ -1756,7 +1783,7 @@ class TestPhase6ArchiveAndFailMovement(unittest.TestCase):
             staged = _stage_fixture(base, "submarket_stats",
                                     "submarket_stats_missing_column.csv",
                                     dest_name="submarket_stats_20260427.csv")
-            dest, err_path = research._fail_file(
+            dest, err_path = costar_ingest._fail_file(
                 staged, {"errors": ["missing required column(s): vacancy_rate_pct"]}
             )
             self.assertFalse(staged.exists())
@@ -1774,8 +1801,8 @@ class TestPhase6ArchiveAndFailMovement(unittest.TestCase):
             a_dir.mkdir(parents=True)
             f1 = a_dir / "submarket_stats_20260427.csv"
             f1.write_text("a", encoding="utf-8")
-            d1 = research._archive_destination(f1, "ARCHIVED")
-            d2 = research._archive_destination(f1, "ARCHIVED")
+            d1 = costar_ingest._archive_destination(f1, "ARCHIVED")
+            d2 = costar_ingest._archive_destination(f1, "ARCHIVED")
             self.assertNotEqual(d1, d2)
 
 
@@ -1783,56 +1810,56 @@ class TestPhase6Coercion(unittest.TestCase):
     """R-306 — locale-tolerant number parsing."""
 
     def test_plain_int(self) -> None:
-        self.assertEqual(research._coerce_optional_int("28500000"), (28500000, None))
+        self.assertEqual(costar_ingest._coerce_optional_int("28500000"), (28500000, None))
 
     def test_thousands_commas_stripped(self) -> None:
-        self.assertEqual(research._coerce_optional_int("28,500,000"), (28500000, None))
+        self.assertEqual(costar_ingest._coerce_optional_int("28,500,000"), (28500000, None))
 
     def test_dollar_sign_stripped(self) -> None:
-        val, err = research._coerce_optional_decimal("$7.85")
+        val, err = costar_ingest._coerce_optional_decimal("$7.85")
         self.assertEqual(val, 7.85)
         self.assertIsNone(err)
 
     def test_percent_sign_stripped(self) -> None:
-        val, err = research._coerce_optional_decimal("5.4%")
+        val, err = costar_ingest._coerce_optional_decimal("5.4%")
         self.assertEqual(val, 5.4)
         self.assertIsNone(err)
 
     def test_blank_returns_none(self) -> None:
-        self.assertEqual(research._coerce_optional_decimal(""), (None, None))
-        self.assertEqual(research._coerce_optional_decimal("N/A"), (None, None))
+        self.assertEqual(costar_ingest._coerce_optional_decimal(""), (None, None))
+        self.assertEqual(costar_ingest._coerce_optional_decimal("N/A"), (None, None))
 
     def test_unparseable_returns_error(self) -> None:
-        val, err = research._coerce_optional_decimal("xyz")
+        val, err = costar_ingest._coerce_optional_decimal("xyz")
         self.assertIsNone(val)
         self.assertIn("unparseable", err)
 
     def test_negative_int_supported(self) -> None:
-        self.assertEqual(research._coerce_optional_int("-420000"), (-420000, None))
+        self.assertEqual(costar_ingest._coerce_optional_int("-420000"), (-420000, None))
 
 
 class TestPhase6DateParsing(unittest.TestCase):
     """R-307 — multiple acceptable date formats."""
 
     def test_iso_format(self) -> None:
-        self.assertEqual(research._parse_report_date("2026-04-27"),
+        self.assertEqual(costar_ingest._parse_report_date("2026-04-27"),
                          ("2026-04-27", None))
 
     def test_us_slash_format(self) -> None:
-        self.assertEqual(research._parse_report_date("04/27/2026"),
+        self.assertEqual(costar_ingest._parse_report_date("04/27/2026"),
                          ("2026-04-27", None))
 
     def test_iso_with_time(self) -> None:
-        self.assertEqual(research._parse_report_date("2026-04-27T00:00:00"),
+        self.assertEqual(costar_ingest._parse_report_date("2026-04-27T00:00:00"),
                          ("2026-04-27", None))
 
     def test_unparseable_returns_error(self) -> None:
-        out, err = research._parse_report_date("not-a-date")
+        out, err = costar_ingest._parse_report_date("not-a-date")
         self.assertIsNone(out)
         self.assertIn("unparseable", err)
 
     def test_empty_returns_error(self) -> None:
-        out, err = research._parse_report_date("")
+        out, err = costar_ingest._parse_report_date("")
         self.assertIsNone(out)
 
 
@@ -1840,32 +1867,32 @@ class TestPhase6HeaderValidation(unittest.TestCase):
     """R-309, R-310 — header set + duplicate detection."""
 
     def test_happy_headers(self) -> None:
-        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS)
-        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+        headers = list(costar_ingest._SUBMARKET_STATS_REQUIRED_COLUMNS)
+        self.assertIsNone(costar_ingest._validate_submarket_stats_headers(headers))
 
     def test_missing_column_detected(self) -> None:
-        headers = [c for c in research._SUBMARKET_STATS_REQUIRED_COLUMNS
+        headers = [c for c in costar_ingest._SUBMARKET_STATS_REQUIRED_COLUMNS
                    if c != "vacancy_rate_pct"]
-        err = research._validate_submarket_stats_headers(headers)
+        err = costar_ingest._validate_submarket_stats_headers(headers)
         self.assertIn("vacancy_rate_pct", err)
 
     def test_duplicate_column_detected(self) -> None:
-        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS) + ["submarket_name"]
-        err = research._validate_submarket_stats_headers(headers)
+        headers = list(costar_ingest._SUBMARKET_STATS_REQUIRED_COLUMNS) + ["submarket_name"]
+        err = costar_ingest._validate_submarket_stats_headers(headers)
         self.assertIn("duplicate", err)
 
     def test_extra_columns_allowed(self) -> None:
-        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS) + ["extra_col"]
-        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+        headers = list(costar_ingest._SUBMARKET_STATS_REQUIRED_COLUMNS) + ["extra_col"]
+        self.assertIsNone(costar_ingest._validate_submarket_stats_headers(headers))
 
     def test_case_insensitive_headers(self) -> None:
-        headers = [c.upper() for c in research._SUBMARKET_STATS_REQUIRED_COLUMNS]
-        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+        headers = [c.upper() for c in costar_ingest._SUBMARKET_STATS_REQUIRED_COLUMNS]
+        self.assertIsNone(costar_ingest._validate_submarket_stats_headers(headers))
 
     def test_bom_stripped(self) -> None:
-        headers = list(research._SUBMARKET_STATS_REQUIRED_COLUMNS)
+        headers = list(costar_ingest._SUBMARKET_STATS_REQUIRED_COLUMNS)
         headers[0] = "﻿" + headers[0]
-        self.assertIsNone(research._validate_submarket_stats_headers(headers))
+        self.assertIsNone(costar_ingest._validate_submarket_stats_headers(headers))
 
 
 class TestPhase6RowValidation(unittest.TestCase):
@@ -1888,47 +1915,47 @@ class TestPhase6RowValidation(unittest.TestCase):
         return base
 
     def test_happy_row(self) -> None:
-        out, err = research._validate_submarket_stats_row(self._row())
+        out, err = costar_ingest._validate_submarket_stats_row(self._row())
         self.assertIsNone(err)
         self.assertEqual(out["submarket_name"], "South Fulton")
         self.assertEqual(out["report_date"], "2026-04-27")
         self.assertEqual(out["vacancy_rate_pct"], 5.4)
 
     def test_empty_submarket_name_rejected(self) -> None:
-        out, err = research._validate_submarket_stats_row(self._row(submarket_name=""))
+        out, err = costar_ingest._validate_submarket_stats_row(self._row(submarket_name=""))
         self.assertIsNone(out)
         self.assertIn("submarket_name", err)
 
     def test_vacancy_out_of_range_rejected(self) -> None:
-        out, err = research._validate_submarket_stats_row(
+        out, err = costar_ingest._validate_submarket_stats_row(
             self._row(vacancy_rate_pct="150"),
         )
         self.assertIsNone(out)
         self.assertIn("vacancy_rate_pct", err)
 
     def test_zero_rent_rejected(self) -> None:
-        out, err = research._validate_submarket_stats_row(
+        out, err = costar_ingest._validate_submarket_stats_row(
             self._row(asking_rent_nnn_psf="0"),
         )
         self.assertIsNone(out)
         self.assertIn("asking_rent_nnn_psf", err)
 
     def test_optional_field_null_accepted(self) -> None:
-        out, err = research._validate_submarket_stats_row(
+        out, err = costar_ingest._validate_submarket_stats_row(
             self._row(availability_rate_pct=""),
         )
         self.assertIsNone(err)
         self.assertIsNone(out["availability_rate_pct"])
 
     def test_unparseable_date_rejected(self) -> None:
-        out, err = research._validate_submarket_stats_row(
+        out, err = costar_ingest._validate_submarket_stats_row(
             self._row(report_date="not-a-date"),
         )
         self.assertIsNone(out)
         self.assertIn("date", err)
 
     def test_negative_absorption_accepted(self) -> None:
-        out, err = research._validate_submarket_stats_row(
+        out, err = costar_ingest._validate_submarket_stats_row(
             self._row(net_absorption_t12_sf="-500000"),
         )
         self.assertIsNone(err)
@@ -1940,7 +1967,7 @@ class TestPhase6EnsureSubmarket(unittest.TestCase):
 
     def test_creates_new_submarket_returning_name(self) -> None:
         fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
-        sid, created, drift = research._ensure_submarket(fake, "Atlanta", "South Fulton")
+        sid, created, drift = costar_ingest._ensure_submarket(fake, "Atlanta", "South Fulton")
         self.assertEqual(sid, "atlanta__south_fulton")
         self.assertTrue(created)
         self.assertIsNone(drift)
@@ -1948,14 +1975,14 @@ class TestPhase6EnsureSubmarket(unittest.TestCase):
 
     def test_existing_submarket_no_drift(self) -> None:
         fake = Phase5FakeConnection(fetchone_queue=[None, ("South Fulton",)])
-        sid, created, drift = research._ensure_submarket(fake, "Atlanta", "South Fulton")
+        sid, created, drift = costar_ingest._ensure_submarket(fake, "Atlanta", "South Fulton")
         self.assertEqual(sid, "atlanta__south_fulton")
         self.assertFalse(created)
         self.assertIsNone(drift)
 
     def test_name_drift_emits_message(self) -> None:
         fake = Phase5FakeConnection(fetchone_queue=[None, ("Old Name",)])
-        sid, created, drift = research._ensure_submarket(fake, "Atlanta", "New Name")
+        sid, created, drift = costar_ingest._ensure_submarket(fake, "Atlanta", "New Name")
         self.assertFalse(created)
         self.assertIsNotNone(drift)
         self.assertIn("Old Name", drift)
@@ -1976,8 +2003,8 @@ class TestPhase6LoadSubmarketStatsFile(unittest.TestCase):
                 ("West Atlanta / I-20",),
                 ("Clayton County",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
 
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 3)
@@ -1998,8 +2025,8 @@ class TestPhase6LoadSubmarketStatsFile(unittest.TestCase):
                 dest_name="submarket_stats_20260427.csv",
             )
             fake = Phase5FakeConnection()
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
 
             self.assertEqual(result["status"], "failed")
             self.assertIn("vacancy_rate_pct", result["error"])
@@ -2018,8 +2045,8 @@ class TestPhase6LoadSubmarketStatsFile(unittest.TestCase):
                 dest_name="submarket_stats_20260427.csv",
             )
             fake = Phase5FakeConnection()
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
 
             self.assertEqual(result["status"], "failed")
             self.assertIn("duplicate", result["error"].lower())
@@ -2031,8 +2058,8 @@ class TestPhase6LoadSubmarketStatsFile(unittest.TestCase):
                 dest_name="submarket_stats_20260427.csv",
             )
             fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
 
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 1)
@@ -2048,8 +2075,8 @@ class TestPhase6LoadSubmarketStatsFile(unittest.TestCase):
                 dest_name="submarket_stats_20260427.csv",
             )
             fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 1)
 
@@ -2068,18 +2095,18 @@ class TestPhase6Reingest(unittest.TestCase):
                 ("West Atlanta / I-20",),
                 ("Clayton County",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
 
             sql_strings = [sql for sql, _ in fake.all_executes]
             delete_count = sum(
                 1 for s in sql_strings
-                if s == research._SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST
+                if s == costar_ingest._SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST
             )
             self.assertEqual(delete_count, 3)
             insert_count = sum(
                 1 for s in sql_strings
-                if s == research._SQL_INSERT_MARKET_CONTEXT
+                if s == costar_ingest._SQL_INSERT_MARKET_CONTEXT
             )
             self.assertEqual(insert_count, 3)
 
@@ -2094,10 +2121,10 @@ class TestPhase6Reingest(unittest.TestCase):
                 ("West Atlanta / I-20",),
                 ("Clayton County",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            research._load_submarket_stats_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            costar_ingest._load_submarket_stats_file(fake, cycle_id, staged)
             for sql, params in fake.all_executes:
-                if sql == research._SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST:
+                if sql == costar_ingest._SQL_DELETE_MARKET_CONTEXT_FOR_REINGEST:
                     self.assertEqual(params[0], "costar")
 
 
@@ -2114,7 +2141,7 @@ class TestPhase6RunIngestionCycle(unittest.TestCase):
         with _temp_costar_base():
             fake = Phase5FakeConnection(fetchone_queue=[(1,)])
             with self._patch_get_connection(fake):
-                summary = research.run_ingestion_cycle()
+                summary = costar_ingest.run_ingestion_cycle()
             self.assertTrue(summary["aborted"])
             self.assertEqual(summary["abort_reason"], "cycle_id_collision")
 
@@ -2124,7 +2151,7 @@ class TestPhase6RunIngestionCycle(unittest.TestCase):
         with _temp_costar_base():
             fake = Phase5FakeConnection(fetchone_queue=[(0,)])
             with self._patch_get_connection(fake):
-                summary = research.run_ingestion_cycle()
+                summary = costar_ingest.run_ingestion_cycle()
             self.assertFalse(summary["aborted"])
             for export_type in (
                 "submarket_stats", "land_sales_comps", "building_sales_comps",
@@ -2151,7 +2178,7 @@ class TestPhase6RunIngestionCycle(unittest.TestCase):
                 ("Clayton County",),
             ])
             with self._patch_get_connection(fake):
-                summary = research.run_ingestion_cycle()
+                summary = costar_ingest.run_ingestion_cycle()
             ss = summary["per_export_type"]["submarket_stats"]
             self.assertEqual(ss["files_loaded"], 1)
             self.assertEqual(ss["rows_loaded"], 3)
@@ -2171,13 +2198,13 @@ class TestPhase6SqlConstantsStaticChecks(unittest.TestCase):
             "_SQL_INSERT_RESEARCH_LOG_INGESTION",
             "_SQL_COUNT_LOG_FOR_INGESTION_CYCLE",
         ):
-            self.assertTrue(hasattr(research, const), f"missing SQL constant {const}")
-            sql = getattr(research, const)
+            self.assertTrue(hasattr(costar_ingest, const), f"missing SQL constant {const}")
+            sql = getattr(costar_ingest, const)
             self.assertIsInstance(sql, str)
             self.assertNotIn("{", sql, f"f-string brace in {const}: {sql}")
 
     def test_no_print_in_ingestion_helpers(self) -> None:
-        tree = ast.parse(RESEARCH_PY_SRC)
+        tree = ast.parse(COSTAR_INGEST_PY_SRC)
         forbidden_names = {
             "run_ingestion_cycle", "_load_submarket_stats_file",
             "_load_submarket_stats", "_load_placeholder",
@@ -2204,24 +2231,24 @@ class TestPhase61CountyToMarket(unittest.TestCase):
     """R-401, R-404 — county→market lookup."""
 
     def test_known_county_resolves(self) -> None:
-        market, used_default = research._resolve_market_from_county("Fulton")
+        market, used_default = costar_ingest._resolve_market_from_county("Fulton")
         self.assertEqual(market, "Atlanta")
         self.assertFalse(used_default)
 
     def test_case_insensitive(self) -> None:
-        market, used_default = research._resolve_market_from_county("DEKALB")
+        market, used_default = costar_ingest._resolve_market_from_county("DEKALB")
         self.assertEqual(market, "Atlanta")
         self.assertFalse(used_default)
 
     def test_unknown_county_uses_default(self) -> None:
-        market, used_default = research._resolve_market_from_county("Forsyth")
+        market, used_default = costar_ingest._resolve_market_from_county("Forsyth")
         self.assertEqual(market, "Atlanta")
         self.assertTrue(used_default)
 
     def test_blank_uses_default(self) -> None:
-        market, used_default = research._resolve_market_from_county("")
+        market, used_default = costar_ingest._resolve_market_from_county("")
         self.assertTrue(used_default)
-        market2, _ = research._resolve_market_from_county(None)
+        market2, _ = costar_ingest._resolve_market_from_county(None)
         self.assertEqual(market2, "Atlanta")
 
     def test_lookup_covers_eight_atlanta_counties(self) -> None:
@@ -2229,7 +2256,7 @@ class TestPhase61CountyToMarket(unittest.TestCase):
             "fulton", "dekalb", "cobb", "gwinnett",
             "clayton", "henry", "spalding", "fayette",
         ):
-            self.assertEqual(research._COUNTY_TO_MARKET[county], "Atlanta")
+            self.assertEqual(costar_ingest._COUNTY_TO_MARKET[county], "Atlanta")
 
 
 class TestPhase61LandSalesCompsValidation(unittest.TestCase):
@@ -2255,7 +2282,7 @@ class TestPhase61LandSalesCompsValidation(unittest.TestCase):
         return base
 
     def test_happy(self) -> None:
-        out, err = research._validate_land_sales_comps_row(self._row())
+        out, err = costar_ingest._validate_land_sales_comps_row(self._row())
         self.assertIsNone(err)
         self.assertEqual(out["address"], "1234 Industrial Blvd")
         self.assertEqual(out["sale_price"], 1875000)
@@ -2265,27 +2292,27 @@ class TestPhase61LandSalesCompsValidation(unittest.TestCase):
         self.assertIn("intended_use", out["raw"])
 
     def test_blank_address_rejected(self) -> None:
-        out, err = research._validate_land_sales_comps_row(self._row(address=""))
+        out, err = costar_ingest._validate_land_sales_comps_row(self._row(address=""))
         self.assertIsNone(out)
         self.assertIn("address", err)
 
     def test_zero_sale_price_rejected(self) -> None:
-        out, err = research._validate_land_sales_comps_row(self._row(sale_price="0"))
+        out, err = costar_ingest._validate_land_sales_comps_row(self._row(sale_price="0"))
         self.assertIsNone(out)
         self.assertIn("sale_price", err)
 
     def test_blank_acres_rejected(self) -> None:
-        out, err = research._validate_land_sales_comps_row(self._row(acres=""))
+        out, err = costar_ingest._validate_land_sales_comps_row(self._row(acres=""))
         self.assertIsNone(out)
         self.assertIn("acres", err)
 
     def test_unparseable_sale_date_rejected(self) -> None:
-        out, err = research._validate_land_sales_comps_row(self._row(sale_date="not-a-date"))
+        out, err = costar_ingest._validate_land_sales_comps_row(self._row(sale_date="not-a-date"))
         self.assertIsNone(out)
         self.assertIn("sale_date", err)
 
     def test_dollar_signs_in_price_accepted(self) -> None:
-        out, err = research._validate_land_sales_comps_row(
+        out, err = costar_ingest._validate_land_sales_comps_row(
             self._row(sale_price="$1,875,000")
         )
         self.assertIsNone(err)
@@ -2316,7 +2343,7 @@ class TestPhase61BuildingSalesCompsValidation(unittest.TestCase):
         return base
 
     def test_happy(self) -> None:
-        out, err = research._validate_building_sales_comps_row(self._row())
+        out, err = costar_ingest._validate_building_sales_comps_row(self._row())
         self.assertIsNone(err)
         self.assertEqual(out["building_sf"], 250000.0)
         self.assertEqual(out["sale_price"], 32500000)
@@ -2324,28 +2351,28 @@ class TestPhase61BuildingSalesCompsValidation(unittest.TestCase):
         self.assertIn("lease_term_remaining_years", out["raw"])
 
     def test_zero_building_sf_rejected(self) -> None:
-        out, err = research._validate_building_sales_comps_row(
+        out, err = costar_ingest._validate_building_sales_comps_row(
             self._row(building_sf="0"),
         )
         self.assertIsNone(out)
         self.assertIn("building_sf", err)
 
     def test_year_built_out_of_range_rejected(self) -> None:
-        out, err = research._validate_building_sales_comps_row(
+        out, err = costar_ingest._validate_building_sales_comps_row(
             self._row(year_built="1700"),
         )
         self.assertIsNone(out)
         self.assertIn("year_built", err)
 
     def test_clear_height_out_of_range_rejected(self) -> None:
-        out, err = research._validate_building_sales_comps_row(
+        out, err = costar_ingest._validate_building_sales_comps_row(
             self._row(clear_height_ft="100"),
         )
         self.assertIsNone(out)
         self.assertIn("clear_height_ft", err)
 
     def test_optional_fields_null_accepted(self) -> None:
-        out, err = research._validate_building_sales_comps_row(
+        out, err = costar_ingest._validate_building_sales_comps_row(
             self._row(year_built="", clear_height_ft="", price_psf="", cap_rate=""),
         )
         self.assertIsNone(err)
@@ -2373,31 +2400,31 @@ class TestPhase61LeasingCompsValidation(unittest.TestCase):
         return base
 
     def test_happy(self) -> None:
-        out, err = research._validate_leasing_comps_row(self._row())
+        out, err = costar_ingest._validate_leasing_comps_row(self._row())
         self.assertIsNone(err)
         self.assertEqual(out["tenant_name"], "Amazon Logistics")
         self.assertEqual(out["lease_term_months"], 84)
         self.assertEqual(out["starting_rent_psf_nnn"], 7.95)
 
     def test_blank_tenant_rejected(self) -> None:
-        out, err = research._validate_leasing_comps_row(self._row(tenant_name=""))
+        out, err = costar_ingest._validate_leasing_comps_row(self._row(tenant_name=""))
         self.assertIsNone(out)
         self.assertIn("tenant_name", err)
 
     def test_zero_term_rejected(self) -> None:
-        out, err = research._validate_leasing_comps_row(self._row(lease_term_months="0"))
+        out, err = costar_ingest._validate_leasing_comps_row(self._row(lease_term_months="0"))
         self.assertIsNone(out)
         self.assertIn("lease_term_months", err)
 
     def test_zero_rent_rejected(self) -> None:
-        out, err = research._validate_leasing_comps_row(
+        out, err = costar_ingest._validate_leasing_comps_row(
             self._row(starting_rent_psf_nnn="0"),
         )
         self.assertIsNone(out)
         self.assertIn("starting_rent_psf_nnn", err)
 
     def test_optional_escalation_null_accepted(self) -> None:
-        out, err = research._validate_leasing_comps_row(self._row(rent_escalation_pct=""))
+        out, err = costar_ingest._validate_leasing_comps_row(self._row(rent_escalation_pct=""))
         self.assertIsNone(err)
         self.assertIsNone(out["rent_escalation_pct"])
 
@@ -2405,7 +2432,7 @@ class TestPhase61LeasingCompsValidation(unittest.TestCase):
         # naics_code is not in required cols, but if a CSV has one, validate.
         row = self._row()
         row["naics_code"] = "abc123"
-        out, err = research._validate_leasing_comps_row(row)
+        out, err = costar_ingest._validate_leasing_comps_row(row)
         self.assertIsNone(out)
         self.assertIn("naics_code", err)
 
@@ -2435,17 +2462,17 @@ class TestPhase61LandListingsValidation(unittest.TestCase):
         return base
 
     def test_happy(self) -> None:
-        out, err = research._validate_land_listings_row(self._row())
+        out, err = costar_ingest._validate_land_listings_row(self._row())
         self.assertIsNone(err)
         self.assertEqual(out["asking_price"], 2775000)
         self.assertEqual(out["acres"], 18.5)
 
     def test_blank_address_rejected(self) -> None:
-        out, err = research._validate_land_listings_row(self._row(address=""))
+        out, err = costar_ingest._validate_land_listings_row(self._row(address=""))
         self.assertIsNone(out)
 
     def test_asking_price_null_accepted(self) -> None:
-        out, err = research._validate_land_listings_row(
+        out, err = costar_ingest._validate_land_listings_row(
             self._row(asking_price="", asking_price_per_acre=""),
         )
         self.assertIsNone(err)
@@ -2453,17 +2480,17 @@ class TestPhase61LandListingsValidation(unittest.TestCase):
         self.assertIsNone(out["asking_price_per_acre"])
 
     def test_zero_acres_rejected(self) -> None:
-        out, err = research._validate_land_listings_row(self._row(acres="0"))
+        out, err = costar_ingest._validate_land_listings_row(self._row(acres="0"))
         self.assertIsNone(out)
         self.assertIn("acres", err)
 
     def test_zero_asking_price_rejected(self) -> None:
-        out, err = research._validate_land_listings_row(self._row(asking_price="0"))
+        out, err = costar_ingest._validate_land_listings_row(self._row(asking_price="0"))
         self.assertIsNone(out)
         self.assertIn("asking_price", err)
 
     def test_negative_days_on_market_rejected(self) -> None:
-        out, err = research._validate_land_listings_row(self._row(days_on_market="-5"))
+        out, err = costar_ingest._validate_land_listings_row(self._row(days_on_market="-5"))
         self.assertIsNone(out)
         self.assertIn("days_on_market", err)
 
@@ -2483,8 +2510,8 @@ class TestPhase61LandSalesCompsLoader(unittest.TestCase):
                 ("Clayton County",),
                 ("Henry County / I-75 South",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_land_sales_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_land_sales_comps_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 3)
             self.assertEqual(result["rows_failed"], 0)
@@ -2499,8 +2526,8 @@ class TestPhase61LandSalesCompsLoader(unittest.TestCase):
                 dest_name="land_sales_comps_202603.csv",
             )
             fake = Phase5FakeConnection()
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_land_sales_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_land_sales_comps_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "failed")
             self.assertIn("intended_use", result["error"])
             self.assertEqual(fake.commits, 0)
@@ -2521,8 +2548,8 @@ class TestPhase61LandSalesCompsLoader(unittest.TestCase):
                 ("South Fulton",),
                 ("Cumming Industrial",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_land_sales_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_land_sales_comps_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 2)
             self.assertEqual(result["rows_failed"], 2)
@@ -2540,16 +2567,16 @@ class TestPhase61LandSalesCompsLoader(unittest.TestCase):
                 ("Clayton County",),
                 ("Henry County / I-75 South",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            research._load_land_sales_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            costar_ingest._load_land_sales_comps_file(fake, cycle_id, staged)
             sql_strings = [sql for sql, _ in fake.all_executes]
             delete_count = sum(
                 1 for s in sql_strings
-                if s == research._SQL_DELETE_LAND_SALES_FOR_REINGEST
+                if s == costar_ingest._SQL_DELETE_LAND_SALES_FOR_REINGEST
             )
             insert_count = sum(
                 1 for s in sql_strings
-                if s == research._SQL_INSERT_LAND_SALES
+                if s == costar_ingest._SQL_INSERT_LAND_SALES
             )
             self.assertEqual(delete_count, 3)
             self.assertEqual(insert_count, 3)
@@ -2569,8 +2596,8 @@ class TestPhase61BuildingSalesCompsLoader(unittest.TestCase):
                 ("South Fulton",),
                 ("West Atlanta / I-20",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_building_sales_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_building_sales_comps_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 2)
             self.assertEqual(result["rows_failed"], 0)
@@ -2585,17 +2612,17 @@ class TestPhase61BuildingSalesCompsLoader(unittest.TestCase):
                 ("South Fulton",),
                 ("West Atlanta / I-20",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            research._load_building_sales_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            costar_ingest._load_building_sales_comps_file(fake, cycle_id, staged)
             sql_strings = [sql for sql, _ in fake.all_executes]
             # Building DELETE used, NOT land DELETE (R-422).
             self.assertGreater(
                 sum(1 for s in sql_strings
-                    if s == research._SQL_DELETE_BUILDING_SALES_FOR_REINGEST), 0,
+                    if s == costar_ingest._SQL_DELETE_BUILDING_SALES_FOR_REINGEST), 0,
             )
             self.assertEqual(
                 sum(1 for s in sql_strings
-                    if s == research._SQL_DELETE_LAND_SALES_FOR_REINGEST), 0,
+                    if s == costar_ingest._SQL_DELETE_LAND_SALES_FOR_REINGEST), 0,
             )
 
 
@@ -2613,8 +2640,8 @@ class TestPhase61LeasingCompsLoader(unittest.TestCase):
                 ("West Atlanta / I-20",),
                 ("Clayton County",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_leasing_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_leasing_comps_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "loaded")
             self.assertEqual(result["rows_loaded"], 3)
             self.assertEqual(result["rows_failed"], 0)
@@ -2626,8 +2653,8 @@ class TestPhase61LeasingCompsLoader(unittest.TestCase):
                 dest_name="leasing_comps_202603.csv",
             )
             fake = Phase5FakeConnection()
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_leasing_comps_file(fake, cycle_id, staged)
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_leasing_comps_file(fake, cycle_id, staged)
             self.assertEqual(result["status"], "failed")
             self.assertIn("lease_start_date", result["error"])
 
@@ -2646,8 +2673,8 @@ class TestPhase61LandListingsLoader(unittest.TestCase):
                 ("Henry County / I-75 South",),
                 ("Clayton County",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_land_listings_file(
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_land_listings_file(
                 fake, cycle_id, staged, "2026-04-27",
             )
             self.assertEqual(result["status"], "loaded")
@@ -2662,8 +2689,8 @@ class TestPhase61LandListingsLoader(unittest.TestCase):
                 dest_name="land_listings_20260427.csv",
             )
             fake = Phase5FakeConnection(fetchone_queue=[("South Fulton",)])
-            cycle_id = research._make_ingestion_cycle_id()
-            result = research._load_land_listings_file(
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            result = costar_ingest._load_land_listings_file(
                 fake, cycle_id, staged, "2026-04-27",
             )
             self.assertEqual(result["status"], "loaded")
@@ -2680,10 +2707,10 @@ class TestPhase61LandListingsLoader(unittest.TestCase):
                 ("Henry County / I-75 South",),
                 ("Clayton County",),
             ])
-            cycle_id = research._make_ingestion_cycle_id()
-            research._load_land_listings_file(fake, cycle_id, staged, "2026-04-27")
+            cycle_id = costar_ingest._make_ingestion_cycle_id()
+            costar_ingest._load_land_listings_file(fake, cycle_id, staged, "2026-04-27")
             for sql, params in fake.all_executes:
-                if sql == research._SQL_DELETE_LAND_LISTINGS_FOR_REINGEST:
+                if sql == costar_ingest._SQL_DELETE_LAND_LISTINGS_FOR_REINGEST:
                     # First param is snapshot_date, second is address.
                     self.assertEqual(params[0], "2026-04-27")
 
@@ -2703,7 +2730,7 @@ class TestPhase61LandListingsLoader(unittest.TestCase):
                     ("Clayton County",),
                 ])
             with mock.patch("research.prepare.get_connection", _ctx):
-                summary = research.run_ingestion_cycle()
+                summary = costar_ingest.run_ingestion_cycle()
             ll = summary["per_export_type"]["land_listings"]
             self.assertEqual(ll["files_loaded"], 1)
             self.assertEqual(ll["rows_loaded"], 3)
@@ -2746,7 +2773,7 @@ class TestPhase61RunIngestionCycleAllReal(unittest.TestCase):
                 ("South Fulton",), ("West Atlanta / I-20",), ("Clayton County",),
             ])
             with self._patch_get_connection(fake):
-                summary = research.run_ingestion_cycle()
+                summary = costar_ingest.run_ingestion_cycle()
             self.assertEqual(
                 summary["per_export_type"]["submarket_stats"]["files_loaded"], 1,
             )
@@ -2762,7 +2789,7 @@ class TestPhase61RunIngestionCycleAllReal(unittest.TestCase):
         with _temp_costar_base():
             fake = Phase5FakeConnection(fetchone_queue=[(0,)])
             with self._patch_get_connection(fake):
-                summary = research.run_ingestion_cycle()
+                summary = costar_ingest.run_ingestion_cycle()
             for export_type in (
                 "submarket_stats", "land_sales_comps", "building_sales_comps",
                 "leasing_comps", "land_listings",
@@ -2789,12 +2816,12 @@ class TestPhase61SqlConstantsStaticChecks(unittest.TestCase):
             "_SQL_DELETE_LAND_LISTINGS_FOR_REINGEST",
             "_SQL_INSERT_LAND_LISTING",
         ):
-            self.assertTrue(hasattr(research, const), f"missing {const}")
-            sql = getattr(research, const)
+            self.assertTrue(hasattr(costar_ingest, const), f"missing {const}")
+            sql = getattr(costar_ingest, const)
             self.assertNotIn("{", sql, f"f-string brace in {const}: {sql}")
 
     def test_no_print_in_phase6_1_helpers(self) -> None:
-        tree = ast.parse(RESEARCH_PY_SRC)
+        tree = ast.parse(COSTAR_INGEST_PY_SRC)
         forbidden_names = {
             "_resolve_market_from_county",
             "_validate_headers_against_required",
@@ -2839,9 +2866,9 @@ class TestPhase61SqlConstantsStaticChecks(unittest.TestCase):
             )
 
     def test_county_to_market_lookup_constant(self) -> None:
-        self.assertTrue(hasattr(research, "_COUNTY_TO_MARKET"))
+        self.assertTrue(hasattr(costar_ingest, "_COUNTY_TO_MARKET"))
         self.assertEqual(
-            research._DEFAULT_INGESTION_MARKET, "Atlanta",
+            costar_ingest._DEFAULT_INGESTION_MARKET, "Atlanta",
         )
 
 
@@ -3842,131 +3869,131 @@ class TestPhase9SafeFilenameSlug(unittest.TestCase):
 
     def test_accepts_typical_parcel_id(self) -> None:
         self.assertEqual(
-            research._safe_filename_slug("fulton-14-0123-LL-045-8"),
+            reporting._safe_filename_slug("fulton-14-0123-LL-045-8"),
             "fulton-14-0123-ll-045-8",
         )
 
     def test_accepts_market_label(self) -> None:
-        self.assertEqual(research._safe_filename_slug("atlanta"), "atlanta")
+        self.assertEqual(reporting._safe_filename_slug("atlanta"), "atlanta")
         self.assertEqual(
-            research._safe_filename_slug("dallas-fort-worth"),
+            reporting._safe_filename_slug("dallas-fort-worth"),
             "dallas-fort-worth",
         )
 
     def test_lowercases(self) -> None:
-        self.assertEqual(research._safe_filename_slug("FOO_BAR"), "foo_bar")
+        self.assertEqual(reporting._safe_filename_slug("FOO_BAR"), "foo_bar")
 
     def test_rejects_empty(self) -> None:
         with self.assertRaises(ValueError):
-            research._safe_filename_slug("")
+            reporting._safe_filename_slug("")
 
     def test_rejects_none(self) -> None:
         with self.assertRaises(ValueError):
-            research._safe_filename_slug(None)  # type: ignore[arg-type]
+            reporting._safe_filename_slug(None)  # type: ignore[arg-type]
 
     def test_rejects_path_traversal(self) -> None:
         for bad in ("..", "../etc", "/abs", "fulton/14", "a\\b"):
             with self.subTest(bad=bad):
                 with self.assertRaises(ValueError):
-                    research._safe_filename_slug(bad)
+                    reporting._safe_filename_slug(bad)
 
     def test_rejects_whitespace(self) -> None:
         with self.assertRaises(ValueError):
-            research._safe_filename_slug("foo bar")
+            reporting._safe_filename_slug("foo bar")
         with self.assertRaises(ValueError):
-            research._safe_filename_slug("foo\tbar")
+            reporting._safe_filename_slug("foo\tbar")
 
     def test_rejects_nul(self) -> None:
         with self.assertRaises(ValueError):
-            research._safe_filename_slug("foo\0bar")
+            reporting._safe_filename_slug("foo\0bar")
 
 
 class TestPhase9MarkdownEscaping(unittest.TestCase):
     """R-622 — _md_table_cell escapes pipes, newlines, length-caps."""
 
     def test_pipe_is_escaped(self) -> None:
-        self.assertIn(r"\|", research._md_table_cell("a|b"))
+        self.assertIn(r"\|", reporting._md_table_cell("a|b"))
 
     def test_newline_collapsed_to_space(self) -> None:
-        self.assertEqual(research._md_table_cell("a\nb"), "a b")
+        self.assertEqual(reporting._md_table_cell("a\nb"), "a b")
 
     def test_tab_collapsed_to_space(self) -> None:
-        self.assertEqual(research._md_table_cell("a\tb"), "a b")
+        self.assertEqual(reporting._md_table_cell("a\tb"), "a b")
 
     def test_length_capped_with_ellipsis(self) -> None:
         long = "x" * 200
-        out = research._md_table_cell(long)
-        self.assertLessEqual(len(out), research._MD_TABLE_CELL_MAX)
+        out = reporting._md_table_cell(long)
+        self.assertLessEqual(len(out), reporting._MD_TABLE_CELL_MAX)
         self.assertTrue(out.endswith("…"))
 
     def test_none_returns_default(self) -> None:
-        self.assertEqual(research._md_table_cell(None), "—")
-        self.assertEqual(research._md_table_cell(""), "—")
+        self.assertEqual(reporting._md_table_cell(None), "—")
+        self.assertEqual(reporting._md_table_cell(""), "—")
 
     def test_md_cell_strips_whitespace(self) -> None:
-        self.assertEqual(research._md_cell("  hello  "), "hello")
-        self.assertEqual(research._md_cell(None), "—")
+        self.assertEqual(reporting._md_cell("  hello  "), "hello")
+        self.assertEqual(reporting._md_cell(None), "—")
 
 
 class TestPhase9CoerceJson(unittest.TestCase):
     """R-609 — JSONB columns may arrive as dict or string."""
 
     def test_dict_passthrough(self) -> None:
-        self.assertEqual(research._coerce_json_field({"a": 1}), {"a": 1})
+        self.assertEqual(reporting._coerce_json_field({"a": 1}), {"a": 1})
 
     def test_json_string_parsed(self) -> None:
         self.assertEqual(
-            research._coerce_json_field('{"a": 1}'), {"a": 1},
+            reporting._coerce_json_field('{"a": 1}'), {"a": 1},
         )
 
     def test_none_returns_empty(self) -> None:
-        self.assertEqual(research._coerce_json_field(None), {})
+        self.assertEqual(reporting._coerce_json_field(None), {})
 
     def test_empty_string_returns_empty(self) -> None:
-        self.assertEqual(research._coerce_json_field(""), {})
-        self.assertEqual(research._coerce_json_field("   "), {})
+        self.assertEqual(reporting._coerce_json_field(""), {})
+        self.assertEqual(reporting._coerce_json_field("   "), {})
 
     def test_unparseable_returns_empty(self) -> None:
-        self.assertEqual(research._coerce_json_field("not json"), {})
+        self.assertEqual(reporting._coerce_json_field("not json"), {})
 
     def test_non_dict_json_returns_empty(self) -> None:
-        self.assertEqual(research._coerce_json_field('"a string"'), {})
-        self.assertEqual(research._coerce_json_field("[1, 2, 3]"), {})
+        self.assertEqual(reporting._coerce_json_field('"a string"'), {})
+        self.assertEqual(reporting._coerce_json_field("[1, 2, 3]"), {})
 
     def test_bytes_decoded(self) -> None:
-        self.assertEqual(research._coerce_json_field(b'{"a": 1}'), {"a": 1})
+        self.assertEqual(reporting._coerce_json_field(b'{"a": 1}'), {"a": 1})
 
 
 class TestPhase9Formatters(unittest.TestCase):
     """R-610 — currency / acres / pct / int formatters."""
 
     def test_currency_int(self) -> None:
-        self.assertEqual(research._format_currency(1234567), "$1,234,567")
+        self.assertEqual(reporting._format_currency(1234567), "$1,234,567")
 
     def test_currency_none(self) -> None:
-        self.assertEqual(research._format_currency(None), "—")
+        self.assertEqual(reporting._format_currency(None), "—")
 
     def test_currency_psf(self) -> None:
-        self.assertEqual(research._format_currency_psf(7.5), "$7.50/SF")
-        self.assertEqual(research._format_currency_psf(None), "—")
+        self.assertEqual(reporting._format_currency_psf(7.5), "$7.50/SF")
+        self.assertEqual(reporting._format_currency_psf(None), "—")
 
     def test_acres(self) -> None:
-        self.assertEqual(research._format_acres(14.7), "14.70 acres")
-        self.assertEqual(research._format_acres(None), "—")
+        self.assertEqual(reporting._format_acres(14.7), "14.70 acres")
+        self.assertEqual(reporting._format_acres(None), "—")
 
     def test_pct(self) -> None:
-        self.assertEqual(research._format_pct(4.2), "4.2%")
-        self.assertEqual(research._format_pct(None), "—")
+        self.assertEqual(reporting._format_pct(4.2), "4.2%")
+        self.assertEqual(reporting._format_pct(None), "—")
 
     def test_int_thousands(self) -> None:
-        self.assertEqual(research._format_int_thousands(1800000), "1,800,000")
-        self.assertEqual(research._format_int_thousands(None), "—")
+        self.assertEqual(reporting._format_int_thousands(1800000), "1,800,000")
+        self.assertEqual(reporting._format_int_thousands(None), "—")
 
     def test_to_float_handles_decimal_like(self) -> None:
         # Simulate a Decimal-like via str input that Python's float can parse.
-        self.assertEqual(research._to_float("4.2"), 4.2)
-        self.assertEqual(research._to_float(None), None)
-        self.assertEqual(research._to_float("not a number"), None)
+        self.assertEqual(reporting._to_float("4.2"), 4.2)
+        self.assertEqual(reporting._to_float(None), None)
+        self.assertEqual(reporting._to_float("not a number"), None)
 
 
 class TestPhase9SnapshotRender(unittest.TestCase):
@@ -3977,7 +4004,7 @@ class TestPhase9SnapshotRender(unittest.TestCase):
         sub_scores = {
             "S2_parcel_geometry": 7, "S4_submarket_vacancy": 8,
         }
-        md, _ws, composite = research._render_score_breakdown_table(
+        md, _ws, composite = reporting._render_score_breakdown_table(
             sub_scores, params["scoring_weights"],
         )
         for name in research._SUB_SCORE_NAMES:
@@ -3992,21 +4019,21 @@ class TestPhase9SnapshotRender(unittest.TestCase):
             "bts": "MODERATE", "spec": "WEAK", "land_bank": "STRONG",
             "ground_lease": "N/A", "flip": "WEAK",
         }
-        md = research._render_strategy_fit_table(sf)
-        for label in research._STRATEGY_LABELS.values():
+        md = reporting._render_strategy_fit_table(sf)
+        for label in reporting._STRATEGY_LABELS.values():
             self.assertIn(label, md)
         self.assertIn("STRONG", md)
         self.assertIn("MODERATE", md)
         self.assertIn("N/A", md)
 
     def test_actionability_table_pass_marks_all_pass(self) -> None:
-        md = research._render_actionability_table("PASS", {})
+        md = reporting._render_actionability_table("PASS", {})
         self.assertEqual(md.count("| PASS |"), 4)
         self.assertNotIn("| FAIL |", md)
         self.assertIn("Overall actionability**: PASS", md)
 
     def test_actionability_table_fail_strategy_short_circuits(self) -> None:
-        md = research._render_actionability_table(
+        md = reporting._render_actionability_table(
             "FAIL:strategy",
             {"strategy": "no strategy rated STRONG or MODERATE"},
         )
@@ -4017,19 +4044,19 @@ class TestPhase9SnapshotRender(unittest.TestCase):
         self.assertIn("no strategy rated STRONG", md)
 
     def test_actionability_table_pending_when_unscored(self) -> None:
-        md = research._render_actionability_table(None, {})
+        md = reporting._render_actionability_table(None, {})
         self.assertEqual(md.count("| PENDING |"), 4)
         self.assertIn("Overall actionability**: PENDING", md)
 
     def test_recommendation_pursue(self) -> None:
-        rec, reason = research._compute_recommendation(
+        rec, reason = reporting._compute_recommendation(
             83.0, "PASS", 70.0, "land_bank", {},
         )
         self.assertEqual(rec, "PURSUE")
         self.assertIn("Land Bank", reason)
 
     def test_recommendation_monitor(self) -> None:
-        rec, reason = research._compute_recommendation(
+        rec, reason = reporting._compute_recommendation(
             75.0, "FAIL:entitlement", 70.0, None,
             {"entitlement": "no rezoning precedent"},
         )
@@ -4038,7 +4065,7 @@ class TestPhase9SnapshotRender(unittest.TestCase):
         self.assertIn("no rezoning precedent", reason)
 
     def test_recommendation_pass_below_threshold(self) -> None:
-        rec, reason = research._compute_recommendation(
+        rec, reason = reporting._compute_recommendation(
             55.0, "PASS", 70.0, "land_bank", {},
         )
         self.assertEqual(rec, "PASS")
@@ -4051,7 +4078,7 @@ class TestPhase9SnapshotRender(unittest.TestCase):
             "owner_type_inferred": None,
         }
         score = {"actionability": "PENDING", "actionability_blockers": {}}
-        md = research._render_investment_thesis(parcel, score, {}, [])
+        md = reporting._render_investment_thesis(parcel, score, {}, [])
         # Should still produce the actionability paragraph but no "good location" etc.
         for banned in ("strong fundamentals", "good location",
                        "favorable market", "promising opportunity"):
@@ -4073,7 +4100,7 @@ class TestPhase9SnapshotRender(unittest.TestCase):
             {"price_per_acre": 25000.0}, {"price_per_acre": 30000.0},
             {"price_per_acre": 28000.0},
         ]
-        md = research._render_investment_thesis(parcel, score, mc, comps)
+        md = reporting._render_investment_thesis(parcel, score, mc, comps)
         self.assertIn("south_fulton", md)
         self.assertIn("14.70 acres", md)
         self.assertIn("AG-1", md)
@@ -4085,7 +4112,7 @@ class TestPhase9SnapshotRender(unittest.TestCase):
     def test_thesis_records_pending_actionability(self) -> None:
         parcel = {"market": "atlanta"}
         score = {"actionability": "PENDING"}
-        md = research._render_investment_thesis(parcel, score, {}, [])
+        md = reporting._render_investment_thesis(parcel, score, {}, [])
         self.assertIn("PENDING", md)
 
 
@@ -4115,7 +4142,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
                 ],
             )
             params = _phase9_params()
-            target = research.generate_snapshot(
+            target = reporting.generate_snapshot(
                 "fulton-14-0123-LL-045-8",
                 conn=fake, output_dir=tmp_path, params=params,
             )
@@ -4151,7 +4178,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
                 ],
             )
             params = _phase9_params()
-            target = research.generate_snapshot(
+            target = reporting.generate_snapshot(
                 "fulton-14-0123-LL-045-8",
                 conn=fake, output_dir=tmp_path, params=params,
             )
@@ -4165,7 +4192,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
             fake = Phase5FakeConnection(fetchone_queue=[])  # parcel returns None
             params = _phase9_params()
             with self.assertRaises(LookupError):
-                research.generate_snapshot(
+                reporting.generate_snapshot(
                     "fulton-missing",
                     conn=fake, output_dir=tmp_path, params=params,
                 )
@@ -4178,7 +4205,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
             )
             params = _phase9_params()
             with self.assertRaises(LookupError):
-                research.generate_snapshot(
+                reporting.generate_snapshot(
                     "fulton-14-0123-LL-045-8",
                     conn=fake, output_dir=tmp_path, params=params,
                 )
@@ -4195,7 +4222,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
                 ],
                 fetchall_queue=[[], []],
             )
-            t1 = research.generate_snapshot(
+            t1 = reporting.generate_snapshot(
                 "fulton-14-0123-LL-045-8",
                 conn=fake1, output_dir=tmp_path, params=params,
             )
@@ -4208,7 +4235,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
                 ],
                 fetchall_queue=[[], []],
             )
-            t2 = research.generate_snapshot(
+            t2 = reporting.generate_snapshot(
                 "fulton-14-0123-LL-045-8",
                 conn=fake2, output_dir=tmp_path, params=params,
             )
@@ -4219,7 +4246,7 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
     def test_snapshot_path_traversal_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):
-                research.generate_snapshot(
+                reporting.generate_snapshot(
                     "../etc/passwd",
                     conn=Phase5FakeConnection(),
                     output_dir=Path(tmp),
@@ -4230,8 +4257,8 @@ class TestPhase9SnapshotEndToEnd(unittest.TestCase):
         """R-608: snapshot describes the latest scored_at row, not earlier
         ones. We assert the SQL contains ORDER BY scored_at DESC LIMIT 1."""
         self.assertIn(
-            "ORDER BY scored_at DESC LIMIT 1",
-            research._SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT,
+            "ORDER BY scored_at DESC, score_id DESC LIMIT 1",
+            reporting._SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT,
         )
 
 
@@ -4249,7 +4276,7 @@ class TestPhase9MemoAggregates(unittest.TestCase):
             {"composite_score": 60, "actionability": "PENDING",
              "primary_strategy": None, "submarket": "south_fulton"},
         ]
-        agg = research._aggregate_pipeline_composition(rows, threshold=70.0)
+        agg = reporting._aggregate_pipeline_composition(rows, threshold=70.0)
         self.assertEqual(agg["total_scored"], 4)
         self.assertEqual(agg["above_threshold_count"], 3)
         self.assertEqual(agg["actionable_count"], 2)
@@ -4267,7 +4294,7 @@ class TestPhase9MemoAggregates(unittest.TestCase):
         ]
         # rows are already pre-sorted by composite DESC by SQL; the helper
         # filters to PASS first, then falls back if N exceeds the count.
-        top = research._select_top_n_actionable(rows, n=2)
+        top = reporting._select_top_n_actionable(rows, n=2)
         self.assertEqual(len(top), 2)
         self.assertTrue(all(r["actionability"] == "PASS" for r in top))
 
@@ -4277,12 +4304,12 @@ class TestPhase9MemoAggregates(unittest.TestCase):
             {"actionability": "FAIL:strategy", "composite_score": 75},
             {"actionability": "PENDING", "composite_score": 70},
         ]
-        top = research._select_top_n_actionable(rows, n=10)
+        top = reporting._select_top_n_actionable(rows, n=10)
         self.assertEqual(len(top), 3)
         self.assertEqual(top[0]["actionability"], "PASS")
 
     def test_aggregate_empty_market(self) -> None:
-        agg = research._aggregate_pipeline_composition([], threshold=70.0)
+        agg = reporting._aggregate_pipeline_composition([], threshold=70.0)
         self.assertEqual(agg["total_scored"], 0)
         self.assertEqual(agg["actionable_count"], 0)
         self.assertEqual(agg["avg_composite"], 0.0)
@@ -4302,7 +4329,7 @@ class TestPhase9MemoRender(unittest.TestCase):
              "owner_name": "OWNER B", "composite_score": 75,
              "actionability": "PASS", "primary_strategy": "spec"},
         ]
-        md = research._render_memo_markdown(
+        md = reporting._render_memo_markdown(
             "atlanta", "score-atlanta-20260504T100000Z-abcd",
             rows, [], [], params=_phase9_params(), today="2026-05-04",
         )
@@ -4318,7 +4345,7 @@ class TestPhase9MemoRender(unittest.TestCase):
 
     def test_memo_empty_market_still_renders(self) -> None:
         """D4 / R-635: a zero-pipeline memo is still informative."""
-        md = research._render_memo_markdown(
+        md = reporting._render_memo_markdown(
             "atlanta", None, [], [], [],
             params=_phase9_params(), today="2026-05-04",
         )
@@ -4335,7 +4362,7 @@ class TestPhase9MemoRender(unittest.TestCase):
              "submarket": "x", "primary_strategy": None}
             for _ in range(6)
         ]
-        md = research._render_memo_markdown(
+        md = reporting._render_memo_markdown(
             "atlanta", None, rows, [], [],
             params=_phase9_params(), today="2026-05-04",
         )
@@ -4357,7 +4384,7 @@ class TestPhase9MemoEndToEnd(unittest.TestCase):
                 ],
             )
             params = _phase9_params()
-            target = research.generate_strategy_memo(
+            target = reporting.generate_strategy_memo(
                 "atlanta",
                 conn=fake, output_dir=tmp_path, params=params,
                 today="2026-05-04",
@@ -4381,7 +4408,7 @@ class TestPhase9MemoEndToEnd(unittest.TestCase):
                 ],
             )
             params = _phase9_params()
-            target = research.generate_strategy_memo(
+            target = reporting.generate_strategy_memo(
                 "atlanta",
                 conn=fake, output_dir=tmp_path, params=params,
                 cycle_id="caller-cycle-123",
@@ -4398,7 +4425,7 @@ class TestPhase9MemoEndToEnd(unittest.TestCase):
                 fetchall_queue=[[], [], []],
             )
             params = _phase9_params()
-            target = research.generate_strategy_memo(
+            target = reporting.generate_strategy_memo(
                 "atlanta",
                 conn=fake, output_dir=tmp_path, params=params,
                 today="2026-05-04",
@@ -4427,7 +4454,7 @@ class TestPhase9NoDatabaseWrites(unittest.TestCase):
                 ],
                 fetchall_queue=[[], []],
             )
-            research.generate_snapshot(
+            reporting.generate_snapshot(
                 "fulton-14-0123-LL-045-8",
                 conn=fake, output_dir=Path(tmp), params=_phase9_params(),
             )
@@ -4441,7 +4468,7 @@ class TestPhase9NoDatabaseWrites(unittest.TestCase):
                 fetchone_queue=[None],
                 fetchall_queue=[[], [], []],
             )
-            research.generate_strategy_memo(
+            reporting.generate_strategy_memo(
                 "atlanta",
                 conn=fake, output_dir=Path(tmp), params=_phase9_params(),
                 today="2026-05-04",
@@ -4471,7 +4498,7 @@ class TestPhase9NoFabrication(unittest.TestCase):
                 fetchone_queue=[null_parcel, _phase9_score_row()],
                 fetchall_queue=[[]],  # only flags fetched (no submarket)
             )
-            target = research.generate_snapshot(
+            target = reporting.generate_snapshot(
                 "fulton-empty",
                 conn=fake, output_dir=tmp_path, params=_phase9_params(),
             )
@@ -4501,13 +4528,13 @@ class TestPhase9SqlConstantsStaticChecks(unittest.TestCase):
     def test_constants_exist(self) -> None:
         for name in self.PHASE9_CONSTANTS:
             self.assertTrue(
-                hasattr(research, name),
+                hasattr(reporting, name),
                 f"missing Phase 9 SQL constant: {name}",
             )
 
     def test_no_string_interpolation(self) -> None:
         for name in self.PHASE9_CONSTANTS:
-            sql = getattr(research, name)
+            sql = getattr(reporting, name)
             self.assertIsInstance(sql, str)
             self.assertNotIn(
                 "{", sql,
@@ -4516,7 +4543,7 @@ class TestPhase9SqlConstantsStaticChecks(unittest.TestCase):
 
     def test_only_select_statements(self) -> None:
         for name in self.PHASE9_CONSTANTS:
-            sql = getattr(research, name).lstrip()
+            sql = getattr(reporting, name).lstrip()
             first = sql.split(None, 1)[0].upper()
             self.assertEqual(
                 first, "SELECT",
@@ -4531,14 +4558,14 @@ class TestPhase9AtomicWrite(unittest.TestCase):
     def test_atomic_write_creates_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "subdir" / "x.md"
-            research._atomic_write_text(target, "hello\n")
+            reporting._atomic_write_text(target, "hello\n")
             self.assertTrue(target.exists())
             self.assertEqual(target.read_text(encoding="utf-8"), "hello\n")
 
     def test_atomic_write_normalizes_crlf(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "x.md"
-            research._atomic_write_text(target, "line1\r\nline2\r\n")
+            reporting._atomic_write_text(target, "line1\r\nline2\r\n")
             data = target.read_bytes()
             self.assertNotIn(b"\r\n", data)
             self.assertIn(b"line1\nline2\n", data)
@@ -4546,14 +4573,14 @@ class TestPhase9AtomicWrite(unittest.TestCase):
     def test_atomic_write_overwrites(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "x.md"
-            research._atomic_write_text(target, "v1\n")
-            research._atomic_write_text(target, "v2\n")
+            reporting._atomic_write_text(target, "v1\n")
+            reporting._atomic_write_text(target, "v2\n")
             self.assertEqual(target.read_text(encoding="utf-8"), "v2\n")
 
     def test_atomic_write_no_tmp_remains(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "x.md"
-            research._atomic_write_text(target, "ok\n")
+            reporting._atomic_write_text(target, "ok\n")
             tmp_files = [
                 p for p in Path(tmp).iterdir()
                 if p.name.startswith(".") and ".tmp." in p.name
@@ -4594,7 +4621,7 @@ class TestPhase10TsvSchemaValidation(unittest.TestCase):
         }
 
     def test_valid_row_passes(self) -> None:
-        out = research._validate_log_row(self._base_row())
+        out = runner._validate_log_row(self._base_row())
         self.assertEqual(out["commit"], "abcdef0")
         self.assertEqual(out["metric"], "5")
         self.assertEqual(out["confidence"], "4.20")
@@ -4604,113 +4631,113 @@ class TestPhase10TsvSchemaValidation(unittest.TestCase):
         row = self._base_row()
         row["commit"] = "abc"
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_accepts_pending_commit(self) -> None:
         row = self._base_row()
         row["commit"] = "pending"
-        out = research._validate_log_row(row)
+        out = runner._validate_log_row(row)
         self.assertEqual(out["commit"], "pending")
 
     def test_rejects_uppercase_sha(self) -> None:
         row = self._base_row()
         row["commit"] = "ABCDEF0"
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_float_metric(self) -> None:
         row = self._base_row()
         row["metric"] = 5.0
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_bool_metric(self) -> None:
         row = self._base_row()
         row["metric"] = True  # bool is a subclass of int
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_negative_metric(self) -> None:
         row = self._base_row()
         row["metric"] = -1
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_nan_confidence(self) -> None:
         row = self._base_row()
         row["confidence"] = float("nan")
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_inf_confidence(self) -> None:
         row = self._base_row()
         row["confidence"] = float("inf")
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_negative_confidence(self) -> None:
         row = self._base_row()
         row["confidence"] = -0.1
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_negative_wall_clock(self) -> None:
         row = self._base_row()
         row["wall_clock_min"] = -1.0
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_rejects_unknown_status(self) -> None:
         row = self._base_row()
         row["status"] = "approved"
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
     def test_accepts_each_known_status(self) -> None:
         for status in ("baseline", "keep", "discard", "crash", "timeout", "halt"):
             row = self._base_row()
             row["status"] = status
-            out = research._validate_log_row(row)
+            out = runner._validate_log_row(row)
             self.assertEqual(out["status"], status)
 
     def test_rejects_negative_api_calls(self) -> None:
         row = self._base_row()
         row["api_calls"] = -1
         with self.assertRaises(ValueError):
-            research._validate_log_row(row)
+            runner._validate_log_row(row)
 
 
 class TestPhase10DescriptionSanitization(unittest.TestCase):
     """R-718 — tabs, newlines, NULs, length cap."""
 
     def test_strips_tabs(self) -> None:
-        self.assertEqual(research._sanitize_description("a\tb"), "a b")
+        self.assertEqual(runner._sanitize_description("a\tb"), "a b")
 
     def test_strips_newlines(self) -> None:
-        self.assertEqual(research._sanitize_description("a\nb\r\nc"), "a b c")
+        self.assertEqual(runner._sanitize_description("a\nb\r\nc"), "a b c")
 
     def test_strips_null_bytes(self) -> None:
-        self.assertEqual(research._sanitize_description("a\x00b"), "a b")
+        self.assertEqual(runner._sanitize_description("a\x00b"), "a b")
 
     def test_collapses_whitespace_runs(self) -> None:
-        self.assertEqual(research._sanitize_description("a   \t\n  b"), "a b")
+        self.assertEqual(runner._sanitize_description("a   \t\n  b"), "a b")
 
     def test_truncates_to_cap(self) -> None:
         s = "x" * 500
-        out = research._sanitize_description(s)
-        self.assertLessEqual(len(out), research._TSV_DESCRIPTION_MAX_LEN)
+        out = runner._sanitize_description(s)
+        self.assertLessEqual(len(out), runner._TSV_DESCRIPTION_MAX_LEN)
         self.assertTrue(out.endswith("…"))
 
     def test_keeps_commas_unlike_csv(self) -> None:
         self.assertEqual(
-            research._sanitize_description("added a,b,c"), "added a,b,c"
+            runner._sanitize_description("added a,b,c"), "added a,b,c"
         )
 
     def test_handles_empty(self) -> None:
-        self.assertEqual(research._sanitize_description(""), "")
+        self.assertEqual(runner._sanitize_description(""), "")
 
     def test_handles_none(self) -> None:
-        self.assertEqual(research._sanitize_description(None), "")
+        self.assertEqual(runner._sanitize_description(None), "")
 
 
 class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
@@ -4719,7 +4746,7 @@ class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
     def test_writes_header_when_file_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "experiment_log.tsv"
-            research.append_experiment_log_row(
+            runner.append_experiment_log_row(
                 {
                     "commit": "abcdef0",
                     "metric": 0,
@@ -4735,7 +4762,7 @@ class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
             lines = content.splitlines()
             self.assertEqual(
                 lines[0],
-                "\t".join(research._TSV_COLUMNS),
+                "\t".join(runner._TSV_COLUMNS),
             )
             self.assertEqual(len(lines), 2)
 
@@ -4743,7 +4770,7 @@ class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "experiment_log.tsv"
             path.touch()
-            research.append_experiment_log_row(
+            runner.append_experiment_log_row(
                 {
                     "commit": "abcdef0",
                     "metric": 1,
@@ -4756,12 +4783,12 @@ class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
                 path=path,
             )
             content = path.read_text(encoding="utf-8")
-            self.assertTrue(content.startswith("\t".join(research._TSV_COLUMNS)))
+            self.assertTrue(content.startswith("\t".join(runner._TSV_COLUMNS)))
 
     def test_skips_header_when_file_already_has_one(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "experiment_log.tsv"
-            research.append_experiment_log_row(
+            runner.append_experiment_log_row(
                 {
                     "commit": "abcdef0",
                     "metric": 0,
@@ -4773,7 +4800,7 @@ class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
                 },
                 path=path,
             )
-            research.append_experiment_log_row(
+            runner.append_experiment_log_row(
                 {
                     "commit": "1234567",
                     "metric": 1,
@@ -4787,7 +4814,7 @@ class TestPhase10TsvHeaderBootstrap(unittest.TestCase):
             )
             lines = path.read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(lines), 3)
-            self.assertEqual(lines[0], "\t".join(research._TSV_COLUMNS))
+            self.assertEqual(lines[0], "\t".join(runner._TSV_COLUMNS))
 
 
 class TestPhase10TsvAppendOnly(unittest.TestCase):
@@ -4797,7 +4824,7 @@ class TestPhase10TsvAppendOnly(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "x.tsv"
             for i in range(5):
-                research.append_experiment_log_row(
+                runner.append_experiment_log_row(
                     {
                         "commit": f"{i:07x}",
                         "metric": i,
@@ -4809,7 +4836,7 @@ class TestPhase10TsvAppendOnly(unittest.TestCase):
                     },
                     path=path,
                 )
-            rows = research.read_experiment_log(path)
+            rows = runner.read_experiment_log(path)
             self.assertEqual(len(rows), 5)
             self.assertEqual(rows[0]["status"], "baseline")
             self.assertEqual(rows[4]["metric"], "4")
@@ -4821,7 +4848,7 @@ class TestPhase10TsvAppendOnly(unittest.TestCase):
     def test_read_returns_empty_for_missing_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "does_not_exist.tsv"
-            self.assertEqual(research.read_experiment_log(path), [])
+            self.assertEqual(runner.read_experiment_log(path), [])
 
     def test_read_skips_only_exact_header(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -4829,11 +4856,11 @@ class TestPhase10TsvAppendOnly(unittest.TestCase):
             # Manually write a fake "header-like" row that differs from the
             # canonical header by one column; the reader must NOT skip it.
             with path.open("w", encoding="utf-8") as fh:
-                fh.write("\t".join(research._TSV_COLUMNS) + "\n")
+                fh.write("\t".join(runner._TSV_COLUMNS) + "\n")
                 fh.write("commit\tmetric\tconfidence\tapi_calls\twall_clock_min\t"
                          "status\twrong_desc\n")
                 fh.write("abcdef0\t1\t0.0\t0\t0.0\tbaseline\treal row\n")
-            rows = research.read_experiment_log(path)
+            rows = runner.read_experiment_log(path)
             # Only the canonical header is skipped; the second row (which
             # has 7 columns but value "wrong_desc" in the description col)
             # is parsed as data.
@@ -4846,28 +4873,28 @@ class TestPhase10DecisionMatrix(unittest.TestCase):
     """R-713 — every cell of the keep/discard/baseline/crash/timeout matrix."""
 
     def test_first_row_is_baseline(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=None, prior_confidence=None,
             new_metric=5, new_confidence=2.0, status="ok",
         )
         self.assertEqual(out, "baseline")
 
     def test_strict_improvement_keeps(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=6, new_confidence=2.0, status="ok",
         )
         self.assertEqual(out, "keep")
 
     def test_regression_discards(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=4, new_confidence=10.0, status="ok",
         )
         self.assertEqual(out, "discard")
 
     def test_tied_metric_higher_confidence_keeps(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=5, new_confidence=3.0, status="ok",
         )
@@ -4876,14 +4903,14 @@ class TestPhase10DecisionMatrix(unittest.TestCase):
     def test_tied_metric_equal_confidence_discards(self) -> None:
         # R-714: simplicity criterion -- equal confidence on tied metric
         # is a discard, not a keep.
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=5, new_confidence=2.0, status="ok",
         )
         self.assertEqual(out, "discard")
 
     def test_tied_metric_lower_confidence_discards(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=5, new_confidence=1.99, status="ok",
         )
@@ -4891,21 +4918,21 @@ class TestPhase10DecisionMatrix(unittest.TestCase):
 
     def test_tied_metric_isclose_confidence_discards(self) -> None:
         # R-715: float tolerance absorbs ULP noise -- treated as equal.
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=5, new_confidence=2.0 + 1e-12, status="ok",
         )
         self.assertEqual(out, "discard")
 
     def test_crash_short_circuits(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=999, new_confidence=999.0, status="crash",
         )
         self.assertEqual(out, "crash")
 
     def test_timeout_short_circuits(self) -> None:
-        out = research.apply_keep_or_revert_decision(
+        out = runner.apply_keep_or_revert_decision(
             prior_metric=5, prior_confidence=2.0,
             new_metric=999, new_confidence=999.0, status="timeout",
         )
@@ -4913,7 +4940,7 @@ class TestPhase10DecisionMatrix(unittest.TestCase):
 
     def test_unknown_status_raises(self) -> None:
         with self.assertRaises(ValueError):
-            research.apply_keep_or_revert_decision(
+            runner.apply_keep_or_revert_decision(
                 prior_metric=5, prior_confidence=2.0,
                 new_metric=5, new_confidence=2.0, status="banana",
             )
@@ -4924,25 +4951,25 @@ class TestPhase10ParseTagFromBranch(unittest.TestCase):
 
     def test_extracts_tag_from_autoresearch_branch(self) -> None:
         self.assertEqual(
-            research._parse_tag_from_branch("autoresearch/atl-2026-05-04"),
+            runner._parse_tag_from_branch("autoresearch/atl-2026-05-04"),
             "atl-2026-05-04",
         )
 
     def test_returns_none_for_main(self) -> None:
-        self.assertIsNone(research._parse_tag_from_branch("main"))
+        self.assertIsNone(runner._parse_tag_from_branch("main"))
 
     def test_returns_none_for_dev_branch(self) -> None:
-        self.assertIsNone(research._parse_tag_from_branch("claude/foo-123"))
+        self.assertIsNone(runner._parse_tag_from_branch("claude/foo-123"))
 
     def test_rejects_uppercase_tag(self) -> None:
         # Branch regex is lowercase-only.
         self.assertIsNone(
-            research._parse_tag_from_branch("autoresearch/ATL-2026")
+            runner._parse_tag_from_branch("autoresearch/ATL-2026")
         )
 
     def test_accepts_dotted_tag(self) -> None:
         self.assertEqual(
-            research._parse_tag_from_branch("autoresearch/v1.2.3"),
+            runner._parse_tag_from_branch("autoresearch/v1.2.3"),
             "v1.2.3",
         )
 
@@ -4951,30 +4978,30 @@ class TestPhase10HaltDetection(unittest.TestCase):
     """R-725, R-728 -- halt sentinel."""
 
     def setUp(self) -> None:
-        self._original_env = os.environ.pop(research._HALT_ENV_VAR, None)
+        self._original_env = os.environ.pop(runner._HALT_ENV_VAR, None)
 
     def tearDown(self) -> None:
-        os.environ.pop(research._HALT_ENV_VAR, None)
+        os.environ.pop(runner._HALT_ENV_VAR, None)
         if self._original_env is not None:
-            os.environ[research._HALT_ENV_VAR] = self._original_env
+            os.environ[runner._HALT_ENV_VAR] = self._original_env
 
     def test_no_halt_by_default(self) -> None:
         # Sandbox may or may not have a real .halt; just check env-var path.
-        if not research._HALT_SENTINEL_PATH.exists():
-            self.assertFalse(research._halted())
+        if not runner._HALT_SENTINEL_PATH.exists():
+            self.assertFalse(runner._halted())
 
     def test_env_var_halts(self) -> None:
-        os.environ[research._HALT_ENV_VAR] = "1"
-        self.assertTrue(research._halted())
+        os.environ[runner._HALT_ENV_VAR] = "1"
+        self.assertTrue(runner._halted())
 
     def test_env_var_empty_string_does_not_halt(self) -> None:
-        os.environ[research._HALT_ENV_VAR] = ""
+        os.environ[runner._HALT_ENV_VAR] = ""
         # Empty env var is falsy in our check -- only set means halt.
         # Hold the test: "" is treated as truthy by os.environ.get() because
         # it's still set; our code uses `if os.environ.get(...):` which is
         # falsy for "".
-        if not research._HALT_SENTINEL_PATH.exists():
-            self.assertFalse(research._halted())
+        if not runner._HALT_SENTINEL_PATH.exists():
+            self.assertFalse(runner._halted())
 
 
 class TestPhase10LastBaselineOrKeep(unittest.TestCase):
@@ -4986,7 +5013,7 @@ class TestPhase10LastBaselineOrKeep(unittest.TestCase):
             {"status": "keep", "metric": "2", "confidence": "1.5"},
             {"status": "discard", "metric": "0", "confidence": "0.0"},
         ]
-        anchor = research._last_baseline_or_keep(rows)
+        anchor = runner._last_baseline_or_keep(rows)
         self.assertEqual(anchor["status"], "keep")
         self.assertEqual(anchor["metric"], "2")
 
@@ -4996,12 +5023,12 @@ class TestPhase10LastBaselineOrKeep(unittest.TestCase):
             {"status": "discard", "metric": "0", "confidence": "0.0"},
             {"status": "crash", "metric": "0", "confidence": "0.0"},
         ]
-        anchor = research._last_baseline_or_keep(rows)
+        anchor = runner._last_baseline_or_keep(rows)
         self.assertEqual(anchor["status"], "baseline")
         self.assertEqual(anchor["metric"], "5")
 
     def test_returns_none_for_empty_log(self) -> None:
-        self.assertIsNone(research._last_baseline_or_keep([]))
+        self.assertIsNone(runner._last_baseline_or_keep([]))
 
     def test_skips_crash_and_timeout(self) -> None:
         rows = [
@@ -5009,7 +5036,7 @@ class TestPhase10LastBaselineOrKeep(unittest.TestCase):
             {"status": "crash", "metric": "0", "confidence": "0.0"},
             {"status": "timeout", "metric": "0", "confidence": "0.0"},
         ]
-        anchor = research._last_baseline_or_keep(rows)
+        anchor = runner._last_baseline_or_keep(rows)
         self.assertEqual(anchor["status"], "baseline")
 
 
@@ -5017,30 +5044,30 @@ class TestPhase10AssertAutoresearchBranch(unittest.TestCase):
     """R-703 -- branch invariant."""
 
     def test_refuses_main(self) -> None:
-        with mock.patch.object(research, "_git_current_branch", return_value="main"):
-            with self.assertRaises(research.SetupError) as cm:
-                research._assert_autoresearch_branch()
+        with mock.patch.object(runner, "_git_current_branch", return_value="main"):
+            with self.assertRaises(runner.SetupError) as cm:
+                runner._assert_autoresearch_branch()
             self.assertIn("autoresearch", str(cm.exception))
 
     def test_refuses_dev_branch(self) -> None:
         with mock.patch.object(
-            research, "_git_current_branch",
+            runner, "_git_current_branch",
             return_value="claude/setup-research-loop-ZUuA6",
         ):
-            with self.assertRaises(research.SetupError):
-                research._assert_autoresearch_branch()
+            with self.assertRaises(runner.SetupError):
+                runner._assert_autoresearch_branch()
 
     def test_refuses_detached_head(self) -> None:
-        with mock.patch.object(research, "_git_current_branch", return_value="HEAD"):
-            with self.assertRaises(research.SetupError):
-                research._assert_autoresearch_branch()
+        with mock.patch.object(runner, "_git_current_branch", return_value="HEAD"):
+            with self.assertRaises(runner.SetupError):
+                runner._assert_autoresearch_branch()
 
     def test_accepts_autoresearch(self) -> None:
         with mock.patch.object(
-            research, "_git_current_branch",
+            runner, "_git_current_branch",
             return_value="autoresearch/atl-2026-05-04",
         ):
-            out = research._assert_autoresearch_branch()
+            out = runner._assert_autoresearch_branch()
             self.assertEqual(out, "autoresearch/atl-2026-05-04")
 
 
@@ -5048,67 +5075,67 @@ class TestPhase10VerifySetupComposite(unittest.TestCase):
     """verify_setup composite status -- ok / warning / fail aggregation."""
 
     def test_non_autoresearch_branch_makes_overall_fail(self) -> None:
-        with mock.patch.object(research, "_git_current_branch", return_value="main"), \
-             mock.patch.object(research, "_check_db_connection",
+        with mock.patch.object(runner, "_git_current_branch", return_value="main"), \
+             mock.patch.object(runner, "_check_db_connection",
                                return_value={"status": "ok", "postgis_version": "3.3"}), \
-             mock.patch.object(research, "_check_harness_for_market",
+             mock.patch.object(runner, "_check_harness_for_market",
                                return_value={"status": "ok", "per_county": {"fulton": "healthy"}}), \
-             mock.patch.object(research, "_check_corridor_bbox",
+             mock.patch.object(runner, "_check_corridor_bbox",
                                return_value={"status": "ok", "seeded_count": 1}), \
-             mock.patch.object(research, "_check_costar_freshness",
+             mock.patch.object(runner, "_check_costar_freshness",
                                return_value={"status": "ok", "fresh_files": 5}):
-            out = research.verify_setup("atlanta")
+            out = runner.verify_setup("atlanta")
             self.assertEqual(out["status"], "fail")
             self.assertFalse(out["is_autoresearch_branch"])
 
     def test_all_ok_returns_ok(self) -> None:
         with mock.patch.object(
-            research, "_git_current_branch",
+            runner, "_git_current_branch",
             return_value="autoresearch/atl-2026-05-04",
         ), \
-            mock.patch.object(research, "_check_db_connection",
+            mock.patch.object(runner, "_check_db_connection",
                               return_value={"status": "ok", "postgis_version": "3.3"}), \
-            mock.patch.object(research, "_check_harness_for_market",
+            mock.patch.object(runner, "_check_harness_for_market",
                               return_value={"status": "ok", "per_county": {"fulton": "healthy"}}), \
-            mock.patch.object(research, "_check_corridor_bbox",
+            mock.patch.object(runner, "_check_corridor_bbox",
                               return_value={"status": "ok", "seeded_count": 1}), \
-            mock.patch.object(research, "_check_costar_freshness",
+            mock.patch.object(runner, "_check_costar_freshness",
                               return_value={"status": "ok", "fresh_files": 5}):
-            out = research.verify_setup("atlanta")
+            out = runner.verify_setup("atlanta")
             self.assertEqual(out["status"], "ok")
             self.assertEqual(out["tag"], "atl-2026-05-04")
             self.assertTrue(out["is_autoresearch_branch"])
 
     def test_costar_warning_with_otherwise_ok_returns_warning(self) -> None:
         with mock.patch.object(
-            research, "_git_current_branch",
+            runner, "_git_current_branch",
             return_value="autoresearch/atl-2026-05-04",
         ), \
-            mock.patch.object(research, "_check_db_connection",
+            mock.patch.object(runner, "_check_db_connection",
                               return_value={"status": "ok", "postgis_version": "3.3"}), \
-            mock.patch.object(research, "_check_harness_for_market",
+            mock.patch.object(runner, "_check_harness_for_market",
                               return_value={"status": "ok", "per_county": {"fulton": "healthy"}}), \
-            mock.patch.object(research, "_check_corridor_bbox",
+            mock.patch.object(runner, "_check_corridor_bbox",
                               return_value={"status": "warning", "seeded_count": 0,
                                             "note": "no bbox"}), \
-            mock.patch.object(research, "_check_costar_freshness",
+            mock.patch.object(runner, "_check_costar_freshness",
                               return_value={"status": "warning", "fresh_files": 0,
                                             "note": "no exports"}):
-            out = research.verify_setup("atlanta")
+            out = runner.verify_setup("atlanta")
             self.assertEqual(out["status"], "warning")
 
     def test_db_fail_returns_fail(self) -> None:
         with mock.patch.object(
-            research, "_git_current_branch",
+            runner, "_git_current_branch",
             return_value="autoresearch/atl-2026-05-04",
         ), \
-            mock.patch.object(research, "_check_db_connection",
+            mock.patch.object(runner, "_check_db_connection",
                               return_value={"status": "fail", "error": "no host"}), \
-            mock.patch.object(research, "_check_harness_for_market",
+            mock.patch.object(runner, "_check_harness_for_market",
                               return_value={"status": "ok", "per_county": {}}), \
-            mock.patch.object(research, "_check_costar_freshness",
+            mock.patch.object(runner, "_check_costar_freshness",
                               return_value={"status": "ok", "fresh_files": 1}):
-            out = research.verify_setup("atlanta")
+            out = runner.verify_setup("atlanta")
             self.assertEqual(out["status"], "fail")
             # Bbox check was skipped because DB was down.
             self.assertEqual(out["checks"]["corridor_bbox"]["status"], "skipped")
@@ -5128,10 +5155,10 @@ class TestPhase10EvaluateMetricRouting(unittest.TestCase):
         def fake_get_connection():
             yield Phase5FakeConnection()
 
-        with mock.patch.object(research, "run_ingestion_cycle", return_value={}), \
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
              mock.patch.object(research, "run_discovery_cycle", return_value={}), \
              mock.patch.object(research, "run_scoring_cycle", return_value={}), \
-             mock.patch.object(research, "generate_strategy_memo",
+             mock.patch.object(reporting, "generate_strategy_memo",
                                return_value=Path("/tmp/memo.md")), \
              mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
              mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
@@ -5139,7 +5166,7 @@ class TestPhase10EvaluateMetricRouting(unittest.TestCase):
              mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
                                return_value=sentinel_confidence), \
              mock.patch.object(research.prepare, "get_connection", fake_get_connection):
-            result = research.evaluate("atlanta")
+            result = runner.evaluate("atlanta")
 
         self.assertEqual(result["metric"], sentinel_metric)
         self.assertEqual(result["confidence"], sentinel_confidence)
@@ -5160,37 +5187,37 @@ class TestPhase10EvaluateMetricRouting(unittest.TestCase):
         def fake_get_connection():
             yield Phase5FakeConnection()
 
-        with mock.patch.object(research, "run_ingestion_cycle", _track("ingestion")), \
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", _track("ingestion")), \
              mock.patch.object(research, "run_discovery_cycle", _track("discovery")), \
              mock.patch.object(research, "run_scoring_cycle", _track("scoring")), \
-             mock.patch.object(research, "generate_strategy_memo", _track("memo")), \
+             mock.patch.object(reporting, "generate_strategy_memo", _track("memo")), \
              mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
              mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
                                return_value=0), \
              mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
                                return_value=0.0), \
              mock.patch.object(research.prepare, "get_connection", fake_get_connection):
-            research.evaluate("atlanta")
+            runner.evaluate("atlanta")
 
         self.assertEqual(order, ["ingestion", "discovery", "scoring", "memo"])
 
     def test_evaluate_catches_crash_and_returns_status(self) -> None:
-        with mock.patch.object(research, "run_ingestion_cycle", return_value={}), \
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
              mock.patch.object(research, "run_discovery_cycle",
                                side_effect=RuntimeError("boom")), \
              mock.patch.object(research.prepare, "verify_parameters_unchanged"):
-            result = research.evaluate("atlanta")
+            result = runner.evaluate("atlanta")
         self.assertEqual(result["status"], "crash")
         self.assertEqual(result["metric"], 0)
         self.assertEqual(result["confidence"], 0.0)
         self.assertIn("RuntimeError", result["error"])
 
     def test_evaluate_catches_budget_exceeded(self) -> None:
-        with mock.patch.object(research, "run_ingestion_cycle", return_value={}), \
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
              mock.patch.object(research, "run_discovery_cycle",
                                side_effect=research.prepare.BudgetExceeded("90 min")), \
              mock.patch.object(research.prepare, "verify_parameters_unchanged"):
-            result = research.evaluate("atlanta")
+            result = runner.evaluate("atlanta")
         self.assertEqual(result["status"], "timeout")
 
     def test_evaluate_calls_verify_parameters_unchanged(self) -> None:
@@ -5201,9 +5228,9 @@ class TestPhase10EvaluateMetricRouting(unittest.TestCase):
 
         with mock.patch.object(research.prepare, "verify_parameters_unchanged",
                                _fake_verify), \
-             mock.patch.object(research, "run_ingestion_cycle",
+             mock.patch.object(costar_ingest, "run_ingestion_cycle",
                                side_effect=RuntimeError("stop")):
-            research.evaluate("atlanta")
+            runner.evaluate("atlanta")
         self.assertEqual(called, [True])
 
 
@@ -5230,7 +5257,7 @@ class TestPhase10ExperimentLoopBaselineBootstrap(unittest.TestCase):
 
     def _patch_setup_ok(self):
         return mock.patch.object(
-            research, "verify_setup",
+            runner, "verify_setup",
             return_value={"status": "ok", "branch": "autoresearch/test",
                           "tag": "test", "is_autoresearch_branch": True,
                           "checks": {}},
@@ -5239,7 +5266,7 @@ class TestPhase10ExperimentLoopBaselineBootstrap(unittest.TestCase):
     def _patch_evaluate(self, sequence):
         it = iter(sequence)
         return mock.patch.object(
-            research, "evaluate",
+            runner, "evaluate",
             side_effect=lambda market, **kw: next(it),
         )
 
@@ -5253,19 +5280,19 @@ class TestPhase10ExperimentLoopBaselineBootstrap(unittest.TestCase):
 
     def test_refuses_without_baseline_and_unconfirmed(self) -> None:
         with self._patch_setup_ok():
-            with self.assertRaises(research.SetupError) as cm:
-                research.experiment_loop("atlanta", max_iterations=0)
+            with self.assertRaises(runner.SetupError) as cm:
+                runner.experiment_loop("atlanta", max_iterations=0)
             self.assertIn("baseline", str(cm.exception))
 
     def test_bootstraps_baseline_when_confirmed(self) -> None:
         evals = [self._make_eval(0, 0.0)]  # baseline-only, then exit
         with self._patch_setup_ok(), \
              self._patch_evaluate(evals), \
-             mock.patch.object(research, "_git_head_commit", return_value="abcdef0"):
-            summary = research.experiment_loop(
+             mock.patch.object(runner, "_git_head_commit", return_value="abcdef0"):
+            summary = runner.experiment_loop(
                 "atlanta", max_iterations=0, confirmed=True,
             )
-        rows = research.read_experiment_log(self.tsv_path)
+        rows = runner.read_experiment_log(self.tsv_path)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["status"], "baseline")
         self.assertEqual(summary["iterations"], 0)
@@ -5281,7 +5308,7 @@ class TestPhase10ExperimentLoopIterations(unittest.TestCase):
         os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
         os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(self.lock_path)
         # Pre-seed a baseline row so the loop bootstraps cleanly.
-        research.append_experiment_log_row({
+        runner.append_experiment_log_row({
             "commit": "0000000",
             "metric": 5,
             "confidence": 4.0,
@@ -5298,7 +5325,7 @@ class TestPhase10ExperimentLoopIterations(unittest.TestCase):
 
     def _patch_setup_ok(self):
         return mock.patch.object(
-            research, "verify_setup",
+            runner, "verify_setup",
             return_value={"status": "ok", "branch": "autoresearch/test",
                           "tag": "test", "is_autoresearch_branch": True,
                           "checks": {}},
@@ -5314,11 +5341,11 @@ class TestPhase10ExperimentLoopIterations(unittest.TestCase):
              "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
         ]
         with self._patch_setup_ok(), \
-             mock.patch.object(research, "evaluate", side_effect=evals), \
-             mock.patch.object(research, "_git_head_commit",
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_git_head_commit",
                                side_effect=["1111111", "2222222", "3333333"]):
-            summary = research.experiment_loop("atlanta", max_iterations=2)
-        rows = research.read_experiment_log(self.tsv_path)
+            summary = runner.experiment_loop("atlanta", max_iterations=2)
+        rows = runner.read_experiment_log(self.tsv_path)
         # baseline + 2 iterations.
         self.assertEqual(len(rows), 3)
         self.assertEqual(summary["iterations"], 2)
@@ -5336,11 +5363,11 @@ class TestPhase10ExperimentLoopIterations(unittest.TestCase):
              "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
         ]
         with self._patch_setup_ok(), \
-             mock.patch.object(research, "evaluate", side_effect=evals), \
-             mock.patch.object(research, "_git_head_commit",
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_git_head_commit",
                                side_effect=["1111111", "2222222"]):
-            research.experiment_loop("atlanta", max_iterations=2)
-        rows = research.read_experiment_log(self.tsv_path)
+            runner.experiment_loop("atlanta", max_iterations=2)
+        rows = runner.read_experiment_log(self.tsv_path)
         self.assertEqual(rows[1]["status"], "keep")
         self.assertEqual(rows[2]["status"], "discard")
 
@@ -5353,32 +5380,32 @@ class TestPhase10ExperimentLoopIterations(unittest.TestCase):
              "api_calls": 0, "wall_clock_min": 0.1, "sub_summaries": {}},
         ]
         with self._patch_setup_ok(), \
-             mock.patch.object(research, "evaluate", side_effect=evals), \
-             mock.patch.object(research, "_git_head_commit",
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_git_head_commit",
                                side_effect=["1111111", "2222222"]):
-            research.experiment_loop("atlanta", max_iterations=2)
-        rows = research.read_experiment_log(self.tsv_path)
+            runner.experiment_loop("atlanta", max_iterations=2)
+        rows = runner.read_experiment_log(self.tsv_path)
         self.assertEqual(rows[1]["status"], "crash")
         self.assertEqual(rows[2]["status"], "keep")
 
     def test_halt_via_env_exits_loop_cleanly(self) -> None:
         # First iteration sets the halt env var; loop exits before iter 2.
         def _evaluate(market, **kw):
-            os.environ[research._HALT_ENV_VAR] = "1"
+            os.environ[runner._HALT_ENV_VAR] = "1"
             return {"market": "atlanta", "status": "ok", "metric": 6,
                     "confidence": 5.0, "api_calls": 0, "wall_clock_min": 0.1,
                     "sub_summaries": {}}
 
         try:
             with self._patch_setup_ok(), \
-                 mock.patch.object(research, "evaluate", side_effect=_evaluate), \
-                 mock.patch.object(research, "_git_head_commit",
+                 mock.patch.object(runner, "evaluate", side_effect=_evaluate), \
+                 mock.patch.object(runner, "_git_head_commit",
                                    return_value="1111111"):
-                summary = research.experiment_loop("atlanta", max_iterations=10)
+                summary = runner.experiment_loop("atlanta", max_iterations=10)
         finally:
-            os.environ.pop(research._HALT_ENV_VAR, None)
+            os.environ.pop(runner._HALT_ENV_VAR, None)
         self.assertEqual(summary["iterations"], 1)
-        rows = research.read_experiment_log(self.tsv_path)
+        rows = runner.read_experiment_log(self.tsv_path)
         # baseline + 1 keep + halt row
         statuses = [r["status"] for r in rows]
         self.assertIn("halt", statuses)
@@ -5392,9 +5419,9 @@ class TestPhase10ExperimentLoopAdvisoryLock(unittest.TestCase):
             lock_path = Path(tmp) / ".lock"
             os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(lock_path)
             try:
-                with research._acquire_loop_lock():
-                    with self.assertRaises(research.LoopLockError):
-                        with research._acquire_loop_lock():
+                with runner._acquire_loop_lock():
+                    with self.assertRaises(runner.LoopLockError):
+                        with runner._acquire_loop_lock():
                             pass
             finally:
                 os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
@@ -5404,10 +5431,10 @@ class TestPhase10ExperimentLoopAdvisoryLock(unittest.TestCase):
             lock_path = Path(tmp) / ".lock"
             os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(lock_path)
             try:
-                with research._acquire_loop_lock():
+                with runner._acquire_loop_lock():
                     pass
                 # Should be acquirable again.
-                with research._acquire_loop_lock():
+                with runner._acquire_loop_lock():
                     pass
             finally:
                 os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
@@ -5424,7 +5451,7 @@ class TestPhase10ExperimentLoopReadOnlyVsImmutables(unittest.TestCase):
         # Contract ban is on WRITING parameters.json or sources.json, which
         # would require either ``open(... "w")`` or ``write_text`` on the
         # immutable paths.  Verify both forms are absent.
-        src = RESEARCH_PY_SRC
+        src = ALL_PIPELINE_PY_SRC
         for path_const in ("_PARAMETERS_PATH", "_SOURCES_PATH"):
             for forbidden in ('"w"', "'w'", '"w+"', "'w+'", '"a"', "'a'"):
                 bad = f"{path_const}.open({forbidden}"
@@ -5444,7 +5471,7 @@ class TestPhase10ExperimentLoopReadOnlyVsImmutables(unittest.TestCase):
     def test_experiment_loop_is_callable_not_notimplemented(self) -> None:
         # G9 -- the stub is gone.
         import inspect
-        src = inspect.getsource(research.experiment_loop)
+        src = inspect.getsource(runner.experiment_loop)
         self.assertNotIn("NotImplementedError", src)
         self.assertIn("Karpathy", src)
 
@@ -5459,32 +5486,32 @@ class TestPhase10TsvCommitFormat(unittest.TestCase):
         }
 
     def test_seven_char_sha(self) -> None:
-        out = research._validate_log_row(self._row_with_commit("0123abc"))
+        out = runner._validate_log_row(self._row_with_commit("0123abc"))
         self.assertEqual(out["commit"], "0123abc")
 
     def test_forty_char_sha(self) -> None:
         sha = "0" * 40
-        out = research._validate_log_row(self._row_with_commit(sha))
+        out = runner._validate_log_row(self._row_with_commit(sha))
         self.assertEqual(out["commit"], sha)
 
     def test_empty_commit_rejected(self) -> None:
         with self.assertRaises(ValueError):
-            research._validate_log_row(self._row_with_commit(""))
+            runner._validate_log_row(self._row_with_commit(""))
 
     def test_special_chars_rejected(self) -> None:
         with self.assertRaises(ValueError):
-            research._validate_log_row(self._row_with_commit("abcd!ef"))
+            runner._validate_log_row(self._row_with_commit("abcd!ef"))
 
 
 class TestPhase10ConstantsContract(unittest.TestCase):
     """G1 / G3 -- module-level constants exist and have the right shape."""
 
     def test_columns_are_seven(self) -> None:
-        self.assertEqual(len(research._TSV_COLUMNS), 7)
+        self.assertEqual(len(runner._TSV_COLUMNS), 7)
 
     def test_columns_match_spec(self) -> None:
         self.assertEqual(
-            research._TSV_COLUMNS,
+            runner._TSV_COLUMNS,
             ("commit", "metric", "confidence", "api_calls",
              "wall_clock_min", "status", "description"),
         )
@@ -5493,19 +5520,19 @@ class TestPhase10ConstantsContract(unittest.TestCase):
         # AUTORESEARCH_MECHANICS.md L309 specifies five statuses; we add
         # 'halt' as a Phase 10 extension for clean exit accounting.
         expected = {"baseline", "keep", "discard", "crash", "timeout", "halt"}
-        self.assertEqual(research._TSV_STATUSES, frozenset(expected))
+        self.assertEqual(runner._TSV_STATUSES, frozenset(expected))
 
     def test_branch_regex_lowercase_only(self) -> None:
         self.assertIsNotNone(
-            research._AUTORESEARCH_BRANCH_RE.match("autoresearch/atl-2026")
+            runner._AUTORESEARCH_BRANCH_RE.match("autoresearch/atl-2026")
         )
         self.assertIsNone(
-            research._AUTORESEARCH_BRANCH_RE.match("autoresearch/ATL-2026")
+            runner._AUTORESEARCH_BRANCH_RE.match("autoresearch/ATL-2026")
         )
 
     def test_budget_is_ninety_minutes(self) -> None:
         # AUTORESEARCH_MECHANICS.md L153 says 90 minutes.
-        self.assertEqual(research._PHASE10_BUDGET_SECONDS, 90 * 60)
+        self.assertEqual(runner._PHASE10_BUDGET_SECONDS, 90 * 60)
 
 
 # ===========================================================================
@@ -6106,3 +6133,418 @@ class TestPhase13CacheGuards(unittest.TestCase):
         self.assertIn(research._SQL_FLAGGED_ACTIONABILITY_BLOCK, sqls)
         # 'zoning moratorium' has no 'entitlement' keyword → deal_killer fails.
         self.assertEqual(out["actionability"], research._ACTIONABILITY_FAIL_DEAL_KILLER)
+
+
+# ===========================================================================
+# prepare-mutation (2026-07-07) — run-scoped metric + experiment purge
+# See reviews/14_streamlining_review/00_streamlining_review.md Finding A.
+# ===========================================================================
+class TestRunScopedScoringStatics(unittest.TestCase):
+    """Static shape of the run/experiment attribution SQL."""
+
+    def test_insert_carries_run_and_experiment_columns(self) -> None:
+        sql = research._SQL_INSERT_PARCEL_SCORE
+        self.assertIn("run_tag", sql)
+        self.assertIn("experiment_id", sql)
+        # 11 bound values: 9 original + run_tag + experiment_id.
+        self.assertEqual(sql.count("%s"), 11)
+        self.assertNotIn("{", sql)
+
+    def test_run_scoped_selection_constant_shape(self) -> None:
+        sql = research._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED
+        # Both the NOT EXISTS arm and the PENDING arm are scoped to the run.
+        self.assertEqual(sql.count("ps.run_tag = %s"), 2)
+        # Deterministic tie-break aligned with prepare.py's DISTINCT ON
+        # selector (scored_at DESC, score_id DESC).
+        self.assertIn("ORDER BY ps.scored_at DESC, ps.score_id DESC", sql)
+        self.assertEqual(sql.count("%s"), 3)
+        self.assertNotIn("{", sql)
+
+    def test_unscoped_selection_gains_score_id_tie_break(self) -> None:
+        sql = research._SQL_LIST_PARCELS_FOR_SCORING
+        self.assertIn("ORDER BY ps.scored_at DESC, ps.score_id DESC", sql)
+
+    def test_insert_columns_exist_in_ddl(self) -> None:
+        import prepare
+        ddl = prepare._DDL_PARCEL_SCORES.lower()
+        for col in ("run_tag", "experiment_id"):
+            self.assertIn(col, ddl)
+
+
+class TestScoreParcelRunStamp(unittest.TestCase):
+    """score_parcel stamps run_tag + experiment_id onto the INSERT."""
+
+    _PTUPLE = (
+        "fulton-001", "atlanta", None, "GA", None, None, None, None,
+        -84.55, 33.55,
+    )
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def _score(self, **kwargs):
+        fake = Phase5FakeConnection(
+            fetchone_queue=[self._PTUPLE, (1000.0, 1100.0, 1.5)],
+        )
+        params = _passing_params()
+        params["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-test-0100",
+            params=params, **kwargs,
+        )
+        return next(
+            params for sql, params in fake.all_executes
+            if "INSERT INTO parcel_scores" in sql
+        )
+
+    def test_explicit_run_and_experiment_ids_are_persisted(self) -> None:
+        params = self._score(run_tag="atl-test", experiment_id="exp-123")
+        self.assertEqual(params[-2], "atl-test")
+        self.assertEqual(params[-1], "exp-123")
+
+    def test_run_tag_derived_when_omitted(self) -> None:
+        with mock.patch.object(
+            research.prepare, "current_run_tag", return_value="atl-derived",
+        ):
+            params = self._score()
+        self.assertEqual(params[-2], "atl-derived")
+        # Ad-hoc scoring carries NO experiment id — such rows are never
+        # purge targets.
+        self.assertIsNone(params[-1])
+
+    def test_off_branch_scoring_stores_null_run_tag(self) -> None:
+        with mock.patch.object(
+            research.prepare, "current_run_tag", return_value=None,
+        ):
+            params = self._score()
+        self.assertIsNone(params[-2])
+        self.assertIsNone(params[-1])
+
+
+class TestEvaluateRunThreading(unittest.TestCase):
+    """evaluate() threads run_tag + experiment_id into scoring and metric."""
+
+    def test_run_tag_and_experiment_id_reach_scoring_and_metric(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def fake_scoring(market, *, run_tag=None, experiment_id=None):
+            captured["scoring"] = {
+                "market": market, "run_tag": run_tag,
+                "experiment_id": experiment_id,
+            }
+            return {}
+
+        def fake_metric(conn, run_tag=None):
+            captured["metric_run_tag"] = run_tag
+            return 3
+
+        def fake_confidence(conn, run_tag=None):
+            captured["confidence_run_tag"] = run_tag
+            return 2.5
+
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", return_value={}), \
+             mock.patch.object(research, "run_scoring_cycle", fake_scoring), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "current_run_tag",
+                               return_value="atl-thread"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               fake_metric), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               fake_confidence), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate("atlanta")
+
+        self.assertEqual(result["run_tag"], "atl-thread")
+        self.assertTrue(result["experiment_id"].startswith("exp-"))
+        self.assertEqual(captured["scoring"]["run_tag"], "atl-thread")
+        self.assertEqual(
+            captured["scoring"]["experiment_id"], result["experiment_id"],
+        )
+        self.assertEqual(captured["metric_run_tag"], "atl-thread")
+        self.assertEqual(captured["confidence_run_tag"], "atl-thread")
+
+    def test_explicit_ids_pass_through_unchanged(self) -> None:
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", return_value={}), \
+             mock.patch.object(research, "run_scoring_cycle", return_value={}), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               return_value=0), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               return_value=0.0), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate(
+                "atlanta", run_tag="atl-x", experiment_id="exp-fixed",
+            )
+        self.assertEqual(result["run_tag"], "atl-x")
+        self.assertEqual(result["experiment_id"], "exp-fixed")
+
+
+class _PurgeFakeCursor:
+    def __init__(self, rowcount: int) -> None:
+        self.executes: list[tuple[str, tuple]] = []
+        self.rowcount = rowcount
+
+    def execute(self, sql: str, params: tuple = ()) -> None:
+        self.executes.append((sql, tuple(params or ())))
+
+    def __enter__(self) -> "_PurgeFakeCursor":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        return None
+
+
+class _PurgeFakeConnection:
+    def __init__(self, rowcount: int = 2) -> None:
+        self.cursors: list[_PurgeFakeCursor] = []
+        self.commits = 0
+        self._rowcount = rowcount
+
+    def cursor(self) -> _PurgeFakeCursor:
+        c = _PurgeFakeCursor(self._rowcount)
+        self.cursors.append(c)
+        return c
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    @property
+    def all_executes(self) -> list[tuple[str, tuple]]:
+        return [e for c in self.cursors for e in c.executes]
+
+
+class TestExperimentPurge(unittest.TestCase):
+    """The data half of revert: a non-kept experiment's rows are deleted."""
+
+    def test_purge_deletes_by_experiment_id_and_logs(self) -> None:
+        fake = _PurgeFakeConnection(rowcount=3)
+
+        @contextmanager
+        def fake_get_connection():
+            yield fake
+
+        with mock.patch.object(
+            runner.prepare, "get_connection", fake_get_connection,
+        ):
+            deleted = runner._purge_experiment_scores(
+                "exp-dead", "atlanta", "discard",
+            )
+
+        self.assertEqual(deleted, 3)
+        sqls = fake.all_executes
+        self.assertIn(
+            (runner._SQL_DELETE_SCORES_FOR_EXPERIMENT, ("exp-dead",)), sqls,
+        )
+        log_rows = [
+            p for s, p in sqls if "INSERT INTO research_log" in s
+        ]
+        self.assertEqual(len(log_rows), 1)
+        self.assertEqual(log_rows[0][1], "experiment_purge")
+        self.assertIn("exp-dead", log_rows[0][3])
+        self.assertEqual(fake.commits, 1)
+
+    def test_delete_targets_only_the_experiment_id(self) -> None:
+        sql = runner._SQL_DELETE_SCORES_FOR_EXPERIMENT
+        self.assertIn("WHERE experiment_id = %s", sql)
+        self.assertNotIn("run_tag", sql)
+        self.assertEqual(sql.count("%s"), 1)
+
+
+class TestLoopPurgeWiring(unittest.TestCase):
+    """experiment_loop purges on discard/crash/timeout, never on keep."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        self.lock_path = Path(self.tmp.name) / ".lock"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(self.lock_path)
+        runner.append_experiment_log_row({
+            "commit": "0000000",
+            "metric": 5,
+            "confidence": 4.0,
+            "api_calls": 0,
+            "wall_clock_min": 0.0,
+            "status": "baseline",
+            "description": "baseline | market=atlanta",
+        }, path=self.tsv_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        self.tmp.cleanup()
+
+    def _patch_setup_ok(self):
+        return mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        )
+
+    def _eval(self, status: str, metric: int, exp_id: str) -> dict[str, Any]:
+        return {
+            "market": "atlanta", "status": status, "metric": metric,
+            "confidence": float(metric), "api_calls": 0,
+            "wall_clock_min": 0.1, "sub_summaries": {},
+            "run_tag": "test", "experiment_id": exp_id,
+        }
+
+    def test_discard_and_crash_purge_keep_does_not(self) -> None:
+        evals = [
+            self._eval("ok", 6, "exp-keep"),      # 6 > 5 baseline -> keep
+            self._eval("ok", 4, "exp-discard"),   # 4 < 6 anchor  -> discard
+            self._eval("crash", 0, "exp-crash"),  # crash          -> crash
+        ]
+        purged: list[tuple[str, str, str]] = []
+        with self._patch_setup_ok(), \
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_purge_experiment_scores",
+                               side_effect=lambda e, m, d: purged.append((e, m, d)) or 0), \
+             mock.patch.object(runner, "_git_head_commit",
+                               side_effect=["1111111", "2222222", "3333333"]):
+            runner.experiment_loop("atlanta", max_iterations=3)
+
+        self.assertEqual(
+            purged,
+            [("exp-discard", "atlanta", "discard"),
+             ("exp-crash", "atlanta", "crash")],
+        )
+
+    def test_purge_failure_does_not_kill_the_loop(self) -> None:
+        evals = [
+            self._eval("ok", 4, "exp-discard"),  # 4 < 5 baseline -> discard
+            self._eval("ok", 6, "exp-keep"),     # 6 > 5 baseline -> keep
+        ]
+        with self._patch_setup_ok(), \
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_purge_experiment_scores",
+                               side_effect=RuntimeError("db down")), \
+             mock.patch.object(runner, "_git_head_commit",
+                               side_effect=["1111111", "2222222"]):
+            summary = runner.experiment_loop("atlanta", max_iterations=2)
+        # NEVER STOP: both iterations completed despite the purge failure.
+        self.assertEqual(summary["iterations"], 2)
+        rows = runner.read_experiment_log(self.tsv_path)
+        self.assertEqual(rows[1]["status"], "discard")
+        self.assertEqual(rows[2]["status"], "keep")
+
+
+# ===========================================================================
+# Streamlining cleanups (2026-07-07) — harness TTL cache, api_calls signal,
+# strict git-head resolution.
+# ===========================================================================
+class TestHarnessGateTTLCache(unittest.TestCase):
+    def setUp(self) -> None:
+        research._HARNESS_GATE_CACHE.clear()
+
+    tearDown = setUp
+
+    def test_positive_verdict_served_from_cache_within_ttl(self) -> None:
+        calls: list[str] = []
+
+        def fake_harness(county):
+            calls.append(county)
+            return {"overall_health": "healthy"}
+
+        with mock.patch.object(
+            research.connector_harness, "run_harness_for_county", fake_harness,
+        ):
+            first = research._harness_gate("fulton", cache_ttl_seconds=900)
+            second = research._harness_gate("fulton", cache_ttl_seconds=900)
+        self.assertEqual(first[0], "healthy")
+        self.assertEqual(second[0], "healthy")
+        # One live probe, one cache hit.
+        self.assertEqual(calls, ["fulton"])
+
+    def test_failing_verdict_is_never_cached(self) -> None:
+        calls: list[str] = []
+
+        def fake_harness(county):
+            calls.append(county)
+            return {"overall_health": "failing"}
+
+        with mock.patch.object(
+            research.connector_harness, "run_harness_for_county", fake_harness,
+        ):
+            research._harness_gate("fulton", cache_ttl_seconds=900)
+            research._harness_gate("fulton", cache_ttl_seconds=900)
+        # Failing always re-probes so recovery is detected immediately.
+        self.assertEqual(calls, ["fulton", "fulton"])
+
+    def test_default_call_bypasses_cache(self) -> None:
+        calls: list[str] = []
+
+        def fake_harness(county):
+            calls.append(county)
+            return {"overall_health": "healthy"}
+
+        with mock.patch.object(
+            research.connector_harness, "run_harness_for_county", fake_harness,
+        ):
+            research._harness_gate("fulton")
+            research._harness_gate("fulton")
+        # No TTL requested -> probe every call (discovery production gate
+        # semantics, and every pre-existing test's expectation).
+        self.assertEqual(calls, ["fulton", "fulton"])
+
+
+class TestApiCallsSignal(unittest.TestCase):
+    def test_evaluate_reports_api_call_delta(self) -> None:
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        def fake_discovery(market):
+            research._API_CALL_COUNT += 7
+            return {}
+
+        before = research.get_api_call_count()
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", fake_discovery), \
+             mock.patch.object(research, "run_scoring_cycle", return_value={}), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               return_value=0), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               return_value=0.0), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate("atlanta")
+        self.assertEqual(result["api_calls"], 7)
+        # Counter is global-monotonic; evaluate reports only its own delta.
+        self.assertEqual(research.get_api_call_count(), before + 7)
+
+
+class TestStrictGitHeadCommit(unittest.TestCase):
+    def test_git_failure_raises_setup_error_by_default(self) -> None:
+        with mock.patch.object(
+            runner.subprocess, "run",
+            side_effect=FileNotFoundError("no git"),
+        ):
+            with self.assertRaises(runner.SetupError):
+                runner._git_head_commit()
+
+    def test_allow_pending_preserves_best_effort_fallback(self) -> None:
+        with mock.patch.object(
+            runner.subprocess, "run",
+            side_effect=FileNotFoundError("no git"),
+        ):
+            self.assertEqual(
+                runner._git_head_commit(allow_pending=True), "pending",
+            )

@@ -14,6 +14,10 @@ on:
   push:
     paths:
       - 'research.py'
+      - 'runner.py'
+      - 'costar_ingest.py'
+      - 'reporting.py'
+      - 'pipeline_common.py'
       - 'prepare.py'
       - 'STORAGE_ARCHITECTURE.md'
       - 'tests/test_discovery.py'
@@ -24,6 +28,10 @@ on:
   pull_request:
     paths:
       - 'research.py'
+      - 'runner.py'
+      - 'costar_ingest.py'
+      - 'reporting.py'
+      - 'pipeline_common.py'
       - 'prepare.py'
       - 'STORAGE_ARCHITECTURE.md'
       - 'tests/test_discovery.py'

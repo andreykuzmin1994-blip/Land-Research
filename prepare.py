@@ -43,6 +43,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -88,7 +89,7 @@ EXIT_RUNTIME_ERROR = 6
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"  # prepare-mutation 2026-07-07: run-scoped metric columns.
 WALL_CLOCK_BUDGET_SECONDS = 90 * 60  # 5400 seconds — Karpathy 90-minute hard limit.
 
 _REPO_ROOT = Path(__file__).resolve().parent
@@ -328,9 +329,19 @@ CREATE TABLE IF NOT EXISTS parcel_scores (
     strategy_fit JSONB,
     primary_strategy TEXT,
     investment_thesis TEXT,
-    notes TEXT
+    notes TEXT,
+    run_tag TEXT,
+    experiment_id TEXT
 );
 """
+
+# prepare-mutation (2026-07-07): run/experiment attribution columns. The
+# ALTERs make apply_schema converge existing databases whose parcel_scores
+# predates the columns (CREATE TABLE IF NOT EXISTS alone would skip them).
+_DDL_PARCEL_SCORES_RUN_COLUMNS = (
+    "ALTER TABLE parcel_scores ADD COLUMN IF NOT EXISTS run_tag TEXT;",
+    "ALTER TABLE parcel_scores ADD COLUMN IF NOT EXISTS experiment_id TEXT;",
+)
 
 _DDL_MARKETS = """
 CREATE TABLE IF NOT EXISTS markets (
@@ -505,6 +516,10 @@ _DDL_INDEXES = (
     # additive cost is modest storage. This index is a pure perf hint — the
     # metric is correct without it (R-1326).
     "CREATE INDEX IF NOT EXISTS idx_scores_parcel_scored_at ON parcel_scores(parcel_id, scored_at DESC, score_id DESC);",
+    # prepare-mutation (2026-07-07): run-scoped variant of the index above,
+    # matching the run-scoped metric's DISTINCT ON (parcel_id) ... WHERE
+    # run_tag = %s ORDER BY parcel_id, scored_at DESC, score_id DESC.
+    "CREATE INDEX IF NOT EXISTS idx_scores_run_parcel_scored_at ON parcel_scores(run_tag, parcel_id, scored_at DESC, score_id DESC);",
     "CREATE INDEX IF NOT EXISTS idx_context_submarket_date ON market_context(submarket_id, as_of_date DESC);",
     "CREATE INDEX IF NOT EXISTS idx_comps_submarket_date ON sales_comps(submarket_id, sale_date DESC);",
     "CREATE INDEX IF NOT EXISTS idx_comps_type ON sales_comps(comp_type);",
@@ -517,6 +532,7 @@ _ALL_DDL: tuple[str, ...] = (
     _DDL_EXTENSION_POSTGIS,
     _DDL_PARCELS,
     _DDL_PARCEL_SCORES,
+    *_DDL_PARCEL_SCORES_RUN_COLUMNS,
     _DDL_MARKETS,
     _DDL_SUBMARKETS,
     _DDL_MARKET_CONTEXT,
@@ -589,11 +605,37 @@ def apply_schema(conn: "psycopg.Connection") -> None:
 # ORDER BY MUST lead with parcel_id (required for DISTINCT ON (parcel_id)),
 # then scored_at DESC (latest), then score_id DESC (deterministic tie-break).
 # Dropping any term is a correctness bug — see R-1324.
+#
+# prepare-mutation (2026-07-07): RUN-SCOPED EVALUATION UNIVERSE. The metric
+# previously counted the latest score of every parcel ever written to
+# parcel_scores, across all runs. That contradicted the canonical definition
+# in AUTORESEARCH_MECHANICS.md ("all scored parcels in the active experiment
+# branch" / `scored_in_current_experiment = TRUE`) in two ways:
+#   1. `git reset --hard` reverts code but not data — a DISCARDED
+#      experiment's parcel_scores rows persisted and inflated every
+#      subsequent measurement, breaking single-change attribution.
+#   2. A new run's baseline silently inherited all prior runs' parcels.
+# Now: when a run tag is in scope, the latest-row pick happens WITHIN that
+# run's rows only (`WHERE run_tag = %s` inside the CTE), and runner.py purges
+# a discarded/crashed/timed-out experiment's rows so the data ratchet mirrors
+# the git ratchet. Metric values from before this commit are NOT comparable
+# to values after; the next run must establish a fresh baseline
+# (AUTORESEARCH_MECHANICS.md "When Mutating prepare.py").
 _LATEST_SCORE_CTE = (
     "WITH latest AS ("
     "    SELECT DISTINCT ON (parcel_id) "
     "        parcel_id, composite_score, confidence_score, actionability "
     "    FROM parcel_scores "
+    "    ORDER BY parcel_id, scored_at DESC, score_id DESC"
+    ")"
+)
+
+_LATEST_SCORE_CTE_RUN_SCOPED = (
+    "WITH latest AS ("
+    "    SELECT DISTINCT ON (parcel_id) "
+    "        parcel_id, composite_score, confidence_score, actionability "
+    "    FROM parcel_scores "
+    "    WHERE run_tag = %s "
     "    ORDER BY parcel_id, scored_at DESC, score_id DESC"
     ")"
 )
@@ -604,39 +646,92 @@ _LATEST_SCORE_FILTER = (
     "actionability = 'PASS' AND composite_score >= %s"
 )
 
+_AUTORESEARCH_BRANCH_RE = r"^autoresearch/([a-z0-9._-]+)$"
 
-def calculate_actionable_pipeline_count(conn: "psycopg.Connection") -> int:
-    """Count parcels whose latest score is PASS and >= ``composite_threshold``.
 
-    Returns 0 against an empty database. The threshold is read from the
-    frozen parameters layer, NOT re-parsed from disk.
+def current_run_tag() -> str | None:
+    """Return the active run tag, or ``None`` when not inside a run.
+
+    Derived from the current git branch: ``autoresearch/<tag>`` -> ``<tag>``.
+    Any other branch (main, feature branches, detached HEAD) or any git
+    failure returns ``None`` — callers then fall back to the UNSCOPED
+    (informational) metric. The runner passes the tag explicitly on the
+    ratchet path, so this helper is a convenience for CLI/ad-hoc callers,
+    not a security boundary.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):  # pragma: no cover — no git
+        return None
+    if proc.returncode != 0:
+        return None
+    branch = proc.stdout.strip()
+    match = re.match(_AUTORESEARCH_BRANCH_RE, branch)
+    return match.group(1) if match else None
+
+
+def _metric_sql_and_params(
+    projection: str, run_tag: str | None
+) -> tuple[str, tuple[Any, ...]]:
+    """Compose the metric query for the given projection and run scope.
+
+    ``run_tag=None`` means "derive from the current git branch"; when no
+    autoresearch branch is checked out either, the query is UNSCOPED (all
+    runs — informational, never a ratchet input).
     """
     threshold = _PARAMETERS["composite_threshold"]
+    if run_tag is None:
+        run_tag = current_run_tag()
+    if run_tag is None:
+        sql = (
+            f"{_LATEST_SCORE_CTE} "
+            f"SELECT {projection} FROM latest WHERE {_LATEST_SCORE_FILTER}"
+        )
+        return sql, (threshold,)
     sql = (
-        f"{_LATEST_SCORE_CTE} "
-        f"SELECT COUNT(*) FROM latest WHERE {_LATEST_SCORE_FILTER}"
+        f"{_LATEST_SCORE_CTE_RUN_SCOPED} "
+        f"SELECT {projection} FROM latest WHERE {_LATEST_SCORE_FILTER}"
     )
+    return sql, (run_tag, threshold)
+
+
+def calculate_actionable_pipeline_count(
+    conn: "psycopg.Connection", run_tag: str | None = None
+) -> int:
+    """Count parcels whose latest score is PASS and >= ``composite_threshold``.
+
+    Scope: rows written during the run identified by ``run_tag``
+    (``None`` -> derive from the current git branch via
+    :func:`current_run_tag`; if that is also ``None``, count across ALL
+    runs — informational only). Returns 0 against an empty database. The
+    threshold is read from the frozen parameters layer, NOT re-parsed
+    from disk.
+    """
+    sql, params = _metric_sql_and_params("COUNT(*)", run_tag)
     with conn.cursor() as cur:
-        cur.execute(sql, (threshold,))
+        cur.execute(sql, params)
         row = cur.fetchone()
     return int(row[0]) if row and row[0] is not None else 0
 
 
-def calculate_confidence_weighted_pipeline(conn: "psycopg.Connection") -> float:
+def calculate_confidence_weighted_pipeline(
+    conn: "psycopg.Connection", run_tag: str | None = None
+) -> float:
     """Sum confidence_score across the actionable pipeline.
 
-    Returns 0.0 against an empty database. Same latest-row CTE and PASS +
-    threshold filter as :func:`calculate_actionable_pipeline_count`; only the
-    projection differs (SUM of confidence_score).
+    Same run scoping, latest-row CTE, and PASS + threshold filter as
+    :func:`calculate_actionable_pipeline_count`; only the projection
+    differs (SUM of confidence_score). Returns 0.0 against an empty
+    database.
     """
-    threshold = _PARAMETERS["composite_threshold"]
-    sql = (
-        f"{_LATEST_SCORE_CTE} "
-        f"SELECT COALESCE(SUM(confidence_score), 0) FROM latest "
-        f"WHERE {_LATEST_SCORE_FILTER}"
+    sql, params = _metric_sql_and_params(
+        "COALESCE(SUM(confidence_score), 0)", run_tag
     )
     with conn.cursor() as cur:
-        cur.execute(sql, (threshold,))
+        cur.execute(sql, params)
         row = cur.fetchone()
     return float(row[0]) if row and row[0] is not None else 0.0
 

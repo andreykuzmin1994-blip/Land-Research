@@ -8,6 +8,8 @@ research / prepare modules.
 
 from __future__ import annotations
 
+import runner
+
 import io
 import json
 import os
@@ -159,13 +161,13 @@ class TestCliHaltCommands(unittest.TestCase):
     def setUp(self) -> None:
         cli._set_color(False)
         import research
-        self._orig_path = research._HALT_SENTINEL_PATH
+        self._orig_path = runner._HALT_SENTINEL_PATH
         self._tmp = tempfile.TemporaryDirectory()
-        research._HALT_SENTINEL_PATH = Path(self._tmp.name) / ".halt"
+        runner._HALT_SENTINEL_PATH = Path(self._tmp.name) / ".halt"
 
     def tearDown(self) -> None:
         import research
-        research._HALT_SENTINEL_PATH = self._orig_path
+        runner._HALT_SENTINEL_PATH = self._orig_path
         self._tmp.cleanup()
 
     def test_halt_creates_sentinel(self) -> None:
@@ -173,11 +175,11 @@ class TestCliHaltCommands(unittest.TestCase):
         ns = mock.Mock()
         rc = cli.cmd_halt(ns)
         self.assertEqual(rc, 0)
-        self.assertTrue(research._HALT_SENTINEL_PATH.exists())
+        self.assertTrue(runner._HALT_SENTINEL_PATH.exists())
 
     def test_halt_idempotent(self) -> None:
         import research
-        research._HALT_SENTINEL_PATH.touch()
+        runner._HALT_SENTINEL_PATH.touch()
         ns = mock.Mock()
         buf = io.StringIO()
         with redirect_stdout(buf):
@@ -187,11 +189,11 @@ class TestCliHaltCommands(unittest.TestCase):
 
     def test_unhalt_removes_sentinel(self) -> None:
         import research
-        research._HALT_SENTINEL_PATH.touch()
+        runner._HALT_SENTINEL_PATH.touch()
         ns = mock.Mock()
         rc = cli.cmd_unhalt(ns)
         self.assertEqual(rc, 0)
-        self.assertFalse(research._HALT_SENTINEL_PATH.exists())
+        self.assertFalse(runner._HALT_SENTINEL_PATH.exists())
 
     def test_unhalt_no_sentinel_is_ok(self) -> None:
         ns = mock.Mock()
@@ -219,7 +221,7 @@ class TestCliLogCommand(unittest.TestCase):
     def _seed(self) -> None:
         import research
         for i, status in enumerate(["baseline", "keep", "discard"]):
-            research.append_experiment_log_row({
+            runner.append_experiment_log_row({
                 "commit": f"{i:07x}", "metric": i, "confidence": float(i),
                 "api_calls": 0, "wall_clock_min": 1.0,
                 "status": status, "description": f"row {i}",
@@ -269,7 +271,7 @@ class TestCliLogCommand(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# verify / status (mocked research.verify_setup)
+# verify / status (mocked runner.verify_setup)
 # ---------------------------------------------------------------------------
 class TestCliVerify(unittest.TestCase):
     def setUp(self) -> None:
@@ -277,7 +279,7 @@ class TestCliVerify(unittest.TestCase):
 
     def test_verify_ok_returns_zero(self) -> None:
         ns = mock.Mock(market="atlanta", json=False)
-        with mock.patch("research.verify_setup", return_value={
+        with mock.patch("runner.verify_setup", return_value={
             "status": "ok", "branch": "autoresearch/test", "tag": "test",
             "is_autoresearch_branch": True,
             "checks": {"db": {"status": "ok", "postgis_version": "3.3"}},
@@ -290,7 +292,7 @@ class TestCliVerify(unittest.TestCase):
 
     def test_verify_warning_returns_zero(self) -> None:
         ns = mock.Mock(market="atlanta", json=False)
-        with mock.patch("research.verify_setup", return_value={
+        with mock.patch("runner.verify_setup", return_value={
             "status": "warning", "branch": "autoresearch/test", "tag": "test",
             "is_autoresearch_branch": True, "checks": {},
         }):
@@ -300,7 +302,7 @@ class TestCliVerify(unittest.TestCase):
 
     def test_verify_fail_returns_two(self) -> None:
         ns = mock.Mock(market="atlanta", json=False)
-        with mock.patch("research.verify_setup", return_value={
+        with mock.patch("runner.verify_setup", return_value={
             "status": "fail", "branch": "main", "tag": None,
             "is_autoresearch_branch": False, "checks": {},
         }):
@@ -314,7 +316,7 @@ class TestCliVerify(unittest.TestCase):
             "status": "ok", "branch": "autoresearch/x", "tag": "x",
             "is_autoresearch_branch": True, "checks": {},
         }
-        with mock.patch("research.verify_setup", return_value=payload):
+        with mock.patch("runner.verify_setup", return_value=payload):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 cli.cmd_verify(ns)
@@ -334,8 +336,8 @@ class TestCliLoopErrors(unittest.TestCase):
     def test_setup_error_maps_to_exit_2(self) -> None:
         import research
         ns = mock.Mock(market="atlanta", max=1, confirmed=False, json=False)
-        with mock.patch.object(research, "experiment_loop",
-                               side_effect=research.SetupError("nope")):
+        with mock.patch.object(runner, "experiment_loop",
+                               side_effect=runner.SetupError("nope")):
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 rc = cli.cmd_loop(ns)
         self.assertEqual(rc, 2)
@@ -343,8 +345,8 @@ class TestCliLoopErrors(unittest.TestCase):
     def test_lock_error_maps_to_exit_3(self) -> None:
         import research
         ns = mock.Mock(market="atlanta", max=1, confirmed=False, json=False)
-        with mock.patch.object(research, "experiment_loop",
-                               side_effect=research.LoopLockError("locked")):
+        with mock.patch.object(runner, "experiment_loop",
+                               side_effect=runner.LoopLockError("locked")):
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 rc = cli.cmd_loop(ns)
         self.assertEqual(rc, 3)
@@ -352,7 +354,7 @@ class TestCliLoopErrors(unittest.TestCase):
     def test_loop_success_returns_zero(self) -> None:
         import research
         ns = mock.Mock(market="atlanta", max=1, confirmed=True, json=False)
-        with mock.patch.object(research, "experiment_loop",
+        with mock.patch.object(runner, "experiment_loop",
                                return_value={"iterations": 1, "halted": False,
                                              "wall_clock_min_total": 1.0,
                                              "market": "atlanta"}):
@@ -368,12 +370,12 @@ class TestCliMain(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         import research
-        self._orig_path = research._HALT_SENTINEL_PATH
-        research._HALT_SENTINEL_PATH = Path(self._tmp.name) / ".halt"
+        self._orig_path = runner._HALT_SENTINEL_PATH
+        runner._HALT_SENTINEL_PATH = Path(self._tmp.name) / ".halt"
 
     def tearDown(self) -> None:
         import research
-        research._HALT_SENTINEL_PATH = self._orig_path
+        runner._HALT_SENTINEL_PATH = self._orig_path
         self._tmp.cleanup()
 
     def test_main_halt_no_color(self) -> None:
@@ -381,15 +383,15 @@ class TestCliMain(unittest.TestCase):
         with redirect_stdout(io.StringIO()):
             rc = cli.main(["--no-color", "halt"])
         self.assertEqual(rc, 0)
-        self.assertTrue(research._HALT_SENTINEL_PATH.exists())
+        self.assertTrue(runner._HALT_SENTINEL_PATH.exists())
 
     def test_main_unhalt(self) -> None:
         import research
-        research._HALT_SENTINEL_PATH.touch()
+        runner._HALT_SENTINEL_PATH.touch()
         with redirect_stdout(io.StringIO()):
             rc = cli.main(["--no-color", "unhalt"])
         self.assertEqual(rc, 0)
-        self.assertFalse(research._HALT_SENTINEL_PATH.exists())
+        self.assertFalse(runner._HALT_SENTINEL_PATH.exists())
 
     def test_main_unknown_subcommand_exits_two(self) -> None:
         with redirect_stderr(io.StringIO()):

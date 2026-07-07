@@ -41,8 +41,7 @@ If you cannot confirm any of these points after reading, re-read the document. D
 > - The agent's primary metric is actionable_pipeline_count
 > - The four actionability gates are: path to control (informational only, never a hard fail), plausible entitlement, viable strategy with next step, no deal-killers
 > - The five investment strategies the agent tags parcels for: BTS, spec development, land bank, ground lease, land flip, plus assemblage
-> - The mandatory three-agent coding workflow: Agent 1 reviews risks, Agent 2 writes code, Agent 3 reviews and is the only one with commit authority
-> - All three agents must run Claude Opus 4.7
+> - The tiered review workflow (STANDING_RISKS.md): tests+CI at Tier 0, one independent fresh-context reviewer at Tier 1, the full three-agent adversarial workflow (sole commit authority with Agent 3) for Tier 2 metric/contract-touching changes — always on the strongest available model
 > - The connector test harness must be built BEFORE individual county connectors"
 
 ---
@@ -58,7 +57,7 @@ If you cannot confirm any of these points after reading, re-read the document. D
 > "Step 3 complete. I have read the infrastructure specs. I understand:
 > - Storage is PostgreSQL + PostGIS, not file-based, not Obsidian
 > - CoStar ingestion is via manual scheduled exports only — scraping is a legal risk and is forbidden
-> - The implementation roadmap has 14 phases; current state is pre-Phase 0 (specifications complete, no code written yet)
+> - The implementation roadmap has 14 phases; I will determine the CURRENT phase from the repo itself in Step 4 (README Status + `make status`), not from any prose snapshot in the specs
 > - I will not propose alternative storage approaches or alternative CoStar integration methods unless the human explicitly asks"
 
 ---

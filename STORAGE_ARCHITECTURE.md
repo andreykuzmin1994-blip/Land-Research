@@ -98,13 +98,24 @@ CREATE TABLE parcel_scores (
     strategy_fit JSONB,                 -- {"bts": "STRONG", "spec": "WEAK", "land_bank": "STRONG", ...}
     primary_strategy TEXT,
     investment_thesis TEXT,             -- The narrative writeup
-    notes TEXT
+    notes TEXT,
+    run_tag TEXT,                       -- autoresearch/<tag> run this row belongs to (NULL = ad-hoc)
+    experiment_id TEXT                  -- evaluate() invocation that wrote it (NULL = ad-hoc)
 );
 
 CREATE INDEX idx_scores_parcel ON parcel_scores(parcel_id);
 CREATE INDEX idx_scores_actionability ON parcel_scores(actionability);
 CREATE INDEX idx_scores_composite ON parcel_scores(composite_score);
+CREATE INDEX idx_scores_run_parcel_scored_at ON parcel_scores(run_tag, parcel_id, scored_at DESC, score_id DESC);
 ```
+
+Run/experiment attribution (prepare-mutation 2026-07-07): the metric in
+`prepare.py` counts only rows whose `run_tag` matches the active
+`autoresearch/<tag>` run, and `runner.py` deletes the rows of a
+discarded/crashed/timed-out experiment by `experiment_id` — so `git reset`
+(code revert) and the score purge (data revert) together make a discarded
+experiment leave no trace in the next measurement. Rows written outside a
+run (both columns NULL) are informational and never purge targets.
 
 **markets**
 Reference table for target markets and submarkets.

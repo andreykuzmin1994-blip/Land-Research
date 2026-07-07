@@ -1,5 +1,5 @@
 {
-  "_comment": "Registry of data source URLs, APIs, and access patterns. The agent may ADD new sources but should not remove existing ones. See appendix_a_county_connectors.md for full per-county specs.",
+  "_comment": "Registry of data source URLs, APIs, and access patterns. LOCKED during a run: the agent NEVER writes this file (adding a source is a metric-manipulation vector — AUTORESEARCH_MECHANICS.md File 5, START_HERE.md Anti-Pattern 7). Humans add sources between experiments and never remove existing ones mid-run. See appendix_a_county_connectors.md for full per-county specs.",
   "_version": "1.0",
 
   "county_parcel_data": {

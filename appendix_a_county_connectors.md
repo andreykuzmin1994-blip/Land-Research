@@ -6,9 +6,30 @@
 
 ---
 
-## Coding Workflow: Three-Agent Code Team
+## Coding Workflow: Tiered Review (Three-Agent Team at Tier 2)
 
-All code referenced in this appendix — the connector harness, individual county connectors, the AI fallback layer, the scoring engine in `research.py`, and any future modifications — must be developed using a **three-agent code team** running Claude Opus 4.7. This is not optional. The complexity of this system, the number of integration points (8 counties, multiple data sources, autonomous loop, AI fallback), and the cost of silent failures (a connector returning bad data could populate the pipeline with garbage for weeks before detection) all justify the overhead of multi-agent review.
+> **Governing rule (2026-07-07 revision):** which review a change needs is
+> defined by the **change tiers in `STANDING_RISKS.md`** — Tier 0 (tests +
+> CI only), Tier 1 (one independent fresh-context reviewer), Tier 2 (full
+> adversarial review). The recurring risk checklist that used to be
+> re-derived in every review also lives there; reviews cite SR-IDs and
+> write out only phase-specific findings.
+>
+> This revision is evidence-based: across the 13 reviewed phases
+> (see `reviews/14_streamlining_review/`), genuinely independent review
+> caught real bugs (the Phase 13 metric double-count, the Phase 3 centroid
+> bug via a fresh-context revalidation) while single-context "three-agent"
+> documents written by one orchestrator forced zero code changes across
+> eight phases. The requirement that matters is **context independence**,
+> not document count. Run the roles below on the **strongest available
+> model** and record which model actually ran in the decision note — do
+> not pin a model name in process docs (the previously pinned "Opus 4.7"
+> aged out within weeks).
+
+The three-agent code team below is the canonical **Tier 2** implementation
+— required for the connector harness internals, the AI fallback layer,
+anything touching `prepare.py`/`runner.py` decision logic, the metric, or
+credentials. The complexity of those integration points and the cost of silent failures (a connector returning bad data could populate the pipeline with garbage for weeks before detection) justify the overhead of multi-agent review there — and, per the audit, only there.
 
 ### The Three Roles
 
@@ -60,29 +81,29 @@ Agent 3 exists because two agents can collude on a flawed solution if neither ha
 
 ### Operational Notes
 
-- All three agents must run Claude Opus 4.7. Do not substitute a smaller model for any of the three roles. The risk review and code review tasks require the same level of reasoning capability as the code-writing task.
-- Each agent runs in a fresh context with only the relevant artifacts available. Agent 2 sees the requirement and Agent 1's review. Agent 3 sees the requirement, Agent 1's review, and Agent 2's code. None of the agents see the others' internal reasoning — only their outputs.
-- The three-agent workflow is required for production code. For exploratory or throwaway scripts (e.g., a one-time data analysis to check a hypothesis), a single agent is acceptable, but the output of such scripts must not be committed to the production codebase without going through the three-agent workflow.
-- When the human disagrees with Agent 3's decision, the human's decision wins. The three-agent workflow is a quality assurance system, not a governance system — final authority remains with the human operator.
+- Run every role on the **strongest available model** and record the model
+  that actually ran in the decision note (the audit found the old "must run
+  Opus 4.7" rule was unverifiable in 8 of 13 phases and stale within weeks).
+  The risk review and code review tasks require the same level of reasoning
+  capability as the code-writing task — never a smaller model for review.
+- Each agent runs in a fresh context with only the relevant artifacts available. Agent 2 sees the requirement and Agent 1's review. Agent 3 sees the requirement, Agent 1's review, and Agent 2's code. None of the agents see the others' internal reasoning — only their outputs. **Context independence is the load-bearing property.** If a sub-agent cannot run (quota, tooling), record the deviation in the decision note and get a fresh-context review before merge — an author reviewing their own code in the same context does not count, whatever the document is titled.
+- When the human disagrees with Agent 3's decision, the human's decision wins. The workflow is a quality assurance system, not a governance system — final authority remains with the human operator.
 - The Reviewer-Implementer (Agent 3) is the only agent that commits code to the repo. Neither Agent 1 nor Agent 2 has commit access. This enforces the review gate.
+- Decision notes are SHORT: what was verified (cite SR-IDs from
+  `STANDING_RISKS.md`), what phase-specific risks were found, what changed
+  as a result, any deviations. The 400-line gate-by-gate tabulation format
+  is retired — gates that matter are encoded as tests.
 
-### When to Skip This Workflow
+### Which Changes Need Which Review
 
-The three-agent workflow is overkill for:
-- Documentation-only changes (updating this appendix, fixing typos, restructuring sections)
-- Configuration changes that don't involve logic (adding a new county to the harness registry, adjusting a scoring weight in `parameters.json`)
-- Trivially safe one-line fixes (renaming a variable for clarity, adding a comment)
-
-The three-agent workflow is required for:
-- New connectors (county or otherwise)
-- Changes to the harness logic
-- Changes to the scoring engine
-- Changes to the AI fallback layer
-- Changes to the autonomous loop in `research.py`
-- Any change that affects how the agent commits results to git
-- Any change to authentication, credentials, or external service integration
-
-When in doubt, run the workflow. The cost of three agents reviewing a small change is low. The cost of a single agent shipping a subtle bug into autonomous overnight runs is high.
+Defined once in `STANDING_RISKS.md` § "Change tiers" — Tier 0 (tests + CI
+only: docs, config, stubs, ops tooling), Tier 1 (one independent
+fresh-context reviewer: ordinary `research.py` logic), Tier 2 (this
+three-agent workflow: harness internals, AI fallback, `prepare.py`/
+`runner.py`/metric/credentials/external integrations). When in doubt, pick
+the higher tier. Exploratory throwaway scripts need no review, but their
+output does not enter the production codebase without passing through a
+tier.
 
 ---
 

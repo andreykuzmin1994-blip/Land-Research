@@ -30,10 +30,9 @@ Exit codes:
 
 from __future__ import annotations
 
+
 import argparse
-import csv
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -154,7 +153,8 @@ def _print_setup_dict(setup: Mapping[str, Any]) -> None:
 
 def cmd_verify(args: argparse.Namespace) -> int:
     import research  # deferred so --help works without DATABASE_URL
-    setup = research.verify_setup(args.market)
+    import runner  # deferred so --help works without DATABASE_URL
+    setup = runner.verify_setup(args.market)
     if args.json:
         print(json.dumps(setup, indent=2, default=str))
     else:
@@ -174,8 +174,9 @@ def cmd_db_check(args: argparse.Namespace) -> int:
 
 def cmd_baseline(args: argparse.Namespace) -> int:
     import research
+    import runner
     print(_c(f"==> running baseline experiment for market={args.market}", _C.BOLD))
-    row = research.run_baseline_experiment(args.market)
+    row = runner.run_baseline_experiment(args.market)
     if args.json:
         print(json.dumps(row, indent=2, default=str))
     else:
@@ -191,6 +192,7 @@ def _print_baseline_row(row: Mapping[str, Any]) -> None:
 
 def cmd_loop(args: argparse.Namespace) -> int:
     import research
+    import runner
     print(_c(
         f"==> experiment_loop(market={args.market}, max_iterations={args.max if args.max else 'None (NEVER STOP)'})",
         _C.BOLD,
@@ -200,15 +202,15 @@ def cmd_loop(args: argparse.Namespace) -> int:
         _C.DIM,
     ))
     try:
-        summary = research.experiment_loop(
+        summary = runner.experiment_loop(
             args.market,
             max_iterations=args.max,
             confirmed=args.confirmed,
         )
-    except research.SetupError as exc:
+    except runner.SetupError as exc:
         print(_status_label("fail") + f"SetupError: {exc}", file=sys.stderr)
         return 2
-    except research.LoopLockError as exc:
+    except runner.LoopLockError as exc:
         print(_status_label("fail") + f"LoopLockError: {exc}", file=sys.stderr)
         return 3
     if args.json:
@@ -222,15 +224,16 @@ def cmd_loop(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     import research
-    setup = research.verify_setup(args.market)
+    import runner
+    setup = runner.verify_setup(args.market)
     print(_c(f"==> verify_setup(market={args.market})", _C.BOLD))
     if args.json:
         print(json.dumps(setup, indent=2, default=str))
     else:
         _print_setup_dict(setup)
     print()
-    log_path = research._experiment_log_path()
-    rows = research.read_experiment_log(log_path)
+    log_path = runner._experiment_log_path()
+    rows = runner.read_experiment_log(log_path)
     print(_c(f"==> last {min(args.tail, len(rows)) if rows else 0} of {len(rows)} TSV rows", _C.BOLD))
     if rows:
         cols = ["commit", "metric", "confidence", "api_calls",
@@ -238,7 +241,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(_render_tsv_table(rows[-args.tail :], cols), end="")
     else:
         print("  (no experiment_log.tsv yet)")
-    halt_path = research._HALT_SENTINEL_PATH
+    halt_path = runner._HALT_SENTINEL_PATH
     if halt_path.exists():
         print()
         print(_status_label("warning") + ".halt sentinel is set")
@@ -247,8 +250,9 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_log(args: argparse.Namespace) -> int:
     import research
-    log_path = research._experiment_log_path()
-    rows = research.read_experiment_log(log_path)
+    import runner
+    log_path = runner._experiment_log_path()
+    rows = runner.read_experiment_log(log_path)
     if not rows:
         print("(no experiment_log.tsv yet)")
         return 0
@@ -310,7 +314,8 @@ def cmd_db_stats(args: argparse.Namespace) -> int:
 
 def cmd_halt(args: argparse.Namespace) -> int:
     import research
-    p = research._HALT_SENTINEL_PATH
+    import runner
+    p = runner._HALT_SENTINEL_PATH
     if p.exists():
         print(_status_label("warning") + f".halt already exists at {p}")
         return 0
@@ -321,7 +326,8 @@ def cmd_halt(args: argparse.Namespace) -> int:
 
 def cmd_unhalt(args: argparse.Namespace) -> int:
     import research
-    p = research._HALT_SENTINEL_PATH
+    import runner
+    p = runner._HALT_SENTINEL_PATH
     if p.exists():
         p.unlink()
         print(_status_label("ok") + ".halt removed")
@@ -332,7 +338,8 @@ def cmd_unhalt(args: argparse.Namespace) -> int:
 
 def cmd_tail(args: argparse.Namespace) -> int:
     import research
-    log_path = research._experiment_log_path()
+    import runner
+    log_path = runner._experiment_log_path()
     if not log_path.exists():
         print("(waiting for experiment_log.tsv to be created; Ctrl-C to exit)")
         try:
