@@ -772,7 +772,7 @@ _SQL_COUNT_LOG_FOR_CYCLE = (
     "SELECT COUNT(*) FROM research_log WHERE cycle_id = %s"
 )
 
-# Phase 7+8 (R-501): _SQL_INSERT_PARCEL_SCORE writes 10 columns into the
+# Phase 7+8 (R-501): _SQL_INSERT_PARCEL_SCORE writes 11 columns into the
 # parcel_scores DDL block defined in prepare.py:317-332. The DDL itself is
 # untouched; only the INSERT projection is extended. Columns added vs.
 # Phase 5: actionability_blockers (JSONB), strategy_fit (JSONB),
@@ -2658,6 +2658,17 @@ def score_parcel(
         cycle_id = _make_scoring_cycle_id("adhoc")
     if run_tag is None:
         run_tag = prepare.current_run_tag()
+    if run_tag is not None and experiment_id is None:
+        # Tier-2 review F7: rows stamped with a run tag but no experiment id
+        # count toward the run's metric forever and are never purge targets.
+        # Legitimate inside evaluate() (which always stamps an id); loud
+        # everywhere else so ad-hoc console scoring during a run is a
+        # deliberate act, not an accident.
+        log.warning(
+            "score_parcel(%s): scoring into run %r WITHOUT an experiment_id "
+            "— this row is unpurgeable and will count in the run metric",
+            parcel_id, run_tag,
+        )
 
     weights = params["scoring_weights"]
 
