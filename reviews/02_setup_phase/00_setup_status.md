@@ -1,3 +1,8 @@
+> **HISTORICAL POINT-IN-TIME LEDGER (2026-04-30).** Superseded by live state:
+> run `make status` / see README.md "Status". Notably, setup + a real
+> experiment run (autoresearch/atl-2026-05-05, merged via PR #20) happened
+> AFTER this document was written; it was intentionally not rewritten.
+
 # Setup Phase — Status and Pre-Flight Checklist
 
 > Per AUTORESEARCH_MECHANICS.md "The Setup Phase". This document is the

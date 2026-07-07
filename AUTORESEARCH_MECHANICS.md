@@ -67,14 +67,20 @@ The agent's loop reads `parameters.json` ONCE at the start of the run and caches
 
 This is the equivalent of Karpathy's `train.py`. The agent modifies this file freely. It contains:
 
-1. **Discovery logic**: how to query county APIs, which corridors to prioritize, which heuristics to apply for off-market identification.
-2. **Source connectors**: per-county API wrappers, AI fallback navigation patterns, CoStar export parsers.
-3. **Scoring implementation**: the sub-score calculation functions for S1–S12 (note: the WEIGHTING is in `prepare.py`, but the per-parameter SCORING is here — the agent can improve how it determines "interstate proximity score" for a parcel, but cannot change how that score is combined into the composite).
+1. **Discovery logic**: how to query county APIs, which corridors to prioritize, which heuristics to apply for off-market identification (including the per-county ArcGIS wrappers and, in Phase 12+, AI-fallback navigation).
+2. **Hard-filter predicates**: the H1–H10 implementations that decide pass/reject/flag per parcel (the RULES of what counts as a failure are specced in `program.md`; the composite/metric consequences are locked in `prepare.py`).
+3. **Scoring implementation**: the sub-score calculation functions for S1–S12 (note: the WEIGHTING is in `parameters.json` and the composite FORMULA in `prepare.py`, but the per-parameter SCORING is here — the agent can improve how it determines "interstate proximity score" for a parcel, but cannot change how that score is combined into the composite).
 4. **Strategy fit assessment**: the logic that tags each parcel with strategy fit ratings.
-5. **Investment thesis generation**: the prompt and logic that produces the narrative writeup.
-6. **Self-modification utilities**: helpers the agent uses to introspect its own performance and propose improvements.
+5. **Actionability gate evaluation**: the four-gate logic that produces the PASS/FAIL inputs the metric filters on.
 
-**The critical separation**: `research.py` produces parcel records and sub-scores. `prepare.py` evaluates those records to produce the metric. The agent can change how it produces the inputs to `prepare.py`, but it cannot change how `prepare.py` evaluates them.
+**What does NOT live here** (split out 2026-07-07; all immutable during a run, same status as `prepare.py`):
+
+- `runner.py` — the experiment loop, setup verification, evaluator, TSV I/O, keep-or-revert recording, and the non-kept-experiment purge. The harness that judges the agent's edits must not be editable by the agent mid-run.
+- `costar_ingest.py` — the CoStar export ETL, frozen to `COSTAR_INGESTION_CONTRACT.md`.
+- `reporting.py` — snapshot and strategy memo rendering.
+- `pipeline_common.py` — shared paths, the `flagged_items` helper, shared SQL.
+
+**The critical separation**: `research.py` produces parcel records and sub-scores. `prepare.py` evaluates those records to produce the metric, and `runner.py` runs the loop that records the outcome. The agent can change how it produces the inputs, but it cannot change how they are evaluated or how the ratchet is recorded.
 
 ### File 5: `sources.json` — Locked Data Source Registry
 
@@ -97,7 +103,7 @@ Before any experiment loop begins, the agent runs a setup sequence with the huma
 
 2. **Create the branch**: `git checkout -b autoresearch/<tag>` from `main`. All experimentation happens on this branch. Main stays clean.
 
-3. **Read the in-scope files**: The agent reads `README.md`, `program.md`, `appendix_a_county_connectors.md`, `STORAGE_ARCHITECTURE.md`, `prepare.py`, `parameters.json`, `sources.json`, and the current `research.py`. Total context: ~80KB. Fits comfortably in Opus 4.7's window.
+3. **Read the in-scope files**: The agent reads `README.md`, `program.md`, `appendix_a_county_connectors.md`, `STORAGE_ARCHITECTURE.md`, `prepare.py`, `parameters.json`, `sources.json`, and the current `research.py`. The 2026-07-07 split exists precisely to keep this reading list tractable: the agent's editable surface (`research.py`) is ~3k lines; `runner.py`/`costar_ingest.py`/`reporting.py` are immutable infrastructure the agent consults only as needed.
 
 4. **Verify infrastructure**:
    - Postgres connection works (`SELECT POSTGIS_VERSION()` returns)
@@ -492,6 +498,8 @@ When implementing this pattern in code, every item below must be true. If any is
 - [ ] The TSV is in `.gitignore`
 - [ ] The branch naming convention is `autoresearch/<tag>` and `main` is never written to during a run
 - [ ] The agent does NOT have the ability to modify `prepare.py`, `parameters.json`, or `sources.json` from within `research.py` (file permissions or runtime check)
+- [ ] `runner.py`, `costar_ingest.py`, `reporting.py`, and `pipeline_common.py` are treated as immutable during a run — the agent never edits the loop that evaluates its own experiments
+- [ ] Every `parcel_scores` row carries `run_tag` + `experiment_id`; the metric counts only the active run's rows; a `discard`/`crash`/`timeout` decision purges that experiment's rows (the data half of the git ratchet)
 - [ ] The simplicity criterion is mentioned in `program.md` and the agent's prompt
 - [ ] The NEVER STOP rule is mentioned in `program.md` and the agent's prompt
 - [ ] When `prepare.py` is mutated (between runs), the protocol is followed and a new branch+baseline is created

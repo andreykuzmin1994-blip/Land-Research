@@ -1,7 +1,9 @@
 # Build Phases
 
 > Implementation roadmap for the Land Site Selector agent.
-> Realistic time estimates assuming evening/weekend work and the three-agent coding workflow.
+> Realistic time estimates assuming evening/weekend work and the tiered review workflow (STANDING_RISKS.md).
+>
+> **Progress note (2026-07-07): Phases 1-10 are SHIPPED** — see README.md "Status" and run `make status` for live state. The per-phase prompts below are kept as the historical build recipe and the template for Phase 11+.
 
 ---
 
@@ -157,7 +159,7 @@ Tell Claude Code:
 Add Clayton, Henry, Cobb, Gwinnett, DeKalb, Fayette, Spalding to the connector registry. Each new county requires:
 1. Validate the county's API endpoint manually (or confirm AI fallback portal)
 2. Add to harness registry, run harness validation
-3. Tell Claude Code via three-agent workflow to add the county's connector to research.py
+3. Tell Claude Code to add the county's connector to research.py (Tier 1 review: one independent fresh-context reviewer per STANDING_RISKS.md)
 4. Run discovery cycle against the new county
 
 Priority order per appendix_a_county_connectors.md: Fulton (done) → Clayton → Henry → Cobb → Gwinnett → DeKalb → Fayette → Spalding.
@@ -168,7 +170,7 @@ Priority order per appendix_a_county_connectors.md: Fulton (done) → Clayton �
 
 **Goal**: When ArcGIS APIs fail or don't exist (Spalding, Fayette), the agent can still extract data via Playwright + Claude vision.
 
-Use the three-agent workflow. Implement the AI fallback per appendix_a_county_connectors.md. Test against qPublic for a known Fulton parcel first, then enable for Spalding and Fayette.
+Use the full three-agent workflow (Tier 2 — external-service integration). Implement the AI fallback per appendix_a_county_connectors.md. Test against qPublic for a known Fulton parcel first, then enable for Spalding and Fayette.
 
 **Exit criteria**: A simulated API failure for Fulton triggers AI fallback successfully. Spalding and Fayette discovery cycles run via AI fallback.
 
