@@ -180,11 +180,28 @@ actionable_pipeline_count = COUNT(parcels WHERE
     hard_filters = ALL_PASS
     AND composite_score >= composite_threshold
     AND actionability = PASS
-    AND scored_in_current_experiment = TRUE
+    AND scored_in_current_run = TRUE      -- run_tag = active autoresearch/<tag>
 )
 ```
 
 **Higher is better.** This is the equivalent of Karpathy's `val_bpb` (where lower is better — direction is just convention).
+
+**Run scoping and the data ratchet** (prepare-mutation 2026-07-07): every
+`parcel_scores` row carries the `run_tag` of the run and the
+`experiment_id` of the `evaluate()` invocation that wrote it. The metric
+counts each parcel's latest row *within the active run only* — a fresh run
+starts from a fresh universe and re-scores parcels for itself, so baselines
+are comparable across runs. When an experiment's decision is `discard`,
+`crash`, or `timeout`, the runner deletes that experiment's rows: `git
+reset --hard HEAD~1` reverts the code, the purge reverts the data. Without
+the purge, a rejected experiment's scores would persist and inflate every
+subsequent measurement, silently breaking single-change attribution.
+
+One caveat is inherent to a stateful pipeline metric: within a run, an
+experiment can also move the metric by scoring backlog parcels discovered
+earlier (data progression), not only by being a better `research.py`. The
+tertiary `discovery_rate` / `conversion_rate` tracking exists for the human
+to spot this pattern; treat single-experiment deltas as evidence, not proof.
 
 ### Why This Metric Is Karpathy-Compliant
 

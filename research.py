@@ -769,8 +769,9 @@ _SQL_INSERT_PARCEL_SCORE = (
     "INSERT INTO parcel_scores ("
     "parcel_id, composite_score, confidence_score, "
     "actionability, actionability_blockers, "
-    "sub_scores, strategy_fit, primary_strategy, notes"
-    ") VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s) "
+    "sub_scores, strategy_fit, primary_strategy, notes, "
+    "run_tag, experiment_id"
+    ") VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) "
     "RETURNING score_id"
 )
 
@@ -835,7 +836,32 @@ _SQL_LIST_PARCELS_FOR_SCORING = (
     "  OR ("
     "    SELECT ps.actionability FROM parcel_scores ps "
     "    WHERE ps.parcel_id = p.parcel_id "
-    "    ORDER BY ps.scored_at DESC LIMIT 1"
+    "    ORDER BY ps.scored_at DESC, ps.score_id DESC LIMIT 1"
+    "  ) = 'PENDING'"
+    ") "
+    "ORDER BY p.parcel_id"
+)
+
+# prepare-mutation (2026-07-07): run-scoped selection variant. Inside a run,
+# "needs scoring" means "no row IN THIS RUN or latest row IN THIS RUN is
+# PENDING" — a parcel scored PASS in a *previous* run is re-scored once per
+# run so the run-scoped metric can see it. Purging a discarded experiment's
+# rows returns its parcels to this selection automatically. The score_id
+# DESC tie-break matches prepare.py's DISTINCT ON selector so the scoring
+# layer and the metric can never disagree about which row is "latest".
+# Params: (market, run_tag, run_tag).
+_SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED = (
+    "SELECT p.parcel_id FROM parcels p "
+    "WHERE p.market = %s "
+    "AND ("
+    "  NOT EXISTS ("
+    "    SELECT 1 FROM parcel_scores ps "
+    "    WHERE ps.parcel_id = p.parcel_id AND ps.run_tag = %s"
+    "  )"
+    "  OR ("
+    "    SELECT ps.actionability FROM parcel_scores ps "
+    "    WHERE ps.parcel_id = p.parcel_id AND ps.run_tag = %s "
+    "    ORDER BY ps.scored_at DESC, ps.score_id DESC LIMIT 1"
     "  ) = 'PENDING'"
     ") "
     "ORDER BY p.parcel_id"
@@ -2553,6 +2579,8 @@ def score_parcel(
     cycle_id: str | None = None,
     params: Mapping[str, Any] | None = None,
     cache: "_CycleCache | None" = None,
+    run_tag: str | None = None,
+    experiment_id: str | None = None,
 ) -> dict[str, Any]:
     """Compute sub-scores S1..S12, strategy fit, and actionability for one
     parcel; persist all of it in a single transaction.
@@ -2570,6 +2598,13 @@ def score_parcel(
     strategy_fit, notes, and all DB rows are bit-identical to the cache=None
     path. When None (every existing caller, incl. the ad-hoc and direct-test
     paths) the original per-parcel queries run verbatim.
+
+    prepare-mutation (2026-07-07): ``run_tag`` and ``experiment_id`` are
+    persisted on every parcel_scores row so the metric can be scoped to the
+    active run and so runner.py can purge a discarded experiment's rows.
+    ``run_tag=None`` derives from the current git branch via
+    :func:`prepare.current_run_tag`; ``experiment_id=None`` (ad-hoc /
+    out-of-loop scoring) is stored as SQL NULL and is never purged.
 
     Returns: {parcel_id, status, composite_score, confidence_score,
     sub_scores, actionability, actionability_blockers, strategy_fit,
@@ -2589,6 +2624,8 @@ def score_parcel(
         params = prepare.get_parameters()
     if cycle_id is None:
         cycle_id = _make_scoring_cycle_id("adhoc")
+    if run_tag is None:
+        run_tag = prepare.current_run_tag()
 
     weights = params["scoring_weights"]
 
@@ -2668,6 +2705,8 @@ def score_parcel(
                             json.dumps(strategy_fit),
                             primary_strategy,
                             notes,
+                            run_tag,
+                            experiment_id,
                         ),
                     )
                 with conn.cursor() as cur:
@@ -2761,15 +2800,27 @@ def score_parcel(
 # ---------------------------------------------------------------------------
 # Scoring cycle driver (R-213)
 # ---------------------------------------------------------------------------
-def run_scoring_cycle(market: str) -> dict[str, Any]:
-    """Score every unscored OR PENDING-latest-row parcel in the given market.
+def run_scoring_cycle(
+    market: str,
+    *,
+    run_tag: str | None = None,
+    experiment_id: str | None = None,
+) -> dict[str, Any]:
+    """Score every parcel needing a score for this run in the given market.
 
-    Phase 7+8 (R-507, R-510): _SQL_LIST_PARCELS_FOR_SCORING returns
-    parcels with no parcel_scores rows AND parcels whose latest row has
+    Phase 7+8 (R-507, R-510): the selection SQL returns parcels with no
+    parcel_scores rows AND parcels whose latest row has
     actionability='PENDING' (the Phase 5 default). Each scoring run
     APPENDS a new parcel_scores row — never UPDATEs in place — so
-    prepare.calculate_actionable_pipeline_count's MAX(scored_at) selector
+    prepare.calculate_actionable_pipeline_count's latest-row selector
     sees the freshest verdict.
+
+    prepare-mutation (2026-07-07): inside a run (``run_tag`` resolved from
+    the argument or the current git branch) the selection and the metric
+    are scoped to THIS RUN's rows — parcels scored in prior runs are
+    re-scored once for the new run. ``experiment_id`` (set by
+    runner.evaluate) is stamped on every row so a discarded experiment's
+    rows can be purged.
     """
     if market not in _MARKET_TO_COUNTIES:
         raise NotImplementedError(
@@ -2779,6 +2830,8 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
     prepare.verify_parameters_unchanged()
     params = prepare.get_parameters()
     cycle_id = _make_scoring_cycle_id(market)
+    if run_tag is None:
+        run_tag = prepare.current_run_tag()
 
     summary: dict[str, Any] = {
         "cycle_id": cycle_id,
@@ -2799,7 +2852,13 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
             return summary
 
         with conn.cursor() as cur:
-            cur.execute(_SQL_LIST_PARCELS_FOR_SCORING, (market,))
+            if run_tag is None:
+                cur.execute(_SQL_LIST_PARCELS_FOR_SCORING, (market,))
+            else:
+                cur.execute(
+                    _SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED,
+                    (market, run_tag, run_tag),
+                )
             parcel_ids = [r[0] for r in cur.fetchall()]
 
         # Phase 13 (R-1310, R-1317): prefetch the per-cycle market_context,
@@ -2815,6 +2874,7 @@ def run_scoring_cycle(market: str) -> dict[str, Any]:
         for pid in parcel_ids:
             result = score_parcel(
                 pid, conn=conn, cycle_id=cycle_id, params=params, cache=cache,
+                run_tag=run_tag, experiment_id=experiment_id,
             )
             status = result.get("status", "error")
             summary["counts"][status] = summary["counts"].get(status, 0) + 1

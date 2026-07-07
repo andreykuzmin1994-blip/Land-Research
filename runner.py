@@ -29,6 +29,7 @@ import logging
 import math
 import os
 import re
+import secrets
 import subprocess
 import time
 from contextlib import contextmanager
@@ -597,6 +598,16 @@ def verify_setup(market: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # evaluate(market) -- one full cycle + metric read (R-701, R-709, R-710)
 # ---------------------------------------------------------------------------
+def _make_experiment_id() -> str:
+    """Unique id stamped on every parcel_scores row an experiment writes.
+
+    prepare-mutation (2026-07-07): the id is how a discarded experiment's
+    rows are found and purged, so the data ratchet mirrors the git ratchet.
+    """
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"exp-{ts}-{secrets.token_hex(3)}"
+
+
 def evaluate(
     market: str,
     *,
@@ -604,6 +615,8 @@ def evaluate(
     skip_discovery: bool = False,
     skip_scoring: bool = False,
     skip_memo: bool = False,
+    run_tag: str | None = None,
+    experiment_id: str | None = None,
 ) -> dict[str, Any]:
     """Run one full Karpathy 'evaluate' cycle and return the metric.
 
@@ -616,6 +629,12 @@ def evaluate(
     and ``prepare.calculate_confidence_weighted_pipeline``.  No reimplementation.
     R-702: ``prepare.verify_parameters_unchanged`` runs at the start.
 
+    prepare-mutation (2026-07-07): ``run_tag`` (None -> derived from the
+    current git branch) scopes both the scoring cycle and the metric read
+    to THIS RUN's rows. ``experiment_id`` (None -> generated) is stamped
+    on every parcel_scores row this evaluate writes, so the loop can purge
+    the rows of a discarded/crashed/timed-out experiment.
+
     The ``skip_*`` flags exist for the test suite -- callers in production
     should leave them False.
 
@@ -625,12 +644,17 @@ def evaluate(
     """
     prepare.verify_parameters_unchanged()
 
+    if run_tag is None:
+        run_tag = prepare.current_run_tag()
+    if experiment_id is None:
+        experiment_id = _make_experiment_id()
+
     started = time.monotonic()
     started_iso = datetime.now(timezone.utc).isoformat()
     log.info(
-        "evaluate.start market=%s started_at=%s skip_ingestion=%s "
-        "skip_discovery=%s skip_scoring=%s skip_memo=%s",
-        market, started_iso,
+        "evaluate.start market=%s started_at=%s run_tag=%s experiment_id=%s "
+        "skip_ingestion=%s skip_discovery=%s skip_scoring=%s skip_memo=%s",
+        market, started_iso, run_tag, experiment_id,
         skip_ingestion, skip_discovery, skip_scoring, skip_memo,
     )
 
@@ -646,7 +670,9 @@ def evaluate(
             sub_summaries["discovery"] = research.run_discovery_cycle(market)
 
         if not skip_scoring:
-            sub_summaries["scoring"] = research.run_scoring_cycle(market)
+            sub_summaries["scoring"] = research.run_scoring_cycle(
+                market, run_tag=run_tag, experiment_id=experiment_id,
+            )
 
         if not skip_memo:
             try:
@@ -659,8 +685,12 @@ def evaluate(
                 sub_summaries["memo"] = {"path": None, "failed": True}
 
         with prepare.get_connection() as conn:
-            metric = prepare.calculate_actionable_pipeline_count(conn)
-            confidence = prepare.calculate_confidence_weighted_pipeline(conn)
+            metric = prepare.calculate_actionable_pipeline_count(
+                conn, run_tag=run_tag,
+            )
+            confidence = prepare.calculate_confidence_weighted_pipeline(
+                conn, run_tag=run_tag,
+            )
     except prepare.BudgetExceeded:
         status = "timeout"
         metric = 0
@@ -692,7 +722,61 @@ def evaluate(
         "sub_summaries": sub_summaries,
         "error": error,
         "started_at": started_iso,
+        "run_tag": run_tag,
+        "experiment_id": experiment_id,
     }
+
+
+# ---------------------------------------------------------------------------
+# Experiment purge (prepare-mutation 2026-07-07) — the data half of revert
+# ---------------------------------------------------------------------------
+_SQL_DELETE_SCORES_FOR_EXPERIMENT = (
+    "DELETE FROM parcel_scores WHERE experiment_id = %s"
+)
+
+_SQL_INSERT_RESEARCH_LOG_PURGE = (
+    "INSERT INTO research_log (cycle_id, action_type, market, notes) "
+    "VALUES (%s, %s, %s, %s)"
+)
+
+
+def _purge_experiment_scores(
+    experiment_id: str, market: str, decision: str
+) -> int:
+    """Delete a non-kept experiment's parcel_scores rows.
+
+    `git reset --hard` reverts the CODE of a discarded experiment;
+    this purge reverts its DATA. Without it, a discarded experiment's
+    scores persist and inflate every subsequent metric read, breaking the
+    single-change attribution the git ratchet exists to provide. Runs in
+    its own connection/transaction; the deletion is logged to
+    research_log (action_type='experiment_purge'). Returns rows deleted.
+
+    Purges ONLY rows stamped with this experiment's id — baseline rows,
+    kept experiments' rows, and ad-hoc (experiment_id NULL) rows are
+    untouchable by construction.
+    """
+    with prepare.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_DELETE_SCORES_FOR_EXPERIMENT, (experiment_id,))
+            deleted = cur.rowcount if cur.rowcount is not None else 0
+        with conn.cursor() as cur:
+            cur.execute(
+                _SQL_INSERT_RESEARCH_LOG_PURGE,
+                (
+                    experiment_id,
+                    "experiment_purge",
+                    market,
+                    f"decision={decision}; deleted {deleted} parcel_scores "
+                    f"rows for experiment_id={experiment_id}",
+                ),
+            )
+        conn.commit()
+    log.info(
+        "purged %d parcel_scores rows for %s experiment %s",
+        deleted, decision, experiment_id,
+    )
+    return int(deleted)
 
 
 # ---------------------------------------------------------------------------
@@ -717,6 +801,15 @@ def run_baseline_experiment(market: str) -> dict[str, Any]:
         new_confidence=result["confidence"],
         status=result["status"],
     )
+    # prepare-mutation (2026-07-07): a crashed/timed-out baseline attempt
+    # must not leave partial rows behind — the retry needs a clean slate.
+    if decision in {"crash", "timeout"} and result.get("experiment_id"):
+        try:
+            _purge_experiment_scores(result["experiment_id"], market, decision)
+        except Exception:
+            log.exception(
+                "purge failed for baseline attempt %s", result["experiment_id"],
+            )
     row = {
         "commit": _git_head_commit(),
         "metric": result["metric"],
@@ -931,6 +1024,25 @@ def experiment_loop(
                 new_confidence=result["confidence"],
                 status=result["status"],
             )
+
+            # prepare-mutation (2026-07-07): the data half of revert. The
+            # agent reverts the CODE via `git reset --hard HEAD~1` (R-723);
+            # the runner purges the DATA a non-kept experiment wrote.
+            if decision in {"discard", "crash", "timeout"} and result.get(
+                "experiment_id"
+            ):
+                try:
+                    _purge_experiment_scores(
+                        result["experiment_id"], market, decision,
+                    )
+                except Exception:
+                    # A failed purge contaminates later metric reads; make it
+                    # loud in the log but keep the loop alive (NEVER STOP).
+                    log.exception(
+                        "purge failed for experiment %s; metric residue may "
+                        "inflate subsequent reads",
+                        result["experiment_id"],
+                    )
 
             row = {
                 "commit": _git_head_commit(),

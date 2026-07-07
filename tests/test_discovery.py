@@ -6133,3 +6133,312 @@ class TestPhase13CacheGuards(unittest.TestCase):
         self.assertIn(research._SQL_FLAGGED_ACTIONABILITY_BLOCK, sqls)
         # 'zoning moratorium' has no 'entitlement' keyword → deal_killer fails.
         self.assertEqual(out["actionability"], research._ACTIONABILITY_FAIL_DEAL_KILLER)
+
+
+# ===========================================================================
+# prepare-mutation (2026-07-07) — run-scoped metric + experiment purge
+# See reviews/14_streamlining_review/00_streamlining_review.md Finding A.
+# ===========================================================================
+class TestRunScopedScoringStatics(unittest.TestCase):
+    """Static shape of the run/experiment attribution SQL."""
+
+    def test_insert_carries_run_and_experiment_columns(self) -> None:
+        sql = research._SQL_INSERT_PARCEL_SCORE
+        self.assertIn("run_tag", sql)
+        self.assertIn("experiment_id", sql)
+        # 11 bound values: 9 original + run_tag + experiment_id.
+        self.assertEqual(sql.count("%s"), 11)
+        self.assertNotIn("{", sql)
+
+    def test_run_scoped_selection_constant_shape(self) -> None:
+        sql = research._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED
+        # Both the NOT EXISTS arm and the PENDING arm are scoped to the run.
+        self.assertEqual(sql.count("ps.run_tag = %s"), 2)
+        # Deterministic tie-break aligned with prepare.py's DISTINCT ON
+        # selector (scored_at DESC, score_id DESC).
+        self.assertIn("ORDER BY ps.scored_at DESC, ps.score_id DESC", sql)
+        self.assertEqual(sql.count("%s"), 3)
+        self.assertNotIn("{", sql)
+
+    def test_unscoped_selection_gains_score_id_tie_break(self) -> None:
+        sql = research._SQL_LIST_PARCELS_FOR_SCORING
+        self.assertIn("ORDER BY ps.scored_at DESC, ps.score_id DESC", sql)
+
+    def test_insert_columns_exist_in_ddl(self) -> None:
+        import prepare
+        ddl = prepare._DDL_PARCEL_SCORES.lower()
+        for col in ("run_tag", "experiment_id"):
+            self.assertIn(col, ddl)
+
+
+class TestScoreParcelRunStamp(unittest.TestCase):
+    """score_parcel stamps run_tag + experiment_id onto the INSERT."""
+
+    _PTUPLE = (
+        "fulton-001", "atlanta", None, "GA", None, None, None, None,
+        -84.55, 33.55,
+    )
+
+    def setUp(self) -> None:
+        research._OZ_TRACTS_CACHE = None
+
+    def _score(self, **kwargs):
+        fake = Phase5FakeConnection(
+            fetchone_queue=[self._PTUPLE, (1000.0, 1100.0, 1.5)],
+        )
+        params = _passing_params()
+        params["scoring_weights"] = TestPhase5Composite.WEIGHTS
+        research.score_parcel(
+            "fulton-001", conn=fake, cycle_id="score-atlanta-test-0100",
+            params=params, **kwargs,
+        )
+        return next(
+            params for sql, params in fake.all_executes
+            if "INSERT INTO parcel_scores" in sql
+        )
+
+    def test_explicit_run_and_experiment_ids_are_persisted(self) -> None:
+        params = self._score(run_tag="atl-test", experiment_id="exp-123")
+        self.assertEqual(params[-2], "atl-test")
+        self.assertEqual(params[-1], "exp-123")
+
+    def test_run_tag_derived_when_omitted(self) -> None:
+        with mock.patch.object(
+            research.prepare, "current_run_tag", return_value="atl-derived",
+        ):
+            params = self._score()
+        self.assertEqual(params[-2], "atl-derived")
+        # Ad-hoc scoring carries NO experiment id — such rows are never
+        # purge targets.
+        self.assertIsNone(params[-1])
+
+    def test_off_branch_scoring_stores_null_run_tag(self) -> None:
+        with mock.patch.object(
+            research.prepare, "current_run_tag", return_value=None,
+        ):
+            params = self._score()
+        self.assertIsNone(params[-2])
+        self.assertIsNone(params[-1])
+
+
+class TestEvaluateRunThreading(unittest.TestCase):
+    """evaluate() threads run_tag + experiment_id into scoring and metric."""
+
+    def test_run_tag_and_experiment_id_reach_scoring_and_metric(self) -> None:
+        captured: dict[str, Any] = {}
+
+        def fake_scoring(market, *, run_tag=None, experiment_id=None):
+            captured["scoring"] = {
+                "market": market, "run_tag": run_tag,
+                "experiment_id": experiment_id,
+            }
+            return {}
+
+        def fake_metric(conn, run_tag=None):
+            captured["metric_run_tag"] = run_tag
+            return 3
+
+        def fake_confidence(conn, run_tag=None):
+            captured["confidence_run_tag"] = run_tag
+            return 2.5
+
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", return_value={}), \
+             mock.patch.object(research, "run_scoring_cycle", fake_scoring), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "current_run_tag",
+                               return_value="atl-thread"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               fake_metric), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               fake_confidence), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate("atlanta")
+
+        self.assertEqual(result["run_tag"], "atl-thread")
+        self.assertTrue(result["experiment_id"].startswith("exp-"))
+        self.assertEqual(captured["scoring"]["run_tag"], "atl-thread")
+        self.assertEqual(
+            captured["scoring"]["experiment_id"], result["experiment_id"],
+        )
+        self.assertEqual(captured["metric_run_tag"], "atl-thread")
+        self.assertEqual(captured["confidence_run_tag"], "atl-thread")
+
+    def test_explicit_ids_pass_through_unchanged(self) -> None:
+        @contextmanager
+        def fake_get_connection():
+            yield Phase5FakeConnection()
+
+        with mock.patch.object(costar_ingest, "run_ingestion_cycle", return_value={}), \
+             mock.patch.object(research, "run_discovery_cycle", return_value={}), \
+             mock.patch.object(research, "run_scoring_cycle", return_value={}), \
+             mock.patch.object(reporting, "generate_strategy_memo",
+                               return_value=Path("/tmp/memo.md")), \
+             mock.patch.object(research.prepare, "verify_parameters_unchanged"), \
+             mock.patch.object(research.prepare, "calculate_actionable_pipeline_count",
+                               return_value=0), \
+             mock.patch.object(research.prepare, "calculate_confidence_weighted_pipeline",
+                               return_value=0.0), \
+             mock.patch.object(research.prepare, "get_connection", fake_get_connection):
+            result = runner.evaluate(
+                "atlanta", run_tag="atl-x", experiment_id="exp-fixed",
+            )
+        self.assertEqual(result["run_tag"], "atl-x")
+        self.assertEqual(result["experiment_id"], "exp-fixed")
+
+
+class _PurgeFakeCursor:
+    def __init__(self, rowcount: int) -> None:
+        self.executes: list[tuple[str, tuple]] = []
+        self.rowcount = rowcount
+
+    def execute(self, sql: str, params: tuple = ()) -> None:
+        self.executes.append((sql, tuple(params or ())))
+
+    def __enter__(self) -> "_PurgeFakeCursor":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        return None
+
+
+class _PurgeFakeConnection:
+    def __init__(self, rowcount: int = 2) -> None:
+        self.cursors: list[_PurgeFakeCursor] = []
+        self.commits = 0
+        self._rowcount = rowcount
+
+    def cursor(self) -> _PurgeFakeCursor:
+        c = _PurgeFakeCursor(self._rowcount)
+        self.cursors.append(c)
+        return c
+
+    def commit(self) -> None:
+        self.commits += 1
+
+    @property
+    def all_executes(self) -> list[tuple[str, tuple]]:
+        return [e for c in self.cursors for e in c.executes]
+
+
+class TestExperimentPurge(unittest.TestCase):
+    """The data half of revert: a non-kept experiment's rows are deleted."""
+
+    def test_purge_deletes_by_experiment_id_and_logs(self) -> None:
+        fake = _PurgeFakeConnection(rowcount=3)
+
+        @contextmanager
+        def fake_get_connection():
+            yield fake
+
+        with mock.patch.object(
+            runner.prepare, "get_connection", fake_get_connection,
+        ):
+            deleted = runner._purge_experiment_scores(
+                "exp-dead", "atlanta", "discard",
+            )
+
+        self.assertEqual(deleted, 3)
+        sqls = fake.all_executes
+        self.assertIn(
+            (runner._SQL_DELETE_SCORES_FOR_EXPERIMENT, ("exp-dead",)), sqls,
+        )
+        log_rows = [
+            p for s, p in sqls if "INSERT INTO research_log" in s
+        ]
+        self.assertEqual(len(log_rows), 1)
+        self.assertEqual(log_rows[0][1], "experiment_purge")
+        self.assertIn("exp-dead", log_rows[0][3])
+        self.assertEqual(fake.commits, 1)
+
+    def test_delete_targets_only_the_experiment_id(self) -> None:
+        sql = runner._SQL_DELETE_SCORES_FOR_EXPERIMENT
+        self.assertIn("WHERE experiment_id = %s", sql)
+        self.assertNotIn("run_tag", sql)
+        self.assertEqual(sql.count("%s"), 1)
+
+
+class TestLoopPurgeWiring(unittest.TestCase):
+    """experiment_loop purges on discard/crash/timeout, never on keep."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.tsv_path = Path(self.tmp.name) / "experiment_log.tsv"
+        self.lock_path = Path(self.tmp.name) / ".lock"
+        os.environ["EXPERIMENT_LOG_PATH"] = str(self.tsv_path)
+        os.environ["EXPERIMENT_LOOP_LOCK_PATH"] = str(self.lock_path)
+        runner.append_experiment_log_row({
+            "commit": "0000000",
+            "metric": 5,
+            "confidence": 4.0,
+            "api_calls": 0,
+            "wall_clock_min": 0.0,
+            "status": "baseline",
+            "description": "baseline | market=atlanta",
+        }, path=self.tsv_path)
+
+    def tearDown(self) -> None:
+        os.environ.pop("EXPERIMENT_LOG_PATH", None)
+        os.environ.pop("EXPERIMENT_LOOP_LOCK_PATH", None)
+        self.tmp.cleanup()
+
+    def _patch_setup_ok(self):
+        return mock.patch.object(
+            runner, "verify_setup",
+            return_value={"status": "ok", "branch": "autoresearch/test",
+                          "tag": "test", "is_autoresearch_branch": True,
+                          "checks": {}},
+        )
+
+    def _eval(self, status: str, metric: int, exp_id: str) -> dict[str, Any]:
+        return {
+            "market": "atlanta", "status": status, "metric": metric,
+            "confidence": float(metric), "api_calls": 0,
+            "wall_clock_min": 0.1, "sub_summaries": {},
+            "run_tag": "test", "experiment_id": exp_id,
+        }
+
+    def test_discard_and_crash_purge_keep_does_not(self) -> None:
+        evals = [
+            self._eval("ok", 6, "exp-keep"),      # 6 > 5 baseline -> keep
+            self._eval("ok", 4, "exp-discard"),   # 4 < 6 anchor  -> discard
+            self._eval("crash", 0, "exp-crash"),  # crash          -> crash
+        ]
+        purged: list[tuple[str, str, str]] = []
+        with self._patch_setup_ok(), \
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_purge_experiment_scores",
+                               side_effect=lambda e, m, d: purged.append((e, m, d)) or 0), \
+             mock.patch.object(runner, "_git_head_commit",
+                               side_effect=["1111111", "2222222", "3333333"]):
+            runner.experiment_loop("atlanta", max_iterations=3)
+
+        self.assertEqual(
+            purged,
+            [("exp-discard", "atlanta", "discard"),
+             ("exp-crash", "atlanta", "crash")],
+        )
+
+    def test_purge_failure_does_not_kill_the_loop(self) -> None:
+        evals = [
+            self._eval("ok", 4, "exp-discard"),  # 4 < 5 baseline -> discard
+            self._eval("ok", 6, "exp-keep"),     # 6 > 5 baseline -> keep
+        ]
+        with self._patch_setup_ok(), \
+             mock.patch.object(runner, "evaluate", side_effect=evals), \
+             mock.patch.object(runner, "_purge_experiment_scores",
+                               side_effect=RuntimeError("db down")), \
+             mock.patch.object(runner, "_git_head_commit",
+                               side_effect=["1111111", "2222222"]):
+            summary = runner.experiment_loop("atlanta", max_iterations=2)
+        # NEVER STOP: both iterations completed despite the purge failure.
+        self.assertEqual(summary["iterations"], 2)
+        rows = runner.read_experiment_log(self.tsv_path)
+        self.assertEqual(rows[1]["status"], "discard")
+        self.assertEqual(rows[2]["status"], "keep")
