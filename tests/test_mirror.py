@@ -25,6 +25,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
+import tests  # noqa: F401 — force the package kill-switch guard to run
+              # even under top-level discovery (`discover tests` imports
+              # modules WITHOUT executing tests/__init__.py)
+
 import prepare
 import runner
 
