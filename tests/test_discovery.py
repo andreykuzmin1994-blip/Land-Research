@@ -23,6 +23,12 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+import tests  # noqa: F401 — force the package kill-switch guard
+              # (EXPERIMENT_LOG_MIRROR_DISABLE) to run even under
+              # top-level discovery, which skips tests/__init__.py; the
+              # loop/baseline tests below reach runner._mirror_log_row
+              # and must never touch a live mirror (SR-6; reviews/17 F1)
+
 # Importing research is import-safe — it uses lazy DB connection. The
 # psycopg dependency is required for module load.
 import research

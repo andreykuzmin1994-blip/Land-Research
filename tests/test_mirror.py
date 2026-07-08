@@ -25,6 +25,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
+import tests  # noqa: F401 — force the package kill-switch guard to run
+              # even under top-level discovery (`discover tests` imports
+              # modules WITHOUT executing tests/__init__.py)
+
 import prepare
 import runner
 
@@ -121,6 +125,15 @@ _VALID_ROW = {
     "status": "baseline",
     "description": "baseline | market=atlanta | run=atl-2026-07-08",
 }
+
+
+class TestSuiteKillSwitch(unittest.TestCase):
+    """Adversarial review F1: the suite-wide kill switch must be ACTIVE
+    (truthy) at test runtime — an empty-string value would re-enable the
+    mirror for every loop test on a machine with a real .env."""
+
+    def test_kill_switch_is_truthy_at_suite_runtime(self):
+        self.assertTrue(os.environ.get(runner._MIRROR_DISABLE_ENV_VAR))
 
 
 class TestMirrorLogRow(unittest.TestCase):

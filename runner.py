@@ -436,10 +436,12 @@ _SQL_SELECT_MIRROR_FOR_RESTORE = (
 )
 # Serializes operator backfills (R-M7 concurrent-backfill race).
 _SQL_BACKFILL_ADVISORY_LOCK = "SELECT pg_advisory_xact_lock(724500108)"
-# Bounds the INSERT server-side (R-M3): connect is already bounded by
-# connect_timeout=10 in prepare.get_connection; without this, a network
-# partition after connect could hang the loop at an iteration boundary.
-# SET LOCAL scopes the timeout to the mirror's own transaction.
+# Bounds lock-waits and slow statements server-side to 5s (R-M3); connect
+# is bounded by connect_timeout=10 in prepare.get_connection. A true
+# network partition after connect is still bounded only by TCP timeouts —
+# the same accepted exposure class as every pre-existing DB call in the
+# loop (adversarial review F4). SET LOCAL scopes the timeout to the
+# mirror's own transaction.
 _MIRROR_STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '5s'"
 # Kill switch (R-M2): tests/__init__.py sets this for the whole offline
 # suite so loop tests on developer machines with a real .env never open
@@ -670,7 +672,9 @@ def restore_experiment_log_from_mirror(
         raise RuntimeError(
             f"{log_path} exists and is non-empty; restore refuses to touch "
             "a live TSV. To reconcile a live TSV into the mirror, run "
-            "backfill_experiment_log_mirror (make mirror-backfill) instead."
+            "backfill_experiment_log_mirror (make mirror-backfill) instead. "
+            "If the file is a hand-created header-only stub, delete it "
+            "first (adversarial review F7)."
         )
     with prepare.get_connection() as conn:
         with conn.cursor() as cur:
