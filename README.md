@@ -47,6 +47,18 @@ make loop-attach        # tmux attach -t loop  (Ctrl-B d to detach again)
 2. Open the Codespace. The devcontainer's `post-start.sh` materializes `.env` from the secret automatically.
 3. Verify: `make db-check` should print PostGIS version + `actionable_pipeline_count: 0`.
 
+**Overnight runs and the Codespaces idle timeout**: GitHub stops idle
+Codespaces — by default 30 minutes after the last connection, 240 minutes
+maximum (Settings → Codespaces → default idle timeout, or per-machine
+`gh codespace edit --idle-timeout 240m`). A detached tmux session does
+NOT count as activity, so "kick the loop and close the laptop" yields at
+most one idle-timeout window of experiments (~2 at 90 minutes each), not
+a true overnight run. For real overnight autonomy, keep a terminal
+attached, or run the loop on a durable host (the DigitalOcean droplet
+already contemplated in the cost table — the repo is a plain git clone +
+`.env` away anywhere). `make loop-bg` prints this warning when it detects
+a Codespace.
+
 **Karpathy iteration loop** (what the agent does between `make loop` runs):
 
 1. Read `experiment_log.tsv`. The most recent `baseline` or `keep` row is the prior anchor.
@@ -63,8 +75,8 @@ Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) d
 
 ```
 land-site-selector/
-├── START_HERE.md                      — Claude Code orientation chain (READ FIRST if you are an agent)
-├── CLAUDE.md                          — Pointer to START_HERE.md
+├── CLAUDE.md                          — Contract card: invariants + orientation tiers (agents read FIRST)
+├── START_HERE.md                      — Full orientation chain (required before code/loop work)
 ├── README.md                          — This file
 ├── AUTORESEARCH_MECHANICS.md          — CANONICAL: how the Karpathy pattern is implemented
 ├── program.md                         — The agent's autonomous loop instructions
@@ -87,7 +99,7 @@ land-site-selector/
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)
 ├── data/                              — Bundled reference data (OZ tract stub, etc.)
-├── tests/                             — Offline suite (600 tests, ~1s) + fixtures
+├── tests/                             — Offline suite (`make tests`, ~1s) + fixtures
 ├── reviews/                           — Review artifacts per change (decision notes; historical 3-agent docs)
 ├── .devcontainer/                     — Codespaces config: secret -> .env hydration
 ├── .githooks/ + .github/workflows/    — Credential guard, offline+live CI, harness CI
@@ -98,20 +110,22 @@ land-site-selector/
 
 ## For Claude Code (and any AI coding agent)
 
-**Read `START_HERE.md` first.** It walks you through a 6-step orientation chain with explicit confirmation gates. Do not skip it — this repo implements the Karpathy AutoResearch pattern and skipping orientation silently corrupts the experimental log.
+**Read `CLAUDE.md` first** — a one-screen contract card with the always-on file mutability invariants and a tier table telling you how much orientation the session needs. Read-only, diagnostic, and docs-only sessions proceed on the card alone (light orientation). Any session touching code, config, tests, the canonical spec, or the experiment loop must then complete the 6-step chain in `START_HERE.md` before acting — skipping it silently corrupts the experimental log.
 
 ## For Humans
 
-Read in this order:
+`CLAUDE.md` is the one-screen version of the rules everything below justifies — start there. Then read for your need; new to the repo entirely, read the table top to bottom (it doubles as the onboarding order):
 
-1. `README.md` (this file)
-2. `AUTORESEARCH_MECHANICS.md` — Canonical specification of how the pattern is implemented. If anything else in this repo conflicts with this document, this document wins.
-3. `program.md` — The agent's strategic instructions
-4. `appendix_a_county_connectors.md` — Data source specs, tiered review workflow, connector harness
-5. `STANDING_RISKS.md` — Recurring risk checklist and review tiers
-6. `STORAGE_ARCHITECTURE.md` — Postgres + PostGIS schema
-7. `COSTAR_INGESTION_CONTRACT.md` — CoStar workflow (no scraping)
-8. `BUILD_PHASES.md` — Implementation roadmap
+| If you want to… | Read |
+|-----------------|------|
+| Operate the loop day-to-day | This README § Quick Start, then `make help` |
+| Understand how the Karpathy pattern is implemented — canonical, wins all conflicts | `AUTORESEARCH_MECHANICS.md` |
+| See what the agent optimizes, how parcels are scored, and redirect it between runs | `program.md` |
+| Add a county, fix a connector, or read the coding workflow spec | `appendix_a_county_connectors.md` |
+| Review a code change (change tiers + recurring risk checklist) | `STANDING_RISKS.md` |
+| Understand the database schema and storage decisions | `STORAGE_ARCHITECTURE.md` |
+| Set up or debug CoStar exports | `COSTAR_EXPORTS_README.md` (ops) + `COSTAR_INGESTION_CONTRACT.md` (spec) |
+| See the roadmap and how each phase was built and reviewed | `BUILD_PHASES.md` + `reviews/` |
 
 ## The Tiered Review Workflow
 

@@ -257,6 +257,12 @@ CREATE INDEX idx_log_timestamp ON research_log(timestamp DESC);
 
 **harness_reports**
 Connector health reports from the test harness.
+Status: the DDL ships (`prepare.apply_schema` creates it) but nothing
+writes this table yet — `connector_harness.py` persists reports as JSON
+files under `harness_reports/` plus the markdown dashboard. Wire the
+table up when connector-health trend analysis needs SQL (the appendix's
+90-day archive cadence); until then it is a future-locked extension
+point, kept in the DDL so adding it later is not a schema migration.
 ```sql
 CREATE TABLE harness_reports (
     report_id SERIAL PRIMARY KEY,
@@ -290,6 +296,44 @@ CREATE TABLE flagged_items (
     resolution_notes TEXT
 );
 ```
+
+**experiment_log_mirror**
+Durability mirror of `experiment_log.tsv` (prepare-mutation 2026-07-08;
+reviews/17_tsv_mirror/). The TSV remains the canonical Karpathy log and
+the only keep-or-revert anchor source; this table exists solely so a
+container reclaim cannot destroy the accumulated experimental history.
+Append-only with NO sanctioned deletion — the experiment purge never
+touches it — and never read by the metric or the decision logic
+(SR-13/SR-15/SR-16). `source` is `live` (runner writes it strictly after
+each TSV append) or `backfill` (operator reconciliation).
+```sql
+CREATE TABLE experiment_log_mirror (
+    entry_id BIGSERIAL PRIMARY KEY,     -- authoritative ordering
+    logged_at TIMESTAMPTZ DEFAULT NOW(),-- backfilled rows: backfill time, not experiment time
+    source TEXT NOT NULL DEFAULT 'live',-- live | backfill
+    run_tag TEXT,                       -- NULL: halt/breaker/outer-crash rows, legacy backfills
+    experiment_id TEXT,                 -- NULL: same cases as run_tag
+    commit_hash TEXT NOT NULL,          -- 7-40 hex chars or the literal 'pending'
+    metric INTEGER NOT NULL,
+    confidence NUMERIC NOT NULL,
+    api_calls INTEGER NOT NULL,
+    wall_clock_min NUMERIC NOT NULL,
+    status TEXT NOT NULL,               -- runner._TSV_STATUSES enforces; no CHECK by design
+    description TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX idx_expmirror_run_entry ON experiment_log_mirror(run_tag, entry_id DESC);
+```
+
+Disaster recovery (`make mirror-restore`) rebuilds a MISSING TSV through
+the runner's validated writer, reading:
+```sql
+SELECT commit_hash, metric, confidence, api_calls, wall_clock_min, status, description
+FROM experiment_log_mirror ORDER BY entry_id;
+```
+The restore refuses to overwrite an existing non-empty TSV; reconciling a
+live TSV into the mirror is the other direction (`make mirror-backfill`,
+idempotent count-based dedup).
 
 ---
 

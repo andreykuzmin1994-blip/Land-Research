@@ -1,8 +1,10 @@
 """cli.py — Operator command-line interface for the autoresearch loop.
 
-Thin argparse wrapper around research.py's public API. Provides
-structured output, ANSI-colored status indicators, exit codes suitable
-for scripting, and a --json mode for machine-readable output.
+Thin argparse wrapper around the runner.py and research.py public API
+(the loop/baseline/status entry points moved to runner.py in the
+2026-07-07 sandbox split). Provides structured output, ANSI-colored
+status indicators, exit codes suitable for scripting, and a --json mode
+for machine-readable output.
 
 Configuration / ergonomic plumbing only -- does not contain
 autoresearch logic. The Makefile provides the equivalent shell-only

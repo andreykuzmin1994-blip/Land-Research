@@ -36,8 +36,10 @@ import re
 import secrets
 import subprocess
 import time
+from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
 
@@ -397,6 +399,315 @@ def append_experiment_log_row(
         os.fsync(fd)
     finally:
         os.close(fd)
+
+
+# ---------------------------------------------------------------------------
+# Experiment-log durability mirror (prepare-mutation 2026-07-08;
+# reviews/17_tsv_mirror/). The TSV above is CANONICAL; the mirror exists so
+# container reclaim cannot destroy the firm's experimental history.
+# Contract (gates G1-G3): mirror calls NEVER raise, NEVER block
+# unboundedly, and ALWAYS run AFTER the TSV append at every call site —
+# the mirror may lag the TSV (warned), but must never contain a live row
+# the canonical log lacks. The mirror is never a decision input: anchor
+# selection (_last_baseline_or_keep) reads the TSV only (SR-15).
+# ---------------------------------------------------------------------------
+_SQL_INSERT_LOG_MIRROR = (
+    "INSERT INTO experiment_log_mirror "
+    "(source, run_tag, experiment_id, commit_hash, metric, confidence, "
+    "api_calls, wall_clock_min, status, description) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+)
+# Backfill dedup is COUNT-based over the full 7-column row value (R-M7):
+# legitimately identical TSV rows exist (repeated outer-crash or halt rows
+# carry no exp= token) and must each backfill exactly once.
+_SQL_COUNT_MIRROR_ROWS = (
+    "SELECT COUNT(*) FROM experiment_log_mirror "
+    "WHERE commit_hash = %s AND metric = %s AND confidence = %s "
+    "AND api_calls = %s AND wall_clock_min = %s AND status = %s "
+    "AND description = %s"
+)
+# Restore reads in entry_id order — the authoritative ordering (logged_at
+# lies for backfilled rows, R-M13). This constant and the COUNT above are
+# the ONLY pipeline reads of the mirror (SR-15 fence; enforced by
+# TestMirrorStaticGuards in tests/test_mirror.py).
+_SQL_SELECT_MIRROR_FOR_RESTORE = (
+    "SELECT commit_hash, metric, confidence, api_calls, wall_clock_min, "
+    "status, description FROM experiment_log_mirror ORDER BY entry_id"
+)
+# Serializes operator backfills (R-M7 concurrent-backfill race).
+_SQL_BACKFILL_ADVISORY_LOCK = "SELECT pg_advisory_xact_lock(724500108)"
+# Bounds the INSERT server-side (R-M3): connect is already bounded by
+# connect_timeout=10 in prepare.get_connection; without this, a network
+# partition after connect could hang the loop at an iteration boundary.
+# SET LOCAL scopes the timeout to the mirror's own transaction.
+_MIRROR_STATEMENT_TIMEOUT = "SET LOCAL statement_timeout = '5s'"
+# Kill switch (R-M2): tests/__init__.py sets this for the whole offline
+# suite so loop tests on developer machines with a real .env never open
+# connections or write to the live mirror (SR-6). Operators may also set
+# it to run mirror-less.
+_MIRROR_DISABLE_ENV_VAR = "EXPERIMENT_LOG_MIRROR_DISABLE"
+
+# R-M8: forensic marker parsing for BACKFILL only. Distinct from
+# _DESCRIPTION_RUN_RE (anchor selection, first-match, defined below) on
+# purpose: crash descriptions embed free error text BEFORE the trailing
+# run=/exp= tokens, so backfill must take the LAST match and validate the
+# shape — a truncated or forged token becomes NULL, never a wrong value.
+_DESC_RUN_TOKEN_RE = re.compile(r"run=([^\s|]+)")
+_DESC_EXP_TOKEN_RE = re.compile(r"exp=([^\s|]+)")
+_RUN_TAG_SHAPE_RE = re.compile(r"^[a-z0-9._-]+$")
+_EXPERIMENT_ID_SHAPE_RE = re.compile(r"^exp-\d{8}T\d{6}Z-[0-9a-f]{6}$")
+
+
+def _parse_markers_from_description(description: str) -> tuple[str | None, str | None]:
+    """Best-effort ``(run_tag, experiment_id)`` from a TSV description.
+
+    Backfill annotation only — live rows thread the real values
+    explicitly (F2 precedent) and are authoritative. Last match wins;
+    shape-validation failures (mid-token truncation by the 200-char
+    description cap, error text that happens to contain ``run=``) yield
+    ``None`` rather than a wrong value (R-M8).
+    """
+    text = description or ""
+    run_tag: str | None = None
+    experiment_id: str | None = None
+    runs = _DESC_RUN_TOKEN_RE.findall(text)
+    if runs and _RUN_TAG_SHAPE_RE.match(runs[-1]):
+        run_tag = runs[-1]
+    exps = _DESC_EXP_TOKEN_RE.findall(text)
+    if exps and _EXPERIMENT_ID_SHAPE_RE.match(exps[-1]):
+        experiment_id = exps[-1]
+    return run_tag, experiment_id
+
+
+def _mirror_log_row(
+    row: Mapping[str, Any],
+    *,
+    run_tag: str | None = None,
+    experiment_id: str | None = None,
+    source: str = "live",
+) -> bool:
+    """Best-effort INSERT of one TSV row into ``experiment_log_mirror``.
+
+    G1: never raises — including ``SystemExit`` from the DSN path
+    (R-M1) — and never blocks unboundedly (connect_timeout in
+    prepare.get_connection + SET LOCAL statement_timeout, R-M3). G3:
+    callers invoke this AFTER ``append_experiment_log_row`` succeeded, so
+    the mirror can never contain a live row the canonical TSV lacks.
+    Returns True only when the row was durably committed; False otherwise
+    (loud warning, never fatal — the TSV remains canonical either way).
+
+    Inserts the ``_validate_log_row`` OUTPUT — sanitized and canonically
+    formatted — not the caller's raw dict, so mirror rows are value-equal
+    to the TSV line that was just written (R-M6). ``run_tag`` /
+    ``experiment_id`` are threaded explicitly by callers, never derived
+    here (F2 precedent).
+    """
+    if os.environ.get(_MIRROR_DISABLE_ENV_VAR):
+        return False
+    try:
+        if not prepare.dsn_available():
+            log.warning(
+                "experiment_log_mirror skipped: no DATABASE_URL "
+                "(TSV remains canonical)"
+            )
+            return False
+        validated = _validate_log_row(row)
+        params = (
+            source,
+            run_tag,
+            experiment_id,
+            validated["commit"],
+            int(validated["metric"]),
+            Decimal(validated["confidence"]),
+            int(validated["api_calls"]),
+            Decimal(validated["wall_clock_min"]),
+            validated["status"],
+            validated["description"],
+        )
+        with prepare.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(_MIRROR_STATEMENT_TIMEOUT)
+                cur.execute(_SQL_INSERT_LOG_MIRROR, params)
+            conn.commit()
+        return True
+    except BaseException:  # noqa: BLE001 — G1: SystemExit included (R-M1)
+        log.warning(
+            "experiment_log_mirror insert failed; TSV remains canonical",
+            exc_info=True,
+        )
+        return False
+
+
+def _coerce_tsv_row(raw: Mapping[str, str]) -> dict[str, str]:
+    """Coerce a ``read_experiment_log`` string row back into the typed
+    shape ``_validate_log_row`` expects, returning the validated dict.
+    Raises ``ValueError`` on garbage — backfill counts and skips such
+    rows rather than aborting (a corrupted TSV line must not block the
+    durability of every other line)."""
+    try:
+        return _validate_log_row(
+            {
+                "commit": raw.get("commit", ""),
+                "metric": int(raw.get("metric", "")),
+                "confidence": float(raw.get("confidence", "")),
+                "api_calls": int(raw.get("api_calls", "")),
+                "wall_clock_min": float(raw.get("wall_clock_min", "")),
+                "status": raw.get("status", ""),
+                "description": raw.get("description", ""),
+            }
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"unbackfillable TSV row: {exc}") from exc
+
+
+def backfill_experiment_log_mirror(
+    path: Path | str | None = None,
+) -> dict[str, int]:
+    """Operator one-shot (``make mirror-backfill``): reconcile TSV → mirror.
+
+    COUNT-based per full 7-column row value (R-M7): for each distinct
+    tuple, insert ``tsv_count − mirror_count`` copies in TSV order, so
+    identical legitimate rows each backfill once and re-runs are
+    idempotent. Runs in ONE transaction behind ``pg_advisory_xact_lock``
+    (concurrent backfills serialize). Parsed ``run=``/``exp=`` markers are
+    best-effort annotations (R-M8); live-threaded values on
+    ``source='live'`` rows are the authoritative ones.
+
+    While the TSV is alive this doubles as the SR-16 divergence canary:
+    ``mirror_only > 0`` with an intact TSV means something wrote the
+    mirror out-of-band. Unlike ``_mirror_log_row``, this is an operator
+    tool and fails LOUDLY (raises) when the database is unreachable.
+    """
+    rows = read_experiment_log(path)
+    summary = {
+        "tsv_rows": len(rows),
+        "inserted": 0,
+        "already_present": 0,
+        "mirror_only": 0,
+        "invalid": 0,
+    }
+    ordered: list[dict[str, str]] = []
+    for raw in rows:
+        try:
+            ordered.append(_coerce_tsv_row(raw))
+        except ValueError:
+            summary["invalid"] += 1
+            log.warning("backfill skipping unparseable TSV row: %r", raw)
+    if not ordered:
+        return summary
+
+    def _key(v: Mapping[str, str]) -> tuple:
+        return tuple(v[c] for c in _TSV_COLUMNS)
+
+    def _count_params(key: tuple) -> tuple:
+        commit, metric, confidence, api_calls, wall_clock, status, desc = key
+        return (
+            commit,
+            int(metric),
+            Decimal(confidence),
+            int(api_calls),
+            Decimal(wall_clock),
+            status,
+            desc,
+        )
+
+    tsv_counts: Counter = Counter(_key(v) for v in ordered)
+    with prepare.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_BACKFILL_ADVISORY_LOCK)
+            need: dict[tuple, int] = {}
+            for key, tsv_n in tsv_counts.items():
+                cur.execute(_SQL_COUNT_MIRROR_ROWS, _count_params(key))
+                mirror_n = int(cur.fetchone()[0])
+                need[key] = max(0, tsv_n - mirror_n)
+                summary["already_present"] += min(tsv_n, mirror_n)
+                if mirror_n > tsv_n:
+                    summary["mirror_only"] += mirror_n - tsv_n
+            for v in ordered:
+                key = _key(v)
+                if need.get(key, 0) <= 0:
+                    continue
+                need[key] -= 1
+                run_tag, experiment_id = _parse_markers_from_description(
+                    v["description"]
+                )
+                cur.execute(
+                    _SQL_INSERT_LOG_MIRROR,
+                    (
+                        "backfill",
+                        run_tag,
+                        experiment_id,
+                        v["commit"],
+                        int(v["metric"]),
+                        Decimal(v["confidence"]),
+                        int(v["api_calls"]),
+                        Decimal(v["wall_clock_min"]),
+                        v["status"],
+                        v["description"],
+                    ),
+                )
+                summary["inserted"] += 1
+        conn.commit()
+    return summary
+
+
+def restore_experiment_log_from_mirror(
+    path: Path | str | None = None,
+) -> dict[str, int]:
+    """Disaster recovery (``make mirror-restore``): rebuild a MISSING
+    ``experiment_log.tsv`` from the mirror, in ``entry_id`` order, through
+    the validated TSV writer (R-M10).
+
+    Refuses to touch an existing non-empty TSV (SR-13 append-only) —
+    restore is for the container-reclaim case where the file is GONE;
+    reconciling a live file is ``backfill_experiment_log_mirror``'s job,
+    in the other direction. Restored history is only as trustworthy as
+    the mirror (SR-16): rows failing TSV validation are skipped and
+    counted, never written.
+    """
+    log_path = Path(path) if path is not None else _experiment_log_path()
+    if log_path.exists() and log_path.stat().st_size > 0:
+        raise RuntimeError(
+            f"{log_path} exists and is non-empty; restore refuses to touch "
+            "a live TSV. To reconcile a live TSV into the mirror, run "
+            "backfill_experiment_log_mirror (make mirror-backfill) instead."
+        )
+    with prepare.get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(_SQL_SELECT_MIRROR_FOR_RESTORE)
+            mirror_rows = cur.fetchall()
+    summary = {
+        "mirror_rows": len(mirror_rows),
+        "rows_written": 0,
+        "rows_skipped": 0,
+    }
+    for (
+        commit_hash,
+        metric,
+        confidence,
+        api_calls,
+        wall_clock_min,
+        status,
+        description,
+    ) in mirror_rows:
+        try:
+            append_experiment_log_row(
+                {
+                    "commit": str(commit_hash),
+                    "metric": int(metric),
+                    "confidence": float(confidence),
+                    "api_calls": int(api_calls),
+                    "wall_clock_min": float(wall_clock_min),
+                    "status": str(status),
+                    "description": str(description),
+                },
+                log_path,
+            )
+            summary["rows_written"] += 1
+        except (TypeError, ValueError):
+            summary["rows_skipped"] += 1
+            log.warning("restore skipped an invalid mirror row", exc_info=True)
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -938,6 +1249,8 @@ def run_baseline_experiment(
         "description": description,
     }
     append_experiment_log_row(row)
+    # G3: mirror strictly after the canonical TSV append.
+    _mirror_log_row(row, run_tag=run_tag, experiment_id=result.get("experiment_id"))
     return row
 
 
@@ -1096,13 +1409,13 @@ def experiment_loop(
         while True:
             if _halted():
                 log.info("experiment_loop halt sentinel detected; exiting cleanly")
-                _record_halt_row(market, "halt sentinel detected")
+                _record_halt_row(market, "halt sentinel detected", run_tag)
                 break
             if max_iterations is not None and iters >= max_iterations:
                 break
             if time.monotonic() - started > _LONG_RUN_GRACEFUL_EXIT_SECONDS:
                 log.info("experiment_loop graceful 7-day exit")
-                _record_halt_row(market, "graceful 7-day exit")
+                _record_halt_row(market, "graceful 7-day exit", run_tag)
                 break
 
             # F4: retry purges that failed at their own iteration boundary —
@@ -1129,6 +1442,7 @@ def experiment_loop(
                     _record_halt_row(
                         market,
                         f"infrastructure failure x{_INFRA_FAILURE_THRESHOLD}",
+                        run_tag,
                     )
                     break
                 # Sleep proportional to consecutive failures, capped.
@@ -1206,6 +1520,7 @@ def experiment_loop(
                         market,
                         f"{consecutive_terminal} consecutive "
                         f"crash/timeout iterations — breaker tripped",
+                        run_tag,
                     )
                     row = {
                         "commit": _git_head_commit(allow_pending=True),
@@ -1217,6 +1532,12 @@ def experiment_loop(
                         "description": _format_loop_description(result, run_tag),
                     }
                     append_experiment_log_row(row, log_path)
+                    # G3: mirror strictly after the canonical TSV append.
+                    _mirror_log_row(
+                        row,
+                        run_tag=run_tag,
+                        experiment_id=result.get("experiment_id"),
+                    )
                     iters += 1
                     break
             else:
@@ -1232,6 +1553,12 @@ def experiment_loop(
                 "description": _format_loop_description(result, run_tag),
             }
             append_experiment_log_row(row, log_path)
+            # G3: mirror strictly after the canonical TSV append.
+            _mirror_log_row(
+                row,
+                run_tag=run_tag,
+                experiment_id=result.get("experiment_id"),
+            )
             rows.append({k: str(v) for k, v in row.items()})
             iters += 1
 
@@ -1243,10 +1570,17 @@ def experiment_loop(
     }
 
 
-def _record_halt_row(market: str, reason: str) -> None:
-    """Append a synthetic ``status=halt`` row for accounting (R-725)."""
+def _record_halt_row(market: str, reason: str, run_tag: str | None = None) -> None:
+    """Append a synthetic ``status=halt`` row for accounting (R-725).
+
+    R-M15(b): the LIVE mirror row carries ``run_tag`` (threaded by the
+    loop) even though the halt description has no ``run=`` token, so a
+    BACKFILLED halt row has ``run_tag=NULL``. Known asymmetry — the
+    live-threaded value is authoritative. G3: mirror only after the TSV
+    append succeeded.
+    """
     try:
-        append_experiment_log_row({
+        row = {
             "commit": _git_head_commit(allow_pending=True),
             "metric": 0,
             "confidence": 0.0,
@@ -1254,9 +1588,12 @@ def _record_halt_row(market: str, reason: str) -> None:
             "wall_clock_min": 0.0,
             "status": "halt",
             "description": f"halt | market={market} | {reason}",
-        })
+        }
+        append_experiment_log_row(row)
     except Exception:
         log.exception("failed to record halt row; continuing exit")
+        return
+    _mirror_log_row(row, run_tag=run_tag, experiment_id=None)
 
 
 def _format_loop_description(
