@@ -123,6 +123,15 @@ _VALID_ROW = {
 }
 
 
+class TestSuiteKillSwitch(unittest.TestCase):
+    """Adversarial review F1: the suite-wide kill switch must be ACTIVE
+    (truthy) at test runtime — an empty-string value would re-enable the
+    mirror for every loop test on a machine with a real .env."""
+
+    def test_kill_switch_is_truthy_at_suite_runtime(self):
+        self.assertTrue(os.environ.get(runner._MIRROR_DISABLE_ENV_VAR))
+
+
 class TestMirrorLogRow(unittest.TestCase):
     """G1 + R-M1 + R-M6: the mirror never raises and inserts validated values."""
 
