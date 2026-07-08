@@ -262,6 +262,19 @@ loop-attach:  ## Attach to the running 'loop' tmux session (Ctrl-B d to detach).
 	@tmux attach -t loop
 
 # ---------------------------------------------------------------------
+# Durability mirror (reviews/17_tsv_mirror — the TSV remains canonical)
+# ---------------------------------------------------------------------
+.PHONY: mirror-backfill
+mirror-backfill:  ## Reconcile experiment_log.tsv -> Postgres mirror (idempotent).
+	@python -c "import json, runner; \
+	print(json.dumps(runner.backfill_experiment_log_mirror(), indent=2))"
+
+.PHONY: mirror-restore
+mirror-restore:  ## Disaster recovery: rebuild a MISSING experiment_log.tsv from the mirror.
+	@python -c "import json, runner; \
+	print(json.dumps(runner.restore_experiment_log_from_mirror(), indent=2))"
+
+# ---------------------------------------------------------------------
 # Higher-level recipes
 # ---------------------------------------------------------------------
 .PHONY: resume

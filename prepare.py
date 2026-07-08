@@ -250,6 +250,21 @@ def _get_connection_dsn() -> str:
     return dsn
 
 
+def dsn_available() -> bool:
+    """True when ``DATABASE_URL`` is resolvable, WITHOUT exiting the process.
+
+    prepare-mutation (2026-07-08): non-exiting companion to
+    ``_get_connection_dsn``, whose ``sys.exit`` on a missing DSN is correct
+    for the CLI entry point but fatal for best-effort callers — a
+    ``SystemExit`` escapes ``except Exception`` (reviews/17_tsv_mirror/
+    R-M1). The experiment-log durability mirror short-circuits on this in
+    environments with no database configured (CI, fresh clones) instead of
+    killing the loop. Read-only helper; no metric surface.
+    """
+    load_dotenv(_REPO_ROOT / ".env")
+    return bool(os.environ.get("DATABASE_URL"))
+
+
 @contextmanager
 def get_connection() -> Iterator["psycopg.Connection"]:
     """Yield a psycopg3 connection with ``autocommit=False``.
@@ -493,6 +508,38 @@ CREATE TABLE IF NOT EXISTS flagged_items (
 );
 """
 
+# prepare-mutation (2026-07-08): durability MIRROR of experiment_log.tsv
+# (reviews/17_tsv_mirror/). The TSV remains the CANONICAL Karpathy log —
+# untracked, append-only, and the ONLY keep-or-revert anchor source; this
+# table exists so container reclaim cannot destroy the firm's experimental
+# history. Append-only with NO sanctioned deletion at all (stronger than
+# parcel_scores: the experiment purge never touches it — discard/crash/
+# timeout rows ARE the learning record, SR-13). Never a decision input,
+# never read by the metric (SR-15). `source` distinguishes live appends
+# from operator backfills (R-M13). `run_tag`/`experiment_id` are nullable:
+# halt/breaker/outer-crash rows and off-branch baselines legitimately lack
+# them. `commit_hash` admits the literal "pending" (runner._TSV_COMMIT_RE)
+# — no hex CHECK. Deliberately no CHECK on `status`: runner._TSV_STATUSES
+# is the enforcement point, and a CHECK would make future vocabulary
+# additions silently un-mirrored under the mirror's warn-only contract
+# (R-M14).
+_DDL_EXPERIMENT_LOG_MIRROR = """
+CREATE TABLE IF NOT EXISTS experiment_log_mirror (
+    entry_id BIGSERIAL PRIMARY KEY,
+    logged_at TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT NOT NULL DEFAULT 'live',
+    run_tag TEXT,
+    experiment_id TEXT,
+    commit_hash TEXT NOT NULL,
+    metric INTEGER NOT NULL,
+    confidence NUMERIC NOT NULL,
+    api_calls INTEGER NOT NULL,
+    wall_clock_min NUMERIC NOT NULL,
+    status TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT ''
+);
+"""
+
 _DDL_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_parcels_county ON parcels(county);",
     "CREATE INDEX IF NOT EXISTS idx_parcels_market ON parcels(market);",
@@ -526,6 +573,9 @@ _DDL_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_log_cycle ON research_log(cycle_id);",
     "CREATE INDEX IF NOT EXISTS idx_log_timestamp ON research_log(timestamp DESC);",
     "CREATE INDEX IF NOT EXISTS idx_harness_county_date ON harness_reports(county, run_at DESC);",
+    # prepare-mutation (2026-07-08): mirror lookups are by run and by the
+    # backfill's full-row count match; entry_id is the authoritative order.
+    "CREATE INDEX IF NOT EXISTS idx_expmirror_run_entry ON experiment_log_mirror(run_tag, entry_id DESC);",
 )
 
 _ALL_DDL: tuple[str, ...] = (
@@ -542,6 +592,7 @@ _ALL_DDL: tuple[str, ...] = (
     _DDL_RESEARCH_LOG,
     _DDL_HARNESS_REPORTS,
     _DDL_FLAGGED_ITEMS,
+    _DDL_EXPERIMENT_LOG_MIRROR,
     *_DDL_INDEXES,
 )
 

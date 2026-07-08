@@ -351,7 +351,7 @@ commit	metric	confidence	api_calls	wall_clock_min	status	description
 3. **confidence**: confidence_weighted_pipeline (float, .2f)
 4. **api_calls**: total external API calls during the experiment (integer)
 5. **wall_clock_min**: total wall clock minutes (.1f)
-6. **status**: `baseline`, `keep`, `discard`, `crash`, `timeout`
+6. **status**: `baseline`, `keep`, `discard`, `crash`, `timeout`, `halt` (synthetic accounting row the loop writes when it exits — halt sentinel, graceful 7-day exit, infrastructure breaker)
 7. **description**: brief text — what the experiment tried (no tabs, no commas in description; commas are tolerated unlike Karpathy's because we're TSV but periods/dashes are preferred)
 
 ### Example
@@ -369,6 +369,19 @@ f6g7h8i	23	19.4	1156	74.0	keep	added development authority site inventory source
 ### Why Untracked
 
 Karpathy keeps `results.tsv` out of git so the experiment log doesn't pollute the commit history. We do the same. The TSV is a parallel record that accumulates over time and survives across runs.
+
+**Durability mirror (prepare-mutation 2026-07-08, DDL-only — metric
+untouched)**: untracked on an ephemeral host means one container reclaim
+destroys the accumulated history, so every TSV append is also mirrored —
+best-effort, warn-only, strictly AFTER the TSV write — into the
+append-only `experiment_log_mirror` Postgres table (`source='live'`).
+The TSV remains canonical and is the ONLY keep-or-revert anchor source;
+the mirror is never a decision input and the metric never reads it.
+`make mirror-backfill` reconciles an existing TSV into the mirror
+(idempotent, count-based, and a divergence canary per SR-16);
+`make mirror-restore` rebuilds a MISSING TSV from the mirror after a
+reclaim, through the validated writer. Restored history is only as
+trustworthy as the mirror — see `STANDING_RISKS.md` SR-13/SR-16.
 
 ### Cross-Run Aggregation
 
