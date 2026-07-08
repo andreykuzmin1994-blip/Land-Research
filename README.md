@@ -47,6 +47,18 @@ make loop-attach        # tmux attach -t loop  (Ctrl-B d to detach again)
 2. Open the Codespace. The devcontainer's `post-start.sh` materializes `.env` from the secret automatically.
 3. Verify: `make db-check` should print PostGIS version + `actionable_pipeline_count: 0`.
 
+**Overnight runs and the Codespaces idle timeout**: GitHub stops idle
+Codespaces — by default 30 minutes after the last connection, 240 minutes
+maximum (Settings → Codespaces → default idle timeout, or per-machine
+`gh codespace edit --idle-timeout 240m`). A detached tmux session does
+NOT count as activity, so "kick the loop and close the laptop" yields at
+most one idle-timeout window of experiments (~2 at 90 minutes each), not
+a true overnight run. For real overnight autonomy, keep a terminal
+attached, or run the loop on a durable host (the DigitalOcean droplet
+already contemplated in the cost table — the repo is a plain git clone +
+`.env` away anywhere). `make loop-bg` prints this warning when it detects
+a Codespace.
+
 **Karpathy iteration loop** (what the agent does between `make loop` runs):
 
 1. Read `experiment_log.tsv`. The most recent `baseline` or `keep` row is the prior anchor.

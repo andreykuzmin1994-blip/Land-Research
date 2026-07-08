@@ -243,6 +243,15 @@ loop-bg: _assert-autoresearch-branch  ## Start the loop in a detached tmux sessi
 	@echo "==> attach:  make loop-attach"
 	@echo "==> tail:    make tail"
 	@echo "==> halt:    make halt"
+	@if [ -n "$${CODESPACES:-}" ]; then \
+	  echo ""; \
+	  echo "==> WARNING: this is a GitHub Codespace. Codespaces STOP on idle"; \
+	  echo "    (default 30 min after you disconnect; max 240 min). A detached"; \
+	  echo "    tmux session does NOT keep the machine alive, so an overnight"; \
+	  echo "    run will be cut short. Bump the timeout (Settings -> Codespaces"; \
+	  echo "    or 'gh codespace edit --idle-timeout 240m') or use a durable"; \
+	  echo "    host for multi-hour runs. See README 'Overnight runs'."; \
+	fi
 
 .PHONY: loop-attach
 loop-attach:  ## Attach to the running 'loop' tmux session (Ctrl-B d to detach).
