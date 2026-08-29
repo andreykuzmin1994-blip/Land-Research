@@ -1,5 +1,7 @@
 name: Phase 1 schema validation
 
+# (no-op touch 2026-05-04: re-trigger after DATABASE_URL secret was set)
+#
 # Two jobs:
 #
 #  - offline-validate: runs the offline metric-calc unit tests
