@@ -21,8 +21,9 @@ HARD CONSTRAINTS — DO NOT VIOLATE WITHOUT A NEW THREE-AGENT REVIEW.
    connector inventory. See risk review §4.2.
 
 3. PII REDACTION IS STRICT-BY-DEFAULT. Owner names and owner mailing addresses
-   are replaced with "[REDACTED]" before any sample feature is serialized to
-   disk. A regex-based failsafe runs as the last step before file write; if
+   (plus any connector_registry.json redaction_extra_fields) are replaced with
+   "[REDACTED]" before any sample feature is serialized to disk. A
+   regex-based failsafe runs as the last step before file write; if
    any English-name pattern survives, it is replaced with "[REDACTION_FAILSAFE]"
    and logged as a warning. There is no --no-redact flag. See risk review
    §4.6 (R-03) and open question 9.a.
@@ -30,6 +31,55 @@ HARD CONSTRAINTS — DO NOT VIOLATE WITHOUT A NEW THREE-AGENT REVIEW.
 4. THE HARNESS'S ONLY WRITE SINKS ARE harness_reports/{county}_{ts}.json AND
    harness_reports/markets_dashboard.md. The optional --output PATH flag adds
    a Markdown summary at PATH but never replaces the per-county JSON.
+
+5. --verbose LOGS METADATA ONLY. The appendix says it "prints raw API
+   responses"; that would copy owner names and mailing addresses into
+   terminal scrollback, tee'd loop logs and retained CI logs (SR-8). It
+   deliberately logs, at DEBUG on stderr, only the sanitised URL, HTTP
+   status, timing, byte size, parse status, top-level JSON keys, feature
+   count and any ArcGIS error code/message. Never bodies or attribute
+   values, and the JSON report is identical with or without it.
+
+============================================================================
+HEALTH LABELS, FAILURE CLASSES, EXIT CODES
+============================================================================
+
+overall_health (STORAGE_ARCHITECTURE.md spells n/a; reports say n_a):
+  healthy   service_alive, layer_schema and known_good_query all passed and
+            nothing failed. A connector is NEVER healthy unless its critical
+            checks actually ran and passed.
+  degraded  the critical checks all passed; a non-critical check failed.
+  failing   a critical check failed, or anything failed while a critical
+            check could not run (fail-closed).
+  n_a       nothing failed but a critical check could not run: either the
+            connector is ai_fallback_only (R-20, failure_class null) or it is
+            not configured yet (no service_url / parcel_layer_id,
+            failure_class "config"). research._harness_gate treats any label
+            other than healthy/degraded/failing as failing, so discovery
+            skips the county (fail-closed; the change that wires such a
+            county into research._MARKET_TO_COUNTIES must teach the gate n_a).
+
+failure_class (report top level, and on every failed check):
+  null       healthy, or ai_fallback_only n_a
+  config     not-configured n_a
+  transport  EVERY failed check failed on the network after retries: a
+             connection error other than TLS, a timeout, or HTTP 5xx
+  logic      anything else, the fail-closed default: ArcGIS error envelopes
+             with any code (including HTTP 200 + {"code": 404}), HTTP 4xx,
+             non-JSON bodies, malformed URLs, TLS failures, zero features,
+             schema / field-mapping drift, crashes
+  The harness-fulton CI job warns on transport and fails on logic (R-12).
+  The per-check transport_status key is legacy (it holds the parse status
+  for any non-ok response); classify on failure_class instead.
+
+Exit codes (precedence 2 > 3 > 1 > 0 across a multi-connector run):
+  0  healthy, or ai_fallback_only n_a
+  2  failing
+  3  degraded
+  1  config error: invalid --output, unknown connector, missing or invalid
+     sources.json / connector_registry.json, or a not-configured n_a
+  (argparse usage errors exit 2 by argparse convention, which is why
+  --verbose is narrowed rather than removed.)
 
 ============================================================================
 THREE INTEGRATION POINTS (callable from research.py — appendix L897-L903):
@@ -135,10 +185,15 @@ NAME_PATTERN = re.compile(
 REDACTION_SENTINELS = frozenset({"[REDACTED]", "[REDACTION_FAILSAFE]"})
 
 # Exit codes — consistent with prepare.py convention (risk review §4.4 / prompt).
+# A not-configured connector (n_a, failure_class "config") exits 1, never 0;
+# an ai_fallback_only n_a exits 0 by design (R-20). See _aggregate_exit_code.
 EXIT_OK = 0
 EXIT_CONFIG_ERROR = 1
 EXIT_CONNECTOR_FAILING = 2
 EXIT_CONNECTOR_DEGRADED = 3
+
+# The checks that must all PASS before a connector can be healthy/degraded.
+CRITICAL_CHECKS = ("service_alive", "layer_schema", "known_good_query")
 
 # Sample size for known-good query / population check.
 KNOWN_GOOD_SAMPLE_SIZE = 10
@@ -185,6 +240,9 @@ class Connector:
     # connector failure (e.g., Subdiv on raw industrial land). Reported in
     # field_population.rates but excluded from low_population_fields.
     optional_fields: Tuple[str, ...] = ()
+    # Extra API field names redacted in report sample features ON TOP OF the
+    # logical-name defaults (connector_registry.json redaction_extra_fields).
+    redaction_extra_fields: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -203,6 +261,24 @@ class CheckResult:
 def _load_json(path: Path) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def _parse_redaction_extra_fields(key: str, raw: Any) -> Tuple[str, ...]:
+    """Validate connector_registry.json `redaction_extra_fields` (SR-8).
+    Entries starting with "_" are notes for humans and are skipped. Anything
+    other than a list of non-empty strings fails loudly at load time: a bare
+    string would otherwise be iterated per character and redact nothing."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, list) or not all(
+        isinstance(name, str) and name.strip() for name in raw
+    ):
+        raise ValueError(
+            f"connector_registry.json {key}.redaction_extra_fields must be a "
+            f"list of non-empty field-name strings (got {raw!r})"
+        )
+    names = [name.strip() for name in raw]
+    return tuple(name for name in names if not name.startswith("_"))
 
 
 def load_registry(
@@ -249,6 +325,8 @@ def load_registry(
             notes=src.get("_notes", ""),
             max_record_count=src.get("max_record_count", 1000),
             optional_fields=tuple(ovl.get("optional_fields") or ()),
+            redaction_extra_fields=_parse_redaction_extra_fields(
+                key, ovl.get("redaction_extra_fields")),
         )
 
     # Validate overlay keys exist in sources.json (risk review 9.j). A typo
@@ -407,9 +485,63 @@ def _arcgis_get(
     code, resp, err = _http_get(session, url, params=params, read_timeout=read_timeout)
     elapsed = time.monotonic() - t0
     if resp is None:
-        return "transport", err or "unknown_transport_error", code, elapsed
-    parse_status, payload = _parse_arcgis_response(resp)
-    return parse_status, payload, code, elapsed
+        status, payload = "transport", err or "unknown_transport_error"
+    else:
+        status, payload = _parse_arcgis_response(resp)
+    _log_response_summary(url, code, resp, status, payload, elapsed)
+    return status, payload, code, elapsed
+
+
+def _log_response_summary(
+    url: str, code: Optional[int], resp: Optional["requests.Response"],
+    status: str, payload: Any, elapsed: float,
+) -> None:
+    """--verbose: one DEBUG line per request. METADATA ONLY (SR-8) — never a
+    response body or attribute value, so owner names and mailing addresses
+    cannot reach terminal, loop or CI logs. See module docstring item 5."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    safe_url = _strip_sensitive_query_params(url)
+    if resp is None:
+        logger.debug("GET %s -> no response (%s) after %dms",
+                     safe_url, payload, int(elapsed * 1000))
+        return
+    try:
+        size: Optional[int] = len(resp.content)
+    except Exception:  # noqa: BLE001 — a summary must never break a check
+        size = None
+    parts = [f"HTTP {code}", f"{int(elapsed * 1000)}ms", f"bytes={size}",
+             f"parse={status}"]
+    if status == "ok":
+        parts.append(f"keys={sorted(str(k) for k in payload)[:20]}")
+        if isinstance(payload.get("features"), list):
+            parts.append(f"features={len(payload['features'])}")
+    elif status == "error" and isinstance(payload, dict):
+        parts.append(f"error_code={payload.get('code')!r}")
+        parts.append(f"error_message={str(payload.get('message'))[:200]!r}")
+    else:
+        parts.append(f"detail={str(payload)[:200]!r}")
+    logger.debug("GET %s -> %s", safe_url, " ".join(parts))
+
+
+# Transport failures are an explicit allowlist (R-12): connection errors other
+# than TLS, timeouts, and HTTP 5xx, each only after _http_get's retries.
+_TRANSPORT_ERROR_PREFIXES = ("connection: ", "timeout: ", "http_5")
+
+
+def _failure_class(status: str, payload: Any) -> str:
+    """Classify a non-ok _arcgis_get result as "transport" or "logic".
+    Everything not on the transport allowlist is logic (fail-closed): ArcGIS
+    error envelopes with any code, HTTP 4xx, non-JSON bodies, malformed URLs
+    ("request: MissingSchema"), TLS failures ("connection: SSLError")."""
+    if (
+        status == "transport"
+        and isinstance(payload, str)
+        and payload.startswith(_TRANSPORT_ERROR_PREFIXES)
+        and "SSLError" not in payload
+    ):
+        return "transport"
+    return "logic"
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +565,7 @@ def check_service_alive(connector: Connector, session: "requests.Session") -> Ch
         "transport_status": status,
         "http_code": code,
         "error": payload if status == "error" else str(payload),
+        "failure_class": _failure_class(status, payload),
     })
 
 
@@ -450,6 +583,7 @@ def check_layer_schema(
         return CheckResult("layer_schema", "fail", {
             "transport_status": status, "http_code": code,
             "error": payload if status == "error" else str(payload),
+            "failure_class": _failure_class(status, payload),
         }), None
     fields = payload.get("fields") or []
     capabilities = (payload.get("capabilities") or "").lower()
@@ -541,6 +675,7 @@ def check_known_good_query(
         return CheckResult("known_good_query", "fail", {
             "transport_status": status, "http_code": code,
             "error": payload if status == "error" else str(payload),
+            "failure_class": _failure_class(status, payload),
         }), []
     features = payload.get("features") or []
     return CheckResult("known_good_query",
@@ -797,7 +932,12 @@ def check_pagination(connector: Connector, session: "requests.Session") -> Check
     base["resultRecordCount"] = 10
     s2, p2, _, _ = _arcgis_get(session, query_url, params=base)
     if s1 != "ok" or s2 != "ok":
-        return CheckResult("pagination", "fail", {"reason": "query failed"})
+        # H-2: carry the sub-queries' class so a full outage stays transport.
+        classes = {_failure_class(s, p) for s, p in ((s1, p1), (s2, p2)) if s != "ok"}
+        return CheckResult("pagination", "fail", {
+            "reason": "query failed",
+            "failure_class": "transport" if classes == {"transport"} else "logic",
+        })
     n1 = len(p1.get("features") or [])
     n2 = len(p2.get("features") or [])
     return CheckResult("pagination",
@@ -814,15 +954,18 @@ def check_performance_baseline(
         return CheckResult("performance_baseline", "skipped",
                            {"reason": "missing service_url or parcel_layer_id"})
     query_url = f"{connector.service_url.rstrip('/')}/{connector.parcel_layer_id}/query"
-    status, _, _, elapsed = _arcgis_get(
+    status, payload, _, elapsed = _arcgis_get(
         session, query_url,
         params=_build_known_good_query_params(connector, count=10),
         read_timeout=SLOW_READ_TIMEOUT,
     )
-    return CheckResult("performance_baseline", "pass" if status == "ok" else "fail", {
+    details: Dict[str, Any] = {
         "response_time_ms": int(elapsed * 1000),
         "note": "Trend detection requires history; single-run pass.",
-    })
+    }
+    if status != "ok":
+        details["failure_class"] = _failure_class(status, payload)
+    return CheckResult("performance_baseline", "pass" if status == "ok" else "fail", details)
 
 
 # ---------------------------------------------------------------------------
@@ -832,16 +975,22 @@ def check_performance_baseline(
 
 def _redact_feature(
     feature: Dict[str, Any], field_mapping: Dict[str, str],
+    extra_fields: Tuple[str, ...] = (),
 ) -> Dict[str, Any]:
-    """Replace PII fields with [REDACTED] before any disk write."""
+    """Replace PII fields with [REDACTED] before any disk write. extra_fields
+    (connector_registry.json redaction_extra_fields) are redacted IN ADDITION
+    to the logical-name defaults, never instead of them. Matching ignores
+    case (R-07: servers return keys in their own case; over-redaction is
+    harmless)."""
     pii_server_fields = set()
     for logical, server_name in field_mapping.items():
         if logical in PII_LOGICAL_NAMES or "address" in logical.lower():
             if server_name:
-                pii_server_fields.add(server_name)
+                pii_server_fields.add(str(server_name).lower())
+    pii_server_fields.update(str(name).lower() for name in extra_fields or ())
     attrs = dict(feature.get("attributes") or {})
     for k in list(attrs.keys()):
-        if k in pii_server_fields:
+        if str(k).lower() in pii_server_fields:
             attrs[k] = "[REDACTED]"
     out = dict(feature)
     out["attributes"] = attrs
@@ -876,17 +1025,34 @@ def _failsafe_check(
 
 
 def _overall_health(check_results: List[CheckResult]) -> str:
-    """Compute the overall health label from the 10 check results."""
-    statuses = [c.status for c in check_results]
-    fails = sum(1 for s in statuses if s == "fail")
-    if fails == 0:
-        return "healthy"
-    # Service or layer or known-good failing -> failing overall.
-    critical_names = {"service_alive", "layer_schema", "known_good_query"}
-    if any(c.status == "fail" and c.name in critical_names for c in check_results):
-        return "failing"
-    # Otherwise some non-critical checks failed -> degraded.
-    return "degraded"
+    """Compute the overall health label from the 10 check results. healthy
+    and degraded both require every CRITICAL_CHECKS entry present and passed;
+    a skipped or missing critical check can only give failing (something
+    else failed) or n_a (nothing ran that could fail: not configured)."""
+    statuses = {c.name: c.status for c in check_results}
+    any_fail = any(c.status == "fail" for c in check_results)
+    if not all(statuses.get(name) == "pass" for name in CRITICAL_CHECKS):
+        return "failing" if any_fail else "n_a"
+    # Critical checks passed; some non-critical check failed -> degraded.
+    return "degraded" if any_fail else "healthy"
+
+
+def _check_failure_class(check: CheckResult) -> Optional[str]:
+    """A failed check's class; a fail without an explicit class is logic."""
+    if check.status != "fail":
+        return None
+    fc = check.details.get("failure_class")
+    return fc if fc in ("transport", "logic") else "logic"
+
+
+def _report_failure_class(check_results: List[CheckResult], overall: str) -> Optional[str]:
+    """Report-level class: transport only if EVERY failed check is transport."""
+    if overall == "healthy":
+        return None
+    if overall == "n_a":
+        return "config"
+    classes = {_check_failure_class(c) for c in check_results if c.status == "fail"}
+    return "transport" if classes == {"transport"} else "logic"
 
 
 def _build_report(
@@ -897,12 +1063,25 @@ def _build_report(
     errors: List[str],
 ) -> Dict[str, Any]:
     """Assemble the final report dict per appendix lines 909-936."""
+    overall = _overall_health(check_results)
+    checks: Dict[str, Dict[str, Any]] = {}
+    for c in check_results:
+        checks[c.name] = {"status": c.status, **c.details}
+        if c.status == "fail":
+            checks[c.name]["failure_class"] = _check_failure_class(c)
+    if overall == "n_a":
+        not_run = [n for n in CRITICAL_CHECKS if checks.get(n, {}).get("status") != "pass"]
+        errors = list(errors) + [
+            "connector not configured: critical check(s) not run: "
+            f"{', '.join(not_run)}; no ArcGIS verdict (n_a)"
+        ]
     return {
         "county": connector.county,
         "market": connector.market,
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "overall_health": _overall_health(check_results),
-        "checks": {c.name: {"status": c.status, **c.details} for c in check_results},
+        "overall_health": overall,
+        "failure_class": _report_failure_class(check_results, overall),
+        "checks": checks,
         "sample_features": sample_features,
         "warnings": warnings_out,
         "errors": errors,
@@ -949,7 +1128,7 @@ def _run_all_checks(connector: Connector, quick: bool = False) -> Dict[str, Any]
         return {
             "county": connector.county, "market": connector.market,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "overall_health": "n_a",
+            "overall_health": "n_a", "failure_class": None,
             "checks": {}, "sample_features": [], "warnings": [],
             "errors": ["connector type is ai_fallback_only; ArcGIS harness not applicable"],
             "connector_config_snapshot": {"access": connector.access,
@@ -1015,7 +1194,10 @@ def _run_all_checks(connector: Connector, quick: bool = False) -> Dict[str, Any]
 
     # Redact sample features (max 3 for the report) before any serialization.
     sample = features[:3]
-    redacted = [_redact_feature(f, connector.field_mapping) for f in sample]
+    redacted = [
+        _redact_feature(f, connector.field_mapping, connector.redaction_extra_fields)
+        for f in sample
+    ]
     sanitized, fs_warnings = _failsafe_check(redacted)
     return _build_report(connector, results, sanitized, fs_warnings, errors)
 
@@ -1029,7 +1211,7 @@ def _safe_run_checks(connector: Connector, quick: bool) -> Dict[str, Any]:
         return {
             "county": connector.county, "market": connector.market,
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "overall_health": "failing",
+            "overall_health": "failing", "failure_class": "logic",
             "checks": {}, "sample_features": [], "warnings": [],
             "errors": [f"harness crash: {e.__class__.__name__}: {e}"],
             "connector_config_snapshot": {"access": connector.access},
@@ -1151,11 +1333,29 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--quick", action="store_true",
                    help="Skip slower checks (geometry_validation, performance_baseline).")
     p.add_argument("--verbose", action="store_true",
-                   help="Print raw API response summaries to stderr.")
+                   help="Log per-request metadata to stderr (sanitised URL, HTTP "
+                        "status, timing, size, top-level keys, feature count, "
+                        "ArcGIS error code/message). Never prints response bodies "
+                        "or attribute values (SR-8 PII) and never changes the "
+                        "JSON report.")
     p.add_argument("--output",
                    help="Path under repo root (must end in .md) to write a "
                         "human-readable Markdown summary in addition to JSON.")
     return p.parse_args(argv)
+
+
+def _aggregate_exit_code(reports: List[Dict[str, Any]]) -> int:
+    """failing (2) > degraded (3) > not-configured n_a (1) > ok (0), so a
+    permanently unconfigured county never masks a real failure and never
+    exits as if it were healthy. ai_fallback_only n_a is ok by design."""
+    healths = [r.get("overall_health") for r in reports]
+    if any(h == "failing" for h in healths):
+        return EXIT_CONNECTOR_FAILING
+    if any(h == "degraded" for h in healths):
+        return EXIT_CONNECTOR_DEGRADED
+    if any(r.get("failure_class") == "config" for r in reports):
+        return EXIT_CONFIG_ERROR
+    return EXIT_OK
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -1196,13 +1396,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         _emit_markdown_summary(reports, output_path)
         logger.info("markdown summary written to %s", output_path)
 
-    # Aggregate exit code: failing > degraded > healthy.
-    healths = [r.get("overall_health") for r in reports]
-    if any(h == "failing" for h in healths):
-        return EXIT_CONNECTOR_FAILING
-    if any(h == "degraded" for h in healths):
-        return EXIT_CONNECTOR_DEGRADED
-    return EXIT_OK
+    return _aggregate_exit_code(reports)
 
 
 if __name__ == "__main__":
