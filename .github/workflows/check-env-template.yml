@@ -1,16 +1,28 @@
 name: env.template lint
 
-# Catches the env.template credential-leak class of incident at the server
-# side. Pre-commit hooks at .githooks/pre-commit catch this before push for
-# anyone with hooks configured, but commits made via the GitHub web UI or
-# clones without hooksPath set bypass that check. This workflow is the
-# always-on safety net.
+# Detects the env.template credential-leak class of incident at the server
+# side. The pre-commit hook at .githooks/pre-commit blocks it before the
+# commit exists for anyone with hooks configured, but commits made via the
+# GitHub web UI or clones without hooksPath set bypass that check. This
+# workflow is the always-on backstop: push is deliberately not filtered by
+# branch, so web-UI commits trigger it too.
+#
+# It runs the SAME checker as the hook (.githooks/check_env_template.py),
+# so the two cannot drift. Neither ever prints a value: findings carry the
+# line number and, when it is a plain identifier, the key name. No xtrace
+# and no log-masking command (masking writes the value into the log).
+#
+# By the time this fails the commit is already on GitHub, so the failure
+# text asks for rotation, not just a fix-forward.
 
 on:
   push:
-    paths: ['env.template', '.github/workflows/check-env-template.yml']
+    paths: ['env.template', '.githooks/**', '.github/workflows/check-env-template.yml']
   pull_request:
-    paths: ['env.template', '.github/workflows/check-env-template.yml']
+    paths: ['env.template', '.githooks/**', '.github/workflows/check-env-template.yml']
+
+permissions:
+  contents: read
 
 jobs:
   lint:
@@ -19,23 +31,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The runner's preinstalled python3: the checker is stdlib-only, and
+      # a Python setup step would spend most of the one-minute budget.
       - name: Reject env.template containing real credentials
         run: |
-          line=$(grep "^DATABASE_URL=" env.template || true)
-          if [ -z "$line" ]; then
-            echo "::error ::env.template missing DATABASE_URL line"
-            exit 1
+          if python3 -I .githooks/check_env_template.py --github env.template; then
+            echo "OK: env.template holds placeholders only."
+            exit 0
           fi
-
-          # Extract the password slot between USER: and @HOST.
-          password=$(echo "$line" | sed -E 's|^DATABASE_URL=postgresql://[^:]+:([^@]*)@.*$|\1|')
-
-          case "$password" in
-            URL_ENCODED_PASSWORD|CHANGE_ME|PASSWORD|"")
-              echo "OK: env.template password slot is the known placeholder '$password'"
-              ;;
-            *)
-              echo "::error ::env.template DATABASE_URL appears to contain a real password slot ('$password'). Real credentials only go in .env (gitignored). See reviews/02_setup_phase/00_setup_status.md 'Incident' section."
-              exit 1
-              ;;
-          esac
+          echo "::error file=env.template::env.template failed the credential check (see the findings above; values are never printed). If any finding is a real credential, this commit has ALREADY put it on GitHub: treat it as leaked, rotate it first, then fix forward with placeholders - reverting alone is not enough. Real credentials only go in .env (gitignored). See reviews/02_setup_phase/00_setup_status.md 'Incident' section."
+          exit 1
