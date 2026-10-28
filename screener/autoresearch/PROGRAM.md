@@ -12,22 +12,26 @@ in January 2016 with only the public data available then, how many of the
 Fulton parcels that the owner sold, and someone then built an industrial
 building on by 2025, would the ranking have put in its top 2%?
 
-- **Pool:** about 3,350 Fulton parcels (5–50 acres) from the 2016 tax
+- **Pool:** about 3,300 Fulton parcels (5–50 acres) from the 2016 tax
   digest that pass the live tool's ownership and land-only screens.
-- **Answer key:** the 48 pool parcels that the 2016 owner sold at a real
-  price (at least $50k per the county deed file) and that are at least half
-  covered by a $1M+ industrial building in the 2025 digest. Title
-  transfers to development authorities and right-of-way deeds don't count.
-- **Splits:** dev (38 positives, about 2,350 parcels) is what the loop
-  sees. Test (10 positives) is sealed: a human checks it every ~20 kept
+- **Answer key:** the 51 pool parcels that the 2016 owner sold in 2016 or
+  later at a real price (at least $50k per the county deed file) and that
+  are at least half covered by a 2025-digest parcel carrying $1M+ of
+  industrial improvements. Right-of-way deeds and sales to a development
+  authority don't count.
+- **Left out:** 44 parcels that got industrial buildings without such a
+  sale (owner-users, corporate successors, replatted ids) are dropped from
+  the pool entirely, so they count neither way.
+- **Splits:** dev (39 positives, about 2,300 parcels) is what the loop
+  sees. Test (12 positives) is sealed: a human checks it every ~20 kept
   experiments. The split is by ~5 km map cell, so test sites are in
   places the loop never saw.
 - **Fixed size:** the top K is fixed at 2% of the pool, so inflating scores
   can't help. Only ranking real sites higher does. The hard screens are
   frozen into the evaluation set.
-- **Baseline (2026-10-28):** 1 hit out of 38 on dev. Random ranking
-  averages 0.85 (5th–95th percentile 0–3). The hand-built weights are
-  about as good as chance, so there is a lot to learn.
+- **Baseline (2026-10-28):** 2 hits out of 39 on dev (top 46). Random
+  ranking averages 0.86 (5th–95th percentile 0–3). The hand-built weights
+  are barely better than chance, so there is a lot to learn.
 
 Built by `build_eval.py` (humans only, between runs). It writes the frozen
 files in `data/`. Blank in the evaluation set, because their values today
@@ -50,13 +54,16 @@ estate / entity / religious), `owner_state`, `owner_po_box`, `years_held`,
 `sales_count`, `inherited`, `distress_owned`, `last_sale_price`.
 
 It must return `{"score": float, "motivation": float, "why_site": [...],
-"why_seller": [...]}`. The live tool shows `why_*` in the briefs, so keep
-them true and readable.
+"why_seller": [...]}`. **Keep `score` on a 0–100 scale**, with the best
+parcels near the top of it. `--decide` refuses scores outside 0–100,
+because the live score adds a fixed 35% for zoning and slope on the same
+scale. The live tool shows `why_*` in the briefs, so keep them true and
+readable.
 
 ## Rules for the agent
 
-1. Edit **only** `screener/rank.py`. `evaluate.py --decide` refuses to run
-   if anything else under `screener/` changed since the best kept run.
+1. Edit **only** `screener/rank.py`. An experiment is one commit that
+   touches only that file; `--decide` refuses anything else.
 2. Never open the files in `data/`, `experiments.tsv` or
    `best_ranking.json`. The score is the only feedback.
 3. Keep `learned_score` pure and general. No lookups of specific values
@@ -76,7 +83,8 @@ The zoning, slope, utilities and incentive terms live in
 
 ## The loop
 
-On the current working branch, with a clean tree:
+On the current working branch, with no uncommitted changes. The frozen
+key in `data/` is committed with the code.
 
 ```bash
 python -m screener.autoresearch.evaluate --decide   # first run records the baseline
@@ -93,6 +101,10 @@ A change is kept only if it adds at least one hit over the best kept run
 map cells are resampled, because sites cluster). Every run is appended to
 `screener/autoresearch/experiments.tsv` (untracked, append-only).
 
+If a human changes the evaluation itself (`evaluate.py`, `screens.py` or
+`data/`), `--decide` refuses until a human runs
+`python -m screener.autoresearch.evaluate --decide --new-baseline`.
+
 Run a bounded batch ("run 15 experiments"), not an endless loop. Then
 report the kept changes and the dev score, and ask a human to run
 `python -m screener.autoresearch.evaluate --test`. Kept changes flow into
@@ -100,7 +112,7 @@ the live ranking, because the live tool scores with the same `rank.py`.
 
 ## Known limits (state them in reports)
 
-- 38 dev positives, so scores move in steps of one site. That's why the
+- 39 dev positives, so scores move in steps of one site. That's why the
   noise bar exists. Expect a handful of keeps, not dozens.
 - Flood maps, exits and rail main lines are today's versions, not 2016's.
   A site filled out of the floodplain looks better than it did then.
@@ -108,8 +120,8 @@ the live ranking, because the live tool scores with the same `rank.py`.
   been perfect but wasn't sold looks like a miss. Long-held land that never
   traded is the opportunity the live tool hunts for, so don't let the
   seller signals collapse entirely toward "already corporate".
-- 47 parcels were built on without a matching deed by the 2016 owner
-  (owner-users, corporate successors, replats). They are left out, not
-  counted as positives.
+- "Built on" means the parcel overlaps a 2025 parcel with $1M+ of
+  industrial improvements. That's usually a new building, but can be an
+  expansion of a neighbour's site.
 - Your own pursue/pass marks (`screener/inputs/decisions.csv`) are not in
   the score yet. Add them as a second term once there are about 30.

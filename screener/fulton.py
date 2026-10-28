@@ -211,22 +211,40 @@ def acquisition(sales: list[dict[str, Any]], owner: str | None) -> dict[str, Any
     """The deed by which `owner` most likely took title.
 
     Skips deeds that don't move the land to a new owner (right-of-way,
-    corrective) and deeds the owner granted (grantor = owner). Same-day
-    ties prefer a named instrument, then the highest price.
+    corrective), deeds the owner granted (grantor = owner), and $0
+    quitclaims / gifts, which are usually family or estate-planning retitles
+    ("SMITH JOHN" -> "JOHN SMITH REVOCABLE TRUST") rather than a purchase.
+    Estate and foreclosure deeds count even at $0. Same-day ties prefer a
+    named instrument, then the highest price.
     """
     usable = [s for s in sales
               if s["instrument"] not in NON_TRANSFER_DEEDS and not same_owner(s["old_owner"], owner)]
-    if not usable:
+    real = [s for s in usable if s["price"] > 0 or s["instrument"] in ESTATE_DEEDS | DISTRESS_DEEDS]
+    # Old deeds often carry no price; fall back to the latest transfer then.
+    pick = real or usable
+    if not pick:
         return None
-    return max(usable, key=lambda s: (s["date"], bool(s["instrument"]), s["price"]))
+    return max(pick, key=lambda s: (s["date"], bool(s["instrument"]), s["price"]))
 
 
 def sold_after(sales: list[dict[str, Any]], owner: str | None, after: date,
                min_price: float) -> bool:
-    """Did `owner` sell the land at a real price on or after `after`?"""
-    return any(s["date"] >= after and s["price"] >= min_price
-               and s["instrument"] not in NON_TRANSFER_DEEDS
-               and same_owner(s["old_owner"], owner) for s in sales)
+    """Did `owner` sell the land at a real price on or after `after`?
+
+    A sale whose buyer was a development authority (seen as the grantor of
+    the next deed) is a tax-abatement title transfer, not a market sale.
+    """
+    deeds = sorted(sales, key=lambda s: s["date"])
+    for i, s in enumerate(deeds):
+        if (s["date"] < after or s["price"] < min_price or s["instrument"] in NON_TRANSFER_DEEDS
+                or not same_owner(s["old_owner"], owner)):
+            continue
+        buyer = next((d["old_owner"] for d in deeds[i + 1:]
+                      if not same_owner(d["old_owner"], owner)), None)
+        if buyer and owner_type(buyer) == "development_authority":
+            continue
+        return True
+    return False
 
 
 def load_cama(cache_dir: Path, owners: dict[str, str], as_of: date | None = None,

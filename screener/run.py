@@ -53,6 +53,7 @@ def reason_key(reason: str) -> str:
     """Group reject reasons that differ only by numbers ("45% in ...")."""
     key = re.sub(r"^only [\d.]+ usable acres.*", "too few usable acres after constraints", reason)
     key = re.sub(r"^[\d.]+% ", "", key)
+    key = re.sub(r"^[\d.]+ mi from", "too far from", key)
     return key.split(" (")[0]
 
 
@@ -173,11 +174,20 @@ def main(argv: list[str] | None = None) -> int:
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)
     unknown = collections.Counter(p["jurisdiction"] for p in survivors
-                                  if p.get("entitlement") == "unknown")
+                                  if p.get("entitlement") == "unknown" and not p.get("zoning_problem"))
     if unknown:
         where = ", ".join(f"{j} {n}" for j, n in unknown.most_common())
         notes.append(f"{sum(unknown.values())} ranked parcels have no machine-readable zoning "
                      f"({where}): check with the city")
+    failed = collections.Counter(p["zoning_problem"] for p in survivors if p.get("zoning_problem"))
+    for problem, n in failed.most_common():
+        notes.append(f"ZONING CHECK FAILED for {n} parcels: {problem}. Re-run later.")
+    pursued_out = [p for p in rejected if decisions.get(p["parcel_id"], {}).get("decision") == "pursue"]
+    for p in pursued_out:
+        notes.append(f"A parcel you're pursuing was screened out: {p['parcel_id']} "
+                     f"({'; '.join(p['reject_reasons'])})")
+    for p in rejected:
+        p["decision"] = decisions.get(p["parcel_id"], {}).get("decision", "")
     notes.append("Wetlands come from the 1980s National Wetlands Inventory and miss small "
                  "and forested wetlands; floodplain from FEMA NFHL (Mar 2026 snapshot)")
     summary = {"county": county.NAME, "run_date": today, "funnel": funnel,

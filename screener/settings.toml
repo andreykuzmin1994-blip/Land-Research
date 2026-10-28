@@ -32,3 +32,6 @@ exclude_government = true
 exclude_developer_owned = true  # Prologis, Link, Exeter, ... already own it
 exclude_utility_owned = true    # railroads, Georgia Power, pipelines
 exclude_listed = true           # parcels you mark "listed" in inputs/decisions.csv
+# Optional screens (off by default; these otherwise only lower the score):
+max_exit_miles = 0              # drop parcels farther than this from an interstate exit (0 = off)
+exclude_hard_entitlement = false  # drop parcels zoned AND planned residential / conservation

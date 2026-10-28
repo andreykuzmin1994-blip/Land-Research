@@ -46,10 +46,11 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
 
     with open(out_dir / "rejected.csv", "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["parcel_id", "jurisdiction", "site_address", "acres", "owner", "reasons"])
+        w.writerow(["parcel_id", "jurisdiction", "site_address", "acres", "owner", "decision", "reasons"])
         for p in rejected:
             w.writerow([p["parcel_id"], p.get("jurisdiction"), p.get("site_address"),
-                        p.get("acres"), p.get("owner"), "; ".join(p.get("reject_reasons", []))])
+                        p.get("acres"), p.get("owner"), p.get("decision", ""),
+                        "; ".join(p.get("reject_reasons", []))])
 
     features = [{
         "type": "Feature",
@@ -85,7 +86,9 @@ def brief(p: dict[str, Any]) -> str:
         "",
         "## The site",
         f"- {p['acres']:.1f} acres; about {p.get('usable_after_slope', p['usable_acres']):.1f} "
-        "usable after floodplain, wetlands, easements and steep ground",
+        "usable after floodplain, mapped wetlands and ponds, protected land / conservation "
+        "easements" + (" and steep ground" if p.get("steep_pct") is not None else
+                       " (slope not checked)") + ". Utility and access easements are not checked",
         f"- Zoning: {p.get('zoning') or 'unknown'}"
         + (f" ({p['zoning_desc']})" if p.get("zoning_desc") else "")
         + f"; future land use: {p.get('flu') or 'unknown'}",
@@ -98,7 +101,7 @@ def brief(p: dict[str, Any]) -> str:
         f"- Floodplain {p.get('flood_pct', 0):.0f}% ({', '.join(p.get('flood_zones') or []) or 'none'}), "
         f"floodway {p.get('floodway_pct', 0):.0f}%, wetlands {p.get('wetland_pct', 0):.0f}%, "
         f"ponds/streams {p.get('water_pct', 0):.0f}%",
-        f"- Slope: {_fmt(p.get('steep_pct'))}% of the site steeper than 15%; "
+        f"- Slope: {_fmt(p.get('steep_pct'))}% of the open ground steeper than 15%; "
         f"relief about {_fmt(p.get('relief_ft'))} ft (USGS lidar 2018-19, 10 m grid)",
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",

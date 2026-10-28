@@ -47,7 +47,7 @@ def motivation(p: dict[str, Any]) -> tuple[float, list[str]]:
     elif years is not None and years >= 10:
         score += 20
         why.append(f"same owner for {years:.0f} years")
-    elif years is not None and years < 3:
+    elif years is not None and years < 3 and (p.get("last_sale_price") or 0) > 0:
         score -= 15
         why.append("bought within the last 3 years")
     if p.get("inherited") or p.get("owner_type") == "estate":

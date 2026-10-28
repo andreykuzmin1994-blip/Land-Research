@@ -53,8 +53,11 @@ def fixed_score(p: dict[str, Any]) -> tuple[float, list[str]]:
 def score(p: dict[str, Any]) -> dict[str, Any]:
     fixed, fixed_why = fixed_score(p)
     learned = rank.learned_score(p)
+    # rank.py must stay on a 0-100 scale (evaluate.py enforces it); clamp
+    # anyway so the fixed share can't be diluted.
+    tuned = max(0.0, min(100.0, float(learned["score"])))
     return {
-        "score": round(FIXED_SHARE * fixed + (1 - FIXED_SHARE) * learned["score"], 1),
+        "score": round(FIXED_SHARE * fixed + (1 - FIXED_SHARE) * tuned, 1),
         "fixed_score": fixed,
         "learned_score": round(learned["score"], 1),
         "motivation_score": round(learned["motivation"], 1),

@@ -17,7 +17,7 @@ from shapely.strtree import STRtree
 
 from . import arcgis
 from .geo import FT_PER_M, LocalProjection, acres, esri_to_shape, haversine_miles
-from .layers import Index
+from .layers import SYSTEM_INTERCHANGES, Index
 from .zoning import entitlement, flu_category, zoning_category
 
 WATER_TYPES = {"Lake", "Freshwater Pond", "Riverine", "Estuarine and Marine Deepwater"}
@@ -58,7 +58,9 @@ def _overlap(geom, proj, total_m2, index: Index, keep: Callable[[dict], bool] = 
 
 def map_checks(parcels: list[dict[str, Any]], idx: dict[str, Index],
                industrial_points: list[tuple[float, float]], contamination_ft: float) -> None:
-    exits = [(s.x, s.y, a) for s, a in idx["exits"].items]
+    exits = [(s.x, s.y, a) for s, a in idx["exits"].items
+             if ((a.get("FED_ASSIGNED_INTERSTATE_NUMBER") or "").strip(),
+                 (a.get("SIGNED_EXIT_NUMBER") or "").strip()) not in SYSTEM_INTERCHANGES]
     ind_tree = STRtree([Point(x, y) for x, y in industrial_points]) if industrial_points else None
 
     for p in parcels:
@@ -253,6 +255,8 @@ def zoning_checks(parcels: list[dict[str, Any]], sources: list[dict[str, Any]],
                                         max_offset=0.00001)
         except arcgis.ArcGISError as exc:
             print(f"  ! zoning source unavailable: {src['name']} ({exc})")
+            for p in group:
+                p.setdefault("zoning_problem", f"{src['name']} was unavailable this run")
             continue
 
         if src["kind"] == "join":
@@ -268,6 +272,10 @@ def zoning_checks(parcels: list[dict[str, Any]], sources: list[dict[str, Any]],
             if matched < 0.5 * len(group):
                 print(f"  ! {src['name']}: only {matched} of {len(group)} parcels matched "
                       "by parcel id; the source's id format may have changed")
+                for p in group:
+                    if not (p["zoning"] or p["flu"]):
+                        p.setdefault("zoning_problem",
+                                     f"{src['name']} didn't match this parcel id this run")
         else:
             items = [(esri_to_shape(f.get("geometry")), f.get("attributes") or {}) for f in feats]
             index = Index([(s, a) for s, a in items if s is not None and not s.is_empty])
@@ -283,6 +291,8 @@ def zoning_checks(parcels: list[dict[str, Any]], sources: list[dict[str, Any]],
         p["flu_category"] = flu_category(p["flu"])
         p["entitlement"], p["entitlement_note"] = entitlement(
             p["zoning_category"], p["flu_category"], p.get("industrial_within_1mi", 0))
+        if p["entitlement"] == "unknown" and p.get("zoning_problem"):
+            p["entitlement_note"] = f"zoning check failed ({p['zoning_problem']}); re-run or ask the city"
 
 
 def _apply_zoning(p: dict[str, Any], src: dict[str, Any], attrs: dict[str, Any]) -> None:

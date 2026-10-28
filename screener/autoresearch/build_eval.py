@@ -13,11 +13,14 @@ Pool:      Fulton 5-50 acre parcels in the 2016 tax digest that pass the live
            tool's ownership and land-only screens (screens.attribute_rejects),
            minus owners whose names read like industrial developer vehicles
            (that land was already off the market).
-Positives: pool parcels that the 2016 owner SOLD after 2016-01-01 at a real
-           price (>= MIN_PRICE, deed history; title transfers to development
-           authorities and right-of-way deeds don't count) AND that are at
-           least half covered, in the 2025 digest, by an industrial building
-           worth $1M+.
+Positives: pool parcels that the 2016 owner SOLD in 2016 or later at a real
+           price (>= MIN_PRICE in the county deed file; right-of-way deeds and
+           sales to a development authority don't count) AND that are at
+           least half covered by a 2025-digest parcel carrying $1M+ of
+           industrial improvements.
+Left out:  parcels built on by 2025 without such a sale (owner-users,
+           corporate successors, replatted ids) are dropped from the pool,
+           not counted as misses.
 Features:  the 2016 digest + deed history before 2016 + layers that change
            slowly (flood, 1980s wetlands, easements, exits, main-line rail).
            Blank (None) because today's values were often changed FOR the
@@ -164,7 +167,9 @@ def main() -> int:
         sold = fulton.sold_after(sales.get(p["parcel_id"], []), p["owner"], AS_OF, MIN_PRICE)
         key = key_for(p["parcel_id"])
         is_pos = share >= 0.5 and sold
-        covered_not_sold += int(share >= 0.5 and not sold)
+        if share >= 0.5 and not sold:
+            covered_not_sold += 1
+            continue
         if is_pos:
             positives.append(key)
         cell = cell_for(p["lon"], p["lat"])
@@ -194,7 +199,7 @@ def main() -> int:
                 for s in ("dev", "test")}
     log(f"Pool {len(records):,}; positives {len(positives)} "
         f"(dev {by_split['dev']}, test {by_split['test']}); "
-        f"{covered_not_sold} built on but not sold by the {AS_OF.year} owner (excluded)")
+        f"{covered_not_sold} built on but not sold by the {AS_OF.year} owner (left out of the pool)")
     return 0
 
 

@@ -3,7 +3,7 @@
   "as_of": "2016-01-01",
   "label_year": 2025,
   "built": "2026-10-28",
-  "pool": 3351,
+  "pool": 3310,
   "min_price": 50000,
   "features": [
    "acres",
@@ -60,7 +60,9 @@
    "exclude_government": true,
    "exclude_developer_owned": true,
    "exclude_utility_owned": true,
-   "exclude_listed": true
+   "exclude_listed": true,
+   "max_exit_miles": 0,
+   "exclude_hard_entitlement": false
   }
  },
  "positives": [
@@ -76,8 +78,10 @@
   "31aa90b4693615fa",
   "31c9966e349043fa",
   "35fd94f42df21ffa",
+  "3611c6e5e9d58102",
   "3650d3056ef4394f",
   "4a3fb89b4b33bc96",
+  "4f494b98ad7c0782",
   "50f54b9e729b508c",
   "51d827b1d617fc70",
   "57c911f320dd5a06",
@@ -101,6 +105,7 @@
   "c5f21cf807457391",
   "cb7990b0a9e5e6af",
   "dc97502dc359d3e3",
+  "e5554b1b4addc726",
   "e892a67d596bba41",
   "f1061d167692153c",
   "f1363d0495370c14",

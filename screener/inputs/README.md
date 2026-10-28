@@ -12,7 +12,9 @@ parcel_id,decision,date,note
 
 - `pass`: drop it from future lists.
 - `listed`: it's already for sale, so drop it (`exclude_listed` in settings).
-- `pursue`: keep it and mark it in the output.
+- `pursue`: mark it in `ranked.csv`. If a later run screens it out (e.g.
+  a new building or owner), `summary.md` calls that out and
+  `rejected.csv` keeps the mark.
 
 Copy parcel ids exactly as they appear in `ranked.csv`, including spaces.
 These marks are also the future second half of the AutoResearch score

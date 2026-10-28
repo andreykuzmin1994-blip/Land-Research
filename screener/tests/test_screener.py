@@ -57,6 +57,12 @@ class OwnerTests(unittest.TestCase):
             "C S X TRANSPORTATION": "utility",
             "SOUTHERN NATURAL GAS CO": "utility",
             "SMITH R R": "individual",
+            "DROOGMANS LESLIE BECKNELL": "individual",
+            "OAKMONT BAPTIST CHURCH": "religious",
+            "BLACK CREEK FARM LLC": "entity",
+            "SCHOOL STREET PARTNERS": "entity",
+            "TEMPLE GRAY JR": "individual",
+            "BECKNELL INDUSTRIAL LLC": "developer",
             "MILLER CUP": "individual",
             "": "unknown",
         }
@@ -207,6 +213,12 @@ class MiscTests(unittest.TestCase):
              "old_owner": "PPF INDUSTRIAL ROYAL SOUTH LLC"},
         ]
         self.assertTrue(sold_after(sales, "SMITH FAMILY TRUST", date(2016, 1, 1), 50_000))
+        to_authority = [
+            {"date": date(2018, 4, 11), "price": 465090, "instrument": "", "old_owner": "JONES ELLIS"},
+            {"date": date(2021, 1, 5), "price": 0, "instrument": "",
+             "old_owner": "DEVELOPMENT AUTHORITY OF FULTON COUNTY"},
+        ]
+        self.assertFalse(sold_after(to_authority, "JONES ELLIS", date(2016, 1, 1), 50_000))
         # A nominal transfer to a development authority is not a sale.
         self.assertFalse(sold_after(sales, "PPF INDUSTRIAL ROYAL SOUTH LLC", date(2016, 1, 1), 50_000))
         self.assertTrue(same_owner("SMITH FAMILY TRUST THE", "SMITH FAMILY TRUST"))
@@ -214,6 +226,7 @@ class MiscTests(unittest.TestCase):
         self.assertTrue(same_owner("TL COOK PROPERTIES L L C", "T L COOK PROPERTIES INC"))
         self.assertTrue(same_owner("SHROPSHINE ELLIS", "SHROPSHIRE ELLIS"))
         self.assertFalse(same_owner("LEE JOHN", "LEE JAMES"))
+        self.assertTrue(same_owner("HARVISCHAK DENNIS", "DENNIS HARVISCHAK REVOCABLE TRUST THE"))
         self.assertFalse(same_owner("PALMETTO BECKNELL INDUSTRI", "BOWEN ROAD ASSOCIATES LLC"))
 
     def test_dates_and_jurisdictions(self):

@@ -48,7 +48,12 @@ def site_rejects(p: dict[str, Any], s: dict[str, Any]) -> list[str]:
         why.append("overlaps protected land or a conservation easement")
     steep = p.get("steep_pct")
     if steep is not None and steep > s["max_steep_pct"]:
-        why.append(f"{steep:.0f}% of the site is steeper than 15%")
+        why.append(f"{steep:.0f}% of the open ground is steeper than 15%")
+    max_exit = s.get("max_exit_miles") or 0
+    if max_exit and p.get("exit_miles") is not None and p["exit_miles"] > max_exit:
+        why.append(f"{p['exit_miles']:.1f} mi from the nearest interstate exit")
+    if s.get("exclude_hard_entitlement") and p.get("entitlement") == "hard":
+        why.append(f"entitlement unlikely ({p.get('entitlement_note')})")
     if usable_after_slope(p) < s["min_usable_acres"]:
         why.append(f"only {usable_after_slope(p):.1f} usable acres after constraints")
     return why
@@ -77,7 +82,8 @@ def flags(p: dict[str, Any]) -> list[str]:
     if "well" in water or "septic" in water or "septic" in sewer:
         out.append("assessor shows well/septic: public water or sewer may need extending")
     if p.get("entitlement") == "unknown":
-        out.append("no machine-readable zoning for this city: confirm with the planning office")
+        out.append(f"zoning check failed: {p['zoning_problem']}" if p.get("zoning_problem")
+                   else "no machine-readable zoning for this city: confirm with the planning office")
     if p.get("flood_pct", 0) > 0:
         out.append(f"{p['flood_pct']:.0f}% in the 100-year floodplain")
     if 0 < p.get("wetland_pct", 0):

@@ -47,6 +47,10 @@ LOG_FILE = HERE / "experiments.tsv"          # append-only, untracked
 BEST_FILE = HERE / "best_ranking.json"       # ranking of the best kept run, untracked
 LOG_COLUMNS = ["time", "commit", "parent", "fingerprint", "hits", "positives", "k",
                "recall", "win_share", "status", "description"]
+# Files whose change alters what the score means. Changing one needs a
+# human-recorded new baseline (--new-baseline).
+EVAL_FILES = ("screener/autoresearch/evaluate.py", "screener/autoresearch/data/",
+              "screener/screens.py")
 K_SHARE = 0.02
 BOOTSTRAP = 500
 WIN_SHARE_TO_KEEP = 0.9
@@ -72,8 +76,9 @@ def _tiebreak(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def ranking(records: list[dict], split: str, scorer, settings: dict) -> list[str]:
-    """Keys of the split's parcels that pass the screens, best first."""
+def ranking(records: list[dict], split: str, scorer, settings: dict) -> tuple[list[str], tuple]:
+    """Keys of the split's parcels that pass the screens, best first, and
+    the (min, max) score seen."""
     scored = []
     for r in records:
         if r["split"] != split or screens.site_rejects(r, settings):
@@ -81,7 +86,8 @@ def ranking(records: list[dict], split: str, scorer, settings: dict) -> list[str
         features = {k: v for k, v in r.items() if k not in HIDDEN}
         scored.append((-float(scorer(features)["score"]), _tiebreak(r["key"]), r["key"]))
     scored.sort()
-    return [key for _, _, key in scored]
+    span = (-scored[-1][0], -scored[0][0]) if scored else (0.0, 0.0)
+    return [key for _, _, key in scored], span
 
 
 def hits_at_k(order: list[str], pool_keys: list[str], positives: set[str]) -> tuple[int, int]:
@@ -112,12 +118,13 @@ def evaluate(records: list[dict], positives: set[str], split: str,
         settings = load_meta_screens()
     pool = [r["key"] for r in records if r["split"] == split]
     pos = {k for k in pool if k in positives}
-    order = ranking(records, split, scorer, settings)
+    order, span = ranking(records, split, scorer, settings)
     hits, k = hits_at_k(order, pool, pos)
     return {
         "split": split, "pool": len(pool), "positives": len(pos), "k": k, "hits": hits,
         "recall": round(hits / len(pos), 3) if pos else 0.0,
-        "positives_screened_out": len(pos - set(order)), "order": order,
+        "positives_screened_out": len(pos - set(order)),
+        "score_range": [round(span[0], 1), round(span[1], 1)], "order": order,
     }
 
 
@@ -184,25 +191,34 @@ def _refuse(msg: str) -> int:
     return 3
 
 
-def decide(records: list[dict], positives: set[str], dev: dict) -> int:
+def decide(records: list[dict], positives: set[str], dev: dict, new_baseline: bool) -> int:
     head = _git("rev-parse", "--short", "HEAD")
     parent = _git("rev-parse", "--short", "HEAD~1")
     fp = fingerprint()
-    if _git("status", "--porcelain", "--", "screener"):
+    if _git("status", "--porcelain", "--untracked-files=no", "--", "screener"):
         return _refuse("uncommitted changes under screener/. Commit the experiment first.")
     if any(r["commit"] == head and r["fingerprint"] == fp for r in _rows()):
         return _refuse(f"commit {head} was already scored. Make a new experiment commit.")
-    best = _best_kept(fp)
+    lo, hi = dev["score_range"]
+    if lo < 0 or hi > 100:
+        return _refuse(f"rank.learned_score ranges {lo}..{hi}; it must stay within 0-100 so "
+                       "the fixed zoning/slope share of the live score is unchanged.")
+    best = None if new_baseline else _best_kept(fp)
     if best is not None:
-        changed = [f for f in _git("diff", "--name-only", best["commit"], "HEAD", "--",
+        touched = [f for f in _git("diff", "--name-only", "HEAD~1", "HEAD", "--",
                                    "screener").splitlines() if f]
-        if any(f != "screener/rank.py" for f in changed):
-            return _refuse("files other than screener/rank.py changed since the best kept "
-                           f"run ({best['commit']}): {', '.join(changed)}. Experiments may "
-                           "only edit rank.py; a human changing anything else starts a new baseline.")
+        if touched != ["screener/rank.py"]:
+            return _refuse("an experiment is one commit that edits only screener/rank.py; "
+                           f"HEAD touches: {', '.join(touched) or 'nothing under screener/'}.")
+        since = [f for f in _git("diff", "--name-only", best["commit"], "HEAD", "--",
+                                 "screener").splitlines() if f.startswith(EVAL_FILES)]
+        if since:
+            return _refuse(f"the evaluation itself changed since the best kept run "
+                           f"({', '.join(since)}). A human must record a new baseline: "
+                           "python -m screener.autoresearch.evaluate --decide --new-baseline")
 
     if best is None or not BEST_FILE.exists():
-        status, why, share = "baseline", "first run on this evaluation set: recorded as the baseline", ""
+        status, why, share = "baseline", "recorded as the baseline for this evaluation set", ""
     else:
         best_order = json.loads(BEST_FILE.read_text())["order"]
         gain = dev["hits"] - int(best["hits"])
@@ -235,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--decide", action="store_true", help="compare to the best kept run and log")
     ap.add_argument("--test", action="store_true", help="also score the sealed test split")
     ap.add_argument("--control", action="store_true", help="what random ranking scores")
+    ap.add_argument("--new-baseline", action="store_true",
+                    help="(humans only) record the current ranking as a fresh baseline")
     args = ap.parse_args(argv)
 
     if not FEATURES_FILE.exists():
@@ -264,7 +282,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.test:
         out["test"] = public(evaluate(records, positives, "test"))
     print(json.dumps(out))
-    return decide(records, positives, dev) if args.decide else 0
+    if args.new_baseline and not args.decide:
+        print("--new-baseline only applies with --decide")
+        return 2
+    return decide(records, positives, dev, args.new_baseline) if args.decide else 0
 
 
 if __name__ == "__main__":

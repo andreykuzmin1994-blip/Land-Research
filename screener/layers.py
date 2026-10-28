@@ -69,6 +69,22 @@ LAYERS: dict[str, Layer] = {
 }
 
 
+# Freeway-to-freeway interchanges in metro Atlanta: no ramps to local roads,
+# so they don't count as truck access. (interstate, signed exit) as GDOT
+# labels them; only junctions we're sure of.
+SYSTEM_INTERCHANGES = {
+    ("20", "51A/B"), ("285", "10A/B"),     # I-20 / I-285 west
+    ("20", "66A/B"), ("285", "46A/B"),     # I-20 / I-285 east
+    ("85", "69"), ("285", "61"),           # I-85 / I-285 south
+    ("75", "238A/B"),                      # I-75 / I-285 south
+    ("75", "259"), ("75", "259A/B"),       # I-75 / I-285 north
+    ("85", "95A/B"), ("285", "33A/B"),     # I-85 / I-285 north (Spaghetti Junction)
+    ("75", "251"), ("85", "85"),           # I-75 / I-85 Brookwood split
+    ("75", "247"), ("20", "57"),           # I-20 / Downtown Connector
+    ("75", "227"), ("675", "1"),           # I-75 / I-675
+}
+
+
 class Index:
     """Shapes + attributes with an STRtree for bbox candidate lookups."""
 
