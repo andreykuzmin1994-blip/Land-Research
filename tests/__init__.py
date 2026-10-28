@@ -24,9 +24,30 @@ Test modules whose tests can reach ``runner._mirror_log_row`` therefore
 ``import tests`` explicitly at module top to force this guard to
 execute under every invocation style. Keep the guard logic here (single
 source of truth); keep those imports in place.
+
+Second guard — raw-response cache redirect (SR-6): discovery tests run
+``research._query_arcgis_corridor``, which caches every page under
+``research._SOURCES_DIR`` (``<repo>/sources/`` in production). Left
+alone, each suite run leaves ``sources/disco-fulton-<ts>-<hex>/`` dirs in
+the repo root. The module attribute is pointed at a per-process temp dir
+(removed at interpreter exit) instead. ``research._safe_cache_path`` is
+untouched and resolves against whatever ``_SOURCES_DIR`` is, so the
+path-traversal checks run unchanged against the temp dir. The same
+``import tests`` caveat applies: modules whose tests can reach the cache
+writer must import this package.
 """
 
+import atexit
 import os
+import shutil
+import tempfile
+from pathlib import Path
 
 if not os.environ.get("EXPERIMENT_LOG_MIRROR_DISABLE"):
     os.environ["EXPERIMENT_LOG_MIRROR_DISABLE"] = "1"
+
+import research  # noqa: E402 — after the kill switch, before any test runs
+
+_SOURCES_TMP = tempfile.mkdtemp(prefix="land-research-test-sources-")
+atexit.register(shutil.rmtree, _SOURCES_TMP, ignore_errors=True)
+research._SOURCES_DIR = Path(_SOURCES_TMP)

@@ -10,6 +10,12 @@ column type are actually exercised together.
 Invoked from ``.github/workflows/discovery-fulton.yml`` against a postgres
 service container with PostGIS installed.
 
+It WRITES (parcels, research_log, flagged_items, PASS parcel_scores rows),
+so it is meant for a throwaway database and refuses to run unless
+``DATABASE_URL`` points at this machine (localhost / 127.0.0.1 / ::1 or a
+Unix socket). Set ``POSTGIS_SMOKE_ALLOW_NONLOCAL=1`` to override that
+deliberately; never point it at the shared Supabase project.
+
 Exit code 0 = pass. Non-zero = fail, with a printed diagnostic.
 """
 
@@ -17,10 +23,12 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sys
 from pathlib import Path
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 
 # Ensure repo root on sys.path so ``research`` and ``prepare`` import.
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -29,10 +37,60 @@ sys.path.insert(0, str(REPO_ROOT))
 import prepare  # noqa: E402
 import research  # noqa: E402
 
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+_ALLOW_NONLOCAL_ENV_VAR = "POSTGIS_SMOKE_ALLOW_NONLOCAL"
+
 
 def _fail(msg: str) -> "psycopg.Connection | None":
     print(f"FAIL: {msg}")
     sys.exit(1)
+
+
+def _nonlocal_hosts(dsn: str) -> list[str]:
+    """Return every host ``dsn`` would reach that is not this machine.
+
+    Follows libpq: ``host`` and ``hostaddr`` may each be comma-separated
+    lists and fall back to ``PGHOST`` / ``PGHOSTADDR`` when absent from
+    the DSN; no host at all (or a ``/``- or ``@``-prefixed one) is a Unix
+    socket. A ``service`` entry resolves from a file this script does not
+    read, so it counts as non-local. Raises ``psycopg.ProgrammingError``
+    on an unparseable DSN.
+    """
+    params = conninfo_to_dict(dsn)
+    service = params.get("service") or os.environ.get("PGSERVICE")
+    if service:
+        return [f"service={service}"]
+    found = []
+    for key, env_var in (("host", "PGHOST"), ("hostaddr", "PGHOSTADDR")):
+        value = params.get(key) or os.environ.get(env_var) or ""
+        for host in str(value).split(","):
+            host = host.strip()
+            if host and host not in _LOCAL_HOSTS and not host.startswith(("/", "@")):
+                found.append(host)
+    return found
+
+
+def _require_local_dsn(dsn: str) -> None:
+    """Exit unless ``dsn`` is local or the explicit opt-in is set.
+
+    Only host names are printed, never the DSN: ``prepare._mask_dsn``
+    masks URL-form DSNs only, and the parser's error text can quote
+    key=value fragments such as a password (SR-8).
+    """
+    if os.environ.get(_ALLOW_NONLOCAL_ENV_VAR) == "1":
+        print(f"WARN: {_ALLOW_NONLOCAL_ENV_VAR}=1 — local-host guard skipped")
+        return
+    try:
+        remote = _nonlocal_hosts(dsn)
+    except psycopg.Error:
+        _fail("DATABASE_URL is not a valid libpq connection string")
+    if remote:
+        _fail(
+            f"refusing to write smoke-test rows to non-local host(s) "
+            f"{', '.join(remote)}. Point DATABASE_URL at a throwaway local "
+            f"PostGIS, or set {_ALLOW_NONLOCAL_ENV_VAR}=1 to override "
+            f"deliberately."
+        )
 
 
 def main() -> int:
@@ -40,6 +98,7 @@ def main() -> int:
     if not dsn:
         _fail("DATABASE_URL not set; cannot run live-PostGIS smoke test")
         return 1
+    _require_local_dsn(dsn)
 
     # Step 1: schema apply.
     with psycopg.connect(dsn, autocommit=False, connect_timeout=10) as conn:
@@ -127,6 +186,15 @@ def main() -> int:
     # (both tied rows pass); the DISTINCT ON (parcel_id) ORDER BY parcel_id,
     # scored_at DESC, score_id DESC selects EXACTLY ONE row — the highest
     # score_id among the tie — so the count is 1.
+    #
+    # The rows carry a fresh smoke-only run_tag and the metric is read with
+    # that tag EXPLICITLY. With run_tag=None prepare derives the scope from
+    # the checked-out branch: on autoresearch/<tag> the run-scoped CTE
+    # filtered these (NULL-tagged) rows out and the count was a false 0;
+    # on any other branch it counted the whole database. The explicit tag
+    # makes the check independent of both, and exercises the run-scoped
+    # CTE the ratchet uses.
+    smoke_run_tag = f"smoke-{secrets.token_hex(4)}"
     threshold = prepare.get_parameters()["composite_threshold"]
     pass_score = threshold + 5  # comfortably over the PASS threshold
     with psycopg.connect(dsn, autocommit=False, connect_timeout=10) as conn:
@@ -143,18 +211,22 @@ def main() -> int:
             # Earlier (loser) PASS row.
             cur.execute(
                 "INSERT INTO parcel_scores "
-                "(parcel_id, scored_at, composite_score, confidence_score, actionability) "
-                "VALUES (%s, NOW() - INTERVAL '1 hour', %s, %s, 'PASS')",
-                (tie_parcel, pass_score, 1.0),
+                "(parcel_id, scored_at, composite_score, confidence_score, "
+                "actionability, run_tag) "
+                "VALUES (%s, NOW() - INTERVAL '1 hour', %s, %s, 'PASS', %s)",
+                (tie_parcel, pass_score, 1.0, smoke_run_tag),
             )
             # Two rows tied at the SAME scored_at; the higher score_id (the
             # SECOND insert) must win. Distinct confidence so we can confirm
             # which row DISTINCT ON picked.
             cur.execute(
                 "INSERT INTO parcel_scores "
-                "(parcel_id, scored_at, composite_score, confidence_score, actionability) "
-                "VALUES (%s, NOW(), %s, %s, 'PASS'), (%s, NOW(), %s, %s, 'PASS')",
-                (tie_parcel, pass_score, 3.0, tie_parcel, pass_score, 9.0),
+                "(parcel_id, scored_at, composite_score, confidence_score, "
+                "actionability, run_tag) "
+                "VALUES (%s, NOW(), %s, %s, 'PASS', %s), "
+                "(%s, NOW(), %s, %s, 'PASS', %s)",
+                (tie_parcel, pass_score, 3.0, smoke_run_tag,
+                 tie_parcel, pass_score, 9.0, smoke_run_tag),
             )
         conn.commit()
 
@@ -163,12 +235,15 @@ def main() -> int:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT score_id, confidence_score FROM parcel_scores "
-                "WHERE parcel_id = %s ORDER BY scored_at DESC, score_id DESC LIMIT 1",
-                (tie_parcel,),
+                "WHERE parcel_id = %s AND run_tag = %s "
+                "ORDER BY scored_at DESC, score_id DESC LIMIT 1",
+                (tie_parcel, smoke_run_tag),
             )
             winner_score_id, winner_conf = cur.fetchone()
 
-        count = prepare.calculate_actionable_pipeline_count(conn)
+        count = prepare.calculate_actionable_pipeline_count(
+            conn, run_tag=smoke_run_tag
+        )
         if count != 1:
             _fail(
                 f"DISTINCT ON tie-break: expected count==1 for one parcel with "
@@ -176,7 +251,9 @@ def main() -> int:
             )
         # The confidence-weighted sum must reflect the SINGLE winning row, i.e.
         # the highest-score_id tied row's confidence (9.0), not a double count.
-        weighted = prepare.calculate_confidence_weighted_pipeline(conn)
+        weighted = prepare.calculate_confidence_weighted_pipeline(
+            conn, run_tag=smoke_run_tag
+        )
         if abs(weighted - float(winner_conf)) > 1e-9:
             _fail(
                 f"DISTINCT ON tie-break: confidence_weighted={weighted} did not "
@@ -185,7 +262,8 @@ def main() -> int:
             )
         print(
             f"OK: DISTINCT ON tie-break selects exactly one row "
-            f"(score_id={winner_score_id}, confidence={winner_conf}); count=1"
+            f"(run_tag={smoke_run_tag}, score_id={winner_score_id}, "
+            f"confidence={winner_conf}); count=1"
         )
 
     print("OK: live-PostGIS smoke test complete")

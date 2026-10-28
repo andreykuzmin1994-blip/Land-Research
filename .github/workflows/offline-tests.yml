@@ -9,6 +9,9 @@ name: Offline test suite
 # § Change tiers: "tests + CI only") assumes CI always runs the tests —
 # this workflow is what makes that assumption true. The suite is cheap
 # enough that path-filtering it would save nothing.
+#
+# The separate screener/ tool has its own offline suite and requirements
+# (shapely); it runs as its own step so a failure names the suite.
 
 on:
   push:
@@ -29,6 +32,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r screener/requirements.txt
 
       - name: Run the full offline suite
         run: python -m unittest discover -s tests -v
+
+      - name: Run the screener offline suite
+        run: python -m unittest discover -s screener/tests -t . -v

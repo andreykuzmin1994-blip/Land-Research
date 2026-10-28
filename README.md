@@ -147,6 +147,52 @@ Code changes are reviewed by blast radius (full definition:
 
 The recurring risk checklist all tiers verify against lives in `STANDING_RISKS.md` (SR-1 … SR-15) — reviews cite IDs instead of restating it.
 
+## Testing
+
+**Offline suites** — no network, secrets or database (SR-6). Both run on
+every push and pull request (`.github/workflows/offline-tests.yml`):
+
+```bash
+python -m unittest discover -s tests                 # root system (`make tests`)
+python -m unittest discover -s screener/tests -t .   # screener/ (pip install -r screener/requirements.txt)
+```
+
+**Live PostGIS smoke test** — the offline suite never executes SQL;
+`tests/test_postgis_smoke.py` runs the discovery UPSERT and the metric
+query against real PostGIS (in CI: `.github/workflows/discovery-fulton.yml`).
+It writes rows, so point it only at a throwaway local container, never at
+Supabase: it refuses a non-local `DATABASE_URL` unless
+`POSTGIS_SMOKE_ALLOW_NONLOCAL=1`. Pass the DSN inline; don't put it in `.env`.
+
+```bash
+docker run -d --rm --name lr-smoke -e POSTGRES_USER=lr -e POSTGRES_PASSWORD=lr_pw \
+  -e POSTGRES_DB=lr_test -p 127.0.0.1:55432:5432 postgis/postgis:16-3.4
+docker exec lr-smoke pg_isready -h 127.0.0.1 -U lr -d lr_test   # repeat until "accepting connections"
+DATABASE_URL=postgresql://lr:lr_pw@localhost:55432/lr_test python tests/test_postgis_smoke.py
+docker stop lr-smoke
+```
+
+**Live connector harness** — queries Fulton's public ArcGIS server
+(rate-limited, SR-11) and writes a redacted report to `harness_reports/`
+(gitignored). Design: `appendix_a_county_connectors.md` § "Connector Test
+Harness"; in CI: `.github/workflows/harness-fulton.yml`.
+
+```bash
+python connector_harness.py --county fulton --quick
+```
+
+**Screener live trial** — downloads free public map data into
+`screener/cache/` and writes `screener/output/` (both gitignored); see
+`screener/README.md`. The two `evaluate` calls are read-only; `--decide`,
+`--test` and `build_eval` belong to the loop and its humans
+(`screener/autoresearch/PROGRAM.md`).
+
+```bash
+python -m screener.run --limit 200 --refresh
+python -m screener.autoresearch.evaluate             # dev score
+python -m screener.autoresearch.evaluate --control   # what random ranking scores
+```
+
 ## Operating Cost (Estimated)
 
 | Component | Cost |
