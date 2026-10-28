@@ -1,0 +1,6 @@
+# Runtime artifacts: downloaded map data, run outputs, the experiment log,
+# and your decisions file (contains owner info you looked up).
+cache/
+output/
+autoresearch/experiments.tsv
+inputs/decisions.csv
