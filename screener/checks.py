@@ -90,6 +90,12 @@ def map_checks(parcels: list[dict[str, Any]], idx: dict[str, Index],
         p["constrained_pct"] = (round(100.0 * proj(unary_union(constrained)).area / total, 1)
                                 if constrained else 0.0)
         p["usable_acres"] = round(p["acres"] * (1 - p["constrained_pct"] / 100.0), 1)
+        # Slope is measured on the unconstrained ground only, so a steep creek
+        # bank inside the floodplain isn't subtracted twice.
+        open_ground = g.difference(unary_union(constrained)) if constrained else g
+        p["_open_ground"] = open_ground if not open_ground.is_empty else g
+        if p["gis_acres"] and p["acres"] and not 0.5 <= p["gis_acres"] / p["acres"] <= 2.0:
+            p["acreage_mismatch"] = True
 
         p["opportunity_zone"] = any(s.contains(c) for s, _ in idx["oz"].candidates(c))
 
@@ -183,7 +189,7 @@ def _hist_share_above(hist: dict[str, Any], threshold: float) -> float | None:
 
 
 def slope_stats(geom) -> dict[str, Any]:
-    """Relief and steepness from USGS 3DEP lidar at ~10 m (under 1 s per parcel)."""
+    """Relief and steepness from USGS 3DEP lidar at ~10 m (about 1-5 s per parcel)."""
     data = arcgis.request_json(SLOPE_URL, {
         "geometry": json.dumps(_esri_polygon(geom)),
         "geometryType": "esriGeometryPolygon",
@@ -209,7 +215,7 @@ def slope_checks(parcels: list[dict[str, Any]], workers: int,
                  progress: Callable[[int, int], None] | None = None) -> None:
     def work(p):
         try:
-            p.update(slope_stats(p["geometry"]))
+            p.update(slope_stats(p.get("_open_ground") or p["geometry"]))
         except arcgis.ArcGISError as exc:
             p.update({"relief_ft": None, "steep_pct": None, "mean_slope_pct": None,
                       "slope_error": str(exc)[:200]})
@@ -252,10 +258,16 @@ def zoning_checks(parcels: list[dict[str, Any]], sources: list[dict[str, Any]],
         if src["kind"] == "join":
             table = {(f["attributes"].get(src["id_field"]) or "").strip(): f["attributes"]
                      for f in feats if f.get("attributes")}
+            matched = 0
             for p in group:
-                a = table.get(p["parcel_id"])
+                key = p["parcel_id"][:-1] if src.get("id_trim_last") else p["parcel_id"]
+                a = table.get(key)
                 if a:
+                    matched += 1
                     _apply_zoning(p, src, a)
+            if matched < 0.5 * len(group):
+                print(f"  ! {src['name']}: only {matched} of {len(group)} parcels matched "
+                      "by parcel id; the source's id format may have changed")
         else:
             items = [(esri_to_shape(f.get("geometry")), f.get("attributes") or {}) for f in feats]
             index = Index([(s, a) for s, a in items if s is not None and not s.is_empty])

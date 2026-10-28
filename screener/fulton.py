@@ -16,7 +16,7 @@ from typing import Any
 
 from . import arcgis
 from .geo import esri_to_shape
-from .owners import is_po_box, mailing_state, owner_type
+from .owners import industrial_named, is_po_box, mailing_state, owner_type, same_owner
 
 NAME = "Fulton"
 STATE = "GA"
@@ -36,7 +36,7 @@ JURISDICTIONS = {
     "25": "Fairburn", "30": "Hapeville", "35": "Mountain Park", "40": "Palmetto",
     "45": "Roswell", "50": "Union City", "55": "South Fulton / unincorporated",
     "56": "Milton", "57": "Johns Creek", "59": "Sandy Springs",
-    "65": "Chattahoochee Hills", "70": "Other (district 70)",
+    "65": "Chattahoochee Hills", "70": "Fulton Industrial District",
 }
 
 # Industrial-class parcels of any size: the "is this an industrial area"
@@ -56,11 +56,11 @@ ZONING_SOURCES: list[dict[str, Any]] = [
      "url": f"{_SF}/Zoning/FeatureServer/0", "zoning_field": "ZClass",
      "desc_field": "ZClassDesc"},
     {"name": "Fulton Industrial District zoning", "kind": "overlay",
-     "jurisdictions": {"South Fulton / unincorporated"},
+     "jurisdictions": {"South Fulton / unincorporated", "Fulton Industrial District"},
      "url": PARCELS_URL.rsplit("/", 1)[0] + "/34", "zoning_field": "ZClass",
      "desc_field": "ZClassDesc"},
     {"name": "Fulton Industrial District future land use", "kind": "overlay",
-     "jurisdictions": {"South Fulton / unincorporated"},
+     "jurisdictions": {"South Fulton / unincorporated", "Fulton Industrial District"},
      "url": PARCELS_URL.rsplit("/", 1)[0] + "/33", "flu_field": "LandUses"},
     {"name": "Fairburn zoning + future land use", "kind": "join",
      "jurisdictions": {"Fairburn"},
@@ -72,7 +72,9 @@ ZONING_SOURCES: list[dict[str, Any]] = [
     {"name": "East Point zoning + future land use", "kind": "join",
      "jurisdictions": {"East Point"},
      "url": "https://services7.arcgis.com/CPLm4MuWYjfnA2R9/arcgis/rest/services/Current_Zoning/FeatureServer/0",
-     "id_field": "PIN", "zoning_field": "ZONING", "flu_field": "Future_Use"},
+     # East Point's PIN is the Fulton parcel id minus its last character.
+     "id_field": "PIN", "id_trim_last": True, "zoning_field": "ZONING",
+     "flu_field": "Future_Use"},
     {"name": "Atlanta zoning", "kind": "overlay", "jurisdictions": {"Atlanta"},
      "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0",
      "zoning_field": "ZONECLASS"},
@@ -88,6 +90,9 @@ ESTATE_DEEDS = {"Executor/Executrix Deed", "Administrators Deed", "Deed of Assen
                 "Year's Support"}
 DISTRESS_DEEDS = {"Deed Under Power of Foreclosur", "Foreclosure Deed", "Tax Deed",
                   "Sheriff's Deed", "Deed in Lieu of Foreclosure"}
+# Recorded deeds that don't move the land to a new owner.
+NON_TRANSFER_DEEDS = {"Right of Way/Dept of Trans", "Corrective Warranty Deed",
+                      "Corrective QC Deed"}
 
 
 def jurisdiction(tax_dist: str | None) -> str:
@@ -138,6 +143,7 @@ def fetch_parcels(min_acres: float, max_acres: float, jurisdictions: set[str] | 
             "owner": owner,
             "owner_mailing": ", ".join(x for x in (addr1, addr2) if x),
             "owner_type": owner_type(owner),
+            "industrial_named": industrial_named(owner),
             "owner_state": mailing_state(addr2),
             "owner_po_box": is_po_box(addr1),
             "assessor_portal": ASSESSOR_PORTAL,
@@ -168,44 +174,75 @@ def _parse_date(text: str | None) -> date | None:
     return d if 1900 <= d.year <= date.today().year + 1 else None
 
 
-def load_cama(cache_dir: Path, parcel_ids: set[str],
-              as_of: date | None = None) -> dict[str, dict[str, Any]]:
-    """Deed history + site supplement for the given parcels.
-
-    as_of keeps only deeds recorded before that date (historical evaluation).
-    """
-    zip_path = arcgis.download(CAMA_URL, cache_dir / "fulton_cama.zip", max_age_days=30)
-    out: dict[str, dict[str, Any]] = {pid: {"sales": []} for pid in parcel_ids}
+def read_cama(cache_dir: Path, parcel_ids: set[str], refresh: bool = False
+              ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
+    """All recorded deeds and the site supplement for the given parcels."""
+    zip_path = arcgis.download(CAMA_URL, cache_dir / "fulton_cama.zip",
+                               max_age_days=0 if refresh else 30)
+    sales: dict[str, list[dict[str, Any]]] = {pid: [] for pid in parcel_ids}
+    supplement: dict[str, dict[str, Any]] = {}
     with zipfile.ZipFile(zip_path) as z:
         with z.open("Tax_Sales.txt") as fh:
             for row in csv.DictReader(io.TextIOWrapper(fh, encoding="latin-1"), delimiter="\t"):
                 pid = (row.get("ParcelID") or "").strip()
-                if pid not in out:
-                    continue
                 d = _parse_date(row.get("SaleDate"))
-                if d is None or (as_of and d >= as_of):
-                    continue
-                out[pid]["sales"].append({
-                    "date": d,
-                    "price": _num(row.get("Price")),
-                    "instrument": (row.get("InstrType") or "").strip(),
-                    "sale_type": (row.get("SaleType") or "").strip(),
-                })
+                if pid in sales and d is not None:
+                    sales[pid].append({
+                        "date": d,
+                        "price": _num(row.get("Price")),
+                        "instrument": (row.get("InstrType") or "").strip(),
+                        "old_owner": (row.get("OldOwner") or "").strip(),
+                    })
         with z.open("Tax_ParcelSupplement.txt") as fh:
             for row in csv.DictReader(io.TextIOWrapper(fh, encoding="latin-1"), delimiter="\t"):
                 pid = (row.get("ParcelID") or "").strip()
-                if pid in out:
-                    out[pid].update({
+                if pid in sales:
+                    supplement[pid] = {
                         "road": (row.get("Street1") or "").strip(),
                         "topography": (row.get("Topo") or "").strip(),
                         "water": (row.get("Water") or "").strip(),
                         "sewer": (row.get("Sewer") or "").strip(),
                         "fronting": (row.get("Fronting") or "").strip(),
-                    })
-    for rec in out.values():
-        sales = sorted(rec.pop("sales"), key=lambda s: s["date"])
-        rec["sales_count"] = len(sales)
-        last = sales[-1] if sales else None
+                    }
+    return sales, supplement
+
+
+def acquisition(sales: list[dict[str, Any]], owner: str | None) -> dict[str, Any] | None:
+    """The deed by which `owner` most likely took title.
+
+    Skips deeds that don't move the land to a new owner (right-of-way,
+    corrective) and deeds the owner granted (grantor = owner). Same-day
+    ties prefer a named instrument, then the highest price.
+    """
+    usable = [s for s in sales
+              if s["instrument"] not in NON_TRANSFER_DEEDS and not same_owner(s["old_owner"], owner)]
+    if not usable:
+        return None
+    return max(usable, key=lambda s: (s["date"], bool(s["instrument"]), s["price"]))
+
+
+def sold_after(sales: list[dict[str, Any]], owner: str | None, after: date,
+               min_price: float) -> bool:
+    """Did `owner` sell the land at a real price on or after `after`?"""
+    return any(s["date"] >= after and s["price"] >= min_price
+               and s["instrument"] not in NON_TRANSFER_DEEDS
+               and same_owner(s["old_owner"], owner) for s in sales)
+
+
+def load_cama(cache_dir: Path, owners: dict[str, str], as_of: date | None = None,
+              refresh: bool = False) -> dict[str, dict[str, Any]]:
+    """Ownership history + site supplement, keyed by parcel id.
+
+    owners maps parcel id -> current owner name. as_of keeps only deeds
+    recorded before that date (historical evaluation).
+    """
+    sales, supplement = read_cama(cache_dir, set(owners), refresh)
+    out: dict[str, dict[str, Any]] = {}
+    for pid, owner in owners.items():
+        rec = dict(supplement.get(pid, {}))
+        before = [s for s in sales.get(pid, []) if as_of is None or s["date"] < as_of]
+        last = acquisition(before, owner)
+        rec["sales_count"] = len(before)
         rec["last_sale_date"] = last["date"].isoformat() if last else None
         rec["last_sale_price"] = last["price"] if last else None
         rec["last_sale_instrument"] = last["instrument"] if last else None
@@ -214,4 +251,5 @@ def load_cama(cache_dir: Path, parcel_ids: set[str],
         rec["distress_owned"] = bool(last and last["instrument"] in DISTRESS_DEEDS)
         ref = as_of or date.today()
         rec["years_held"] = round((ref - last["date"]).days / 365.25, 1) if last else None
+        out[pid] = rec
     return out

@@ -7,6 +7,7 @@ parcel, so developer families are matched on distinctive names only.
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 
 US_STATES = {
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID",
@@ -41,9 +42,20 @@ _GOVERNMENT_RE = re.compile(
     r"\bSCHOOL\b|\bGEORGIA DOT\b|\bG D O T\b|\bAUTHORITY\b|\bGOVERNMENT\b"
 )
 _UTILITY_RE = re.compile(
-    r"\bRAILWAY\b|\bRAILROAD\b|\bRAIL ROAD\b|\bNORFOLK SOUTHERN\b|\bCSX\b|"
-    r"\bGEORGIA POWER\b|\bGAS LIGHT\b|\bPIPELINE\b|\bPIPE LINE\b|\bELECTRIC MEMBERSHIP\b|"
-    r"\bGEORGIA TRANSMISSION\b|\bOGLETHORPE POWER\b|\bMUNICIPAL ELECTRIC\b"
+    # RR / RY only with a company word: "SMITH R R" is a person's initials.
+    r"\bRAILWAY\b|\bRAILROAD\b|\bRAIL ROAD\b|\bRWY\b|"
+    r"\b(RR|R R|RY)\s+(CO|COMPANY|CORP|INC|SYSTEM)\b|\bLINE (RR|R R|RY)\b|"
+    r"\bNORFOLK SOUTHERN\b|\bCSX\b|\bC S X\b|\bSEABOARD\b|\bCENTRAL OF (GA|GEORGIA)\b|"
+    r"\bGEORGIA POWER\b|\bGAS LIGHT\b|\bNATURAL GAS\b|\bTRANSCO\b|\bPIPELINE\b|"
+    r"\bPIPE LINE\b|\bELECTRIC MEMBERSHIP\b|\bGEORGIA TRANSMISSION\b|\bOGLETHORPE POWER\b|"
+    r"\bMUNICIPAL ELECTRIC\b|\bBELLSOUTH\b|\bAT&T\b"
+)
+# Names typical of developer special-purpose entities ("PPF INDUSTRIAL
+# ROYAL SOUTH LLC", "SRPF A GRAHAM ROAD INDUSTRIAL"). Also catches operating
+# businesses ("ACME INDUSTRIAL SUPPLY"), so the live tool only flags it.
+_INDUSTRIAL_NAME_RE = re.compile(
+    r"\bINDUSTRIAL\b|\bLOGISTICS\b|\bDISTRIBUTION\b|\bWAREHOUSE\b|\bCOMMERCE (CENTER|PARK)\b|"
+    r"\bTRADE CENTER\b|\bBUSINESS PARK\b|\bINDUSTRIAL PARK\b"
 )
 _RELIGIOUS_RE = re.compile(
     r"\bCHURCH\b|\bMINISTR(Y|IES)\b|\bTEMPLE\b|\bMOSQUE\b|\bBAPTIST\b|\bMETHODIST\b|"
@@ -94,6 +106,11 @@ def owner_type(name: str | None) -> str:
     return "individual"
 
 
+def industrial_named(name: str | None) -> bool:
+    """Owner name reads like an industrial developer vehicle or business."""
+    return bool(_INDUSTRIAL_NAME_RE.search(normalize(name)))
+
+
 def mailing_state(addr2: str | None) -> str | None:
     """State code from a 'CITY ST 12345' line, or None if it isn't a US address."""
     m = _ZIP_TAIL_RE.search(normalize(addr2))
@@ -104,3 +121,27 @@ def mailing_state(addr2: str | None) -> str | None:
 
 def is_po_box(addr1: str | None) -> bool:
     return bool(_PO_BOX_RE.search(normalize(addr1)))
+
+
+_SUFFIX_RE = re.compile(
+    r"\b(L ?L ?C|INC|CORP|CORPORATION|L ?P|LLP|LTD|CO|COMPANY|THE|TRUST|TRUSTEES?|TR|ET AL|ETAL)\b")
+
+
+def _compact(name: str | None) -> str:
+    return re.sub(r"[^A-Z0-9]", "", _SUFFIX_RE.sub(" ", normalize(name)))
+
+
+def same_owner(a: str | None, b: str | None) -> bool:
+    """Loose match between a tax-roll owner and a deed grantor.
+
+    The two files spell names differently ("SABEN L L C" / "SABEN, LLC",
+    "TL COOK" / "T L COOK"), the deed file truncates at 30 characters, and
+    typos happen ("SHROPSHINE" / "SHROPSHIRE").
+    """
+    ca, cb = _compact(a), _compact(b)
+    if not ca or not cb:
+        return False
+    n = min(len(ca), len(cb), 12)
+    if ca[:n] == cb[:n]:
+        return True
+    return SequenceMatcher(None, ca[:20], cb[:20]).ratio() >= 0.85

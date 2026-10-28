@@ -55,6 +55,8 @@ def site_rejects(p: dict[str, Any], s: dict[str, Any]) -> list[str]:
 
 
 def usable_after_slope(p: dict[str, Any]) -> float:
+    """Usable acres net of steep ground. steep_pct is measured on the
+    unconstrained part of the parcel, so the two don't overlap."""
     steep = p.get("steep_pct") or 0.0
     return round(p["usable_acres"] * (1 - steep / 100.0), 1)
 
@@ -80,6 +82,13 @@ def flags(p: dict[str, Any]) -> list[str]:
         out.append(f"{p['flood_pct']:.0f}% in the 100-year floodplain")
     if 0 < p.get("wetland_pct", 0):
         out.append(f"{p['wetland_pct']:.0f}% mapped wetlands (1980s NWI; field delineation needed)")
+    if p.get("acreage_mismatch"):
+        out.append(f"parcel map shows {p.get('gis_acres')} acres vs {p.get('acres')} on the "
+                   "tax record: map-based checks may be off")
+    if (p.get("land_value") or 0) == 0:
+        out.append("assessor land value is $0 (often railroad or utility land, assessed by the state)")
+    if p.get("industrial_named"):
+        out.append("owner name reads like an industrial company or developer vehicle")
     if p.get("owner_type") == "religious":
         out.append("owned by a religious organization")
     if p.get("slope_error"):

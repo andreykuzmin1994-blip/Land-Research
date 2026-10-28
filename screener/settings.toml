@@ -15,7 +15,7 @@ max_acres = 50
 jurisdictions = [
   "South Fulton / unincorporated", "Atlanta", "East Point", "College Park",
   "Hapeville", "Fairburn", "Union City", "Palmetto", "Chattahoochee Hills",
-  "Other (district 70)",
+  "Fulton Industrial District",
 ]
 
 [screens]

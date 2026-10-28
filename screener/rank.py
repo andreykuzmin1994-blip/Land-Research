@@ -1,30 +1,26 @@
-"""Ranking: how good a site is, and how likely the owner is to sell.
+"""The tunable part of the score: access, land, setting and the seller.
 
-This is the one file the AutoResearch loop is allowed to edit
-(screener/autoresearch/). Keep score() pure: it reads the parcel record and
-returns numbers and reasons, with no I/O. Features a parcel lacks (for
-example zoning in the historical evaluation set) arrive as None and must
-be handled.
+This is the ONE file the AutoResearch loop edits (screener/autoresearch/
+PROGRAM.md). The fixed part (zoning, slope, utilities, incentives) lives in
+scoring.py and is not the loop's to change.
+
+learned_score() must stay pure: read the parcel record, return numbers and
+reasons, no I/O. Fields may be None (the historical answer key leaves
+zoning, slope, utilities, contamination and Opportunity Zones blank), so
+handle missing values.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-SITE_WEIGHTS = {
-    "access": 25,          # distance to an interstate exit
-    "entitlement": 25,     # zoning / future land use path
-    "usable_land": 15,     # acres left after flood, wetlands, easements, slope
-    "topography": 10,      # share of the site steeper than 15%
-    "industrial_area": 10, # industrial parcels within a mile
+WEIGHTS = {
+    "access": 30,          # distance to an interstate exit
+    "usable_land": 20,     # acres left after flood, wetlands, easements, slope
+    "industrial_area": 15, # industrial parcels within a mile
     "rail": 5,
-    "utilities": 5,
-    "incentives": 5,
+    "seller": 30,          # seller motivation (0-100, scaled)
 }
-SITE_SHARE = 0.7  # final score = 70% site quality + 30% seller motivation
-
-ENTITLEMENT_VALUE = {"by_right": 1.0, "likely": 0.8, "possible": 0.5,
-                     "unknown": 0.4, "hard": 0.0, None: 0.4}
 
 
 def _access(miles: float | None) -> float:
@@ -39,48 +35,7 @@ def _access(miles: float | None) -> float:
     return 0.0
 
 
-def _utilities(p: dict[str, Any]) -> float:
-    water, sewer = (p.get("water") or "").lower(), (p.get("sewer") or "").lower()
-    if not water and not sewer:
-        return 0.4
-    if "septic" in water or "well" in water or "septic" in sewer:
-        return 0.2
-    if "all public" in water or "underground" in sewer or "public sewer" in water:
-        return 1.0
-    return 0.6
-
-
-def site_score(p: dict[str, Any]) -> tuple[float, list[str]]:
-    usable = p.get("usable_after_slope", p.get("usable_acres")) or 0.0
-    steep = p.get("steep_pct")
-    rail = p.get("rail_ft")
-    parts = {
-        "access": _access(p.get("exit_miles")),
-        "entitlement": ENTITLEMENT_VALUE.get(p.get("entitlement"), 0.4),
-        "usable_land": min(usable / 15.0, 1.0),
-        "topography": 0.5 if steep is None else max(0.0, 1.0 - steep / 40.0),
-        "industrial_area": min((p.get("industrial_within_1mi") or 0) / 15.0, 1.0),
-        "rail": 1.0 if rail is not None and rail <= 300 else 0.5 if rail is not None and rail <= 1500 else 0.0,
-        "utilities": _utilities(p),
-        "incentives": 1.0 if p.get("opportunity_zone") else 0.0,
-    }
-    score = sum(SITE_WEIGHTS[k] * v for k, v in parts.items())
-    why = []
-    if p.get("exit_miles") is not None:
-        why.append(f"{p['exit_miles']:.1f} mi to {p.get('exit_label') or 'an interstate exit'}")
-    if p.get("entitlement_note"):
-        why.append(p["entitlement_note"])
-    why.append(f"{usable:.0f} usable acres")
-    if parts["industrial_area"] >= 0.6:
-        why.append(f"{p.get('industrial_within_1mi')} industrial parcels within 1 mile")
-    if parts["rail"] == 1.0:
-        why.append(f"rail-adjacent ({p.get('rail_owner') or 'rail'} within 300 ft)")
-    if p.get("opportunity_zone"):
-        why.append("in a federal Opportunity Zone")
-    return round(score, 1), why
-
-
-def motivation_score(p: dict[str, Any]) -> tuple[float, list[str]]:
+def motivation(p: dict[str, Any]) -> tuple[float, list[str]]:
     score, why = 0.0, []
     years = p.get("years_held")
     if years is None and p.get("sales_count") == 0:
@@ -112,13 +67,28 @@ def motivation_score(p: dict[str, Any]) -> tuple[float, list[str]]:
     return max(0.0, min(100.0, score)), why
 
 
-def score(p: dict[str, Any]) -> dict[str, Any]:
-    site, site_why = site_score(p)
-    motive, motive_why = motivation_score(p)
+def learned_score(p: dict[str, Any]) -> dict[str, Any]:
+    usable = p.get("usable_after_slope", p.get("usable_acres")) or 0.0
+    rail = p.get("rail_ft")
+    seller, why_seller = motivation(p)
+    parts = {
+        "access": _access(p.get("exit_miles")),
+        "usable_land": min(usable / 15.0, 1.0),
+        "industrial_area": min((p.get("industrial_within_1mi") or 0) / 15.0, 1.0),
+        "rail": 1.0 if rail is not None and rail <= 300 else 0.5 if rail is not None and rail <= 1500 else 0.0,
+        "seller": seller / 100.0,
+    }
+    why = []
+    if p.get("exit_miles") is not None:
+        why.append(f"{p['exit_miles']:.1f} mi to {p.get('exit_label') or 'an interstate exit'}")
+    why.append(f"{usable:.0f} usable acres")
+    if parts["industrial_area"] >= 0.6:
+        why.append(f"{p.get('industrial_within_1mi')} industrial parcels within 1 mile")
+    if parts["rail"] == 1.0:
+        why.append(f"rail-adjacent ({p.get('rail_owner') or 'rail'} within 300 ft)")
     return {
-        "score": round(SITE_SHARE * site + (1 - SITE_SHARE) * motive, 1),
-        "site_score": site,
-        "motivation_score": motive,
-        "why_site": site_why,
-        "why_seller": motive_why,
+        "score": sum(WEIGHTS[k] * v for k, v in parts.items()),
+        "motivation": seller,
+        "why_site": why,
+        "why_seller": why_seller,
     }

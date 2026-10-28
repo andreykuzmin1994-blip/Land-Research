@@ -4,3 +4,4 @@ cache/
 output/
 autoresearch/experiments.tsv
 inputs/decisions.csv
+autoresearch/best_ranking.json

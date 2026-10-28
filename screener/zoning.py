@@ -20,7 +20,8 @@ UNKNOWN = "unknown"           # no machine-readable zoning for this parcel
 _INDUSTRIAL_RE = re.compile(r"^(M-?1A?|M-?2|M-?3|I-?1|I-?2|I-?3|MI|LI|HI|IL|IH|IND|IG|IM)C?$")
 _FLEX_RE = re.compile(r"^(BP|I-?MIX|IMU|MIC|MXCI)C?$")
 _REZONABLE_RE = re.compile(r"^(AG(-?1)?|A(-?1)?|A-?L|RR|AR|C-?[1-5]|GC|CR|CL|HC|C2[CM]?|C1[CM]?)C?$")
-_RESIDENTIAL_RE = re.compile(r"^(R|RM|RG|RMD|MR|PD-?H|PUD|R-?LC|MHP|TR|SUB|RL|RT|R1A?)")
+# CUP = South Fulton "Community Unit Plan", a residential subdivision district.
+_RESIDENTIAL_RE = re.compile(r"^(R|RM|RG|RMD|MR|PD-?H|PUD|R-?LC|MHP|TR|SUB|RL|RT|R1A?|CUP)")
 
 _FLU_INDUSTRIAL_RE = re.compile(r"INDUSTR|LOGISTIC|BUSINESS PARK|DISTRIBUTION|MANUFACTUR|^I$|^BP$")
 _FLU_RESIDENTIAL_RE = re.compile(

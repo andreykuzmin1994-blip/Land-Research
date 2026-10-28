@@ -11,7 +11,7 @@ from typing import Any
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
-    "rank", "score", "site_score", "motivation_score", "parcel_id", "jurisdiction",
+    "rank", "score", "fixed_score", "learned_score", "motivation_score", "parcel_id", "jurisdiction",
     "site_address", "acres", "usable_after_slope", "entitlement", "zoning", "flu",
     "exit_label", "exit_miles", "rail_ft", "industrial_within_1mi", "flood_pct",
     "wetland_pct", "steep_pct", "relief_ft", "owner", "owner_type", "owner_mailing",
@@ -78,8 +78,9 @@ def brief(p: dict[str, Any]) -> str:
     lines = [
         f"# #{p['rank']} — {p.get('site_address') or 'no site address'} ({p['jurisdiction']})",
         "",
-        f"**Score {p['score']}** (site {p['site_score']}, seller motivation "
-        f"{p['motivation_score']}) · parcel `{p['parcel_id']}` · "
+        f"**Score {p['score']}** (zoning & ground {p['fixed_score']}, access/land/seller "
+        f"{p['learned_score']}, seller motivation {p['motivation_score']}) · "
+        f"parcel `{p['parcel_id']}` · "
         f"[map]({p['maps_link']}) · county record: {p.get('assessor_portal', '')}",
         "",
         "## The site",
@@ -132,7 +133,9 @@ def brief(p: dict[str, Any]) -> str:
 def _planning_office(jurisdiction: str) -> str:
     if jurisdiction == "South Fulton / unincorporated":
         return "City of South Fulton planning (Fulton County if unincorporated)"
-    if jurisdiction.startswith("Other") or jurisdiction.startswith("district"):
+    if jurisdiction == "Fulton Industrial District":
+        return "Fulton County planning (Fulton Industrial District)"
+    if jurisdiction.startswith("district"):
         return "the county or city planning office"
     return f"{jurisdiction} planning"
 

@@ -2,51 +2,81 @@
 
 The Karpathy loop, pointed at a score the agent cannot game. An agent
 improves **one file**, `screener/rank.py`, and keeps a change only if the
-ranking gets better at finding land that industrial developers actually
-bought.
+ranking gets better at finding land that owners actually sold to
+industrial developers.
 
 ## The score
 
 `python -m screener.autoresearch.evaluate` answers one question: standing
-in January 2018 with only the public data available then, how many of the
-Fulton parcels that developers bought and built warehouses on by 2025 would
-the ranking have put in its top 2%?
+in January 2016 with only the public data available then, how many of the
+Fulton parcels that the owner sold, and someone then built an industrial
+building on by 2025, would the ranking have put in its top 2%?
 
-- **Pool:** about 3,000 Fulton land parcels (5–50 acres) from the 2018 tax
-  digest, after the same ownership screens as the live tool.
-- **Answer key:** pool parcels that, in the 2025 digest, are at least half
-  covered by an industrial building worth $1M+ and have a new owner.
-- **Splits:** dev (about three quarters of ~5 km map cells) is what the loop
-  sees. Test (the rest) is sealed: humans check it every ~20 kept
-  experiments to catch overfitting.
-- **Why it can't be gamed:** loosening screens or inflating scores doesn't
-  help. The top-K size is fixed, so only putting real developer sites
-  higher raises the score.
+- **Pool:** about 3,350 Fulton parcels (5–50 acres) from the 2016 tax
+  digest that pass the live tool's ownership and land-only screens.
+- **Answer key:** the 48 pool parcels that the 2016 owner sold at a real
+  price (at least $50k per the county deed file) and that are at least half
+  covered by a $1M+ industrial building in the 2025 digest. Title
+  transfers to development authorities and right-of-way deeds don't count.
+- **Splits:** dev (38 positives, about 2,350 parcels) is what the loop
+  sees. Test (10 positives) is sealed: a human checks it every ~20 kept
+  experiments. The split is by ~5 km map cell, so test sites are in
+  places the loop never saw.
+- **Fixed size:** the top K is fixed at 2% of the pool, so inflating scores
+  can't help. Only ranking real sites higher does. The hard screens are
+  frozen into the evaluation set.
+- **Baseline (2026-10-28):** 1 hit out of 38 on dev. Random ranking
+  averages 0.85 (5th–95th percentile 0–3). The hand-built weights are
+  about as good as chance, so there is a lot to learn.
 
 Built by `build_eval.py` (humans only, between runs). It writes the frozen
-files in `data/`. Zoning, utilities and road type are blank in the
-evaluation set, because today's values were often changed *for* the
-project. Owner names, parcel ids and coordinates are not in the records.
+files in `data/`. Blank in the evaluation set, because their values today
+were often changed for the project or weren't knowable in 2016: zoning,
+utilities, road type, slope, contamination listings, Opportunity Zones and
+jurisdiction. Owner names, parcel ids and coordinates are not in the
+records.
+
+## What `rank.py` can use
+
+`learned_score(p)` receives one parcel record with these fields (any can
+be None):
+
+`acres`, `usable_acres`, `usable_after_slope`, `flood_pct`,
+`floodway_pct`, `wetland_pct`, `water_pct`, `easement_pct`,
+`protected_pct`, `constrained_pct`, `exit_miles`, `rail_ft`, `rail_owner`,
+`industrial_within_1mi`, `land_value`, `class_code` (Georgia digest class,
+e.g. R4/C5/I4/A5/V5), `land_use_code`, `owner_type` (individual / trust /
+estate / entity / religious), `owner_state`, `owner_po_box`, `years_held`,
+`sales_count`, `inherited`, `distress_owned`, `last_sale_price`.
+
+It must return `{"score": float, "motivation": float, "why_site": [...],
+"why_seller": [...]}`. The live tool shows `why_*` in the briefs, so keep
+them true and readable.
 
 ## Rules for the agent
 
-1. Edit **only** `screener/rank.py`. Never edit `evaluate.py`,
-   `build_eval.py`, `screens.py`, `settings.toml` or anything in `data/`,
-   and never open the files in `data/`.
-2. Don't touch the entitlement or utilities terms (`ENTITLEMENT_VALUE`,
-   `SITE_WEIGHTS["entitlement"]`, `SITE_WEIGHTS["utilities"]`, `_utilities`).
-   The evaluation set has no zoning or utility data, so the score can't
-   measure them, and a change there would alter the live list without
-   evidence.
-3. Keep `score()` pure and generic. No lookups by parcel key, no
-   coordinates, no thresholds fitted to single parcels.
-4. One idea per experiment. Example ideas: reshape the access curve, weight
-   industrial context more, use relief instead of steep share, reward
-   longer holding periods, combine signals (e.g. access × context).
+1. Edit **only** `screener/rank.py`. `evaluate.py --decide` refuses to run
+   if anything else under `screener/` changed since the best kept run.
+2. Never open the files in `data/`, `experiments.tsv` or
+   `best_ranking.json`. The score is the only feedback.
+3. Keep `learned_score` pure and general. No lookups of specific values
+   that single out a handful of parcels (exact acreages, land values or
+   codes chosen to hit known answers). Prefer smooth curves and
+   explainable signals.
+4. One idea per experiment. Examples: reshape the access curve, weight
+   industrial context more, use land class (commercial / industrial tracts),
+   rethink which seller signals matter, combine signals (access ×
+   context), reward size within 5–50 acres.
+5. Keep `why_site` / `why_seller` honest. They are the user-facing
+   explanation of the score.
+
+The zoning, slope, utilities and incentive terms live in
+`screener/scoring.py`, which the loop may not touch. They are fixed at
+35% of the live score.
 
 ## The loop
 
-On a branch named `autoresearch-screener/<date>`:
+On the current working branch, with a clean tree:
 
 ```bash
 python -m screener.autoresearch.evaluate --decide   # first run records the baseline
@@ -54,27 +84,32 @@ python -m screener.autoresearch.evaluate --decide   # first run records the base
 #   edit screener/rank.py (one idea)
 git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
-#   DISCARD -> git reset --hard HEAD~1
+#   DISCARD -> run the exact `git reset --hard <parent>` it prints
 #   KEEP    -> carry on from here
 ```
 
-A change is kept only if it adds at least one hit **and** beats the
-bootstrap noise of the best kept run. Every run is appended to
+A change is kept only if it adds at least one hit over the best kept run
+**and** beats it in at least 90% of clustered bootstrap resamples (whole
+map cells are resampled, because sites cluster). Every run is appended to
 `screener/autoresearch/experiments.tsv` (untracked, append-only).
 
 Run a bounded batch ("run 15 experiments"), not an endless loop. Then
 report the kept changes and the dev score, and ask a human to run
-`--test`. Kept changes flow into the live ranking automatically, because
-the live tool uses the same `rank.py`.
+`python -m screener.autoresearch.evaluate --test`. Kept changes flow into
+the live ranking, because the live tool scores with the same `rank.py`.
 
-## Known limits (be honest about them in reports)
+## Known limits (state them in reports)
 
-- About 100 positives in total, so scores move in steps of one site.
-  That's why the noise bar exists.
-- Flood maps, contamination lists, exits and lidar are today's versions,
-  not 2018's. A site filled out of the floodplain or graded flat before
-  the 2018–19 lidar flight looks better than it did then.
-- "Developer bought it" is a proxy for "good site". Sites a developer
-  would have loved but couldn't buy look like misses.
+- 38 dev positives, so scores move in steps of one site. That's why the
+  noise bar exists. Expect a handful of keeps, not dozens.
+- Flood maps, exits and rail main lines are today's versions, not 2016's.
+  A site filled out of the floodplain looks better than it did then.
+- The key rewards "sold to a developer who built". Land that would have
+  been perfect but wasn't sold looks like a miss. Long-held land that never
+  traded is the opportunity the live tool hunts for, so don't let the
+  seller signals collapse entirely toward "already corporate".
+- 47 parcels were built on without a matching deed by the 2016 owner
+  (owner-users, corporate successors, replats). They are left out, not
+  counted as positives.
 - Your own pursue/pass marks (`screener/inputs/decisions.csv`) are not in
-  the score yet. Add them once there are about 30.
+  the score yet. Add them as a second term once there are about 30.

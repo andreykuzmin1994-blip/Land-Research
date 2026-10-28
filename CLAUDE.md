@@ -13,8 +13,9 @@ AutoResearch loop). It shares no code, tables or files with the system
 below. The invariants and orientation tiers on this card govern the root
 system. Work inside `screener/` follows `screener/README.md`, and its loop
 follows `screener/autoresearch/PROGRAM.md`. There, the agent edits only
-`screener/rank.py` and never edits `evaluate.py`, `build_eval.py` or
-`data/`. The CoStar rule below applies everywhere.
+`screener/rank.py` and never edits `scoring.py`, `screens.py`,
+`settings.toml`, `autoresearch/evaluate.py`, `autoresearch/build_eval.py`
+or `autoresearch/data/`. The CoStar rule below applies everywhere.
 
 ## Invariants (always in force, at every tier)
 

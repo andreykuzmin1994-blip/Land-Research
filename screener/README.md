@@ -41,11 +41,13 @@ minutes. Use `--refresh` to force fresh downloads.
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed` or
   `pursue`. Passed and listed parcels drop out of future runs. See
   `inputs/README.md`.
-- `screener/rank.py`: how the score is built. Site quality counts 70%
-  (access, zoning path, usable acres, slope, nearby industry, rail,
-  utilities, Opportunity Zone) and seller motivation 30% (holding period,
-  inherited, out-of-state, individual owner). This is also the file the
-  AutoResearch loop improves (below).
+- The score has two parts:
+  - **`screener/scoring.py`, 35%, set by you:** zoning / future land use
+    path, slope, utilities and Opportunity Zone. The answer key can't
+    measure these, so AutoResearch never touches them.
+  - **`screener/rank.py`, 65%, tuned by AutoResearch:** access to an
+    interstate exit, usable acres, nearby industry, rail, and seller
+    motivation (holding period, inherited, out-of-state, owner type).
 
 ## How it works
 
@@ -96,14 +98,23 @@ parcels (county GIS, 5-50 ac, chosen cities)
 ## AutoResearch
 
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
-against an answer key it can't game: Fulton land from 2018 that developers
-actually bought and built warehouses on by 2025. See
-`screener/autoresearch/PROGRAM.md`.
+against an answer key it can't game: the Fulton land that owners sold, in
+2016–2024, to buyers who then built industrial buildings on it (48 sites,
+spatially split into dev/test). See `screener/autoresearch/PROGRAM.md`.
+
+Baseline: the hand-built ranking finds 1 of 38 dev sites in its top 2%,
+about what random ranking does. The developer sites sit much closer to
+exits and inside industrial areas, and were mostly sold by companies, so
+there is a lot for the loop to learn.
 
 ```bash
-python -m screener.autoresearch.build_eval          # once, by a human (~15 min)
-python -m screener.autoresearch.evaluate --decide   # baseline, then per experiment
+python -m screener.autoresearch.build_eval          # rebuild the frozen key (humans only, ~5 min)
+python -m screener.autoresearch.evaluate --decide   # baseline, then once per experiment
+python -m screener.autoresearch.evaluate --test     # sealed test split (humans only)
 ```
+
+To run the loop, open a fresh Claude Code session and say: "Read
+screener/autoresearch/PROGRAM.md and run 15 experiments."
 
 ## Tests
 

@@ -7,8 +7,11 @@ import unittest
 
 from shapely.geometry import Polygon
 
-from screener import checks, rank, screens, zoning
-from screener.fulton import _parse_date, jurisdiction
+from datetime import date
+
+from screener import checks, rank, scoring, screens, zoning
+from screener.fulton import _parse_date, acquisition, jurisdiction, sold_after
+from screener.owners import same_owner
 from screener.geo import LocalProjection, acres, esri_to_shape, haversine_miles
 from screener.owners import is_po_box, mailing_state, owner_type
 from screener.run import reason_key
@@ -50,6 +53,11 @@ class OwnerTests(unittest.TestCase):
             "AIRPORT DISTRIBUTION CENTER LLC": "entity",
             "FIRST BAPTIST CHURCH OF FAIRBURN": "religious",
             "VARELA KENDRICK": "individual",
+            "SEABOARD COAST LINE RR": "utility",
+            "C S X TRANSPORTATION": "utility",
+            "SOUTHERN NATURAL GAS CO": "utility",
+            "SMITH R R": "individual",
+            "MILLER CUP": "individual",
             "": "unknown",
         }
         for name, expected in cases.items():
@@ -69,7 +77,7 @@ class ZoningTests(unittest.TestCase):
             self.assertEqual(zoning.zoning_category(code), zoning.INDUSTRIAL, code)
         for code in ("AG-1", "A-L", "C-2", "C2C", "GC"):
             self.assertEqual(zoning.zoning_category(code), zoning.REZONABLE, code)
-        for code in ("R-3", "RMD-1", "R-2 OVERLAY", "PD-H"):
+        for code in ("R-3", "RMD-1", "R-2 OVERLAY", "PD-H", "CUP"):
             self.assertEqual(zoning.zoning_category(code), zoning.RESIDENTIAL, code)
         self.assertEqual(zoning.zoning_category(None), zoning.UNKNOWN)
         self.assertEqual(zoning.zoning_category("I-MIX-C"), zoning.FLEX)
@@ -142,18 +150,28 @@ class ScreenTests(unittest.TestCase):
 
 class RankTests(unittest.TestCase):
     def test_closer_exit_scores_higher(self):
-        near = rank.score(parcel(exit_miles=0.8))["score"]
-        far = rank.score(parcel(exit_miles=5.0))["score"]
+        near = scoring.score(parcel(exit_miles=0.8))["score"]
+        far = scoring.score(parcel(exit_miles=5.0))["score"]
         self.assertGreater(near, far)
 
     def test_missing_features_do_not_crash(self):
         bare = {"parcel_id": "x", "acres": 10.0, "usable_acres": None}
-        out = rank.score(bare)
+        out = scoring.score(bare)
         self.assertTrue(0 <= out["score"] <= 100)
+        self.assertTrue(0 <= rank.learned_score(bare)["score"] <= 100)
+
+    def test_fixed_part_is_constant_when_blank(self):
+        # The evaluation set blanks zoning/slope/utilities/OZ: every parcel
+        # must get the same fixed score, so ranking by learned_score alone
+        # matches the live order.
+        a = parcel(entitlement=None, steep_pct=None, water=None, sewer=None, opportunity_zone=None)
+        b = parcel(entitlement=None, steep_pct=None, water=None, sewer=None, opportunity_zone=None,
+                   exit_miles=9.0, owner_state="TX")
+        self.assertEqual(scoring.fixed_score(a)[0], scoring.fixed_score(b)[0])
 
     def test_seller_signals(self):
-        long_held = rank.motivation_score(parcel(years_held=30, owner_state="FL"))[0]
-        recent = rank.motivation_score(parcel(years_held=1, owner_type="entity"))[0]
+        long_held = rank.motivation(parcel(years_held=30, owner_state="FL"))[0]
+        recent = rank.motivation(parcel(years_held=1, owner_type="entity"))[0]
         self.assertGreater(long_held, recent)
 
 
@@ -164,12 +182,47 @@ class MiscTests(unittest.TestCase):
         self.assertEqual(reason_key("only 3.1 usable acres after constraints"),
                          "too few usable acres after constraints")
 
+    def test_acquisition_skips_row_and_grants(self):
+        sales = [
+            {"date": date(2001, 8, 10), "price": 90000, "instrument": "Warranty Deed",
+             "old_owner": "JONES MARY"},
+            {"date": date(2020, 12, 11), "price": 0, "instrument": "Right of Way/Dept of Trans",
+             "old_owner": "BLACKMON MARK A"},
+            {"date": date(2022, 3, 1), "price": 5000, "instrument": "Quit Claim Deed",
+             "old_owner": "BLACKMON MARK A"},
+        ]
+        self.assertEqual(acquisition(sales, "BLACKMON MARK A")["date"], date(2001, 8, 10))
+        ties = [
+            {"date": date(2019, 1, 2), "price": 0, "instrument": "", "old_owner": "X LLC"},
+            {"date": date(2019, 1, 2), "price": 2207524, "instrument": "Limited Warranty Deed",
+             "old_owner": "X LLC"},
+        ]
+        self.assertEqual(acquisition(ties, "Y LLC")["price"], 2207524)
+
+    def test_sold_after(self):
+        sales = [
+            {"date": date(2017, 5, 1), "price": 1_200_000, "instrument": "Limited Warranty Deed",
+             "old_owner": "SMITH FAMILY TRUST THE"},
+            {"date": date(2019, 1, 1), "price": 10, "instrument": "",
+             "old_owner": "PPF INDUSTRIAL ROYAL SOUTH LLC"},
+        ]
+        self.assertTrue(sold_after(sales, "SMITH FAMILY TRUST", date(2016, 1, 1), 50_000))
+        # A nominal transfer to a development authority is not a sale.
+        self.assertFalse(sold_after(sales, "PPF INDUSTRIAL ROYAL SOUTH LLC", date(2016, 1, 1), 50_000))
+        self.assertTrue(same_owner("SMITH FAMILY TRUST THE", "SMITH FAMILY TRUST"))
+        self.assertTrue(same_owner("SABEN L L C", "SABEN, LLC"))
+        self.assertTrue(same_owner("TL COOK PROPERTIES L L C", "T L COOK PROPERTIES INC"))
+        self.assertTrue(same_owner("SHROPSHINE ELLIS", "SHROPSHIRE ELLIS"))
+        self.assertFalse(same_owner("LEE JOHN", "LEE JAMES"))
+        self.assertFalse(same_owner("PALMETTO BECKNELL INDUSTRI", "BOWEN ROAD ASSOCIATES LLC"))
+
     def test_dates_and_jurisdictions(self):
         self.assertIsNone(_parse_date("0002-01-01 00:00:00"))
         self.assertIsNone(_parse_date("5024-01-01"))
         self.assertEqual(str(_parse_date("2017-08-11 00:00:00.0000000")), "2017-08-11")
         self.assertEqual(jurisdiction("55C"), "South Fulton / unincorporated")
         self.assertEqual(jurisdiction("05AZ"), "Atlanta")
+        self.assertEqual(jurisdiction("70D"), "Fulton Industrial District")
 
 
 if __name__ == "__main__":
@@ -185,7 +238,8 @@ class EvaluateTests(unittest.TestCase):
         self.records = []
         for i in range(200):
             rec = parcel(exit_miles=0.5 + (i % 50) / 10.0)
-            rec.update({"key": f"k{i:03d}", "split": "dev" if i % 4 else "test", "signal": i})
+            rec.update({"key": f"k{i:03d}", "split": "dev" if i % 4 else "test", "signal": i,
+                        "block": f"b{i % 10}"})
             self.records.append(rec)
         # Positives: the ten highest "signal" values in dev.
         dev = [r for r in self.records if r["split"] == "dev"]
@@ -210,7 +264,23 @@ class EvaluateTests(unittest.TestCase):
 
         self.ev.evaluate(self.records, self.positives, "dev", scorer=spy, settings=SETTINGS)
         self.assertTrue(seen)
-        self.assertTrue(all("key" not in s and "split" not in s for s in seen))
+        self.assertTrue(all(not ({"key", "split", "block"} & s) for s in seen))
+
+    def test_hits_at_k_counts_repeats(self):
+        order = ["a", "b", "c", "d"]
+        unique = ["a", "b", "c", "d"] + [f"x{i}" for i in range(96)]
+        self.assertEqual(self.ev.hits_at_k(order, unique, {"a"}), (1, 2))
+        # "a" drawn twice in a bootstrap sample fills both top-K slots.
+        self.assertEqual(self.ev.hits_at_k(order, ["a", "a"] + ["c"] * 98, {"a"}), (2, 2))
+
+    def test_paired_win_share(self):
+        perfect = self.ev.evaluate(self.records, self.positives, "dev",
+                                   scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
+        inverse = self.ev.evaluate(self.records, self.positives, "dev",
+                                   scorer=lambda f: {"score": -f["signal"]}, settings=SETTINGS)
+        share = self.ev.paired_win_share(self.records, self.positives,
+                                         perfect["order"], inverse["order"])
+        self.assertGreater(share, 0.9)
 
     def test_screened_out_positives_cannot_hit(self):
         for r in self.records:

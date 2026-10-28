@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import arcgis, checks, layers, rank, report, screens
+from . import arcgis, checks, layers, report, scoring, screens
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -101,7 +101,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     log("Deed history and site records (county CAMA extract)")
-    cama = county.load_cama(HERE / "cache", {p["parcel_id"] for p in live})
+    cama = county.load_cama(HERE / "cache", {p["parcel_id"]: p["owner"] for p in live},
+                            refresh=args.refresh)
     for p in live:
         p.update(cama.get(p["parcel_id"], {}))
 
@@ -114,11 +115,13 @@ def main(argv: list[str] | None = None) -> int:
         log(f"Map layer: {layer.name}")
         try:
             idx[key] = layers.fetch(layer, tiles, region)
-            log(f"  {len(idx[key]):,} features")
         except arcgis.ArcGISError as exc:
-            idx[key] = layers.Index([])
-            notes.append(f"{layer.name} was unavailable this run; its check was skipped")
-            log(f"  ! unavailable: {exc}")
+            # A missing layer would read as "0% floodplain" etc., so stop
+            # rather than publish unchecked parcels as clean.
+            log(f"  ! {layer.name} is unavailable ({exc}).")
+            log("Stopping: re-run later (finished downloads are cached).")
+            return 1
+        log(f"  {len(idx[key]):,} features")
     log("Industrial parcels (context)")
     industrial = county.fetch_industrial_points()
 
@@ -159,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         notes.append("slope check skipped: steepness is not in the scores or screens")
 
     for p in survivors:
-        p.update(rank.score(p))
+        p.update(scoring.score(p))
         p["flags"] = screens.flags(p)
         d = decisions.get(p["parcel_id"])
         p["decision"] = d["decision"] if d else ""
@@ -169,10 +172,12 @@ def main(argv: list[str] | None = None) -> int:
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)
-    unknown_zoning = sum(1 for p in survivors if p.get("entitlement") == "unknown")
-    if unknown_zoning:
-        notes.append(f"{unknown_zoning} ranked parcels have no machine-readable zoning "
-                     "(College Park, Hapeville, Palmetto, Chattahoochee Hills): check with the city")
+    unknown = collections.Counter(p["jurisdiction"] for p in survivors
+                                  if p.get("entitlement") == "unknown")
+    if unknown:
+        where = ", ".join(f"{j} {n}" for j, n in unknown.most_common())
+        notes.append(f"{sum(unknown.values())} ranked parcels have no machine-readable zoning "
+                     f"({where}): check with the city")
     notes.append("Wetlands come from the 1980s National Wetlands Inventory and miss small "
                  "and forested wetlands; floodplain from FEMA NFHL (Mar 2026 snapshot)")
     summary = {"county": county.NAME, "run_date": today, "funnel": funnel,
