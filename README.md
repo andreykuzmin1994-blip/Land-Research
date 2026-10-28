@@ -35,7 +35,15 @@ This codebase is operated through `make`. Open the repo in a Codespace and run:
 ```bash
 make daily              # ONE COMMAND: cuts/resumes today's autoresearch branch,
                         # verifies Supabase, kicks the loop in a detached tmux
-                        # session, prints attach + tail commands.
+                        # session, prints attach + tail commands. Refuses
+                        # (before starting tmux) until the run has a baseline.
+
+# New run only (a new branch/TAG — make daily starts one each calendar day;
+# pass TAG=<existing tag> to keep working on an earlier run):
+make baseline           # Setup Step 5: verify_setup + loop lock, then record the
+                        # run's baseline row (refuses a second one for the run).
+                        # Review that row (Setup Step 6), then run make daily
+                        # (or make loop-bg) again.
 
 # In a second terminal:
 make tail               # live-stream experiment_log.tsv as rows land
@@ -67,12 +75,21 @@ already contemplated in the cost table — the repo is a plain git clone +
 `.env` away anywhere). `make loop-bg` prints this warning when it detects
 a Codespace.
 
+**Baseline confirmation (Setup Step 6)**: `make loop`, `make loop-bg` and
+`make daily` only iterate on a run that already has its `baseline` row;
+otherwise they stop and point at `make baseline`. `CONFIRM=1` on the make
+command line (e.g. `make loop MAX=2 CONFIRM=1`) lets the loop bootstrap the
+baseline and start iterating without that review. It is the human's
+consent for that one invocation: the agent never supplies it, and a
+`CONFIRM` exported in the environment is ignored. Experiments (the
+baseline included) are interrupted at 90 minutes and recorded as `timeout`.
+
 **Karpathy iteration loop** (what the agent does between `make loop` runs):
 
 1. Read `experiment_log.tsv`. The most recent `baseline` or `keep` row is the prior anchor.
 2. Form a hypothesis. Edit `research.py` (the only file the agent edits). One focused change.
 3. `git commit -m "exp: <description>"` on the active `autoresearch/<tag>` branch.
-4. `make loop MAX=1` — runs one full cycle, appends a row to `experiment_log.tsv` with the keep-or-revert decision.
+4. `make loop MAX=1` — runs one full cycle, appends a row to `experiment_log.tsv` with the keep-or-revert decision. (Needs the run's confirmed baseline row — see above.)
 5. Read the new row. If `status=keep`, branch advances. If `status=discard`, `git reset --hard HEAD~1`. If `status=crash` or `timeout`, diagnose and retry.
 
 Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) drives the iteration; `make loop` provides the evaluator + decision recording. Auto-revert is intentionally NOT in `make loop` — that's the agent's responsibility (R-723 / D1).

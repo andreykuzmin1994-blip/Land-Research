@@ -34,11 +34,13 @@ import math
 import os
 import re
 import secrets
+import signal
 import subprocess
+import threading
 import time
 from collections import Counter
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
@@ -69,6 +71,8 @@ log = logging.getLogger("research")
 #   - append_experiment_log_row(...)   -- TSV append-only writer (R-716..R-721)
 #   - verify_setup(market)             -- AUTORESEARCH_MECHANICS Setup Step 4
 #   - run_baseline_experiment(market)  -- AUTORESEARCH_MECHANICS Setup Step 5
+#   - run_gated_baseline(market)       -- the same, behind lock + verify_setup
+#                                         (operator entry: make baseline)
 #   - experiment_loop(market, ...)     -- the NEVER STOP loop (R-723..R-732)
 #
 # What this block DOES NOT do (R-723):
@@ -118,11 +122,13 @@ _HALT_ENV_VAR = "EXPERIMENT_LOOP_HALT"
 _LOOP_LOCK_PATH = _REPO_ROOT / ".experiment_loop.lock"
 _LOOP_LOCK_ENV_VAR = "EXPERIMENT_LOOP_LOCK_PATH"
 
-# R-733 — soft per-iteration budget.  AUTORESEARCH_MECHANICS.md L153 says 90
-# minutes; Phase 10's in-process loop measures wall-clock and emits a
-# ``status=timeout`` row if elapsed exceeds.  OS-level enforcement requires
-# launching the evaluator as a subprocess wrapped by
-# ``prepare.run_with_os_timeout`` -- documented but not the default.
+# R-733 — per-experiment budget.  AUTORESEARCH_MECHANICS.md "The Time Budget"
+# says 90 minutes.  Enforced IN-PROCESS by ``_evaluate_with_budget``: a
+# runner-owned SIGALRM interrupts evaluate, the experiment is recorded as
+# ``timeout`` and purged; a result that returns late is relabelled
+# ``timeout`` as the backstop.  Not OS-level (no subprocess isolation, no
+# SIGTERM/SIGKILL) -- that remains the earmarked hardening shared with SR-16.
+# Read at call time, so tests can patch it.
 _PHASE10_BUDGET_SECONDS = 90 * 60
 
 # R-731 — catastrophic failure detection.
@@ -148,6 +154,18 @@ class SetupError(RuntimeError):
 class LoopLockError(RuntimeError):
     """Raised when a second ``experiment_loop`` attempts to start while
     another one already holds the advisory lock (R-729)."""
+
+
+class _ExperimentBudgetInterrupt(BaseException):
+    """Raised by the runner's SIGALRM handler when an experiment overruns
+    ``_PHASE10_BUDGET_SECONDS`` (R-733).
+
+    A BaseException on purpose: ``prepare.BudgetExceeded`` is a
+    RuntimeError, and the sandbox's per-parcel / per-file ``except
+    Exception`` handlers swallow it -- the alarm fires once, so the
+    experiment simply ran on. Only ``_evaluate_with_budget`` catches this
+    and turns it into a ``timeout`` result.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +290,18 @@ def _sanitize_description(raw: str) -> str:
     return s
 
 
+def _format_confidence(confidence: float) -> str:
+    """The TSV's canonical confidence text (schema: float, 2 decimals).
+
+    Single source for the writer AND the keep-or-revert comparison, so a
+    decision made against an anchor read back from the TSV and one made
+    against the in-memory row of the same process cannot differ. Changing
+    this changes the TSV byte format (mirror backfill dedups on exact
+    values) -- don't.
+    """
+    return f"{confidence:.2f}"
+
+
 def _validate_log_row(row: Mapping[str, Any]) -> dict[str, str]:
     """Validate a candidate TSV row and return the stringified column tuple.
 
@@ -304,7 +334,7 @@ def _validate_log_row(row: Mapping[str, Any]) -> dict[str, str]:
         raise ValueError(
             f"confidence must be finite and non-negative (got {confidence!r})"
         )
-    out["confidence"] = f"{confidence:.2f}"
+    out["confidence"] = _format_confidence(confidence)
 
     api_calls = row.get("api_calls", 0)
     if isinstance(api_calls, bool) or not isinstance(api_calls, int):
@@ -732,6 +762,13 @@ def apply_keep_or_revert_decision(
            tied metric reverts (Karpathy simplicity criterion).
     R-715: float comparison on confidence uses ``math.isclose`` to absorb
            ULP-level noise.
+    Both confidences are compared at the TSV's stored precision
+    (``_format_confidence``). The prior usually comes back from the TSV
+    already rounded, so comparing it against a full-precision new value
+    made an identical re-run look like a gain (49/12 = 4.0833 is stored as
+    "4.08") -- and ``make loop MAX=1`` starts every decision from the TSV.
+    Consequence, accepted: a gain that does not move the stored 2-decimal
+    value is a tie, and a tie reverts.
 
     Inputs:
         ``status``           -- evaluator's status: 'ok', 'crash', 'timeout'.
@@ -764,13 +801,14 @@ def apply_keep_or_revert_decision(
     if new_metric < prior_metric:
         return "discard"
 
-    # Metrics are equal.  Use confidence as a STRICT tiebreaker (R-714).
-    confidence_equal = math.isclose(
-        new_confidence, prior_confidence, rel_tol=1e-9, abs_tol=1e-9
-    )
+    # Metrics are equal.  Use confidence as a STRICT tiebreaker (R-714),
+    # at the precision the TSV stores it.
+    new_q = float(_format_confidence(new_confidence))
+    prior_q = float(_format_confidence(prior_confidence))
+    confidence_equal = math.isclose(new_q, prior_q, rel_tol=1e-9, abs_tol=1e-9)
     if confidence_equal:
         return "discard"
-    if new_confidence > prior_confidence:
+    if new_q > prior_q:
         return "keep"
     return "discard"
 
@@ -813,11 +851,55 @@ def _last_baseline_or_keep(
     return None
 
 
+def _has_run_baseline(rows: Sequence[Mapping[str, str]], run_tag: str) -> bool:
+    """True when a ``baseline`` row stamped ``run=<run_tag>`` exists (F1).
+
+    The single Setup Step 6 rule shared by ``experiment_loop``'s gate,
+    ``run_gated_baseline``'s duplicate refusal and the Makefile pre-flight
+    (``current_run_has_baseline``). A prior run's baseline does not count;
+    neither does a crash/timeout baseline ATTEMPT (its status is not
+    ``baseline``).
+    """
+    return any(
+        r.get("status") == "baseline" and _row_run_tag(r) == run_tag
+        for r in rows
+    )
+
+
+def current_run_has_baseline(path: Path | str | None = None) -> bool:
+    """Does the run of the CURRENT ``autoresearch/<tag>`` branch have its
+    baseline row yet?
+
+    Operator pre-flight for ``make loop-bg`` / ``make daily``: they refuse
+    BEFORE spawning tmux, so a missing baseline is reported in the
+    operator's terminal instead of in a dead tmux session. Off an
+    autoresearch branch there is no run, hence no baseline.
+    """
+    run_tag = _parse_tag_from_branch(_git_current_branch())
+    if run_tag is None:
+        return False
+    return _has_run_baseline(read_experiment_log(path), run_tag)
+
+
 # ---------------------------------------------------------------------------
 # verify_setup (AUTORESEARCH_MECHANICS Setup Step 4)
 # ---------------------------------------------------------------------------
 def _check_db_connection() -> dict[str, Any]:
-    """R-708 / Setup Step 4a -- DB ping with PostGIS sanity check."""
+    """R-708 / Setup Step 4a -- DB ping with PostGIS sanity check.
+
+    A missing DSN is a 'fail' check, never an exit. prepare's DSN lookup
+    calls ``sys.exit`` (right for its own CLI); the ``SystemExit`` escaped
+    ``except Exception`` here, so ``make status``/``make verify`` died with
+    no output and a vanished DSN killed the NEVER-STOP loop without a halt
+    row. Only that SystemExit, around the connect, is caught --
+    KeyboardInterrupt still propagates.
+    """
+    if not prepare.dsn_available():
+        return {
+            "status": "fail",
+            "error": "DATABASE_URL not set; copy env.template to .env and "
+                     "fill in the DSN",
+        }
     try:
         with prepare.get_connection() as conn:
             with conn.cursor() as cur:
@@ -826,6 +908,12 @@ def _check_db_connection() -> dict[str, Any]:
         return {
             "status": "ok",
             "postgis_version": row[0] if row else None,
+        }
+    except SystemExit as exc:
+        # The DSN disappeared between dsn_available() and the connect.
+        return {
+            "status": "fail",
+            "error": f"DATABASE_URL unavailable (prepare exited with code {exc.code})",
         }
     except Exception as exc:
         return {"status": "fail", "error": str(exc)}
@@ -858,35 +946,106 @@ def _check_corridor_bbox(market: str) -> dict[str, Any]:
         return {"status": "fail", "error": str(exc)}
 
 
-def _check_costar_freshness() -> dict[str, Any]:
-    """R-706 / Setup Step 4c -- CoStar staleness check (informational)."""
-    if not _COSTAR_BASE_DIR.exists():
+# R-706 — costar_ingest._archive_destination renames every processed export
+# to <stem>_<YYYYMMDDTHHMMSSZ>_<hex><suffix> under ARCHIVED/<type>/;
+# stripping that stamp lets the contract's intake pattern date it again.
+_COSTAR_ARCHIVE_STAMP_RE = re.compile(
+    r"_\d{8}T\d{6}Z_[0-9a-f]+(?=\.csv$)", re.IGNORECASE,
+)
+# Clock-skew allowance for export dates ahead of today. Anything later is
+# a mis-named file, which must not read as "fresh" forever.
+_COSTAR_FUTURE_TOLERANCE_DAYS = 1
+
+
+def _costar_export_date(
+    name: str, pattern: re.Pattern[str], archived: bool
+) -> date | None:
+    """The export date in a CoStar filename, per the contract's patterns
+    (COSTAR_INGESTION_CONTRACT.md); ``YYYYMM`` monthly exports date from
+    the 1st. ``None`` for hidden, non-matching or impossible-date names."""
+    if name.startswith("."):
+        return None
+    if archived:
+        name = _COSTAR_ARCHIVE_STAMP_RE.sub("", name, count=1)
+    match = pattern.match(name)
+    if not match:
+        return None
+    stamp = match.group(1)
+    if len(stamp) == 6:
+        stamp += "01"
+    try:
+        return datetime.strptime(stamp, "%Y%m%d").date()
+    except ValueError:
+        return None
+
+
+def _check_costar_freshness(now: datetime | None = None) -> dict[str, Any]:
+    """R-706 / Setup Step 4c -- CoStar staleness check (informational).
+
+    Freshness is the export's FILENAME date, for the five export types
+    costar_ingest registers, counted in both the intake folder
+    ``<type>/`` and ``ARCHIVED/<type>/`` -- ingestion moves every
+    processed file there, so an intake-only scan reported a healthy,
+    fully ingested feed as stale. ``FAILED/`` and unregistered types
+    (tenant_intel) never count. An archived file proves the export
+    arrived, not that its rows committed, so this stays a 'warning'-only
+    check: it returns 'ok' or 'warning', never 'fail', and never raises
+    (verify_setup runs it every loop iteration).
+    """
+    today = (now or datetime.now(timezone.utc)).date()
+    cutoff = today - timedelta(days=_COSTAR_STALENESS_DAYS)
+    horizon = today + timedelta(days=_COSTAR_FUTURE_TOLERANCE_DAYS)
+    try:
+        if not _COSTAR_BASE_DIR.is_dir():
+            return {
+                "status": "warning",
+                "fresh_files": 0,
+                "note": (
+                    f"CoStar export directory {_COSTAR_BASE_DIR} does not exist; "
+                    "AUTORESEARCH_MECHANICS.md permits baselining with stale or "
+                    "missing CoStar data, the strategy memo will flag the gap"
+                ),
+            }
+        fresh = 0
+        newest: date | None = None
+        for export_type, spec in costar_ingest._INGESTION_LOADERS.items():
+            for folder, archived in (
+                (_COSTAR_BASE_DIR / export_type, False),
+                (_COSTAR_BASE_DIR / "ARCHIVED" / export_type, True),
+            ):
+                try:
+                    if not folder.is_dir():
+                        continue
+                    for entry in folder.iterdir():
+                        if not entry.is_file():
+                            continue
+                        exported = _costar_export_date(
+                            entry.name, spec["pattern"], archived,
+                        )
+                        if exported is None or exported > horizon:
+                            continue
+                        if newest is None or exported > newest:
+                            newest = exported
+                        if exported >= cutoff:
+                            fresh += 1
+                except OSError:
+                    log.warning("CoStar freshness: cannot read %s; skipped", folder)
+    except Exception as exc:  # informational check -- never kill the loop
+        log.warning("CoStar freshness scan failed", exc_info=True)
         return {
             "status": "warning",
-            "note": (
-                f"CoStar export directory {_COSTAR_BASE_DIR} does not exist; "
-                "AUTORESEARCH_MECHANICS.md permits baselining with stale or "
-                "missing CoStar data, the strategy memo will flag the gap"
-            ),
+            "fresh_files": 0,
+            "note": f"CoStar freshness scan failed ({type(exc).__name__}); "
+                    "treating CoStar data as stale",
         }
-    cutoff = time.time() - _COSTAR_STALENESS_DAYS * 86400
-    fresh: list[str] = []
-    for sub in _COSTAR_BASE_DIR.iterdir():
-        if not sub.is_dir():
-            continue
-        for f in sub.glob("*.csv"):
-            try:
-                if f.stat().st_mtime >= cutoff:
-                    fresh.append(f.name)
-            except OSError:
-                continue
     return {
         "status": "ok" if fresh else "warning",
-        "fresh_files": len(fresh),
+        "fresh_files": fresh,
+        "newest_export_date": newest.isoformat() if newest else None,
         "note": (
             None
             if fresh
-            else f"no CoStar exports within the last {_COSTAR_STALENESS_DAYS} "
+            else f"no CoStar exports dated within the last {_COSTAR_STALENESS_DAYS} "
             "days; the strategy memo will flag the staleness"
         ),
     }
@@ -1133,6 +1292,145 @@ def evaluate(
 
 
 # ---------------------------------------------------------------------------
+# Experiment budget (R-733) — AUTORESEARCH_MECHANICS.md "The Time Budget"
+# ---------------------------------------------------------------------------
+@contextmanager
+def _experiment_budget(seconds: int) -> Iterator[None]:
+    """Interrupt the wrapped block after ``seconds`` of wall clock.
+
+    A runner-owned SIGALRM handler raises ``_ExperimentBudgetInterrupt``.
+    The timer is cancelled BEFORE the previous handler is restored: a
+    SIGALRM landing under SIG_DFL would kill the process with no TSV row.
+    SIGALRM is POSIX-only and handlers install only from the main thread;
+    elsewhere the block runs unbudgeted (loud warning) and the relabel in
+    ``_evaluate_with_budget`` is the only enforcement.
+    """
+    if not hasattr(signal, "SIGALRM"):
+        unarmed = "SIGALRM is unavailable on this platform"
+    elif threading.current_thread() is not threading.main_thread():
+        unarmed = "not running on the main thread"
+    else:
+        unarmed = None
+    if unarmed is not None:
+        log.warning(
+            "experiment budget NOT armed (%s); an overrun is only relabelled "
+            "'timeout' after evaluate returns", unarmed,
+        )
+        yield
+        return
+
+    def _on_alarm(signum: int, frame: Any) -> None:
+        raise _ExperimentBudgetInterrupt(
+            f"experiment exceeded its {seconds}s wall-clock budget"
+        )
+
+    previous = signal.signal(signal.SIGALRM, _on_alarm)
+    try:
+        displaced = signal.alarm(seconds)
+        if displaced:
+            log.warning(
+                "experiment budget displaced a pending SIGALRM (%ss left)",
+                displaced,
+            )
+        try:
+            yield
+        finally:
+            signal.alarm(0)
+    finally:
+        # Nested so the handler is restored even when the interrupt (or a
+        # Ctrl-C) lands in the inner cleanup; cancel again before restoring.
+        signal.alarm(0)
+        signal.signal(
+            signal.SIGALRM, previous if previous is not None else signal.SIG_DFL,
+        )
+
+
+def _raised_by_budget(exc: BaseException) -> bool:
+    """True when ``exc`` surfaced while a budget interrupt was propagating
+    (e.g. psycopg failing to roll back a connection whose query the
+    interrupt cut off): the interrupt sits in its context/cause chain."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if isinstance(current, _ExperimentBudgetInterrupt):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _evaluate_with_budget(
+    market: str, *, run_tag: str | None, experiment_id: str
+) -> dict[str, Any]:
+    """Run ``evaluate`` under the experiment budget -- the ONE budget layer.
+
+    An experiment that overruns ``_PHASE10_BUDGET_SECONDS`` (read now,
+    clamped to a whole second >= 1 because ``signal.alarm(0)`` would mean
+    "no alarm") is interrupted and returned as a ``timeout`` result. The
+    caller generates ``experiment_id`` and passes it in, so the result
+    carries the id the purge needs even when evaluate never returns --
+    the interrupt escaping evaluate's handlers, firing in its return
+    tail, or surfacing chained under a cleanup error.
+
+    Backstop (keep it -- SR-16, off-main-thread runs): a result that comes
+    back after the budget elapsed, by the runner's clock or evaluate's, is
+    relabelled ``timeout`` whether it says ``ok`` or ``crash``. Only the
+    evaluate call is budgeted; purge, TSV append, mirror and git run
+    after the timer is cancelled. Other exceptions propagate as before.
+
+    In-process, not OS-level: code in this interpreter can still defeat
+    the signal (its own handler or ``alarm(0)``, catching BaseException,
+    a blocking C call, worker threads) -- the accepted SR-16 class.
+    """
+    budget = max(1, int(_PHASE10_BUDGET_SECONDS))
+    started = time.monotonic()
+    api_calls_before = research.get_api_call_count()
+    interrupted: str | None = None
+    try:
+        with _experiment_budget(budget):
+            result = evaluate(market, run_tag=run_tag, experiment_id=experiment_id)
+    except _ExperimentBudgetInterrupt as exc:
+        interrupted = str(exc)
+    except Exception as exc:
+        if not _raised_by_budget(exc):
+            raise
+        interrupted = f"{type(exc).__name__} after budget interrupt: {exc}"
+    elapsed = time.monotonic() - started
+
+    if interrupted is not None:
+        log.error(
+            "evaluate.timeout market=%s experiment_id=%s: %s",
+            market, experiment_id, interrupted,
+        )
+        return {
+            "market": market,
+            "status": "timeout",
+            "metric": 0,
+            "confidence": 0.0,
+            "api_calls": research.get_api_call_count() - api_calls_before,
+            "wall_clock_min": elapsed / 60.0,
+            "sub_summaries": {},
+            "error": "budget_exceeded",
+            "run_tag": run_tag,
+            "experiment_id": experiment_id,
+            "stamp_audit_violations": 0,
+        }
+
+    elapsed = max(elapsed, float(result.get("wall_clock_min", 0.0)) * 60.0)
+    if elapsed >= budget and result.get("status") in {"ok", "crash"}:
+        log.error(
+            "evaluate.timeout market=%s experiment_id=%s: returned %r after "
+            "%.0fs (budget %ss); relabelled 'timeout'",
+            market, result.get("experiment_id"), result.get("status"),
+            elapsed, budget,
+        )
+        result = dict(result)
+        result["status"] = "timeout"
+        result["error"] = "budget_exceeded"
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Experiment purge (prepare-mutation 2026-07-07) — the data half of revert
 # ---------------------------------------------------------------------------
 _SQL_DELETE_SCORES_FOR_EXPERIMENT = (
@@ -1208,7 +1506,10 @@ def run_baseline_experiment(
     Caller is responsible for invoking this ONCE per autoresearch branch
     before the experiment loop begins.  ``experiment_loop`` calls this
     automatically when no baseline row FOR THE CURRENT RUN exists in the
-    TSV (the file accumulates across runs by design).
+    TSV (the file accumulates across runs by design) and the human
+    confirmed; operators go through ``run_gated_baseline`` (lock + verify).
+    The baseline runs under the same experiment budget as every iteration
+    (R-733): a hung baseline is recorded as ``timeout`` and purged.
     """
     if run_tag is None:
         # Derive cwd-pinned from THIS repo's branch (F2); off-branch direct
@@ -1220,7 +1521,9 @@ def run_baseline_experiment(
                 "branch; the baseline row will carry no run marker and the "
                 "metric read is UNSCOPED (informational only)"
             )
-    result = evaluate(market, run_tag=run_tag)
+    result = _evaluate_with_budget(
+        market, run_tag=run_tag, experiment_id=_make_experiment_id(),
+    )
     decision = apply_keep_or_revert_decision(
         prior_metric=None,
         prior_confidence=None,
@@ -1323,6 +1626,56 @@ def _acquire_loop_lock() -> Iterator[None]:
             pass
 
 
+def run_gated_baseline(
+    market: str, *, allow_rebaseline: bool = False
+) -> dict[str, Any]:
+    """Setup Step 5 for operators (``make baseline`` / ``cli.py baseline``).
+
+    Runs the baseline behind the loop's own gates: the advisory loop lock
+    first (never two writers on one run), then ``verify_setup`` --
+    refusing on 'fail', proceeding on 'warning' -- and the run tag that
+    check derived from the branch (F2). A run that already has a
+    ``baseline`` row is refused unless ``allow_rebaseline``: a second
+    baseline row re-anchors the ratchet to HEAD mid-run
+    (``_last_baseline_or_keep`` takes the newest). Re-baseline by starting
+    a new run (new TAG); crash/timeout attempts never count, so a failed
+    attempt can simply be retried.
+
+    The lock is taken HERE, not in ``run_baseline_experiment``:
+    ``experiment_loop`` calls that while already holding the lock, and a
+    second flock on a fresh descriptor fails even within one process.
+    """
+    with _acquire_loop_lock():
+        setup = verify_setup(market)
+        if setup["status"] == "fail":
+            raise SetupError(
+                f"verify_setup failed: {json.dumps(setup, default=str)}"
+            )
+        run_tag = setup.get("tag")
+        if not run_tag:
+            raise SetupError(
+                "a baseline requires an autoresearch/<tag> branch; "
+                f"current branch is {setup.get('branch')!r} (no run tag)"
+            )
+        if setup["status"] == "warning":
+            warned = sorted(
+                name for name, check in (setup.get("checks") or {}).items()
+                if (check or {}).get("status") == "warning"
+            )
+            log.warning(
+                "verify_setup=warning (%s); recording the baseline anyway -- "
+                "the strategy memo flags it", ", ".join(warned) or "unspecified",
+            )
+        if not allow_rebaseline and _has_run_baseline(read_experiment_log(), run_tag):
+            raise SetupError(
+                f"run '{run_tag}' already has a baseline row in "
+                "experiment_log.tsv; a second one would re-anchor the ratchet "
+                "mid-run. Start a new run (a new autoresearch/<tag> branch) "
+                "to re-baseline."
+            )
+        return run_baseline_experiment(market, run_tag=run_tag)
+
+
 # ---------------------------------------------------------------------------
 # experiment_loop -- the NEVER STOP runner
 # ---------------------------------------------------------------------------
@@ -1381,10 +1734,7 @@ def experiment_loop(
         # F1: the TSV accumulates across runs; only a baseline stamped with
         # THIS run's tag counts. A prior run's baseline must not suppress
         # re-baselining (its metric is not comparable under the new tag).
-        has_baseline = any(
-            r.get("status") == "baseline" and _row_run_tag(r) == run_tag
-            for r in rows
-        )
+        has_baseline = _has_run_baseline(rows, run_tag)
 
         if not has_baseline:
             # Setup Step 5 -- establish baseline.  The first call to
@@ -1392,16 +1742,19 @@ def experiment_loop(
             # baseline before iterating.  AUTORESEARCH_MECHANICS.md L114
             # requires the human to confirm the baseline before the loop
             # begins; we honour this by requiring ``confirmed=True`` OR a
-            # pre-existing baseline row FOR THIS RUN.
+            # pre-existing baseline row FOR THIS RUN.  (A crashed/timed-out
+            # bootstrap does not stop the loop: the first successful
+            # iteration, still on unmodified code, becomes the baseline.)
             if not confirmed:
                 raise SetupError(
                     "no baseline row for run "
                     f"'{run_tag}' in experiment_log.tsv and confirmed=False. "
                     "Per AUTORESEARCH_MECHANICS.md Setup Step 6, the human must "
-                    "confirm the baseline before the loop begins. Either run "
-                    "run_baseline_experiment(market) and review the result, then "
-                    "call experiment_loop(market, confirmed=True), OR call "
-                    "experiment_loop(market, confirmed=True) directly to bootstrap."
+                    "confirm the baseline before the loop begins. Record it "
+                    "with run_gated_baseline(market) (make baseline), review "
+                    "the row, then start the loop. Bootstrapping and iterating "
+                    "without that review needs the human's explicit "
+                    "confirmed=True (make loop CONFIRM=1)."
                 )
             baseline = run_baseline_experiment(market, run_tag=run_tag)
             log.info("baseline established: %s", baseline)
@@ -1421,18 +1774,6 @@ def experiment_loop(
                 log.info("experiment_loop graceful 7-day exit")
                 _record_halt_row(market, "graceful 7-day exit", run_tag)
                 break
-
-            # F4: retry purges that failed at their own iteration boundary —
-            # unpurged residue contaminates every later metric read, so keep
-            # trying until the DB accepts the delete.
-            still_pending: list[tuple[str, str]] = []
-            for exp_id, exp_decision in pending_purges:
-                try:
-                    _purge_experiment_scores(exp_id, market, exp_decision)
-                except Exception:
-                    log.exception("purge retry failed for experiment %s", exp_id)
-                    still_pending.append((exp_id, exp_decision))
-            pending_purges = still_pending
 
             # Per-iteration setup re-check (R-731).
             iter_setup = verify_setup(market)
@@ -1454,11 +1795,30 @@ def experiment_loop(
                 continue
             consecutive_setup_failures = 0
 
+            # F4: retry purges that failed at their own iteration boundary —
+            # unpurged residue contaminates every later metric read, so keep
+            # trying until the DB accepts the delete. Only after verify_setup
+            # passed: a purge against a DB the check just failed (or a DSN
+            # that vanished, whose SystemExit would kill the loop) is futile.
+            still_pending: list[tuple[str, str]] = []
+            for exp_id, exp_decision in pending_purges:
+                try:
+                    _purge_experiment_scores(exp_id, market, exp_decision)
+                except Exception:
+                    log.exception("purge retry failed for experiment %s", exp_id)
+                    still_pending.append((exp_id, exp_decision))
+            pending_purges = still_pending
+
             # Run one experiment. F2: the tag is threaded explicitly — the
             # ratchet path never depends on process cwd for its scope.
+            # R-733: the runner owns the experiment_id and the budget, so an
+            # interrupted or crashed experiment's rows remain purgeable.
+            experiment_id = _make_experiment_id()
             iter_started = time.monotonic()
             try:
-                result = evaluate(market, run_tag=run_tag)
+                result = _evaluate_with_budget(
+                    market, run_tag=run_tag, experiment_id=experiment_id,
+                )
             except Exception as exc:  # pylint: disable=broad-except
                 # R-726: a crash inside evaluate is caught and recorded; the
                 # loop keeps going.  evaluate() already catches its own
@@ -1473,15 +1833,8 @@ def experiment_loop(
                     "wall_clock_min": (time.monotonic() - iter_started) / 60.0,
                     "error": f"{type(exc).__name__}: {exc}",
                     "run_tag": run_tag,
-                    "experiment_id": None,
+                    "experiment_id": experiment_id,
                 }
-
-            # R-733: soft per-iteration budget check.
-            if result.get("wall_clock_min", 0.0) * 60 > _PHASE10_BUDGET_SECONDS:
-                # The evaluator already emits status=ok in this case because
-                # it lacks an internal SIGALRM.  Promote to 'timeout' here.
-                if result["status"] == "ok":
-                    result["status"] = "timeout"
 
             # Decide.
             prior = _last_baseline_or_keep(rows, run_tag=run_tag)
@@ -1563,7 +1916,10 @@ def experiment_loop(
                 run_tag=run_tag,
                 experiment_id=result.get("experiment_id"),
             )
-            rows.append({k: str(v) for k, v in row.items()})
+            # The next decision's anchor must be exactly what the TSV holds
+            # (rounded confidence, sanitized/truncated description) so a
+            # fresh process reading the file back decides identically.
+            rows.append(_validate_log_row(row))
             iters += 1
 
     return {

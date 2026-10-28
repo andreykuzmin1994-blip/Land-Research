@@ -15,7 +15,7 @@ Subcommands (run ``python cli.py --help`` for the full list):
 
     verify              Pretty-print verify_setup(MARKET) results
     db-check            Run prepare.py (Supabase + PostGIS sanity ping)
-    baseline            Bootstrap the baseline experiment row
+    baseline            Record the run's baseline row (lock + verify gated)
     loop                Run experiment_loop with structured output
     status              verify_setup + last 10 TSV rows
     log                 Pretty-print experiment_log.tsv
@@ -178,16 +178,27 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     import research
     import runner
     print(_c(f"==> running baseline experiment for market={args.market}", _C.BOLD))
-    row = runner.run_baseline_experiment(args.market)
+    try:
+        # Setup Step 5 behind the loop lock + verify_setup; refuses a
+        # 'fail' setup and a second baseline for the same run.
+        row = runner.run_gated_baseline(args.market)
+    except runner.SetupError as exc:
+        print(_status_label("fail") + f"SetupError: {exc}", file=sys.stderr)
+        return 2
+    except runner.LoopLockError as exc:
+        print(_status_label("fail") + f"LoopLockError: {exc}", file=sys.stderr)
+        return 3
     if args.json:
         print(json.dumps(row, indent=2, default=str))
     else:
         _print_baseline_row(row)
-    return 0
+    # A crash/timeout attempt is logged (and purged) but is not a baseline.
+    return 0 if row.get("status") == "baseline" else 1
 
 
 def _print_baseline_row(row: Mapping[str, Any]) -> None:
-    print(_status_label("ok") + _c("baseline row written", _C.BOLD))
+    ok = row.get("status") == "baseline"
+    print(_status_label("ok" if ok else "fail") + _c("baseline row written", _C.BOLD))
     for k in ("commit", "metric", "confidence", "wall_clock_min", "status", "description"):
         print(f"  {k}: {row.get(k)}")
 
@@ -388,7 +399,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("db-check", help="run prepare.py (Supabase + PostGIS ping)")
     p.set_defaults(fn=cmd_db_check)
 
-    p = sub.add_parser("baseline", help="run the baseline experiment for a market")
+    p = sub.add_parser(
+        "baseline",
+        help="record this run's baseline (loop lock + verify_setup gated)",
+    )
     p.add_argument("--market", default="atlanta")
     p.set_defaults(fn=cmd_baseline)
 
@@ -400,7 +414,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--confirmed", action="store_true",
-        help="bypass the Setup Step 6 baseline-confirmation gate",
+        help="human consent to bootstrap a missing baseline and iterate "
+             "without reviewing it first (Setup Step 6)",
     )
     p.set_defaults(fn=cmd_loop)
 
