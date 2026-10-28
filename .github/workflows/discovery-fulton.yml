@@ -22,6 +22,7 @@ on:
       - 'STORAGE_ARCHITECTURE.md'
       - 'tests/test_discovery.py'
       - 'tests/test_postgis_smoke.py'
+      - 'tests/live_txn_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -36,6 +37,7 @@ on:
       - 'STORAGE_ARCHITECTURE.md'
       - 'tests/test_discovery.py'
       - 'tests/test_postgis_smoke.py'
+      - 'tests/live_txn_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -104,3 +106,8 @@ jobs:
 
       - name: Run live-PostGIS smoke test
         run: python tests/test_postgis_smoke.py
+
+      # After the smoke test: it asserts a global unscoped pipeline count,
+      # and this check deletes every row it writes.
+      - name: Run live transaction-integrity check
+        run: python tests/live_txn_check.py

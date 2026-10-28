@@ -144,6 +144,12 @@ _SQL_FETCH_OPEN_FLAGS_FOR_PARCEL = (
 )
 
 # R-613: top-N memo highlights ordered by composite_score then scored_at.
+# Exactly ONE latest row per parcel, picked with the metric's tie-break
+# (scored_at DESC, score_id DESC — same as _SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT
+# and prepare.py's DISTINCT ON). A `scored_at = MAX(scored_at)` match counted
+# every row tied at the maximum (all rows of one scoring cycle share now()).
+# Deliberately UNSCOPED (no run_tag): memos describe the accumulated pipeline
+# (AUTORESEARCH_MECHANICS.md).
 _SQL_FETCH_SCORED_PARCELS_FOR_MEMO = (
     "SELECT ps.parcel_id, p.address, p.county, p.submarket, p.acreage, "
     "p.owner_name, p.owner_type_inferred, "
@@ -153,9 +159,10 @@ _SQL_FETCH_SCORED_PARCELS_FOR_MEMO = (
     "FROM parcel_scores ps "
     "JOIN parcels p USING (parcel_id) "
     "WHERE p.market = %s "
-    "AND ps.scored_at = ("
-    "  SELECT MAX(scored_at) FROM parcel_scores "
-    "  WHERE parcel_id = ps.parcel_id"
+    "AND ps.score_id = ("
+    "  SELECT score_id FROM parcel_scores "
+    "  WHERE parcel_id = ps.parcel_id "
+    "  ORDER BY scored_at DESC, score_id DESC LIMIT 1"
     ") "
     "ORDER BY ps.composite_score DESC NULLS LAST, ps.scored_at DESC"
 )
