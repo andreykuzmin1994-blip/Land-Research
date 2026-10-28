@@ -6,6 +6,17 @@ depends on file mutability rules that hold in **every** session — including
 quick Q&A. Read this card first; the tier table below tells you how much
 more you need to read before acting.
 
+## Scope note: `screener/`
+
+`screener/` is a separate, simpler tool (free-data land screen + its own
+AutoResearch loop). It shares no code, tables or files with the system
+below. The invariants and orientation tiers on this card govern the root
+system. Work inside `screener/` follows `screener/README.md`, and its loop
+follows `screener/autoresearch/PROGRAM.md`. There, the agent edits only
+`screener/rank.py` and never edits `scoring.py`, `screens.py`,
+`settings.toml`, `autoresearch/evaluate.py`, `autoresearch/build_eval.py`
+or `autoresearch/data/`. The CoStar rule below applies everywhere.
+
 ## Invariants (always in force, at every tier)
 
 - **NEVER edit `prepare.py` or `parameters.json`** — the immutable metric

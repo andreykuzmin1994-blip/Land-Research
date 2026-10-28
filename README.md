@@ -11,6 +11,14 @@ The agent supports five investment strategies (BTS development, spec development
 
 ## Status
 
+**2026-10-28: simpler path added — `screener/`.** A plain, database-free land
+screen built on free public data (county GIS, FEMA, USFWS, USGS, EPA, GDOT)
+that ranks buyable, buildable Fulton parcels and writes one-page briefs.
+It has its own small AutoResearch loop scored against land developers
+actually bought (`screener/autoresearch/PROGRAM.md`). Start there:
+`screener/README.md`. Everything below describes the original system,
+which is unchanged.
+
 Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop runs end-to-end against Fulton County, with the full Karpathy-pattern infrastructure: setup-phase verifier, evaluator, append-only TSV experiment log, keep-or-revert decision logic, halt sentinel, advisory locking. Atlanta is the only configured market; Phase 11+ adds the remaining counties.
 
 2026-07-07 restructure (see `reviews/14_streamlining_review/`):

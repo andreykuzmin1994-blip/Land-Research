@@ -1,0 +1,37 @@
+# Land screener settings. Edit freely; every run reads this file.
+
+[run]
+county = "fulton"
+briefs = 25          # one-page briefs for the top N parcels
+slope = true         # USGS lidar slope check, about 1 second per parcel
+workers = 6          # parallel slope requests
+cache_days = 7       # reuse downloaded map data for this many days
+
+[area]
+min_acres = 5
+max_acres = 50
+# Fulton jurisdictions to search. North Fulton cities (Alpharetta, Roswell,
+# Milton, Johns Creek, Sandy Springs, Mountain Park) are left out by default.
+jurisdictions = [
+  "South Fulton / unincorporated", "Atlanta", "East Point", "College Park",
+  "Hapeville", "Fairburn", "Union City", "Palmetto", "Chattahoochee Hills",
+  "Fulton Industrial District",
+]
+
+[screens]
+max_improvement_value = 250000  # skip parcels already built on (and improvements > half the land value)
+max_flood_pct = 40              # % of parcel in the 100-year floodplain
+max_floodway_pct = 10           # % in a regulatory floodway
+max_wetland_pct = 20            # % mapped wetlands (ponds/streams counted separately)
+max_protected_pct = 10          # overlap with protected land or conservation easements
+max_steep_pct = 40              # % of parcel steeper than 15% slope
+min_usable_acres = 4            # acres left after all of the above
+contamination_buffer_ft = 500   # flag listed contamination sites this close
+exclude_tax_exempt = true
+exclude_government = true
+exclude_developer_owned = true  # Prologis, Link, Exeter, ... already own it
+exclude_utility_owned = true    # railroads, Georgia Power, pipelines
+exclude_listed = true           # parcels you mark "listed" in inputs/decisions.csv
+# Optional screens (off by default; these otherwise only lower the score):
+max_exit_miles = 0              # drop parcels farther than this from an interstate exit (0 = off)
+exclude_hard_entitlement = false  # drop parcels zoned AND planned residential / conservation
