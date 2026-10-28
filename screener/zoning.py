@@ -75,13 +75,17 @@ def entitlement(zoning_cat: str, flu_cat: str, industrial_neighbors: int) -> tup
         return "likely", "future land use map calls for industrial"
     if zoning_cat == FLEX:
         return "likely", "flex / business-park zoning"
+    if flu_cat == "conservation":
+        return "hard", "planned for conservation"
+    if zoning_cat == RESIDENTIAL and flu_cat == RESIDENTIAL:
+        return "hard", "zoned and planned residential"
     if zoning_cat == REZONABLE and industrial_neighbors >= 5:
         return "possible", f"rezoning needed; {industrial_neighbors} industrial parcels within 1 mile"
-    if zoning_cat == RESIDENTIAL or flu_cat in (RESIDENTIAL, "conservation"):
+    if zoning_cat == RESIDENTIAL or flu_cat == RESIDENTIAL:
         if industrial_neighbors >= 10:
             return "possible", (f"residential designation but {industrial_neighbors} industrial "
                                 "parcels within 1 mile")
-        return "hard", "residential or conservation designation"
+        return "hard", "residential designation"
     if zoning_cat == REZONABLE:
         return "possible", "rezoning needed (agricultural/commercial today)"
     if zoning_cat == UNKNOWN and flu_cat == UNKNOWN:

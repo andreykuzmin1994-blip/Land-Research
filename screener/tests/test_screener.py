@@ -85,7 +85,9 @@ class ZoningTests(unittest.TestCase):
         self.assertEqual(zoning.entitlement("industrial", "unknown", 0)[0], "by_right")
         self.assertEqual(zoning.entitlement("rezonable", "industrial", 0)[0], "likely")
         self.assertEqual(zoning.entitlement("residential", "residential", 2)[0], "hard")
-        self.assertEqual(zoning.entitlement("residential", "residential", 12)[0], "possible")
+        self.assertEqual(zoning.entitlement("residential", "residential", 12)[0], "hard")
+        self.assertEqual(zoning.entitlement("residential", "unknown", 12)[0], "possible")
+        self.assertEqual(zoning.entitlement("rezonable", "conservation", 30)[0], "hard")
         self.assertEqual(zoning.entitlement("unknown", "unknown", 0)[0], "unknown")
 
 
