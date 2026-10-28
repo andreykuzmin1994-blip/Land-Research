@@ -35,9 +35,16 @@ Results land in `screener/output/fulton-<date>/`:
 
 Map data is cached for 7 days and the county deed file for 30
 (`screener/cache/`), so re-runs take a few minutes. `--refresh` forces
-fresh downloads of both. If a map layer is down, the run stops rather than
-treat its parcels as clear; if a city zoning service is down, the run
-continues and `summary.md` says which zoning check failed.
+fresh downloads of both. If a map layer is down, or sends back a malformed
+or partial answer, the run stops rather than treat its parcels as clear.
+It also stops if the county parcels, deed file or industrial parcels can't
+be read. Bad answers aren't cached, so a re-run asks again; if the stop
+message mentions `--refresh`, re-run with it. A layer that has no
+features near the parcels (which can be normal, e.g. no Opportunity Zone
+nearby) doesn't stop the run, but `summary.md` names it.
+If a city zoning service is down, the run continues and `summary.md` says
+which zoning check failed. It also counts parcels whose lidar slope check
+failed: they stay in the list, flagged, without the steep-ground screen.
 
 ## Tune it
 

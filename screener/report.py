@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -65,10 +66,18 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
     briefs = out_dir / "briefs"
     briefs.mkdir(exist_ok=True)
     for p in ranked[:top_n]:
-        name = f"{p['rank']:03d}_{p['parcel_id'].replace(' ', '_')}.md"
-        (briefs / name).write_text(brief(p))
+        path = briefs / f"{p['rank']:03d}_{_safe_name(p['parcel_id'])}.md"
+        if path.resolve().parent != briefs.resolve():
+            raise ValueError(f"brief file name escapes {briefs}: {path.name!r}")
+        path.write_text(brief(p))
 
     (out_dir / "summary.md").write_text(_summary_md(summary, ranked[:10]))
+
+
+def _safe_name(text: str, limit: int = 100) -> str:
+    """County ids as file names: each character outside A-Z a-z 0-9 . _ -
+    becomes "_" (so "07 0300" stays "07_0300"), capped at limit."""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", text)[:limit]
 
 
 def _money(v: Any) -> str:
@@ -165,7 +174,11 @@ def _summary_md(s: dict[str, Any], top: list[dict[str, Any]]) -> str:
 
 
 def _map_html(features: list[dict[str, Any]], s: dict[str, Any]) -> str:
-    data = json.dumps({"type": "FeatureCollection", "features": features})
+    # County strings go inside <script>: escape <, > and & so "</script>" or
+    # "<!--" in an owner name can't end it. They only occur inside JSON
+    # strings, where the \u forms read back as the same characters.
+    data = (json.dumps({"type": "FeatureCollection", "features": features})
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
     title = html.escape(f"{s['county']} land screen {s['run_date']}")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">

@@ -31,6 +31,13 @@ def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+def stop(what: str, exc: Exception) -> int:
+    """A source the screen can't do without failed: say which, and stop."""
+    log(f"  ! {what} is unavailable ({exc}).")
+    log("Stopping: re-run later (finished downloads are cached).")
+    return 1
+
+
 def load_decisions() -> dict[str, dict[str, str]]:
     """Your pursue / pass / listed marks, keyed by parcel id."""
     if not DECISIONS_FILE.exists():
@@ -76,8 +83,11 @@ def main(argv: list[str] | None = None) -> int:
     notes: list[str] = []
 
     log(f"{county.NAME} County: fetching {area['min_acres']}-{area['max_acres']} acre parcels")
-    parcels = county.fetch_parcels(area["min_acres"], area["max_acres"],
-                                   set(area.get("jurisdictions") or []))
+    try:
+        parcels = county.fetch_parcels(area["min_acres"], area["max_acres"],
+                                       set(area.get("jurisdictions") or []))
+    except arcgis.ArcGISError as exc:
+        return stop("the county parcel layer", exc)
     parcels.sort(key=lambda p: p["parcel_id"])
     if args.limit:
         parcels = parcels[:args.limit]
@@ -102,8 +112,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     log("Deed history and site records (county CAMA extract)")
-    cama = county.load_cama(HERE / "cache", {p["parcel_id"]: p["owner"] for p in live},
-                            refresh=args.refresh)
+    try:
+        cama = county.load_cama(HERE / "cache", {p["parcel_id"]: p["owner"] for p in live},
+                                refresh=args.refresh)
+    except arcgis.ArcGISError as exc:
+        return stop("the county deed file", exc)
     for p in live:
         p.update(cama.get(p["parcel_id"], {}))
 
@@ -119,12 +132,23 @@ def main(argv: list[str] | None = None) -> int:
         except arcgis.ArcGISError as exc:
             # A missing layer would read as "0% floodplain" etc., so stop
             # rather than publish unchecked parcels as clean.
-            log(f"  ! {layer.name} is unavailable ({exc}).")
-            log("Stopping: re-run later (finished downloads are cached).")
-            return 1
+            return stop(layer.name, exc)
         log(f"  {len(idx[key]):,} features")
     log("Industrial parcels (context)")
-    industrial = county.fetch_industrial_points()
+    try:
+        industrial = county.fetch_industrial_points()
+    except arcgis.ArcGISError as exc:
+        return stop("the county parcel layer (industrial parcels)", exc)
+    # No features at all is normal for some layers (no Opportunity Zone
+    # nearby) but reads as "clear" or "far" for every parcel, so say so.
+    empty = [layers.LAYERS[key].name for key in idx if not len(idx[key])]
+    if not industrial:
+        empty.append("county industrial parcels")
+    if empty:
+        log(f"  ! no features near these parcels: {'; '.join(empty)}")
+        notes.append(f"No features came back near these parcels from: {'; '.join(empty)}. "
+                     "Every parcel reads as clear of (or far from) them; if that's unexpected, "
+                     "re-run with --refresh before relying on it.")
 
     log("Running map checks")
     checks.map_checks(live, idx, industrial, scr["contamination_buffer_ft"])
@@ -148,6 +172,12 @@ def main(argv: list[str] | None = None) -> int:
         log(f"Slope from USGS lidar for {len(survivors):,} parcels")
         checks.slope_checks(survivors, int(run_cfg.get("workers", 6)),
                             lambda d, n: log(f"  slope {d:,}/{n:,}"))
+        slope_failed = sum(1 for p in survivors if p.get("slope_error"))
+        if slope_failed:
+            log(f"  ! slope check failed for {slope_failed:,} of {len(survivors):,} parcels")
+            notes.append(f"SLOPE CHECK FAILED for {slope_failed} of {len(survivors)} parcels: "
+                         "the steep-ground screen was not applied to them (each is flagged "
+                         "\"slope check failed\"). Re-run later.")
         kept = []
         for p in survivors:
             p["usable_after_slope"] = screens.usable_after_slope(p)

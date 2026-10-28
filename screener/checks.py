@@ -191,7 +191,10 @@ def _hist_share_above(hist: dict[str, Any], threshold: float) -> float | None:
 
 
 def slope_stats(geom) -> dict[str, Any]:
-    """Relief and steepness from USGS 3DEP lidar at ~10 m (about 1-5 s per parcel)."""
+    """Relief and steepness from USGS 3DEP lidar at ~10 m (about 1-5 s per parcel).
+
+    An answer without usable histograms raises arcgis.BadAnswer.
+    """
     data = arcgis.request_json(SLOPE_URL, {
         "geometry": json.dumps(_esri_polygon(geom)),
         "geometryType": "esriGeometryPolygon",
@@ -199,11 +202,25 @@ def slope_stats(geom) -> dict[str, Any]:
         # Resample the 1 m lidar to ~10 m: at 1 m, ditches and stream banks
         # read as "steep" and overstate grading by 2-3x; relief is unchanged.
         "pixelSize": SLOPE_PIXEL,
-    })
+    }, check=_slope_problem)
+    return _slope_from(data)
+
+
+def _slope_problem(data: dict[str, Any]) -> str | None:
+    # 3DEP sometimes answers HTTP 200 with no histograms ({"statistics": []}):
+    # that is a failed check, not flat ground.
+    try:
+        out = _slope_from(data)
+    except (AttributeError, IndexError, KeyError, TypeError, ValueError):
+        return "no usable slope data in the answer"
+    if out["relief_ft"] is None or out["steep_pct"] is None:
+        return "no usable slope data in the answer"
+    return None
+
+
+def _slope_from(data: dict[str, Any]) -> dict[str, Any]:
     hists = data.get("histograms") or []
     stats = data.get("statistics") or []
-    if len(hists) < 2 or len(stats) < 2:
-        return {"relief_ft": None, "steep_pct": None, "mean_slope_pct": None}
     p2, p98 = _hist_quantile(hists[0], 0.02), _hist_quantile(hists[0], 0.98)
     steep = _hist_share_above(hists[1], 15.0)
     return {
@@ -247,12 +264,9 @@ def zoning_checks(parcels: list[dict[str, Any]], sources: list[dict[str, Any]],
         wanted = [f for f in (src.get("id_field"), src.get("zoning_field"),
                               src.get("desc_field"), src.get("flu_field")) if f]
         try:
-            ids: set[int] = set()
-            for env in tiles_for(group):
-                ids.update(arcgis.query_ids(src["url"], "1=1", env))
-            feats = arcgis.fetch_by_ids(src["url"], sorted(ids), ",".join(wanted),
-                                        return_geometry=src["kind"] == "overlay",
-                                        max_offset=0.00001)
+            feats = arcgis.features_in(src["url"], "1=1", tiles_for(group), ",".join(wanted),
+                                       return_geometry=src["kind"] == "overlay",
+                                       max_offset=0.00001)
         except arcgis.ArcGISError as exc:
             print(f"  ! zoning source unavailable: {src['name']} ({exc})")
             for p in group:
