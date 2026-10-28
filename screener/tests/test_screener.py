@@ -238,10 +238,6 @@ class MiscTests(unittest.TestCase):
         self.assertEqual(jurisdiction("70D"), "Fulton Industrial District")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class EvaluateTests(unittest.TestCase):
     """The AutoResearch scorer, on a synthetic pool (no data files needed)."""
 
@@ -303,3 +299,7 @@ class EvaluateTests(unittest.TestCase):
                                scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
         self.assertEqual(res["hits"], 0)
         self.assertEqual(res["positives_screened_out"], 10)
+
+
+if __name__ == "__main__":
+    unittest.main()

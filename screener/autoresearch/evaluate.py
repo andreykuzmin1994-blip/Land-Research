@@ -22,20 +22,35 @@ Keep rule (--decide): the experiment must add at least one hit over the
 best kept run AND win in at least 90% of clustered bootstrap resamples.
 Each resample draws whole ~5 km map cells, because positives come in
 clusters, and scores both rankings on the same draw.
+
+Guards. Before rank.py is imported, a static check (rank_problems) must
+pass, or nothing is scored. --decide also refuses (exit 3, logs nothing)
+on uncommitted changes or untracked files under screener/, a commit that
+touches anything but screener/rank.py, a score that isn't a finite number
+in 0-100, or a best kept run whose experiments.tsv row or
+best_ranking.json is missing or doesn't match. A human then records a new
+baseline (--new-baseline), which starts a new chain: later experiments are
+compared with it, not with older runs.
 """
 
 from __future__ import annotations
 
+import __future__
 import argparse
+import ast
 import csv
 import gzip
 import hashlib
 import importlib
+import importlib.util
+import inspect
 import json
+import math
 import random
 import subprocess
 import sys
 import time
+import typing
 from pathlib import Path
 
 from .. import screens
@@ -45,6 +60,11 @@ FEATURES_FILE = HERE / "data" / "fulton_2016_features.json.gz"
 LABELS_FILE = HERE / "data" / "fulton_2016_labels.json"
 LOG_FILE = HERE / "experiments.tsv"          # append-only, untracked
 BEST_FILE = HERE / "best_ranking.json"       # ranking of the best kept run, untracked
+RANK_FILE = HERE.parent / "rank.py"
+# Uncommitted changes and untracked (not ignored) files under screener/.
+# The "## <branch>" header line shows that git answered.
+STATUS_ARGS = ("status", "--porcelain", "--branch", "--untracked-files=all", "--", "screener")
+NEW_BASELINE = "python -m screener.autoresearch.evaluate --decide --new-baseline"
 LOG_COLUMNS = ["time", "commit", "parent", "fingerprint", "hits", "positives", "k",
                "recall", "win_share", "status", "description"]
 # Files whose change alters what the score means. Changing one needs a
@@ -55,6 +75,15 @@ K_SHARE = 0.02
 BOOTSTRAP = 500
 WIN_SHARE_TO_KEEP = 0.9
 HIDDEN = ("key", "split", "block")           # never passed to the ranking
+# What rank.py may import (PROGRAM.md: pure, no I/O). math is for smooth curves.
+RANK_IMPORTS = ("__future__", "math", "typing")
+# Builtins, helpers and attributes that open files, run code, or reach module
+# internals or the evaluator's stack frames (str.format can walk attributes).
+RANK_BANNED_NAMES = {"open", "exec", "eval", "compile", "__import__", "globals", "locals", "vars",
+                     "getattr", "setattr", "delattr", "breakpoint", "input", "get_type_hints",
+                     "ForwardRef", "format", "format_map", "gi_frame", "cr_frame", "ag_frame",
+                     "tb_frame", "f_back", "f_globals", "f_locals", "f_builtins"}
+RANK_BANNED_STRINGS = ("autoresearch/data", "fulton_2016", "experiments.tsv", "best_ranking")
 
 
 def load() -> tuple[list[dict], set[str], dict]:
@@ -76,18 +105,26 @@ def _tiebreak(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def ranking(records: list[dict], split: str, scorer, settings: dict) -> tuple[list[str], tuple]:
-    """Keys of the split's parcels that pass the screens, best first, and
-    the (min, max) score seen."""
-    scored = []
+def ranking(records: list[dict], split: str, scorer, settings: dict
+            ) -> tuple[list[str], tuple, int]:
+    """Keys of the split's parcels that pass the screens, best first, the
+    (min, max) finite score seen, and how many scores were NaN or infinite.
+    One NaN anywhere scrambles the sort, so those rank last and --decide
+    refuses the run."""
+    scored, nonfinite = [], 0
     for r in records:
         if r["split"] != split or screens.site_rejects(r, settings):
             continue
         features = {k: v for k, v in r.items() if k not in HIDDEN}
-        scored.append((-float(scorer(features)["score"]), _tiebreak(r["key"]), r["key"]))
+        score = float(scorer(features)["score"])
+        if not math.isfinite(score):
+            nonfinite += 1
+            score = -math.inf
+        scored.append((-score, _tiebreak(r["key"]), r["key"]))
     scored.sort()
-    span = (-scored[-1][0], -scored[0][0]) if scored else (0.0, 0.0)
-    return [key for _, _, key in scored], span
+    finite = [-s for s, _, _ in scored if math.isfinite(s)]
+    span = (min(finite), max(finite)) if finite else (0.0, 0.0)
+    return [key for _, _, key in scored], span, nonfinite
 
 
 def hits_at_k(order: list[str], pool_keys: list[str], positives: set[str]) -> tuple[int, int]:
@@ -118,13 +155,14 @@ def evaluate(records: list[dict], positives: set[str], split: str,
         settings = load_meta_screens()
     pool = [r["key"] for r in records if r["split"] == split]
     pos = {k for k in pool if k in positives}
-    order, span = ranking(records, split, scorer, settings)
+    order, span, nonfinite = ranking(records, split, scorer, settings)
     hits, k = hits_at_k(order, pool, pos)
     return {
         "split": split, "pool": len(pool), "positives": len(pos), "k": k, "hits": hits,
         "recall": round(hits / len(pos), 3) if pos else 0.0,
         "positives_screened_out": len(pos - set(order)),
-        "score_range": [round(span[0], 1), round(span[1], 1)], "order": order,
+        "score_range": [round(span[0], 1), round(span[1], 1)], "nonfinite_scores": nonfinite,
+        "order": order,
     }
 
 
@@ -150,6 +188,75 @@ def paired_win_share(records: list[dict], positives: set[str], new: list[str],
     return wins / BOOTSTRAP
 
 
+def rank_problems(source: str) -> list[str]:
+    """Why rank.py's source breaks PROGRAM.md rules 1-3, if it does.
+
+    rank.py may import only __future__, math and typing (no module objects
+    or private names through them); may not use open, eval, exec, compile,
+    getattr, globals, vars, str.format, frame attributes (gi_frame, f_back,
+    f_locals...) and the like, dunder names, private attributes, or global /
+    nonlocal state; and its strings (docstrings aside) may not name the
+    evaluation files. It reads the source before rank.py is imported. It
+    guards against drift and is not a sandbox.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as e:
+        return [f"does not parse ({e.msg}, line {e.lineno})"]
+    modules = {name for m in (__future__, math, typing) for name, value in vars(m).items()
+               if inspect.ismodule(value)}
+
+    def banned_attr(name: str) -> bool:
+        return name.startswith("_") or name in modules or name in RANK_BANNED_NAMES
+
+    docstrings = {id(node.body[0].value) for node in ast.walk(tree)
+                  if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                       ast.AsyncFunctionDef))
+                  and node.body and isinstance(node.body[0], ast.Expr)}
+    problems = []
+    for node in ast.walk(tree):
+        where = f"line {getattr(node, 'lineno', '?')}"
+        if isinstance(node, ast.Import):
+            problems += [f"{where}: imports {a.name}" for a in node.names
+                         if a.name not in RANK_IMPORTS]
+        elif isinstance(node, ast.ImportFrom):
+            if node.level or node.module not in RANK_IMPORTS:
+                problems.append(f"{where}: imports from {'.' * node.level}{node.module or ''}")
+            problems += [f"{where}: imports {a.name} from {node.module}" for a in node.names
+                         if a.name == "*" or banned_attr(a.name)]
+        elif isinstance(node, ast.Name) and (node.id in RANK_BANNED_NAMES
+                                             or node.id[:2] == node.id[-2:] == "__"):
+            problems.append(f"{where}: uses {node.id}")
+        elif isinstance(node, ast.Attribute) and banned_attr(node.attr):
+            problems.append(f"{where}: uses .{node.attr}")
+        elif isinstance(node, ast.MatchClass):           # case C(attr=x) reads C.attr
+            problems += [f"{where}: uses .{a}" for a in node.kwd_attrs if banned_attr(a)]
+        elif isinstance(node, (ast.Global, ast.Nonlocal)):
+            problems.append(f"{where}: keeps state between calls ({', '.join(node.names)})")
+        elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
+              and id(node) not in docstrings
+              and any(name in node.value for name in RANK_BANNED_STRINGS)):
+            problems.append(f"{where}: names an evaluation file ({node.value!r})")
+    return problems
+
+
+def _rank_origin() -> str | None:
+    """The file `import screener.rank` would load, found without running it."""
+    try:
+        spec = importlib.util.find_spec("screener.rank")
+    except (ImportError, ValueError):
+        return None
+    return spec.origin if spec else None
+
+
+def rank_import_problems() -> list[str]:
+    """rank_problems for the rank.py that would be imported."""
+    origin = _rank_origin()
+    if not origin or Path(origin).resolve() != RANK_FILE.resolve():
+        return [f"screener.rank would load from {origin}, not screener/rank.py"]
+    return rank_problems(RANK_FILE.read_text())
+
+
 def _git(*args: str) -> str:
     try:
         return subprocess.run(["git", *args], capture_output=True, text=True,
@@ -170,11 +277,31 @@ def _rows() -> list[dict]:
         return list(csv.DictReader(fh, delimiter="\t"))
 
 
-def _best_kept(fp: str) -> dict | None:
-    """Best baseline/keep row for this evaluation set whose commit is still in history."""
-    rows = [r for r in _rows() if r["status"] in ("baseline", "keep") and r["fingerprint"] == fp
-            and _is_ancestor(r["commit"])]
-    return max(rows, key=lambda r: int(r["hits"]), default=None)
+def _kept_rows(fp: str) -> list[dict]:
+    """Baseline and keep rows for this evaluation set, in log order."""
+    return [r for r in _rows() if r["status"] in ("baseline", "keep") and r["fingerprint"] == fp]
+
+
+def _best_kept(rows: list[dict]) -> dict | None:
+    """Best run of the current chain: the latest baseline whose commit is
+    still in history, and the keeps logged after it that are too. A new
+    baseline starts a new chain, so --new-baseline resets the bar."""
+    start = next((i for i in reversed(range(len(rows)))
+                  if rows[i]["status"] == "baseline" and _is_ancestor(rows[i]["commit"])), None)
+    if start is None:
+        return None
+    chain = [rows[start]] + [r for r in rows[start + 1:]
+                             if r["status"] == "keep" and _is_ancestor(r["commit"])]
+    return max(reversed(chain), key=lambda r: int(r["hits"]))
+
+
+def _saved_best() -> dict | None:
+    """best_ranking.json, or None if it is missing or unreadable."""
+    try:
+        saved = json.loads(BEST_FILE.read_text())
+    except (OSError, ValueError):
+        return None
+    return saved if isinstance(saved, dict) and isinstance(saved.get("order"), list) else None
 
 
 def _append(row: dict) -> None:
@@ -193,34 +320,60 @@ def _refuse(msg: str) -> int:
 
 def decide(records: list[dict], positives: set[str], dev: dict, new_baseline: bool) -> int:
     head = _git("rev-parse", "--short", "HEAD")
+    if not head:
+        return _refuse("git did not give the current commit. Run this inside the repository.")
     parent = _git("rev-parse", "--short", "HEAD~1")
     fp = fingerprint()
-    if _git("status", "--porcelain", "--untracked-files=no", "--", "screener"):
-        return _refuse("uncommitted changes under screener/. Commit the experiment first.")
-    if any(r["commit"] == head and r["fingerprint"] == fp for r in _rows()):
+    git_status = _git(*STATUS_ARGS).splitlines()
+    if not git_status or not git_status[0].startswith("##"):
+        return _refuse("git did not give the status of screener/.")
+    if git_status[1:]:
+        return _refuse("uncommitted changes or untracked files under screener/ "
+                       f"({', '.join(line[3:] for line in git_status[1:4])}). Commit the "
+                       "experiment first; rank.py may not use any other file.")
+    # A human may re-record an already scored commit (the best kept run).
+    if not new_baseline and any(r["commit"] == head and r["fingerprint"] == fp for r in _rows()):
         return _refuse(f"commit {head} was already scored. Make a new experiment commit.")
+    if dev.get("nonfinite_scores"):
+        return _refuse(f"rank.learned_score returned {dev['nonfinite_scores']} scores that are NaN "
+                       "or infinite; every score must be a finite number.")
     lo, hi = dev["score_range"]
     if lo < 0 or hi > 100:
         return _refuse(f"rank.learned_score ranges {lo}..{hi}; it must stay within 0-100 so "
                        "the fixed zoning/slope share of the live score is unchanged.")
-    best = None if new_baseline else _best_kept(fp)
+    best, saved = None, None
+    if not new_baseline:
+        rows = _kept_rows(fp)
+        best, saved = _best_kept(rows), _saved_best()
+        if best is None and rows:
+            return _refuse("experiments.tsv has kept runs for this evaluation set, but none is in "
+                           "this branch's history (reset, or branched from before the baseline). "
+                           f"A human must record a new baseline: {NEW_BASELINE}")
+        if best is None and saved is not None and saved.get("fingerprint") == fp:
+            return _refuse("best_ranking.json is from this evaluation set, but experiments.tsv has "
+                           "no kept run for it. A human must record a new baseline: "
+                           f"{NEW_BASELINE}")
     if best is not None:
-        touched = [f for f in _git("diff", "--name-only", "HEAD~1", "HEAD", "--",
-                                   "screener").splitlines() if f]
+        touched = [f for f in _git("diff", "--name-only", "HEAD~1", "HEAD").splitlines() if f]
         if touched != ["screener/rank.py"]:
             return _refuse("an experiment is one commit that edits only screener/rank.py; "
-                           f"HEAD touches: {', '.join(touched) or 'nothing under screener/'}.")
+                           f"HEAD touches: {', '.join(touched) or 'nothing'}.")
         since = [f for f in _git("diff", "--name-only", best["commit"], "HEAD", "--",
                                  "screener").splitlines() if f.startswith(EVAL_FILES)]
         if since:
             return _refuse(f"the evaluation itself changed since the best kept run "
                            f"({', '.join(since)}). A human must record a new baseline: "
-                           "python -m screener.autoresearch.evaluate --decide --new-baseline")
+                           f"{NEW_BASELINE}")
+        if (saved is None or saved.get("commit") != best["commit"]
+                or saved.get("fingerprint") != fp):
+            return _refuse(f"best_ranking.json is missing, unreadable or not from the best kept "
+                           f"run ({best['commit']}), so the keep bar can't be checked. A human "
+                           f"must check out {best['commit']} and record it again: {NEW_BASELINE}")
 
-    if best is None or not BEST_FILE.exists():
+    if best is None:
         status, why, share = "baseline", "recorded as the baseline for this evaluation set", ""
     else:
-        best_order = json.loads(BEST_FILE.read_text())["order"]
+        best_order = saved["order"]
         gain = dev["hits"] - int(best["hits"])
         share = paired_win_share(records, positives, dev["order"], best_order)
         if gain >= 1 and share >= WIN_SHARE_TO_KEEP:
@@ -258,6 +411,12 @@ def main(argv: list[str] | None = None) -> int:
     if not FEATURES_FILE.exists():
         print("No evaluation set yet: run `python -m screener.autoresearch.build_eval` first.")
         return 2
+    if not args.control:
+        # Before anything imports rank.py: a refused file never runs.
+        problems = rank_import_problems()
+        if problems:
+            return _refuse("screener/rank.py breaks PROGRAM.md rules 1-3, so it was not run: "
+                           + "; ".join(problems[:5]))
     records, positives, _ = load()
     public = lambda res: {k: v for k, v in res.items() if k != "order"}
 

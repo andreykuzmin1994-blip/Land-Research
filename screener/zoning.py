@@ -23,11 +23,20 @@ _REZONABLE_RE = re.compile(r"^(AG(-?1)?|A(-?1)?|A-?L|RR|AR|C-?[1-5]|GC|CR|CL|HC|
 # CUP = South Fulton "Community Unit Plan", a residential subdivision district.
 _RESIDENTIAL_RE = re.compile(r"^(R|RM|RG|RMD|MR|PD-?H|PUD|R-?LC|MHP|TR|SUB|RL|RT|R1A?|CUP)")
 
-_FLU_INDUSTRIAL_RE = re.compile(r"INDUSTR|LOGISTIC|BUSINESS PARK|DISTRIBUTION|MANUFACTUR|^I$|^BP$")
+_FLU_INDUSTRIAL_RE = re.compile(
+    r"INDUSTR|LOGISTIC|BUSINESS PARK|DISTRIBUTION|MANUFACTUR(?!ED HOM)|^I$|^BP$")
+# NEIGHBORHOOD is residential ("Suburban Neighborhood"), except as the
+# scale of a commercial or mixed-use area ("Neighborhood Commercial").
 _FLU_RESIDENTIAL_RE = re.compile(
-    r"RESIDENTIAL|NEIGHBORHOOD|^MDR$|^LDR$|^HDR$|^R$|SINGLE[- ]FAMILY"
+    r"RESIDENTIAL|NEIGHBORHOOD(?! (COMMERCIAL|MIXED|CENTER|CENTRE|VILLAGE|NODE|RETAIL|BUSINESS|"
+    r"OFFICE|SERVICE))|^MDR$|^LDR$|^HDR$|^R$|SINGLE[- ]FAMILY|MOBILE HOME|MANUFACTURED HOM"
 )
-_FLU_PROTECT_RE = re.compile(r"CONSERV|PRESERVE|GREENSPACE|OPEN SPACE|PARK(?!.*BUSINESS)")
+# PARK as a word ("Parks & Recreation"), not "Parkway" / "Parking" or a
+# park of buildings ("Office Park", "Mobile Home Park").
+_FLU_PROTECT_RE = re.compile(r"CONSERV|PRESERVE|GREEN ?SPACE|OPEN SPACE|\bPARKS?\b")
+_FLU_BUILT_PARK_RE = re.compile(
+    r"\b(BUSINESS|OFFICE|INDUSTRIAL|COMMERCE|CORPORATE|TECHNOLOGY|TECH|RESEARCH|SCIENCE|"
+    r"MEDICAL|TRADE|LOGISTICS|MOBILE HOME|MANUFACTURED HOME|RV|TRAILER) PARKS?\b")
 _FLU_RURAL_RE = re.compile(r"RURAL|AGRICULTUR")
 
 
@@ -59,7 +68,7 @@ def flu_category(label: str | None) -> str:
         return UNKNOWN
     if _FLU_INDUSTRIAL_RE.search(t):
         return INDUSTRIAL
-    if _FLU_PROTECT_RE.search(t):
+    if _FLU_PROTECT_RE.search(_FLU_BUILT_PARK_RE.sub(" ", t)):
         return "conservation"
     if _FLU_RURAL_RE.search(t):
         return "rural"

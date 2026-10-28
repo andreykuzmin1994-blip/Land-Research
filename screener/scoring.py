@@ -11,6 +11,7 @@ shrink their weight in the live list.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from . import rank
@@ -53,14 +54,24 @@ def fixed_score(p: dict[str, Any]) -> tuple[float, list[str]]:
 def score(p: dict[str, Any]) -> dict[str, Any]:
     fixed, fixed_why = fixed_score(p)
     learned = rank.learned_score(p)
+    try:
+        raw = float(learned["score"])
+    except (TypeError, ValueError):
+        raw = math.nan
+    # min/max would turn NaN or infinity into 100 (or 0). An unusable
+    # learned score counts as 0, and the brief says so.
+    why_learned = []
+    if not math.isfinite(raw):
+        why_learned = [f"learned score unusable ({learned['score']!r}): counted as 0"]
+        raw = 0.0
     # rank.py must stay on a 0-100 scale (evaluate.py enforces it); clamp
     # anyway so the fixed share can't be diluted.
-    tuned = max(0.0, min(100.0, float(learned["score"])))
+    tuned = max(0.0, min(100.0, raw))
     return {
         "score": round(FIXED_SHARE * fixed + (1 - FIXED_SHARE) * tuned, 1),
         "fixed_score": fixed,
-        "learned_score": round(learned["score"], 1),
+        "learned_score": round(raw, 1),
         "motivation_score": round(learned["motivation"], 1),
-        "why_site": fixed_why + learned["why_site"],
+        "why_site": fixed_why + why_learned + learned["why_site"],
         "why_seller": learned["why_seller"],
     }

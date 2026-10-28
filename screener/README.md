@@ -1,14 +1,15 @@
 # Land screener
 
 Finds 5–50 acre industrial-development land in Fulton County that looks
-**buyable** (private, not built on, not developer-, government- or
-utility-owned) and **buildable** (not mostly floodplain, wetlands,
-protected land or steep ground). It then ranks what's left: closeness to
-an interstate exit, the zoning path and nearby industry raise the score,
-and so do signs of a motivated seller. Exit distance and zoning shape the
-score but don't screen anything out unless you switch on the optional
-screens in `settings.toml`. It writes a one-page brief for each top parcel.
-Free public data only: no CoStar, no paid parcel feeds, no scraping.
+**buyable** (private, not built on, not owned by a developer, government,
+utility or homeowners' / community association) and **buildable** (not
+mostly floodplain, wetlands, protected land or steep ground). It then
+ranks what's left: closeness to an interstate exit, the zoning path and
+nearby industry raise the score, and so do signs of a motivated seller.
+Exit distance and zoning shape the score but don't screen anything out
+unless you switch on the optional screens in `settings.toml`. It writes a
+one-page brief for each top parcel. Free public data only: no CoStar, no
+paid parcel feeds, no scraping.
 
 This is separate from the AutoResearch loop in the repo root (`research.py`,
 `prepare.py`, `runner.py`), which is left untouched. It needs no database
@@ -52,6 +53,12 @@ failed: they stay in the list, flagged, without the steep-ground screen.
   screen threshold (floodplain %, wetlands %, slope, usable acres, which
   owners to exclude). Optional screens: `max_exit_miles` and
   `exclude_hard_entitlement` (drop land zoned and planned residential).
+  `exclude_association_owned` drops land held by homeowners', property
+  owners', community, neighborhood, townhome, condominium or civic
+  associations: subdivision common areas, not land for sale. The owner
+  name must pair an owners' word with an association word ("... HOMEOWNERS
+  ASSN INC"), or carry HOA inside a company name ("... HOA INC"); ASSOC,
+  ASSOCIATION or POA alone don't count.
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed` or
   `pursue`. Passed and listed parcels drop out of future runs. See
   `inputs/README.md`.
@@ -136,6 +143,30 @@ python -m screener.autoresearch.evaluate --decide --new-baseline   # humans, aft
 
 To run the loop, open a fresh Claude Code session and say: "Read
 screener/autoresearch/PROGRAM.md and run 15 experiments."
+
+The evaluator refuses (prints `REFUSED: ...`, exits 3, logs nothing) when:
+
+- `rank.py` breaks the purity rules. It is checked before it is imported,
+  so a refused file never runs, and nothing is scored. It may import only
+  `__future__`, `math` and `typing`; may not use `open`, `eval`, `exec`,
+  `compile`, `getattr`, `globals`, `vars`, `str.format`, frame attributes
+  (`gi_frame`, `f_back`, `f_locals`) and the like, dunder names, private
+  names, or `global` / `nonlocal`; and its strings may not name the
+  evaluation files. This catches drift. It is not a sandbox.
+- (`--decide`) there are uncommitted changes or untracked files under
+  `screener/` (ignored files such as `cache/` don't count), the experiment
+  commit touches any file besides `screener/rank.py`, or git can't be read.
+- (`--decide`) any score is NaN or infinite, or outside 0–100.
+- (`--decide`) the evaluation changed since the best kept run (`evaluate.py`,
+  `screens.py`, `data/`), or the best kept run's record is broken:
+  `best_ranking.json` is missing, unreadable or from another run, or
+  `experiments.tsv` has kept runs, none of which is in this branch's
+  history. Deleting one of those files can't reset the bar.
+
+In each of the last cases a human re-records the baseline with
+`--decide --new-baseline` (at the best kept commit when only its record
+was lost). A new baseline starts a new chain: later experiments are
+compared with it, not with older runs.
 
 ## Tests
 
