@@ -68,7 +68,9 @@ the runner changes `experiment_log.tsv`.
 
 Claude Code may edit only `research.py`, cannot read `.env`, and gets a short
 list of allowed git and test commands; the script still checks every commit
-itself, because the check is what the ratchet relies on. Logs: `~/.land-research/autopilot.log` and one file per agent round in
+itself, because the check is what the ratchet relies on.
+
+Logs: `~/.land-research/autopilot.log` and one file per agent round in
 `~/.land-research/agent-logs/` (inside Ubuntu; from Windows Explorer,
 `\\wsl$\Ubuntu\home\<you>\`).
 
