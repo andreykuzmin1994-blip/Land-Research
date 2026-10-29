@@ -89,7 +89,8 @@ backstory.
 
 Real credentials only ever go in `.env` (gitignored). The CI workflow at
 `.github/workflows/validate-phase1.yml` re-runs `python prepare.py` against
-the live Supabase project on every push that touches `prepare.py`,
-`parameters.json`, `requirements.txt`, or `STORAGE_ARCHITECTURE.md`. It
-needs a `DATABASE_URL` repository secret — set it once in GitHub Settings
--> Secrets and variables -> Actions.
+a throwaway PostGIS service container on every push that touches
+`prepare.py`, `parameters.json`, `requirements.txt`, or
+`STORAGE_ARCHITECTURE.md`. It needs no secrets. The live Supabase project
+is checked by `make verify` / `make status` from a Codespace with the real
+`DATABASE_URL`.

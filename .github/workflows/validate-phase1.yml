@@ -8,16 +8,16 @@ name: Phase 1 schema validation
 #    parameter binding, and threshold-immutability contract that the
 #    AutoResearch metric depends on. Always actionable to a developer.
 #
-#  - live-validate: re-runs prepare.py against the live Supabase project
-#    to catch DDL regressions, parameters loader breakage, and PostGIS
-#    extension drift before they reach main. Requires the DATABASE_URL
-#    repository secret. If the secret is missing, this job fails loudly
-#    with a setup hint while offline-validate still gives signal that
-#    the metric calculation itself is healthy.
+#  - live-validate: re-runs prepare.py end to end (schema apply, PostGIS
+#    version, both metric functions) against a throwaway postgis/postgis
+#    service container -- the same image discovery-fulton.yml uses. Needs
+#    no secrets, so it gives signal on every run and from forks.
 #
-# Setup once: in the GitHub UI, Settings -> Secrets and variables ->
-# Actions -> New repository secret. Name: DATABASE_URL. Value: the full
-# Supabase Session pooler DSN with the URL-encoded password.
+# History: live-validate used to target the live Supabase project through
+# a DATABASE_URL repository secret. It failed all 25 recorded runs because
+# the secret went stale (ENOTFOUND for the tenant, reviews/17_tsv_mirror/),
+# so it never gave signal. Checking the real project for drift is now the
+# operator's `make verify` / `make status`, which use the real .env.
 
 on:
   push:
@@ -69,10 +69,28 @@ jobs:
           python -m unittest tests.test_prepare -v
 
   live-validate:
-    # Runs prepare.py against the live Supabase project. Fails loudly
-    # if the secret is not configured so the human knows to set it.
+    # Runs prepare.py against a fresh PostGIS. No secrets.
     runs-on: ubuntu-latest
     timeout-minutes: 5
+
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: lr
+          POSTGRES_PASSWORD: lr_pw
+          POSTGRES_DB: lr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lr -d lr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://lr:lr_pw@localhost:5432/lr_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -85,18 +103,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify DATABASE_URL secret is configured
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Wait for postgis service
         run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::error ::DATABASE_URL secret is not configured. Add it in Settings -> Secrets and variables -> Actions -> New repository secret. Use the Supabase Session pooler DSN with URL-encoded password. The offline-validate job still ran the FakeConnection tests, but live schema/metric drift is not being checked until this is set."
-            exit 1
-          fi
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U lr -d lr_test; then
+              echo "postgis is ready"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error ::postgis service did not become ready in 60s"
+          exit 1
 
-      - name: Run prepare.py against Supabase
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Run prepare.py against PostGIS
         run: |
           set -eo pipefail
           python prepare.py | tee prepare.log
@@ -158,9 +176,8 @@ jobs:
                   fh.write(f"- actionable_pipeline_count: **{count_i}**\n")
                   fh.write(f"- confidence_weighted_pipeline: **{confidence_f}**\n")
                   fh.write(
-                      "\nReview against the most recent main run before "
-                      "merging. A non-trivial change here on a PR that does "
-                      "NOT touch parcel data is a red flag — the metric "
-                      "calculation may have drifted.\n"
+                      "\nRun against an empty throwaway PostGIS, so both "
+                      "values should be 0. Anything else means the metric "
+                      "counts rows that do not exist.\n"
                   )
           PY
