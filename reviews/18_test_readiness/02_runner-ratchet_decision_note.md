@@ -133,6 +133,14 @@ Agent 3 found no defects that need code changes, and made no fixups.
    outer commit, so an interrupt (or any crash) mid-ingestion can drop the
    DB load of already-archived exports. Follow-up: a Tier 2
    `costar_ingest` change to archive only after commit.
+   - *Update (2026-10-29):* stale for ingestion since the txn-integrity
+     track (`686174a`). Each file now commits in its own transaction
+     before it is archived, so an interrupted ingestion loses only the
+     in-flight file's uncommitted rows, and that file stays in intake; a
+     file committed but not yet archived is re-ingested idempotently. The
+     follow-up above is done. Discovery and scoring still roll back a
+     whole interrupted cycle. Files archived before `686174a` may lack
+     their rows (`03_txn-integrity_decision_note.md`, "Past losses").
 4. **DSN deletion mid-run.** A `SystemExit` from inside evaluate or the
    purge after in-process DSN deletion still ends the loop (SR-16 class).
 5. **Step 6 is procedural.** Nothing records that a human reviewed the

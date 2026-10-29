@@ -43,6 +43,17 @@ CONFIRM_FLAG :=
 CONFIRM_FWD  :=
 endif
 
+# Aligned table of the TSV on stdin. `column` is not installed everywhere
+# (util-linux / bsdmainutils), so fall back to awk (POSIX; `help` uses it
+# too). Rendering must never fail a target: `make baseline` runs `make log`
+# after recording the row, and `orient` is the no-DB light-tier snapshot
+# (no Python, no runner import).
+TSV_ALIGN = { if command -v column >/dev/null 2>&1; then \
+	column -t -s "$$(printf '\t')"; \
+	else \
+	awk -F '\t' '{ n[NR] = NF; for (i = 1; i <= NF; i++) { c[NR, i] = $$i; if (length($$i) > w[i]) w[i] = length($$i) } } END { for (r = 1; r <= NR; r++) { s = ""; for (i = 1; i <= n[r]; i++) s = s (i > 1 ? "  " : "") sprintf("%-" w[i] "s", c[r, i]); sub(/ +$$/, "", s); print s } }'; \
+	fi; }
+
 # ---------------------------------------------------------------------
 # Help (default target)
 # ---------------------------------------------------------------------
@@ -132,14 +143,16 @@ baseline: _assert-autoresearch-branch  ## Setup Step 5: verify + loop lock, then
 	@echo "==> running baseline experiment for market=$(MARKET) (verify_setup + loop lock first)"
 	@python cli.py --json baseline --market '$(MARKET)' || { rc=$$?; \
 	  echo "==> no baseline recorded for this run (exit $$rc; see above)."; \
-	  echo "    2 = setup refused (verify_setup fail, wrong branch, or this run already"; \
-	  echo "        has a baseline -- start a new run with 'make setup TAG=...');"; \
+	  echo "    2 = setup refused (verify_setup fail; wrong branch; this run already"; \
+	  echo "        has a baseline -- start a new run with 'make setup TAG=...'; or an"; \
+	  echo "        earlier attempt's rows could not be purged -- 'make db-check', retry);"; \
 	  echo "    3 = a loop holds the lock ('make halt' first);"; \
-	  echo "    1 = the attempt crashed/timed out (row logged + purged) -- fix, then retry."; \
+	  echo "    1 = the attempt crashed/timed out (row logged; its rows are purged now,"; \
+	  echo "        or before the next attempt evaluates) -- fix, then retry."; \
 	  exit $$rc; }
 	@echo ""
 	@echo "==> baseline row appended to experiment_log.tsv:"
-	@$(MAKE) --no-print-directory log
+	@$(MAKE) --no-print-directory log || echo "==> (could not render the log; the row is recorded -- see 'python cli.py log')"
 	@echo ""
 	@echo "==> Setup Step 6: review the baseline above. Then start the loop: make loop-bg (or make daily / make loop)."
 
@@ -191,7 +204,7 @@ orient:  ## Offline orientation snapshot: contract card + branch/run/TSV state (
 	@if [ -f experiment_log.tsv ]; then \
 	  echo "==> last 5 rows of experiment_log.tsv:"; \
 	  (head -1 experiment_log.tsv; tail -5 experiment_log.tsv | grep -v '^commit\b' || true) \
-	    | column -t -s "$$(printf '\t')"; \
+	    | $(TSV_ALIGN); \
 	else \
 	  echo "==> no experiment_log.tsv yet (no baseline recorded — run 'make baseline', review it, then 'make loop')"; \
 	fi
@@ -206,7 +219,7 @@ status:  ## Print verify_setup + last 10 rows of experiment_log.tsv.
 	@if [ -f experiment_log.tsv ]; then \
 	  echo "==> last 10 rows of experiment_log.tsv:"; \
 	  (head -1 experiment_log.tsv; tail -10 experiment_log.tsv | grep -v '^commit\b' || true) \
-	    | column -t -s "$$(printf '\t')"; \
+	    | $(TSV_ALIGN); \
 	else \
 	  echo "==> experiment_log.tsv does not exist yet (run 'make baseline', review it, then 'make loop')"; \
 	fi
@@ -215,7 +228,7 @@ status:  ## Print verify_setup + last 10 rows of experiment_log.tsv.
 .PHONY: log
 log:  ## Pretty-print full experiment_log.tsv as an aligned table.
 	@if [ -f experiment_log.tsv ]; then \
-	  column -t -s "$$(printf '\t')" experiment_log.tsv; \
+	  $(TSV_ALIGN) < experiment_log.tsv; \
 	else \
 	  echo "==> no experiment_log.tsv yet"; \
 	fi
@@ -296,8 +309,7 @@ mirror-backfill:  ## Reconcile experiment_log.tsv -> Postgres mirror (idempotent
 
 .PHONY: mirror-restore
 mirror-restore:  ## Disaster recovery: rebuild a MISSING experiment_log.tsv from the mirror.
-	@python -c "import json, runner; \
-	print(json.dumps(runner.restore_experiment_log_from_mirror(), indent=2))"
+	@python cli.py --no-color mirror-restore
 
 # ---------------------------------------------------------------------
 # Higher-level recipes

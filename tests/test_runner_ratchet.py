@@ -12,7 +12,12 @@
     runner-measured after-the-fact relabel kept as the backstop;
 (e) Setup Step 6: the baseline is recorded behind verify + the loop lock,
     and ``make loop``/``loop-bg``/``daily`` only bootstrap past a missing
-    baseline on an explicit command-line ``CONFIRM=1``.
+    baseline on an explicit command-line ``CONFIRM=1``;
+(g) follow-ups (2026-10-29): a failed purge is retried whenever the DB
+    check passes, on every exit, and rebuilt from the TSV by the next
+    process; descriptions keep their run=/exp= markers inside the cap and
+    report the real discovery counts; make log/orient/status work without
+    ``column``; mirror-restore refuses in one line.
 
 Hermetic per SR-6: the TSV and the loop lock live in tempdirs, the mirror
 is off (``import tests``), and every path that could reach a database —
@@ -246,22 +251,39 @@ class TestDecisionPrecision(_TsvLoopBase):
                 self.assertEqual(decision, row["status"], row)
             replayed.append(row)
 
-    def test_truncated_description_anchors_identically_on_both_paths(self) -> None:
-        # >200 chars of description: the TSV truncation drops the trailing
-        # run= token, so that keep row no longer anchors THIS run. The
-        # in-memory anchor must see exactly the TSV row (validated), not
-        # the raw untruncated dict.
-        per_county = {f"county{i:02d}": {"inserted": i} for i in range(30)}
+    def test_long_description_keeps_its_markers_on_both_paths(self) -> None:
+        # Thirty counties of discovery counts (the real connector shape)
+        # overflow the 200-char cap. The writer's truncation used to cut
+        # the trailing run= token, so the keep stopped anchoring THIS run.
+        # The composer drops counters instead: the keep still anchors, and
+        # the in-memory anchor (the validated row) and the TSV anchor
+        # decide alike.
+        per_county = {
+            f"county{i:02d}": {
+                "aborted": False, "per_corridor": {},
+                "totals": {"discovery": i, "rejection": 0, "unmappable": 0},
+            }
+            for i in range(30)
+        }
         long_keep = _ok_result(
-            7, 1.0, sub_summaries={"discovery": {"per_county": per_county}},
+            7, 1.0, sub_summaries={
+                "discovery": {"aborted": False, "per_county": per_county},
+            },
         )
         self._point_at(Path(self.tmp.name) / "mem")
         self._seed("baseline", 5, 1.0)
         self._run_loop([long_keep, _ok_result(6, 1.0)], max_iterations=2)
         mem_rows = self._rows()
         self.assertEqual(mem_rows[1]["status"], "keep")
-        self.assertIsNone(runner._row_run_tag(mem_rows[1]))
+        description = mem_rows[1]["description"]
+        self.assertLessEqual(len(description), runner._TSV_DESCRIPTION_MAX_LEN)
+        self.assertIn("discovery_county00=0", description)
+        self.assertEqual(runner._row_run_tag(mem_rows[1]), "test")
+        tag, experiment_id = runner._parse_markers_from_description(description)
+        self.assertEqual(tag, "test")
+        self.assertIsNotNone(experiment_id)
         via_mem = mem_rows[2]["status"]
+        self.assertEqual(via_mem, "discard")  # 6 against the keep's 7
 
         self._point_at(Path(self.tmp.name) / "tsv")
         self._seed("baseline", 5, 1.0)
@@ -405,37 +427,55 @@ class TestDbCheckWithoutDsn(_TsvLoopBase):
         self.assertEqual(len(halt), 1)
         self.assertIn("infrastructure failure", halt[0]["description"])
 
-    def test_pending_purge_retry_waits_for_a_passing_verify(self) -> None:
-        # A failed purge is retried only once verify_setup passes again —
-        # never against a DB the setup check just declared unusable.
+    def test_pending_purge_retry_needs_a_usable_db_not_a_passing_verify(self) -> None:
+        # A failed purge is not retried against a DB the setup check just
+        # declared unusable, but it IS retried as soon as the DB sub-check
+        # passes -- even while verify_setup still fails overall on the
+        # harness -- and so before the next experiment is evaluated.
         self._seed("baseline", 5, 1.0)
         calls: list[str] = []
-        setup_seq = [dict(_SETUP_OK), dict(_SETUP_OK),
-                     dict(_SETUP_OK, status="fail"), dict(_SETUP_OK)]
+
+        def setup(status: str, db: str, harness: str) -> dict[str, Any]:
+            return dict(_SETUP_OK, status=status, checks={
+                "db": {"status": db}, "harness": {"status": harness},
+            })
+
+        setup_seq = [setup("ok", "ok", "ok"), setup("ok", "ok", "ok"),
+                     setup("fail", "fail", "ok"), setup("fail", "ok", "fail"),
+                     setup("ok", "ok", "ok")]
 
         def fake_verify(market):
-            calls.append("verify")
+            calls.append(f"verify:db={setup_seq[0]['checks']['db']['status']}")
             return setup_seq.pop(0)
 
         def flaky_purge(exp_id, market, decision):
-            calls.append(f"purge:{exp_id}")
-            if calls.count(f"purge:{exp_id}") == 1:
+            first = not any(c.startswith(f"purge:{exp_id}") for c in calls)
+            calls.append(f"purge:{exp_id}:{'fail' if first else 'ok'}")
+            if first:
                 raise RuntimeError("db down")
             return 0
 
         results = iter([_ok_result(4, 1.0, experiment_id="exp-a"),
                         _ok_result(6, 1.0, experiment_id="exp-b")])
+
+        def fake_evaluate(market, **kw):
+            out = next(results)
+            calls.append(f"evaluate:{out['experiment_id']}")
+            return out
+
         with mock.patch.object(runner, "verify_setup", fake_verify), \
-             mock.patch.object(runner, "evaluate",
-                               side_effect=lambda m, **kw: next(results)), \
+             mock.patch.object(runner, "evaluate", fake_evaluate), \
              mock.patch.object(runner, "_purge_experiment_scores", flaky_purge), \
              mock.patch.object(runner, "_git_head_commit", return_value="abcdef0"), \
              mock.patch.object(runner.time, "sleep"):
-            runner.experiment_loop("atlanta", max_iterations=2)
-        self.assertEqual(
-            calls,
-            ["verify", "verify", "purge:exp-a", "verify", "verify", "purge:exp-a"],
-        )
+            summary = runner.experiment_loop("atlanta", max_iterations=2)
+        self.assertEqual(calls, [
+            "verify:db=ok", "verify:db=ok", "evaluate:exp-a", "purge:exp-a:fail",
+            "verify:db=fail",                       # DB unusable: no retry
+            "verify:db=ok", "purge:exp-a:ok",       # harness down, DB ok: retried
+            "verify:db=ok", "evaluate:exp-b",       # only then the next experiment
+        ])
+        self.assertEqual(summary["unpurged_experiment_ids"], [])
 
 
 # ===========================================================================
@@ -1013,6 +1053,837 @@ class TestMakefileDryRun(unittest.TestCase):
                 unconfirmed = self._dry("loop-bg", env_extra=env)
                 self.assertNotIn("CONFIRM", self._line(spawn, unconfirmed))
                 self.assertIn('[ -z "" ]', unconfirmed)  # pre-flight runs
+
+
+# ===========================================================================
+# (g) Runner follow-ups: durable pending purges, the description budget, ops
+# ===========================================================================
+def _xid(n: int) -> str:
+    """A real-shaped experiment id (``exp-<UTC stamp>-<6 hex>``)."""
+    return f"exp-20261029T{n:06d}Z-{n:06x}"
+
+
+def _setup(status: str = "ok", db: str = "ok", harness: str = "ok") -> dict[str, Any]:
+    """verify_setup result with explicit DB and harness sub-checks."""
+    return dict(_SETUP_OK, status=status, checks={
+        "db": {"status": db}, "harness": {"status": harness},
+    })
+
+
+_HARNESS_DOWN = ("fail", "ok", "fail")   # e.g. a Fulton GIS outage; DB fine
+_DB_DOWN = ("fail", "fail", "ok")
+
+# A realistic psycopg DB-blip crash text (the row whose purge is most likely
+# to fail too).
+_PSYCOPG_BLIP = (
+    "OperationalError: consuming input failed: server closed the connection "
+    "unexpectedly\n\tThis probably means the server terminated abnormally\n\t"
+    "before or while processing the request."
+)
+
+
+class _ResidueCursor:
+    def __init__(self, db: "_ResidueDb") -> None:
+        self.db = db
+        self.rows: list[tuple[str]] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql, params=None):
+        self.db.executes.append((sql, params))
+        if sql == getattr(runner, "_SQL_SELECT_EXPERIMENT_RESIDUE", None):
+            if self.db.read_fails:
+                raise RuntimeError("residue read failed")
+            tag, ids = params
+            self.rows = [(i,) for i in ids if tag == "test" and i in self.db.residue]
+
+    def fetchall(self):
+        return list(self.rows)
+
+
+class _ResidueDb:
+    """Stands in for ``prepare.get_connection``: answers the residue read
+    (the purge itself is patched), records every connection, and can play
+    a vanished DSN (prepare's ``SystemExit``)."""
+
+    def __init__(self) -> None:
+        self.residue: set[str] = set()
+        self.read_fails = False
+        self.no_dsn = False
+        self.executes: list[tuple[str, Any]] = []
+        self.connects = 0
+
+    @contextmanager
+    def connection(self):
+        self.connects += 1
+        if self.no_dsn:
+            raise SystemExit(prepare.EXIT_DATABASE_URL_MISSING)
+        yield self
+
+    def cursor(self):
+        return _ResidueCursor(self)
+
+    def residue_reads(self) -> list[Any]:
+        sql = getattr(runner, "_SQL_SELECT_EXPERIMENT_RESIDUE", None)
+        return [p for s, p in self.executes if s == sql]
+
+
+class _FollowupBase(_TsvLoopBase):
+    """Loop harness that records one event stream: verify, evaluate:<id>,
+    purge:<id>:<outcome>, halt. ``self.plan`` scripts purge outcomes in
+    call order (default ok): fail = RuntimeError (a DB blip), real = the
+    REAL purge against ``self.db``."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.events: list[str] = []
+        self.plan: list[str] = []
+        self.db = _ResidueDb()
+        self._real_purge = runner._purge_experiment_scores
+        for target, attr, value, create in (
+            (runner, "_SETTLED_EXPERIMENT_IDS", set(), True),
+            (prepare, "get_connection", self.db.connection, False),
+            (runner.time, "sleep", lambda seconds: None, False),
+        ):
+            patcher = mock.patch.object(target, attr, value, create=create)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _purge(self, experiment_id: str, market: str, decision: str) -> int:
+        outcome = self.plan.pop(0) if self.plan else "ok"
+        self.events.append(f"purge:{experiment_id}:{outcome}")
+        if outcome == "fail":
+            raise RuntimeError("server closed the connection unexpectedly")
+        if outcome == "real":
+            return self._real_purge(experiment_id, market, decision)
+        had = experiment_id in self.db.residue
+        self.db.residue.discard(experiment_id)
+        return 3 if had else 0
+
+    @contextmanager
+    def _patched(self, results=(), setups=(), ids=None, git=None):
+        results = list(results)
+        setups = [_setup(*s) if isinstance(s, tuple) else s for s in setups]
+        id_iter = iter(ids or [_xid(n) for n in range(1, 200)])
+
+        def fake_verify(market):
+            self.events.append("verify")
+            return setups.pop(0) if setups else _setup()
+
+        def fake_evaluate(market, **kw):
+            self.events.append(f"evaluate:{kw.get('experiment_id')}")
+            out = results.pop(0)
+            if callable(out):
+                out = out(kw)
+            out = dict(out)
+            out.setdefault("experiment_id", kw.get("experiment_id"))
+            return out
+
+        real_halt = runner._record_halt_row
+
+        def halt(*args, **kwargs):
+            self.events.append("halt")
+            return real_halt(*args, **kwargs)
+
+        git_patch = (
+            mock.patch.object(runner, "_git_head_commit", side_effect=git)
+            if git is not None
+            else mock.patch.object(runner, "_git_head_commit", return_value="abcdef0")
+        )
+        with mock.patch.object(runner, "verify_setup", fake_verify), \
+             mock.patch.object(runner, "evaluate", fake_evaluate), \
+             mock.patch.object(runner, "_purge_experiment_scores", self._purge), \
+             mock.patch.object(runner, "_make_experiment_id", lambda: next(id_iter)), \
+             mock.patch.object(runner, "_record_halt_row", halt), \
+             git_patch:
+            yield
+
+    def _loop(self, results=(), *, max_iterations=5, confirmed=False, **kw) -> dict:
+        with self._patched(results, **kw):
+            return runner.experiment_loop(
+                "atlanta", max_iterations=max_iterations, confirmed=confirmed,
+            )
+
+    def _evaluated(self) -> list[str]:
+        return [e for e in self.events if e.startswith("evaluate:")]
+
+    def _purges(self) -> list[str]:
+        return [e for e in self.events if e.startswith("purge:")]
+
+
+A, B = _xid(1), _xid(2)
+_DISCARD = _ok_result(4, 1.0)                 # below the seeded baseline (5)
+_KEEP = _ok_result(6, 1.0)
+_CRASH = dict(_ok_result(0, 0.0), status="crash", error="boom")
+
+
+class TestPendingPurgeDurability(_FollowupBase):
+    """(a) A failed purge is retried whenever the DB is usable, once more
+    on every exit, and rebuilt from the TSV by the next process."""
+
+    def test_retry_runs_during_a_harness_only_failure_streak(self) -> None:
+        # The verified finding: A's purge hits a DB blip; verify_setup then
+        # fails 3x on the harness while the DB is fine. The retry used to
+        # wait for an overall pass, so the breaker halted and A's rows
+        # stayed (a later experiment was credited with them).
+        self._seed("baseline", 5, 1.0)
+        self.db.residue.add(A)
+        self.plan = ["fail"]
+        summary = self._loop(
+            [_DISCARD], setups=[_setup(), _setup()] + [_HARNESS_DOWN] * 3,
+        )
+        self.assertEqual(self.events, [
+            "verify", "verify", f"evaluate:{A}", f"purge:{A}:fail",
+            "verify", f"purge:{A}:ok",              # harness down, DB ok
+            "verify", "verify", "halt",
+        ])
+        self.assertEqual(self.db.residue, set())
+        last = self._rows()[-1]
+        self.assertEqual(last["status"], "halt")
+        self.assertIn("infrastructure failure", last["description"])
+        self.assertEqual(summary.get("unpurged_experiment_ids"), [])
+
+    def test_without_a_dsn_nothing_claims_purged(self) -> None:
+        # DB down x3 with the DSN gone: no retry during the streak; the exit
+        # retry (after the halt row) meets prepare's SystemExit, which ends
+        # the pass without killing the loop or claiming a purge.
+        self._seed("baseline", 5, 1.0)
+        self.plan = ["fail", "real"]
+        self.db.no_dsn = True
+        with self.assertLogs("research", level="INFO") as logs:
+            summary = self._loop(
+                [_DISCARD], setups=[_setup(), _setup()] + [_DB_DOWN] * 3,
+            )
+        self.assertEqual(self.events, [
+            "verify", "verify", f"evaluate:{A}", f"purge:{A}:fail",
+            "verify", "verify", "verify", "halt", f"purge:{A}:real",
+        ])
+        self.assertEqual(summary["unpurged_experiment_ids"], [A])
+        messages = [r.getMessage() for r in logs.records]
+        errors = [r.getMessage() for r in logs.records if r.levelname == "ERROR"]
+        self.assertTrue(any(A in m and "NOT purged" in m for m in errors), errors)
+        self.assertTrue(any(A in m and "could not be purged" in m for m in errors), errors)
+        self.assertFalse([m for m in messages if m.startswith("purged ")], messages)
+
+    def test_queue_survives_the_process(self) -> None:
+        # `make loop MAX=1` restarts the process every experiment, so the
+        # in-memory queue never crossed one boundary; the TSV row does.
+        self._seed("baseline", 5, 1.0)
+        self.db.residue.add(A)
+        self.plan = ["fail", "fail"]
+        first = self._loop([_DISCARD], max_iterations=1, ids=[A])
+        self.assertEqual(first["unpurged_experiment_ids"], [A])
+        self.assertTrue(self._rows()[-1]["description"].endswith(f"exp={A}"))
+
+        self.events.clear()
+        second = self._loop([_KEEP], max_iterations=1, ids=[B])
+        self.assertEqual(self.events, [
+            "verify", f"purge:{A}:ok", "verify", f"evaluate:{B}",
+        ])
+        self.assertEqual(self.db.residue_reads(), [("test", [A])])
+        self.assertEqual(second["unpurged_experiment_ids"], [])
+
+    def test_long_db_blip_crash_row_is_rebuilt_into_the_queue(self) -> None:
+        # (a) needs (b): the crash row of a DB blip carries the longest
+        # error text, and its purge is the one most likely to fail too.
+        self._seed("baseline", 5, 1.0)
+        self.db.residue.add(A)
+        self.plan = ["fail", "fail"]
+        crash = dict(_ok_result(0, 0.0), status="crash", error=_PSYCOPG_BLIP * 2)
+        self._loop([crash], max_iterations=1, ids=[A])
+        row = self._rows()[-1]
+        self.assertEqual(row["status"], "crash")
+        self.assertLessEqual(len(row["description"]), runner._TSV_DESCRIPTION_MAX_LEN)
+        self.assertEqual(
+            runner._parse_markers_from_description(row["description"]), ("test", A),
+        )
+        self.events.clear()
+        self._loop([_KEEP], max_iterations=1, ids=[B])
+        self.assertEqual(self._purges(), [f"purge:{A}:ok"])
+        self.assertEqual(self.db.residue, set())
+
+    def test_rebuild_filters(self) -> None:
+        X = [_xid(n) for n in range(100, 120)]
+        spec = [
+            ("baseline", f"baseline | market=atlanta | run=test | exp={X[0]}"),
+            ("discard", f"market=atlanta | scored=1 | run=test | exp={X[1]}"),
+            ("crash", f"market=atlanta | OperationalError: server closed | run=test | exp={X[2]}"),
+            ("timeout", f"market=atlanta | budget_exceeded | run=test | exp={X[3]}"),
+            ("crash", f"baseline | market=atlanta | run=test | exp={X[4]}"),
+            ("discard", f"market=atlanta | run=old | exp={X[5]}"),            # other run
+            ("discard", "market=atlanta | scored=1"),                          # legacy
+            ("keep", f"market=atlanta | run=test | exp={X[6]}"),
+            ("halt", "halt | market=atlanta | infrastructure failure x3"),
+            ("discard", "market=atlanta | run=test | exp=e1"),                 # malformed
+            ("discard", "market=atlanta | run=test | exp=exp-20261029T0000…"),  # truncated
+            ("crash", f"market=atlanta | boom run=test | exp={X[7]} | run=old | exp={X[8]}"),
+            ("crash", f"market=atlanta | ValueError run=test | exp={X[9]} | scored=2 | run=te…"),
+            ("discard", f"market=atlanta | run=test | exp={X[6]}"),           # on the keep row
+            ("discard", f"market=atlanta | run=test | exp={X[1]}"),           # duplicate
+            ("discard", f"market=atlanta | run=test2 | exp={X[10]}"),
+            ("discard", f"market=atlanta | run=tes | exp={X[11]}"),
+            ("discard", f"market=atlanta | run=test | exp={X[12]} | x"),      # not the tail
+            ("timeout", f"market=atlanta | run=test | exp={X[13]}"),          # settled here
+            ("discard", f"market=atlanta | run=test | exp={X[0]}"),           # the baseline's id
+        ]
+        for status, description in spec:
+            self._seed(status, 0, 0.0, description)
+        rows = self._rows()          # through the real TSV writer and reader
+        with mock.patch.object(runner, "_SETTLED_EXPERIMENT_IDS", {X[13]}, create=True), \
+             self.assertLogs("research", level="WARNING") as logs:
+            pending = runner._pending_purges_from_log(rows, "test")
+        self.assertEqual(list(pending), [X[1], X[2], X[3], X[4]])
+        self.assertEqual([p.decision for p in pending.values()],
+                         ["discard", "crash", "timeout", "crash"])
+        self.assertEqual([p.position for p in pending.values()], [1, 2, 3, 4])
+        self.assertFalse(any(p.confirmed for p in pending.values()))
+        self.assertTrue(any("parseable" in m for m in logs.output), logs.output)
+        # Run-scoped: the forged earlier token (X7) is never a candidate.
+        self.assertEqual(list(runner._pending_purges_from_log(rows, "old")),
+                         [X[5], X[8]])
+
+    # --- every exit gets one more attempt, after its halt row -------------
+    def _exit_case(self, results, **kw) -> dict:
+        self._seed("baseline", 5, 1.0)
+        self.db.residue.add(A)
+        self.plan = ["fail", "ok"]
+        return self._loop(results, **kw)
+
+    def test_halt_sentinel_exit(self) -> None:
+        self.addCleanup(os.environ.pop, runner._HALT_ENV_VAR, None)
+
+        def discard_then_halt(kw):
+            os.environ[runner._HALT_ENV_VAR] = "1"
+            return _DISCARD
+
+        summary = self._exit_case([discard_then_halt])
+        self.assertEqual(self.events[-3:], [f"purge:{A}:fail", "halt", f"purge:{A}:ok"])
+        self.assertEqual(summary["unpurged_experiment_ids"], [])
+
+    def test_max_iterations_exit(self) -> None:
+        summary = self._exit_case([_DISCARD], max_iterations=1)
+        self.assertEqual(self.events, [
+            "verify", "verify", f"evaluate:{A}", f"purge:{A}:fail", f"purge:{A}:ok",
+        ])
+        self.assertEqual(summary["unpurged_experiment_ids"], [])
+
+    def test_seven_day_exit(self) -> None:
+        def discard_then_expire(kw):
+            runner._LONG_RUN_GRACEFUL_EXIT_SECONDS = -1  # restored by the patch
+            return _DISCARD
+
+        with mock.patch.object(runner, "_LONG_RUN_GRACEFUL_EXIT_SECONDS", 3600):
+            self._exit_case([discard_then_expire])
+        self.assertEqual(self.events[-3:], [f"purge:{A}:fail", "halt", f"purge:{A}:ok"])
+        self.assertIn("7-day", self._rows()[-1]["description"])
+
+    def test_terminal_breaker_exit(self) -> None:
+        with mock.patch.object(runner, "_TERMINAL_STATUS_BREAKER", 1):
+            self._exit_case([_CRASH])
+        self.assertEqual(self.events, [
+            "verify", "verify", f"evaluate:{A}", f"purge:{A}:fail", "halt",
+            f"purge:{A}:ok",
+        ])
+        self.assertEqual([r["status"] for r in self._rows()], ["baseline", "halt", "crash"])
+
+    def test_infra_halt_on_a_failing_db(self) -> None:
+        self._exit_case([_DISCARD], setups=[_setup(), _setup()] + [_DB_DOWN] * 3)
+        self.assertEqual(self.events, [
+            "verify", "verify", f"evaluate:{A}", f"purge:{A}:fail",
+            "verify", "verify", "verify",             # DB unusable: no retry
+            "halt", f"purge:{A}:ok",
+        ])
+
+    def test_exception_exit_retries_without_masking_the_exception(self) -> None:
+        # The strict git lookup runs after the purge and before the TSV
+        # append: the id is in neither the TSV nor (formerly) any queue.
+        for second in ("ok", "fail"):
+            with self.subTest(exit_retry=second):
+                self._point_at(Path(self.tmp.name) / f"exc-{second}")
+                self._seed("baseline", 5, 1.0)
+                self.events.clear()
+                self.plan = ["fail", second]
+                with self.assertLogs("research", level="ERROR") as logs, \
+                     self.assertRaises(runner.SetupError) as cm:
+                    self._loop([_DISCARD], ids=[A],
+                               git=runner.SetupError("git rev-parse HEAD failed"))
+                self.assertIn("git rev-parse", str(cm.exception))
+                self.assertEqual(self._purges(), [f"purge:{A}:fail", f"purge:{A}:{second}"])
+                unpurged = any(A in m and "could not be purged" in m for m in logs.output)
+                self.assertEqual(unpurged, second == "fail")
+
+    def test_keyboard_interrupt_propagates_without_database_work(self) -> None:
+        self._seed("baseline", 5, 1.0)
+        self.plan = ["fail", "fail"]
+
+        def interrupted(kw):
+            raise KeyboardInterrupt
+
+        with self.assertLogs("research", level="ERROR") as logs, \
+             self.assertRaises(KeyboardInterrupt):
+            self._loop([_DISCARD, interrupted])
+        self.assertEqual(self.events, [
+            "verify", "verify", f"evaluate:{A}", f"purge:{A}:fail",
+            "verify", f"purge:{A}:fail", f"evaluate:{B}",   # no exit retry
+        ])
+        self.assertTrue(any(A in m and "interrupted" in m for m in logs.output))
+
+    # --- no baseline over unpurged rows; the loop otherwise goes on -------
+    def test_no_iteration_becomes_the_baseline_over_unpurged_rows(self) -> None:
+        # A crashed bootstrap whose purge keeps failing: the next ok result
+        # would be recorded as the baseline over its rows, so nothing is
+        # evaluated and the infra breaker halts.
+        self.db.residue.add(A)
+        self.plan = ["fail"] * 10
+        with self.assertLogs("research", level="ERROR") as logs:
+            summary = self._loop([_CRASH], confirmed=True)
+        self.assertEqual(self._evaluated(), [f"evaluate:{A}"])
+        self.assertEqual([r["status"] for r in self._rows()], ["crash", "halt"])
+        self.assertEqual(summary["unpurged_experiment_ids"], [A])
+        self.assertTrue(any(A in m and "no baseline yet" in m for m in logs.output))
+
+    def test_bootstrap_refused_while_an_earlier_attempt_is_unpurged(self) -> None:
+        self._seed("crash", 0, 0.0, f"baseline | market=atlanta | run=test | exp={A}")
+        self.db.residue.add(A)
+        self.plan = ["fail"]
+        with self.assertRaises(runner.SetupError) as cm:
+            self._loop([_ok_result(5, 1.0)], confirmed=True, ids=[B])
+        self.assertIn(A, str(cm.exception))
+        self.assertEqual(self._evaluated(), [])
+        self.assertEqual(len(self._rows()), 1)
+
+    def test_bootstrap_purges_an_earlier_attempt_first(self) -> None:
+        self._seed("crash", 0, 0.0, f"baseline | market=atlanta | run=test | exp={A}")
+        self.db.residue.add(A)
+        self._loop([_ok_result(5, 1.0)], max_iterations=0, confirmed=True, ids=[B])
+        self.assertEqual(self.events, ["verify", f"purge:{A}:ok", f"evaluate:{B}"])
+        self.assertEqual([r["status"] for r in self._rows()], ["crash", "baseline"])
+
+    def test_loop_with_a_baseline_keeps_going_loudly(self) -> None:
+        # Accepted residual (NEVER STOP, pinned by TestLoopPurgeWiring): with
+        # the run's baseline recorded, a purge that keeps failing while the
+        # DB check passes does not stop the loop; the ERROR says the next
+        # metric includes the unpurged rows.
+        self._seed("baseline", 5, 1.0)
+        self.plan = ["fail"] * 5
+        with self.assertLogs("research", level="ERROR") as logs:
+            summary = self._loop([_DISCARD, _KEEP], max_iterations=2)
+        self.assertEqual(summary["iterations"], 2)
+        self.assertEqual(summary["unpurged_experiment_ids"], [A])
+        self.assertTrue(any(A in m and "its metric includes them" in m
+                            for m in logs.output))
+
+    # --- the gated baseline (make baseline) --------------------------------
+    def _gated(self, ids) -> dict:
+        with self._patched([_ok_result(5, 1.0)], ids=ids):
+            return runner.run_gated_baseline("atlanta")
+
+    def test_gated_baseline_purges_an_earlier_attempt_first(self) -> None:
+        self._seed("crash", 0, 0.0, f"baseline | market=atlanta | run=test | exp={A}")
+        self.db.residue.add(A)
+        row = self._gated([B])
+        self.assertEqual(self.events, ["verify", f"purge:{A}:ok", f"evaluate:{B}"])
+        self.assertEqual(row["status"], "baseline")
+        self.assertEqual(row["description"], f"baseline | market=atlanta | run=test | exp={B}")
+
+    def test_gated_baseline_refuses_over_rows_it_cannot_purge(self) -> None:
+        self._seed("crash", 0, 0.0, f"baseline | market=atlanta | run=test | exp={A}")
+        self.db.residue.add(A)
+        self.plan = ["fail"]
+        with self.assertRaises(runner.SetupError) as cm:
+            self._gated([B])
+        self.assertIn(A, str(cm.exception))
+        self.assertEqual(self._evaluated(), [])
+        self.assertEqual(len(self._rows()), 1)
+
+    def test_gated_baseline_skips_a_clean_attempt(self) -> None:
+        self._seed("crash", 0, 0.0, f"baseline | market=atlanta | run=test | exp={A}")
+        self._gated([B])
+        self.assertEqual(self.events, ["verify", f"evaluate:{B}"])
+        self.assertEqual(self.db.residue_reads(), [("test", [A])])
+
+    def test_operator_text_no_longer_claims_purged(self) -> None:
+        self.assertNotIn("row logged + purged", _recipe("baseline"))
+        cli_src = (_REPO_ROOT / "cli.py").read_text(encoding="utf-8")
+        self.assertNotIn("logged (and purged)", cli_src)
+
+    # --- one read per start; purge only what is left ----------------------
+    def _seed_discards(self, ids) -> None:
+        self._seed("baseline", 5, 1.0)
+        for experiment_id in ids:
+            self._seed("discard", 4, 1.0,
+                       f"market=atlanta | scored=1 | run=test | exp={experiment_id}")
+
+    def test_loop_start_reads_once_and_writes_nothing_for_clean_ids(self) -> None:
+        ids = [_xid(n) for n in range(300, 350)]
+        self._seed_discards(ids)
+        summary = self._loop(max_iterations=0)
+        self.assertEqual(self.db.connects, 1)
+        self.assertEqual(self.db.executes[0][0], runner._RESIDUE_STATEMENT_TIMEOUT)
+        self.assertEqual(self.db.residue_reads(), [("test", ids)])
+        self.assertEqual(self._purges(), [])
+        self.assertEqual(summary["unpurged_experiment_ids"], [])
+        self._loop(max_iterations=0)        # settled: not even re-read
+        self.assertEqual(self.db.connects, 1)
+
+    def test_only_ids_with_leftover_rows_are_purged(self) -> None:
+        ids = [_xid(n) for n in range(300, 350)]
+        self._seed_discards(ids)
+        self.db.residue.update({ids[39], ids[9]})
+        summary = self._loop(max_iterations=0)
+        self.assertEqual(self._purges(), [f"purge:{ids[9]}:ok", f"purge:{ids[39]}:ok"])
+        self.assertEqual(summary["unpurged_experiment_ids"], [])
+
+    def test_failed_residue_read_keeps_every_candidate_pending(self) -> None:
+        ids = [_xid(n) for n in range(300, 303)]
+        self._seed_discards(ids)
+        self.db.residue.update(ids)
+        self.db.read_fails = True
+        summary = self._loop(max_iterations=0)
+        self.assertEqual(self._purges(), [])
+        self.assertEqual(summary["unpurged_experiment_ids"], ids)
+        self.assertEqual(self.db.connects, 2)       # loop start + exit retry
+
+    def test_late_purge_under_an_anchor_is_an_error(self) -> None:
+        self._seed("baseline", 5, 1.0)
+        self._seed("discard", 4, 1.0, f"market=atlanta | run=test | exp={A}")
+        self._seed("keep", 6, 1.0, f"market=atlanta | run=test | exp={B}")
+        self.db.residue.add(A)
+        with self.assertLogs("research", level="ERROR") as logs:
+            self._loop(max_iterations=0)
+        self.assertEqual(self._purges(), [f"purge:{A}:ok"])
+        self.assertTrue(any("late purge" in m and A in m for m in logs.output))
+
+    def test_cli_loop_warns_about_unpurged_ids(self) -> None:
+        import cli
+        ns = mock.Mock(market="atlanta", max=1, confirmed=False, json=False)
+        out = io.StringIO()
+        with mock.patch.object(runner, "experiment_loop",
+                               return_value={"iterations": 1,
+                                             "unpurged_experiment_ids": [A]}), \
+             redirect_stdout(out):
+            rc = cli.cmd_loop(ns)
+        self.assertEqual(rc, 0)
+        self.assertIn(A, out.getvalue())
+        self.assertIn("could not be purged", out.getvalue())
+
+
+class TestDescriptionBudget(_FollowupBase):
+    """(b) Real discovery counts, a formatter that never raises, and the
+    trailing run=/exp= markers always inside the 200-char cap."""
+
+    def _fulton(self, discovery: int = 7) -> dict[str, Any]:
+        """The shape research._discover_fulton returns."""
+        counts = {"discovery": discovery, "rejection": 2, "unmappable": 1}
+        return {"aborted": False,
+                "per_corridor": {"south_fulton_campbellton": dict(counts)},
+                "totals": dict(counts)}
+
+    def _describe(self, discovery=None, scoring=None, **extra) -> str:
+        sub = {}
+        if discovery is not None:
+            sub["discovery"] = discovery
+        if scoring is not None:
+            sub["scoring"] = scoring
+        result = _ok_result(5, 1.0, experiment_id=A, sub_summaries=sub)
+        result.update(extra)
+        return runner._format_loop_description(result, "test")
+
+    def test_real_fulton_shape_reports_its_discovery_total(self) -> None:
+        discovery = {
+            "cycle_id": "disco-fulton-x", "market": "atlanta", "counties": ["fulton"],
+            "aborted": False, "abort_reason": None, "harness_status": "healthy",
+            "per_county": {"fulton": self._fulton(1075)},
+        }
+        scoring = {"aborted": False, "counts": {"scored": 3, "missing": 0, "error": 0}}
+        self.assertEqual(
+            self._describe(discovery, scoring),
+            f"market=atlanta | discovery_fulton=1075 | scored=3 | run=test | exp={A}",
+        )
+
+    def test_aborted_or_skipped_county_prints_no_count(self) -> None:
+        drift = {"aborted": True, "reason": "field_mapping_drift", "missing": ["PARCELID"]}
+        for discovery in (
+            {"aborted": False, "per_county": {"fulton": drift}},
+            {"aborted": False, "per_county": {"fulton": {"skipped": True,
+                                                          "reason": "no_connector"}}},
+            {"aborted": True, "abort_reason": "harness_failing",
+             "per_county": {"fulton": {"skipped": True, "reason": "harness_failing"}}},
+            {"aborted": True, "abort_reason": "cycle_id_collision",
+             "per_county": {"fulton": self._fulton()}},
+        ):
+            with self.subTest(discovery=discovery):
+                self.assertEqual(self._describe(discovery),
+                                 f"market=atlanta | run=test | exp={A}")
+
+    def test_formatter_never_raises_and_keeps_the_tail(self) -> None:
+        def county(info):
+            return {"discovery": {"aborted": False, "per_county": info}}
+
+        garbage = [
+            None, [], "x", 5,
+            {"discovery": 5}, {"discovery": [1]}, {"discovery": {"per_county": 5}},
+            county({"fulton": 5}), county({"fulton": None}), county({"fulton": "x"}),
+            county({"fulton": {"totals": 5}}),
+            county({"fulton": {"totals": {"discovery": "7"}}}),
+            county({"fulton": {"totals": {"discovery": True}}}),
+            county({"fulton": {"totals": {"discovery": -1}}}),
+            county({"x run=evil": {"totals": {"discovery": 3}}}),
+            county({"fulton | exp=x": {"totals": {"discovery": 3}}}),
+            county({7: {"totals": {"discovery": 3}}}),
+            {"scoring": 5}, {"scoring": {"counts": 5}},
+            {"scoring": {"counts": {"scored": "7"}}},
+            {"scoring": {"counts": {"scored": None}}},
+        ]
+        for sub in garbage:
+            with self.subTest(sub=sub):
+                result = {"market": "atlanta", "status": "crash", "error": "boom",
+                          "sub_summaries": sub, "experiment_id": A,
+                          "stamp_audit_violations": "3"}
+                description = runner._format_loop_description(result, "test")
+                self.assertEqual(description, f"market=atlanta | boom | run=test | exp={A}")
+        self.assertEqual(runner._format_loop_description(None, "test"),
+                         "market=? | run=test")
+
+    def test_markers_survive_every_length(self) -> None:
+        tags = ["t", "atl-2026-10-29", "atl-2026-10-29-" + "x" * 25,
+                "a" * 64]  # the longest tag the run entry points accept
+        filler = (_PSYCOPG_BLIP + " ") * 5
+        errors = [filler[:n] for n in (0, 1, 23, 24, 25, 80, 150, 199, 200, 201, 250, 600)]
+        cases = []
+        n = 0
+        for tag in tags:
+            for error in errors:
+                for counties in (0, 1, 30):
+                    for violations in (0, 7):
+                        n += 1
+                        per_county = {f"county{i:02d}": self._fulton(i) for i in range(counties)}
+                        result = {
+                            "market": "atlanta",
+                            "status": "crash" if error else "ok",
+                            "error": error or None,
+                            "sub_summaries": {
+                                "discovery": {"aborted": False, "per_county": per_county},
+                                "scoring": {"aborted": False, "counts": {"scored": 12}},
+                            },
+                            "stamp_audit_violations": violations,
+                            "experiment_id": _xid(n),
+                        }
+                        description = runner._format_loop_description(result, tag)
+                        cases.append((tag, error, violations, _xid(n), description))
+                        runner.append_experiment_log_row({
+                            "commit": "abcdef0", "metric": 0, "confidence": 0.0,
+                            "status": "crash" if error else "discard",
+                            "description": description,
+                        }, path=self.tsv_path)
+        rows = self._rows()
+        self.assertEqual(len(rows), len(cases))
+        for row, (tag, error, violations, experiment_id, description) in zip(rows, cases):
+            with self.subTest(tag=tag, error=len(error), violations=violations,
+                              description=description):
+                self.assertLessEqual(len(description), runner._TSV_DESCRIPTION_MAX_LEN)
+                self.assertEqual(row["description"], description)  # writer did not cut
+                self.assertEqual(runner._row_run_tag(row), tag)
+                self.assertEqual(runner._parse_markers_from_description(row["description"]),
+                                 (tag, experiment_id))
+                self.assertEqual("stamp_audit_violations=7" in description, bool(violations))
+                if error:
+                    self.assertIn(" ".join(error.split())[:20], description)
+
+    def test_realistic_db_blip_row_keeps_its_markers(self) -> None:
+        # Unbudgeted, this row was 250 chars: the cap cut both markers.
+        result = dict(_ok_result(0, 0.0), status="crash", error=_PSYCOPG_BLIP,
+                      experiment_id=A, sub_summaries={
+                          "scoring": {"aborted": False, "counts": {"scored": 0}},
+                      })
+        naive = " | ".join(["market=atlanta", " ".join(_PSYCOPG_BLIP.split()),
+                            "scored=0", "run=atl-2026-10-29", f"exp={A}"])
+        self.assertGreater(len(naive), runner._TSV_DESCRIPTION_MAX_LEN)
+        description = runner._format_loop_description(result, "atl-2026-10-29")
+        self.assertLessEqual(len(description), runner._TSV_DESCRIPTION_MAX_LEN)
+        self.assertTrue(description.startswith("market=atlanta | OperationalError: "))
+        self.assertTrue(description.endswith(f"… | scored=0 | run=atl-2026-10-29 | exp={A}"))
+
+    def test_baseline_description_is_budgeted_too(self) -> None:
+        description = runner._compose_description(
+            ["baseline", "market=" + "m" * 300], ["run=test", f"exp={A}"],
+        )
+        self.assertLessEqual(len(description), runner._TSV_DESCRIPTION_MAX_LEN)
+        self.assertTrue(description.startswith("baseline | market=mmm"))
+        self.assertTrue(description.endswith(f"… | run=test | exp={A}"))
+
+    def test_sanitize_unchanged_and_idempotent(self) -> None:
+        # The mirror stores the sanitized text and backfill dedups on exact
+        # values (SR-13): the writer's sanitizer must not change.
+        ab = "ab " * 100
+        corpus = {
+            "": "",
+            "plain": "plain",
+            "a\tb\nc\r\nd\x00e": "a b c d e",
+            "  lead   and  trail  ": "lead and trail",
+            "x" * 200: "x" * 200,
+            "x" * 201: "x" * 199 + "…",
+            ab: ab.strip()[:199].rstrip() + "…",
+            f"market=atlanta | run=test | exp={A}": f"market=atlanta | run=test | exp={A}",
+        }
+        for raw, expected in corpus.items():
+            with self.subTest(raw=raw[:30]):
+                self.assertEqual(runner._sanitize_description(raw), expected)
+                self.assertEqual(runner._sanitize_description(expected), expected)
+                if len(raw) <= runner._TSV_DESCRIPTION_MAX_LEN:
+                    self.assertEqual(runner._description_piece(raw), expected)
+        self.assertEqual(runner._sanitize_description(None), "")
+
+    def test_overlong_run_tag_is_refused(self) -> None:
+        self.assertEqual(runner._MAX_RUN_TAG_LEN, 64)
+        tag = "a" * (runner._MAX_RUN_TAG_LEN + 1)
+        setup = dict(_SETUP_OK, tag=tag, branch=f"autoresearch/{tag}")
+        with mock.patch.object(runner, "verify_setup", return_value=setup), \
+             mock.patch.object(runner, "evaluate",
+                               side_effect=AssertionError("must not evaluate")):
+            with self.assertRaises(runner.SetupError):
+                runner.experiment_loop("atlanta", max_iterations=0, confirmed=True)
+            with self.assertRaises(runner.SetupError):
+                runner.run_gated_baseline("atlanta")
+        self.assertFalse(self.tsv_path.exists())
+
+
+@unittest.skipUnless(shutil.which("make"), "GNU make required")
+class TestOpsTooling(unittest.TestCase):
+    """(d) make log/orient/status render without `column`; a recorded
+    baseline exits 0. (e) mirror-restore refuses in one line."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cwd = Path(self.tmp.name) / "work"
+        self.cwd.mkdir()
+        self.bin = Path(self.tmp.name) / "bin"   # the only PATH entry
+        self.bin.mkdir()
+        # A byte-identical copy, so the recipes' own `$(MAKE) log` finds it.
+        shutil.copyfile(_MAKEFILE, self.cwd / "Makefile")
+        for tool in ("git", "head", "tail", "grep", "awk", "date", "cat"):
+            found = shutil.which(tool)
+            if found is None:
+                self.skipTest(f"{tool} not installed")
+            (self.bin / tool).symlink_to(found)
+        self.descriptions = [
+            "baseline | market=atlanta | run=test | exp=" + _xid(1),
+            "market=atlanta | discovery_fulton=1075 | scored=3 | run=test | exp=" + _xid(2),
+            "market=atlanta | OperationalError: boom … | run=test | exp=" + _xid(3),
+        ]
+        for status, description in zip(("baseline", "keep", "crash"), self.descriptions):
+            runner.append_experiment_log_row({
+                "commit": "abcdef0", "metric": 5, "confidence": 1.0,
+                "status": status, "description": description,
+            }, path=self.cwd / "experiment_log.tsv")
+
+    def _script(self, name: str, body: str) -> None:
+        path = self.bin / name
+        if path.is_symlink() or path.exists():
+            path.unlink()
+        path.write_text(f"#!/bin/bash\n{body}\n", encoding="utf-8")
+        path.chmod(0o755)
+
+    def _make(self, *targets: str) -> subprocess.CompletedProcess:
+        env = {k: v for k, v in os.environ.items()
+               if k not in {"CONFIRM", "MAKEFLAGS", "MFLAGS", "MAKELEVEL",
+                            "EXPERIMENT_LOG_PATH"}}
+        env["PATH"] = str(self.bin)
+        return subprocess.run(
+            [shutil.which("make"), "--no-print-directory", *targets],
+            cwd=str(self.cwd), env=env, capture_output=True, text=True, timeout=60,
+        )
+
+    def test_log_and_orient_render_without_column(self) -> None:
+        for target in ("log", "orient"):
+            with self.subTest(target=target):
+                proc = self._make(target)
+                self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+                for description in self.descriptions:
+                    self.assertIn(description, proc.stdout)
+                self.assertNotIn("column", proc.stderr)
+
+    def test_column_is_used_when_installed(self) -> None:
+        self._script("column", "echo FAKE-COLUMN; exec cat")
+        proc = self._make("log")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertTrue(proc.stdout.startswith("FAKE-COLUMN"), proc.stdout)
+
+    def test_recorded_baseline_exits_zero_even_if_the_log_cannot_render(self) -> None:
+        self._script("git", "echo autoresearch/test")
+        self._script("python", "exit 0")         # cli.py baseline recorded it
+        self._script("awk", "exit 1")            # and nothing can render the TSV
+        proc = self._make("baseline")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("could not render", proc.stdout)
+        self.assertIn("Setup Step 6", proc.stdout)
+
+    def test_refused_baseline_still_exits_nonzero(self) -> None:
+        self._script("git", "echo autoresearch/test")
+        self._script("python", "exit 2")
+        proc = self._make("baseline")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("no baseline recorded", proc.stdout)
+        self.assertNotIn("Setup Step 6", proc.stdout)
+
+    def test_static_guards(self) -> None:
+        text = _MAKEFILE.read_text(encoding="utf-8")
+        self.assertIn("TSV_ALIGN = { if command -v column >/dev/null 2>&1; then", text)
+        for target in ("orient", "status", "log"):
+            recipe = _recipe(target)
+            self.assertNotIn("column", recipe, target)
+            self.assertIn("$(TSV_ALIGN)", recipe, target)
+        orient = _recipe("orient")
+        self.assertNotIn("python", orient)       # the no-DB light-tier path
+        self.assertNotIn("runner", orient)
+        baseline = _recipe("baseline")
+        log_line = next(l for l in baseline.splitlines()
+                        if "--no-print-directory log" in l)
+        self.assertIn("||", log_line)
+        self.assertIn("exit $$rc", baseline)
+        restore = _recipe("mirror-restore")
+        self.assertIn("cli.py --no-color mirror-restore", restore)
+        self.assertNotIn("python -c", restore)
+
+
+class TestMirrorRestoreRefusal(_TsvLoopBase):
+    """(e) A live TSV: one formatted stderr line, non-zero, no DB contact."""
+
+    def test_refusal_is_one_line_without_traceback_or_db(self) -> None:
+        import cli
+        self._seed("baseline", 5, 1.0)
+        before = self.tsv_path.read_bytes()
+        connects: list[str] = []
+
+        def no_connection():
+            connects.append("connect")
+            raise AssertionError("mirror-restore must refuse before connecting")
+
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(prepare, "get_connection", no_connection), \
+             redirect_stdout(out), redirect_stderr(err):
+            rc = cli.main(["--no-color", "mirror-restore"])
+        self.assertEqual(rc, 2)
+        lines = err.getvalue().splitlines()
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("mirror-restore refused", lines[0])
+        self.assertIn("non-empty", lines[0])
+        self.assertNotIn("Traceback", err.getvalue())
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual(self.tsv_path.read_bytes(), before)
+        self.assertEqual(connects, [])
+
+    def test_refusal_is_a_narrow_runtime_error(self) -> None:
+        self._seed("baseline", 5, 1.0)
+        with self.assertRaises(runner.RestoreRefusedError):
+            runner.restore_experiment_log_from_mirror(self.tsv_path)
+        self.assertTrue(issubclass(runner.RestoreRefusedError, RuntimeError))
+        self.assertFalse(issubclass(runner.RestoreRefusedError, runner.SetupError))
 
 
 if __name__ == "__main__":

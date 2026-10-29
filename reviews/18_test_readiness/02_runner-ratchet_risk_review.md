@@ -32,6 +32,8 @@ Base `29c051e`. Scope: runner.py (decision, TSV, budget, setup checks), Makefile
 | RR-18 | LOW | e | After a crashed or timed-out bootstrap baseline, the loop carries on, and the first successful iteration (same in-process code) is written as `baseline`. This is existing behaviour. | Acceptable and defensible. Document it, or raise `SetupError`; either is fine, but do not leave it unspecified. |
 | RR-19 | LOW | e | Stale docs outside the file list: CLAUDE.md L72 ("make daily → make tail → make halt"), and the `make orient`/`make status` hints "run 'make baseline' or 'make loop'". | Update the Makefile hints and README. Flag CLAUDE.md for the human. |
 
+*Update (2026-10-29), RR-12 (ii) and (iii):* the ingestion clauses are stale since the txn-integrity track (`686174a`). Ingestion now commits each file in its own transaction before archiving it, so an interrupted ingestion loses only the in-flight file's uncommitted rows, and that file stays in intake; a file committed but not yet archived is re-ingested idempotently. Discovery and scoring still commit at the end of the cycle, so an interrupted discovery or scoring cycle still rolls back. Files archived before `686174a` may lack their rows (`03_txn-integrity_decision_note.md`, "Past losses").
+
 ## 2. Design notes per requirement
 
 - **(a)** Make TSV replay deterministic: replaying `apply_keep_or_revert_decision` over the written TSV, using TSV anchors only, must reproduce every status the loop wrote. Quantize either in the pure function (none of the existing tests use sub-0.01 deltas except 1e-12, which still ties) or at the call site, but with ONE shared formatter. Pin the writer's output strings in a test.
@@ -87,6 +89,7 @@ Base `29c051e`. Scope: runner.py (decision, TSV, budget, setup checks), Makefile
 
 - OS-level, subprocess-isolated experiment enforcement (SIGTERM, then SIGKILL after 30 s, as the spec describes). It remains the earmarked hardening, shared with SR-16.
 - costar_ingest archives before the outer commit (RR-12 iii).
+  - *Update (2026-10-29):* no longer true since `686174a`: each file commits before it is archived (see the RR-12 update under §1).
 - The 200-char description cap can cut the `run=`/`exp=` tokens (anchor scoping). Changing the format or token order is out of scope.
 - `db-stats`/`cli` hard-coded threshold 70 and unscoped "actionable" count.
 - Doc drift in CLAUDE.md, START_HERE.md and AUTORESEARCH_MECHANICS.md (not in the file list). Stale prepare.py docstrings (immutable).

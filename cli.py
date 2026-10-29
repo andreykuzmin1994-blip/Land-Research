@@ -22,11 +22,13 @@ Subcommands (run ``python cli.py --help`` for the full list):
     db-stats            Per-table row counts and research_log breakdown
     halt / unhalt       Sentinel manipulation
     tail                Live-stream experiment_log.tsv
+    mirror-restore      Rebuild a MISSING experiment_log.tsv from the mirror
 
 Exit codes:
     0   success
     1   generic failure
-    2   setup error (e.g. wrong branch, DATABASE_URL missing)
+    2   setup error (e.g. wrong branch, DATABASE_URL missing) or a refused
+        precondition (mirror-restore over a live experiment_log.tsv)
     3   lock contention (loop already running)
 """
 
@@ -192,7 +194,9 @@ def cmd_baseline(args: argparse.Namespace) -> int:
         print(json.dumps(row, indent=2, default=str))
     else:
         _print_baseline_row(row)
-    # A crash/timeout attempt is logged (and purged) but is not a baseline.
+    # A crash/timeout attempt is logged but is not a baseline. Its rows are
+    # purged; if that purge failed, the next baseline purges them first (or
+    # refuses, exit 2, while they cannot be purged).
     return 0 if row.get("status") == "baseline" else 1
 
 
@@ -232,6 +236,10 @@ def cmd_loop(args: argparse.Namespace) -> int:
         print(_status_label("ok") + _c("loop ended", _C.BOLD))
         for k, v in summary.items():
             print(f"  {k}: {v}")
+        if summary.get("unpurged_experiment_ids"):
+            print(_status_label("warning") + "some non-kept experiments' rows "
+                  "could not be purged (see the ERROR above); the next loop "
+                  "start re-checks them")
     return 0
 
 
@@ -349,6 +357,19 @@ def cmd_unhalt(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mirror_restore(args: argparse.Namespace) -> int:
+    import runner
+    try:
+        summary = runner.restore_experiment_log_from_mirror()
+    except runner.RestoreRefusedError as exc:
+        # Refused before any database connection; one line, no traceback.
+        print(_status_label("fail") + f"mirror-restore refused: {exc}",
+              file=sys.stderr)
+        return 2
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
 def cmd_tail(args: argparse.Namespace) -> int:
     import research
     import runner
@@ -440,6 +461,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("tail", help="live-stream experiment_log.tsv")
     p.set_defaults(fn=cmd_tail)
+
+    p = sub.add_parser(
+        "mirror-restore",
+        help="rebuild a MISSING experiment_log.tsv from the Postgres mirror "
+             "(refuses, exit 2, when a live TSV exists)",
+    )
+    p.set_defaults(fn=cmd_mirror_restore)
 
     return parser
 
