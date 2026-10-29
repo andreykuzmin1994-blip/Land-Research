@@ -167,6 +167,17 @@ def main(argv: list[str] | None = None) -> int:
             survivors.append(p)
     funnel.append(("pass floodplain, wetlands, protected-land and size screens", len(survivors)))
     log(f"  {len(survivors):,} pass the map screens")
+    # Kept and flagged rather than screened out: the tax record says there is
+    # land, and the frozen evaluation knows no such screen (screens.py).
+    tiny = sum(1 for p in survivors if checks.too_small_for_slope(p))
+    if tiny:
+        log(f"  ! {tiny:,} of {len(survivors):,} parcels have under one 10 m lidar pixel of open "
+            "ground on the parcel map")
+        notes.append(f"{tiny} of {len(survivors)} parcels that pass the map screens have under "
+                     "one 10 m lidar pixel (100 m²) of open ground on the county parcel map, so "
+                     "their map checks can't be trusted and slope was not checked (each is "
+                     "flagged). The map shape is the problem, not a failed check: compare the "
+                     "county parcel map with the tax record.")
 
     if run_cfg.get("slope", True) and not args.no_slope and survivors:
         log(f"Slope from USGS lidar for {len(survivors):,} parcels")
@@ -195,6 +206,9 @@ def main(argv: list[str] | None = None) -> int:
     for p in survivors:
         p.update(scoring.score(p))
         p["flags"] = screens.flags(p)
+        if checks.too_small_for_slope(p):
+            p["flags"].append(f"{checks.SLOPE_SKIPPED}: slope not checked, and the map checks "
+                              "(floodplain, wetlands, usable acres) can't be trusted")
         d = decisions.get(p["parcel_id"])
         p["decision"] = d["decision"] if d else ""
     survivors.sort(key=lambda p: (-p["score"], p["parcel_id"]))

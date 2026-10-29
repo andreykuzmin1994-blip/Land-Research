@@ -7,6 +7,7 @@ and report all read one flat record.
 from __future__ import annotations
 
 import json
+import math
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
@@ -38,6 +39,12 @@ SLOPE_RULE = json.dumps({
 
 
 SLOPE_PIXEL = json.dumps({"x": 10, "y": 10, "spatialReference": {"wkid": 3857}})
+# One 10 m Web Mercator pixel covers at most 100 m² of ground (about 69 m²
+# at Atlanta's latitude). On less open ground than that, 3DEP answers
+# {"statistics": []} every time: a parcel-map problem, not a server failure,
+# so slope isn't asked for (SLOPE_SKIPPED) and nothing is retried.
+SLOPE_MIN_M2 = 100.0
+SLOPE_SKIPPED = "the parcel map leaves under one 10 m lidar pixel of open ground"
 
 
 def _overlap(geom, proj, total_m2, index: Index, keep: Callable[[dict], bool] = lambda a: True):
@@ -96,7 +103,8 @@ def map_checks(parcels: list[dict[str, Any]], idx: dict[str, Index],
         # bank inside the floodplain isn't subtracted twice.
         open_ground = g.difference(unary_union(constrained)) if constrained else g
         p["_open_ground"] = open_ground if not open_ground.is_empty else g
-        if p["gis_acres"] and p["acres"] and not 0.5 <= p["gis_acres"] / p["acres"] <= 2.0:
+        # 0.0 GIS acres (a map polygon of a few m²) is the worst mismatch of all.
+        if p["acres"] and not 0.5 <= p["gis_acres"] / p["acres"] <= 2.0:
             p["acreage_mismatch"] = True
 
         p["opportunity_zone"] = any(s.contains(c) for s, _ in idx["oz"].candidates(c))
@@ -230,9 +238,32 @@ def _slope_from(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def slope_area_m2(geom) -> float:
+    """Ground area (m²) of the polygons slope_stats sends for geom: its
+    top-level Polygon parts, as _esri_polygon picks them. 0.0 for an empty,
+    line-only or zero-area shape; nothing is projected or raised for those."""
+    parts = [g for g in getattr(geom, "geoms", [geom]) if g.geom_type == "Polygon"]
+    deg2 = sum(g.area for g in parts)
+    if not deg2 > 0:
+        return 0.0
+    xmin, ymin, xmax, ymax = geom.bounds
+    proj = LocalProjection((xmin + xmax) / 2, (ymin + ymax) / 2)
+    m2 = deg2 * proj.kx * proj.ky
+    return m2 if math.isfinite(m2) else 0.0
+
+
+def too_small_for_slope(p: dict[str, Any]) -> bool:
+    """The parcel's open ground on the county map is under one 10 m lidar pixel."""
+    return slope_area_m2(p.get("_open_ground") or p["geometry"]) < SLOPE_MIN_M2
+
+
 def slope_checks(parcels: list[dict[str, Any]], workers: int,
                  progress: Callable[[int, int], None] | None = None) -> None:
     def work(p):
+        if too_small_for_slope(p):
+            p.update({"relief_ft": None, "steep_pct": None, "mean_slope_pct": None,
+                      "slope_skipped": SLOPE_SKIPPED})
+            return p
         try:
             p.update(slope_stats(p.get("_open_ground") or p["geometry"]))
         except arcgis.ArcGISError as exc:

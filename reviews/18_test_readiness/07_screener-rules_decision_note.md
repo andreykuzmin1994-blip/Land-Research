@@ -82,6 +82,25 @@
    - **Fix.** Frame attributes, `format` and `format_map` are banned. Private from-imports are
      refused. `MatchClass` keyword attributes get the same attribute rule.
    - Tests added; README and docstring updated.
+   - **Correction (2026-10-29, follow-up track `screener-followups`).** "Fixed" overstated
+     this: only the spellings were banned, not the routes. Four routes still passed
+     `rank_problems` at `9269736` and `bf4d29b`:
+     - a positional class pattern whose `__match_args__` comes from a string or a metaclass
+       property (`case probe(v)`);
+     - code-object surgery (`gi_code.replace(co_names=...)`, rebuilt with `type(fn)`), with
+       names built by `chr()`;
+     - a `# coding: utf-7` cookie that hides a line of code in what `read_text()` parses as
+       a comment;
+     - (found in the follow-up's own review) `import typing as __builtins__`, after which
+       later functions resolve bare names such as `sys` and `operator` in `typing`'s
+       namespace.
+
+     The follow-up refuses `match` statements, the frame / generator / coroutine / traceback /
+     code-object attribute families, `type`, dunder definitions, class keywords, dunder
+     `import ... as` / `except ... as` names, non-annotation `typing` names and changes to
+     imported modules. It also checks the bytes the importer compiles. The check is still a
+     drift guard, not a sandbox (see residual 3, `screener/README.md` § "The purity check" and
+     `11_screener-followups_decision_note.md`).
 2. **`same_owner` rule 5 (near spelling) overrode rule 4.** Long names with clashing initials or
    JR vs SR matched ("DOE JOHNATHAN R" / "W", "ACME PARTNERS A LLC" / "B LLC").
    - **Fix.** A near spelling must keep the same initials, generation marks and numbers.

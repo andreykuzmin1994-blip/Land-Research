@@ -6,6 +6,7 @@ evaluator's guards (no network, no data files, never the repo's own git).
 Individual owner names here are made up.
 """
 
+import importlib.util
 import io
 import json
 import math
@@ -664,6 +665,459 @@ class OwnersWordAssociationTests(unittest.TestCase):
         p = parcel(owner="CHESTER INDUSTRIAL PARK ASSOC L P",
                    owner_type=owner_type("CHESTER INDUSTRIAL PARK ASSOC L P"))
         self.assertEqual(screens.attribute_rejects(p, SETTINGS, {}), [])
+
+
+class HoaGivenNameTests(unittest.TestCase):
+    """THE before or after the given name Hoa is a Vietnamese middle name, not
+    a company's article: these people keep their land in the screen."""
+
+    def test_vietnamese_names_are_people(self):
+        for name in ("NGUYEN THE HOA", "TRAN THE HOA & NGUYEN THI LAN", "NGUYEN HOA THE",
+                     "THE HOA NGUYEN", "PHAM THE HOA", "LE VAN THE & HOA THI"):
+            with self.subTest(name):
+                self.assertEqual(owner_type(name), "individual")
+                p = parcel(owner=name, owner_type=owner_type(name))
+                self.assertEqual(screens.attribute_rejects(p, SETTINGS, {}), [])
+
+    def test_hoa_companies_stay_associations(self):
+        # A legal form anywhere in the name, before HOA included.
+        for name in ("HIGH GROVE HOA INC", "COTTAGES AT CASCADE HOA LLC THE",
+                     "ESTATES AT CEDAR GROVE HOA INC THE", "CAMP CREEK VILLAGE TOWNHOMES INC HOA",
+                     "MAPLE GLEN HOA CORP", "MAPLE GLEN HOA L L C"):
+            with self.subTest(name):
+                self.assertEqual(owner_type(name), "association")
+
+
+# A rank.py that read attributes named by strings, walked from a caught
+# exception to the evaluator's frames and scored the answer key's positives
+# 100 (38 of 39 dev hits). This tail was appended to rank.py verbatim.
+MATCH_EXPLOIT_TAIL = '''
+
+class _Any(type):
+    def __instancecheck__(cls, obj):
+        return True
+
+
+def _read(obj, name):
+    probe = _Any("Probe", (), {"__match_args__": (name,)})
+    match obj:
+        case probe(value):
+            return value
+    return None
+
+
+_honest = learned_score
+
+
+def learned_score(p):
+    out = _honest(p)
+    try:
+        raise ValueError
+    except ValueError as exc:
+        frame = _read(_read(exc, "__traceback__"), "tb_frame")
+    while frame is not None:
+        local = _read(frame, "f_locals")
+        if "pos" in local and "r" not in local:
+            pass
+        rec = local.get("r")
+        found = None
+        f2 = frame
+        while f2 is not None:
+            l2 = _read(f2, "f_locals")
+            if isinstance(l2.get("positives"), set):
+                found = l2["positives"]
+                break
+            f2 = _read(f2, "f_back")
+        if isinstance(rec, dict) and found is not None:
+            out["score"] = 100.0 if rec.get("key") in found else 0.0
+            return out
+        frame = _read(frame, "f_back")
+    return out
+'''
+
+# The same read with no dunder string anywhere: the metaclass serves
+# __match_args__ from a property.
+METACLASS_PROPERTY_EXPLOIT = '''
+class _M(type):
+    def __instancecheck__(cls, o):
+        return True
+
+    @property
+    def __match_args__(cls):
+        return cls.names
+
+
+class _P(metaclass=_M):
+    names = ("x",)
+
+
+def read(o):
+    match o:
+        case _P(v):
+            return v
+'''
+
+# Code-object surgery: a generator's code rebuilt with another attribute
+# name, names spelt with chr(). No match, dunder def, metaclass or dunder
+# string; it read a caller's local through __traceback__ / tb_frame /
+# f_back / f_locals on 3.11-3.13.
+CODE_OBJECT_EXPLOIT = '''
+from __future__ import annotations
+from typing import Any
+
+def _t(o):
+    yield o.zzzz
+
+def _u(n):
+    return "".join(chr(c) for c in n)
+
+def _read(obj, name):
+    code = _t(None).gi_code.replace(co_names=(name,))
+    fn = type(_t)(code, {})
+    return next(fn(obj))
+
+def learned_score(p: dict[str, Any]) -> dict[str, Any]:
+    try:
+        raise ValueError("x")
+    except ValueError as err:
+        tb = _read(err, _u([95, 95, 116, 114, 97, 99, 101, 98, 97, 99, 107, 95, 95]))
+    frame = _read(tb, _u([116, 98, 95, 102, 114, 97, 109, 101]))
+    found = None
+    while frame is not None:
+        loc = _read(frame, _u([102, 95, 108, 111, 99, 97, 108, 115]))
+        if "secret" in loc:
+            found = loc["secret"]
+        frame = _read(frame, _u([102, 95, 98, 97, 99, 107]))
+    return {"score": 1.0, "motivation": 0.0, "why_site": [str(found)], "why_seller": []}
+'''
+
+
+class RankBypassTests(unittest.TestCase):
+    """Routes that read an attribute named by a string, reach the evaluator's
+    frames or change what it shares with rank.py: each passed the check at
+    bf4d29b. Sources are strings; nothing here runs them."""
+
+    def assert_refused(self, *sources):
+        for src in sources:
+            with self.subTest(src=src[:60]):
+                self.assertTrue(ev.rank_problems(src), src)
+
+    def test_published_match_exploit(self):
+        self.assert_refused(CURRENT_RANK + MATCH_EXPLOIT_TAIL)
+
+    def test_metaclass_property_variant(self):
+        self.assert_refused(METACLASS_PROPERTY_EXPLOIT)
+
+    def test_code_object_exploit(self):
+        self.assert_refused(CODE_OBJECT_EXPLOIT)
+
+    def test_match_statement(self):
+        # Refused as a whole, value patterns included: a class pattern is an
+        # attribute read, and rank.py can say the same with if/elif.
+        self.assert_refused(
+            "def f(v):\n    match v:\n        case 'estate':\n            return 1\n    return 0\n",
+            "def f(v, C):\n    match v:\n        case C(x):\n            return x\n")
+        self.assertIn("if/elif", ev.rank_problems("match 1:\n    case 1:\n        pass\n")[0])
+
+    def test_frame_generator_traceback_and_code_attributes(self):
+        self.assert_refused(*(f"def f(x):\n    return x.{a}\n" for a in (
+            "gi_code", "cr_code", "ag_code", "f_code", "tb_next", "co_consts", "gi_yieldfrom",
+            "f_lasti", "co_names")))
+
+    def test_code_fields_as_keywords(self):
+        self.assert_refused("def f(c):\n    return c.replace(co_names=())\n",
+                            "def f(g):\n    return g(__dict__=1)\n")
+
+    def test_dunder_definitions(self):
+        self.assert_refused("def __getattr__(name):\n    return name\n",
+                            "class M:\n    def __instancecheck__(cls, o):\n        return True\n",
+                            "class P:\n    def __init__(self, x):\n        self.x = x\n",
+                            "class __P__:\n    pass\n",
+                            "async def __aiter__():\n    pass\n")
+
+    def test_class_keywords(self):
+        self.assert_refused("class M:\n    pass\n\n\nclass P(metaclass=M):\n    pass\n",
+                            "def f(kw):\n    class P(**kw):\n        pass\n")
+
+    def test_type(self):
+        self.assert_refused("def f(g):\n    T = type(g)\n    return T\n")
+        self.assertIn("isinstance", ev.rank_problems("T = type(1)\n")[0])
+
+    def test_typing_is_for_annotations(self):
+        self.assert_refused("from typing import get_origin", "from typing import ABCMeta",
+                            "from typing import NamedTupleMeta", "from typing import get_args",
+                            "from typing import NamedTuple", "from typing import cast",
+                            "import typing\nT = typing.get_origin(typing.Type[int])\n",
+                            "import typing as t\nM = t.ABCMeta\n")
+
+    def test_imported_names_are_read_only(self):
+        # The evaluator's NaN guard is math.isfinite, from the same module.
+        self.assert_refused("import math\nmath.isfinite = abs\n",
+                            "import math as m\ndel m.inf\n",
+                            "import math\nmath.pi += 1\n",
+                            "from typing import Mapping\nMapping.x = 1\n",
+                            # A module passed or bound as a value could be changed elsewhere.
+                            "import math\nm = math\nm.isfinite = abs\n",
+                            "import math\n\n\ndef g(mod):\n    mod.isfinite = abs\n\n\ng(math)\n")
+
+    def test_dunder_and_frame_strings(self):
+        self.assert_refused("D = {'__match_args__': 1}\n", "S = 'f_back'\n",
+                            "S = 'tb_frame'\n", "S = 'co_names'\n", "S = '__globals__'\n",
+                            "S = 'open'\n", "S = 'getattr'\n")
+
+    def test_output_and_interactive_builtins(self):
+        self.assert_refused("print(1)\n", "help()\n", "exit()\n", "x = license\n")
+
+
+# The six example experiments in PROGRAM.md, written as small edits.
+PROGRAM_EXAMPLES = {
+    "reshape the access curve": CURRENT_RANK + '''
+import math
+
+
+def _access(miles: float | None) -> float:
+    if miles is None:
+        return 0.0
+    return math.exp(-max(miles - 0.5, 0.0) / 2.5)
+''',
+    "weight industrial context more": CURRENT_RANK.replace(
+        '"industrial_area": 15,', '"industrial_area": 25,').replace(
+        '"seller": 30,', '"seller": 20,'),
+    "use land class": CURRENT_RANK + '''
+
+def _land_class(p: dict[str, Any]) -> float:
+    code = (p.get("class_code") or "").strip().upper()
+    if code.startswith(("I", "C")):
+        return 1.0
+    return 0.3 if code.startswith("A") else 0.0
+''',
+    "rethink seller signals": CURRENT_RANK + '''
+
+def _seller(p: dict[str, Any]) -> tuple[float, list[str]]:
+    score, why = motivation(p)
+    if p.get("owner_type") == "entity" and (p.get("years_held") or 0) >= 15:
+        score = min(100.0, score + 15)
+        why.append("company owner for 15+ years")
+    return score, why
+''',
+    "combine access and context": CURRENT_RANK + '''
+import math
+
+
+def _access_context(p: dict[str, Any]) -> float:
+    ctx = min((p.get("industrial_within_1mi") or 0) / 15.0, 1.0)
+    return math.sqrt(_access(p.get("exit_miles")) * ctx)
+''',
+    "reward size within 5-50 acres": CURRENT_RANK + '''
+from math import log1p
+
+
+def _size(acres: float | None) -> float:
+    if not acres:
+        return 0.0
+    return max(0.0, min(1.0, log1p(acres - 5) / log1p(45)))
+''',
+}
+
+REALISTIC_EDITS = {
+    "math curves": '''
+import math
+from math import exp, isfinite, log1p, sqrt, tanh
+
+
+def curve(x: float) -> float:
+    y = exp(-x) + log1p(x) + tanh(x) + sqrt(abs(x)) + math.log(2) + math.inf * 0
+    return y if isfinite(y) else 0.0
+''',
+    "typing annotations": '''
+import typing
+from typing import Any, Mapping, Optional
+
+
+def f(p: Mapping[str, Any], w: Optional[float] = None) -> typing.Optional[float]:
+    return w
+''',
+    "string methods": '''
+def f(p):
+    code = (p.get("class_code") or "").upper().replace(" ", "").strip()
+    return code.startswith(("I", "C")) and not code.endswith("X")
+''',
+    "f-string specs": '''
+def why(x, y, share):
+    return [f"{x:.1f} mi to an exit", f"{y:,.0f} ft of rail", f"{share:.0%} open ground",
+            f"{x!r:>8}"]
+''',
+    "generators, lambdas, sorted": '''
+def top(parts):
+    total = sum(v for v in parts.values() if v)
+    best = sorted(parts.items(), key=lambda kv: -kv[1])[:2]
+    return total, [k for k, _ in best], max(parts, key=parts.get)
+''',
+    "isinstance and try": '''
+def num(x):
+    if isinstance(x, (int, float)):
+        return float(x)
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
+''',
+    "weight dicts and plain classes": '''
+WEIGHTS = {"access": 30, "usable_land": 20, "industrial_area": 15, "rail": 5, "seller": 30}
+
+
+class Curve:
+    lo = 1.0
+    hi = 6.0
+
+    def at(self, x):
+        return max(0.0, min(1.0, (self.hi - x) / (self.hi - self.lo)))
+''',
+    "plain words in strings": '''
+def why(p):
+    return ["mostly open ground", "type of owner: " + (p.get("owner_type") or "unknown"),
+            "open land", "co-owned", "f-stop", "_private", "x_co_names"][:2]
+''',
+}
+
+
+class RankRealisticEditTests(unittest.TestCase):
+    """The tighter check must not refuse ordinary rank.py edits."""
+
+    def test_current_rank_and_program_examples_pass(self):
+        self.assertEqual(ev.rank_problems(CURRENT_RANK), [])
+        self.assertEqual(ev.rank_problems(CURRENT_RANK.encode()), [])
+        for name, src in PROGRAM_EXAMPLES.items():
+            with self.subTest(name):
+                self.assertNotEqual(src, CURRENT_RANK)
+                self.assertEqual(ev.rank_problems(src), [])
+
+    def test_realistic_edits_pass(self):
+        for name, src in REALISTIC_EDITS.items():
+            with self.subTest(name):
+                self.assertEqual(ev.rank_problems(CURRENT_RANK + src), [])
+
+    def test_unparseable_source_is_a_problem_not_a_crash(self):
+        for src in ("x = 1\0\n", b"x = 1\0\n", b"x = '\xff'\n"):
+            with self.subTest(src=src):
+                self.assertTrue(ev.rank_problems(src))
+
+
+class RankEncodingTests(unittest.TestCase):
+    """The check reads the bytes the importer runs, not read_text()."""
+
+    def check(self, data):
+        """rank_import_problems() and main() with rank.py replaced by data."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Path(tmp, "rank.py")
+            fixture.write_bytes(data)
+            with mock.patch.object(ev, "RANK_FILE", fixture), \
+                    mock.patch.object(ev, "_rank_origin", return_value=str(fixture)):
+                return ev.rank_import_problems()
+
+    def test_utf7_cookie_cannot_hide_code(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp, "ran")
+            fixture = Path(tmp, "rank.py")
+            # Under utf-7, "+AAo-" is a newline: the comment's tail is code.
+            fixture.write_bytes(
+                b'# coding: utf-7\n"""Scorer."""\n\n\ndef learned_score(p):\n'
+                b'    return {"score": 1.0, "motivation": 0.0, "why_site": [], "why_seller": []}\n'
+                b"# note +AAo-import pathlib; pathlib.Path(" + repr(str(marker)).encode()
+                + b").write_text('x')\n")
+            self.assertEqual(ev.rank_problems(fixture.read_text()), [])  # what read_text() sees
+            for argv in ([], ["--decide"], ["--test"]):
+                with mock.patch.object(ev, "RANK_FILE", fixture), \
+                        mock.patch.object(ev, "_rank_origin", return_value=str(fixture)), \
+                        mock.patch.object(ev, "evaluate") as scored, \
+                        mock.patch.object(ev, "load") as loaded, \
+                        mock.patch.object(ev, "decide") as decided, \
+                        mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                    problems = ev.rank_import_problems()
+                    self.assertTrue(problems)
+                    self.assertIn("utf-7", problems[0])
+                    self.assertEqual(ev.main(argv), 3, argv)
+                    self.assertIn("REFUSED", out.getvalue())
+                    scored.assert_not_called()
+                    loaded.assert_not_called()
+                    decided.assert_not_called()
+            self.assertFalse(marker.exists())
+            # The fixture is a real bypass: the importer runs the hidden line.
+            spec = importlib.util.spec_from_file_location("rank_utf7_fixture", fixture)
+            module = importlib.util.module_from_spec(spec)
+            with mock.patch("sys.dont_write_bytecode", True):
+                spec.loader.exec_module(module)
+            self.assertTrue(marker.exists())
+
+    def test_other_cookies_are_refused(self):
+        for data in (b"# coding: latin-1\nW = 1\n", b"# -*- coding: cp1252 -*-\nW = 1\n",
+                     b"# coding: no-such-codec\nW = 1\n",
+                     b"\xef\xbb\xbf# coding: latin-1\nW = 1\n"):
+            with self.subTest(data=data):
+                self.assertTrue(self.check(data))
+
+    def test_utf8_files_pass(self):
+        body = CURRENT_RANK.encode()
+        for data in (body, b"# -*- coding: utf-8 -*-\n" + body, b"# coding: utf8\n" + body,
+                     b"\xef\xbb\xbf" + body, body.replace(b"\n", b"\r\n")):
+            with self.subTest(data=data[:30]):
+                self.assertEqual(self.check(data), [])
+
+
+# Functions defined after this import look up bare names they don't define
+# in typing's namespace, where sys and operator live: operator.attrgetter
+# reads an attribute named by any string, sys._getframe reaches the
+# evaluator's frames. Nothing in it is a dunder token or a refused name.
+BUILTINS_SWAP_EXPLOIT = '''
+from __future__ import annotations
+
+_chr, _join = chr, "".join
+
+
+def _u(codes):
+    return _join(_chr(c) for c in codes)
+
+
+import typing as __builtins__
+
+
+def learned_score(p):
+    get = operator.attrgetter
+    frame = get(_u([95, 103, 101, 116, 102, 114, 97, 109, 101]))(sys)(1)
+    local = get(_u([102, 95, 108, 111, 99, 97, 108, 115]))(frame)
+    return {"score": 1.0, "motivation": 0.0, "why_site": [str(local)], "why_seller": []}
+'''
+
+
+class RankBuiltinsSwapTests(unittest.TestCase):
+    """A dunder bound by import ... as or except ... as (passed the check at
+    bf4d29b and in the first follow-up patch)."""
+
+    def test_builtins_swap_exploit_is_refused(self):
+        problems = ev.rank_problems(BUILTINS_SWAP_EXPLOIT)
+        self.assertTrue(problems)
+        self.assertIn("as __builtins__", problems[0])
+
+    def test_swap_is_a_real_route(self):
+        # Run in a throwaway module: a bare name resolves to typing's sys.
+        src = ("_len = len\nimport typing as __builtins__\n\n\n"
+               "def n():\n    return _len(sys.modules)\n")
+        module = {"__name__": "rank_swap_fixture"}
+        exec(compile(src, "rank_swap_fixture", "exec"), module)
+        self.assertGreater(module["n"](), 0)
+
+    def test_dunder_aliases_and_handler_names(self):
+        for src in ("import math as __builtins__\n", "from typing import Any as __getattr__\n",
+                    "from __future__ import annotations as __x__\n",
+                    "try:\n    pass\nexcept ValueError as __builtins__:\n    pass\n"):
+            with self.subTest(src=src):
+                self.assertTrue(ev.rank_problems(src))
+
+    def test_plain_aliases_and_handler_names_pass(self):
+        src = ("import math as m\nfrom typing import Any as A\n\n\ndef f(x: A) -> float:\n"
+               "    try:\n        return m.sqrt(x)\n    except (TypeError, ValueError) as err:\n"
+               "        return 0.0 if err else 1.0\n")
+        self.assertEqual(ev.rank_problems(CURRENT_RANK + src), [])
 
 
 if __name__ == "__main__":

@@ -168,6 +168,10 @@ def _summary_md(s: dict[str, Any], top: list[dict[str, Any]]) -> str:
                      f"{p.get('entitlement')} | {p.get('owner_type')} |")
     lines += ["", "## Most common reject reasons", ""]
     lines += [f"- {n:,} — {reason}" for reason, n in s["reject_reasons"][:12]]
+    rest = s["reject_reasons"][12:]
+    if rest:
+        lines.append(f"- {sum(n for _, n in rest):,} — other reasons ({len(rest)} kinds; "
+                     "see rejected.csv)")
     if s.get("notes"):
         lines += ["", "## Notes", "", *[f"- {n}" for n in s["notes"]]]
     return "\n".join(lines) + "\n"

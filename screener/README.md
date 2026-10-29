@@ -47,6 +47,33 @@ If a city zoning service is down, the run continues and `summary.md` says
 which zoning check failed. It also counts parcels whose lidar slope check
 failed: they stay in the list, flagged, without the steep-ground screen.
 
+A parcel whose county map polygon leaves less than one 10 m lidar pixel
+(100 m²) of open ground is a map problem, not a failed check: the lidar
+service answers such a shape with nothing every time, so it isn't asked.
+Such a parcel stays ranked, because the tax record says there is land and a
+hard screen belongs in `screens.py` (with a new evaluation baseline), but
+it can't read as clean. It gets two flags: the parcel map vs tax-record
+acreage mismatch (a 0.0-acre map shape included), and one saying that
+slope wasn't checked and the map checks can't be trusted. Its 0%
+floodplain and wetlands come from the tiny shape, so they mean nothing.
+`summary.md` counts these parcels in their own note, which doesn't say
+"re-run later". It does so with `--no-slope` too. A thin sliver bigger
+than one pixel can still get an empty answer, and that still counts as a
+failed slope check.
+
+**Public data changes between days.** On 2026-10-28 and 29, the USGS 3DEP
+lidar service returned different slope statistics for 464 of 2,110
+identical requests (about 22%), while the elevation statistics were
+identical. Overnight, changed Fulton appraisal values moved about 19
+parcels between "already built on" and ranked. Parcels near a threshold
+can therefore flip from one run to the next: `max_steep_pct` (share of open
+ground steeper than 15%), `min_usable_acres` and `max_improvement_value`.
+Comparing two runs then mixes data changes with code changes. To compare
+code, run both versions on the same cache (no `--refresh`, within
+`cache_days`), after checking that every source you compare was cached:
+map layers, county parcels and slope answers are kept for 7 days, the deed
+file for 30.
+
 ## Tune it
 
 - `screener/settings.toml`: acreage, which cities to search, and every
@@ -57,8 +84,9 @@ failed: they stay in the list, flagged, without the steep-ground screen.
   owners', community, neighborhood, town, townhome, condominium or civic
   associations: subdivision common areas, not land for sale. The owner
   name must pair an owners' word with an association word ("... HOMEOWNERS
-  ASSN INC"), or carry HOA inside a company name ("... HOA INC"); ASSOC,
-  ASSOCIATION or POA alone don't count.
+  ASSN INC"), or carry HOA inside a company name with a legal form ("... HOA
+  INC"; THE doesn't count, since Hoa and The are also Vietnamese given and
+  middle names); ASSOC, ASSOCIATION or POA alone don't count.
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed` or
   `pursue`. Passed and listed parcels drop out of future runs. See
   `inputs/README.md`.
@@ -146,13 +174,9 @@ screener/autoresearch/PROGRAM.md and run 15 experiments."
 
 The evaluator refuses (prints `REFUSED: ...`, exits 3, logs nothing) when:
 
-- `rank.py` breaks the purity rules. It is checked before it is imported,
-  so a refused file never runs, and nothing is scored. It may import only
-  `__future__`, `math` and `typing`; may not use `open`, `eval`, `exec`,
-  `compile`, `getattr`, `globals`, `vars`, `str.format`, frame attributes
-  (`gi_frame`, `f_back`, `f_locals`) and the like, dunder names, private
-  names, or `global` / `nonlocal`; and its strings may not name the
-  evaluation files. This catches drift. It is not a sandbox.
+- `rank.py` breaks the purity rules (below). It is checked before it is
+  imported, in every mode but `--control`, so a refused file never runs
+  and nothing is scored.
 - (`--decide`) there are uncommitted changes or untracked files under
   `screener/` (ignored files such as `cache/` don't count), the experiment
   commit touches any file besides `screener/rank.py`, or git can't be read.
@@ -167,6 +191,67 @@ In each of the last cases a human re-records the baseline with
 `--decide --new-baseline` (at the best kept commit when only its record
 was lost). A new baseline starts a new chain: later experiments are
 compared with it, not with older runs.
+
+### The purity check
+
+`rank_problems` in `evaluate.py` reads `rank.py` as the importer does: the
+file's bytes, decoded by their own coding declaration. That declaration
+must be UTF-8: any other `# coding:` line is refused, because under
+`utf-7` a comment can decode to a line of code. The check refuses:
+
+- imports other than `__future__`, `math` and `typing`. From `typing`, only
+  annotation names (`Any`, `Optional`, `Union`, `Mapping`, `Sequence`,
+  `Iterable`, `Callable`, `Dict`, `List`, `Tuple`, `Final`, `Literal`,
+  `TYPE_CHECKING`); no module objects or private names through any of
+  them;
+- the names `open`, `eval`, `exec`, `compile`, `getattr`, `setattr`,
+  `delattr`, `globals`, `locals`, `vars`, `breakpoint`, `input`, `print`,
+  `help`, `exit`, `quit`, `type`, `format` (and `str.format`),
+  `get_type_hints` and `ForwardRef`; dunder names (`__x__`); private (`_x`)
+  attributes;
+- attributes of frames, generators, coroutines, tracebacks and code
+  objects (any attribute starting with `f_`, `gi_`, `cr_`, `ag_`, `tb_` or
+  `co_`), and keyword arguments named `co_...` or `__x__`;
+- `match` statements (use if/elif), a function or class with a dunder name
+  (`__init__`, `__getattr__`, `__instancecheck__`...), and class keywords
+  such as `metaclass=`;
+- binding a dunder name with `import ... as` or `except ... as`
+  (`import typing as __builtins__` would make every later function look
+  up bare names such as `sys` in `typing`'s namespace);
+- assigning to or deleting an attribute of an imported module or name
+  (`math.isfinite = ...`), and using a module as a value (`m = math`);
+- `global` and `nonlocal`;
+- strings (docstrings aside) that name the evaluation files, or that are
+  exactly a dunder (`"__globals__"`), a frame or code attribute (`"f_back"`)
+  or one of the refused builtins (`"open"`).
+
+These rules close the routes known on Python 3.11–3.13 to read an
+attribute named by a string (`match` class patterns, rebuilt code objects,
+metaclass hooks, `str.format`, a swapped `__builtins__`). They also close
+the known routes to the evaluator's stack frames, which hold the answer
+key, and to `open`, which reaches the key files on disk. Known routes are
+closed; others may exist.
+The check is a drift guard, not a sandbox. A `rank.py` written to cheat
+could still find a route nobody has listed, so a human reads every `exp:`
+diff, as with `research.py` (`STANDING_RISKS.md` SR-16). Scoring in a
+separate process wouldn't help: every route to the frames found so far
+also reaches `open` and the files in `data/`. Real isolation needs
+filesystem confinement, which the standard library can't give portably.
+
+Known gaps:
+- A dunder or frame attribute name can still be computed as a string
+  (`"_" * 2 + ...`). The rules refuse the known ways to use such a string
+  (getattr, `match`, `type()`, class hooks, code objects), not the string.
+- A planted `screener/__pycache__/rank.*.pyc` whose recorded timestamp and
+  size match `rank.py` would run instead of the checked source. git ignores
+  it, so `--decide` doesn't see it.
+- The file could change between the check and the import.
+- Changing shared objects through their methods (such as registering a
+  class with an ABC) isn't detected.
+- The live `python -m screener.run` doesn't run the check.
+- Python 3.14 adds public evaluation hooks (`annotationlib`,
+  `ForwardRef.evaluate`, template strings) that these rules haven't been
+  reviewed against.
 
 ## Tests
 

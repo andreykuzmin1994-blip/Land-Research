@@ -25,10 +25,10 @@ from pathlib import Path
 from unittest import mock
 
 import requests
-from shapely.geometry import box
+from shapely.geometry import GeometryCollection, LineString, Point, Polygon, box
 from shapely.geometry.polygon import orient
 
-from screener import arcgis, checks, fulton, layers, report, run, scoring, screens
+from screener import arcgis, checks, fulton, geo, layers, report, run, scoring, screens
 
 SETTINGS_FILE = Path(run.__file__).resolve().parent / "settings.toml"
 REAL_LOAD_CAMA = fulton.load_cama
@@ -450,8 +450,8 @@ class CamaTests(Offline):
                 self.assertIn("--refresh", str(ctx.exception))
 
 
-class RunTests(Offline):
-    """run.main end to end on two synthetic parcels."""
+class RunHarness(Offline):
+    """run.main end to end on synthetic parcels (two unless a test adds more)."""
 
     def setUp(self):
         super().setUp()
@@ -488,6 +488,10 @@ class RunTests(Offline):
         self.assertNotIn("Traceback", log)
         self.assertFalse(self.out.exists())
         self.assertNotIn("TEST OWNER", log)
+
+
+class RunTests(RunHarness):
+    """run.main end to end on two synthetic parcels."""
 
     def test_clean_run_has_no_failure_notes(self):
         code, _ = self.main()
@@ -617,6 +621,218 @@ class BriefNameTests(unittest.TestCase):
             # Ids with only spaces keep the names they had before.
             self.assertTrue((briefs / "001_07_030000811192.md").is_file())
             self.assertEqual({p.relative_to(tmp).parts[0] for p in Path(tmp).rglob("*")}, {"out"})
+
+
+C = (-84.46, 33.6)  # south-west corner of the tiny parcel in mixed runs
+NINE_M2, FIFTY_M2 = 3.0, 7.07  # sides (m) of squares of about 9 and 50 m²
+
+
+def indexes():
+    """world() as the map checks see it (layers.fetch output)."""
+    return {key: layers.Index([(geo.esri_to_shape(f["geometry"]), f["attributes"])
+                               for f in fake.feats.values()])
+            for key, fake in world().items()}
+
+
+def map_checked(geometry, acres=20.0):
+    p = county_parcel("P1", A)
+    p.update({"geometry": geometry, "acres": acres})
+    checks.map_checks([p], indexes(), [(-84.49, 33.605)], 500.0)
+    return p
+
+
+class TinyParcelMapTests(unittest.TestCase):
+    """A county polygon far smaller than the tax record ("14 ... UNIT 200":
+    about 9 m² of map for 7.7 assessed acres) is a map problem, so it is
+    flagged as one."""
+
+    FEATURE_FIELDS = ("usable_acres", "constrained_pct", "flood_pct", "floodway_pct",
+                      "wetland_pct", "water_pct", "easement_pct", "protected_pct", "exit_miles",
+                      "rail_ft", "rail_owner", "industrial_within_1mi")
+
+    def test_zero_gis_acres_is_an_acreage_mismatch(self):
+        p = map_checked(square(*A, side_m=NINE_M2), acres=7.7)
+        self.assertEqual(p["gis_acres"], 0.0)
+        self.assertTrue(p.get("acreage_mismatch"))
+        self.assertIn("parcel map shows 0.0 acres vs 7.7 on the tax record: map-based checks "
+                      "may be off", screens.flags(p))
+
+    def test_ratios_within_bounds_raise_no_mismatch(self):
+        side = 285.0 * math.sqrt(0.55)  # about 11 acres of map for 20 on the tax record
+        for geometry, acres in ((square(*A), 20.0), (square(*A), 39.0), (square(*A, side), 20.0)):
+            p = map_checked(geometry, acres)
+            self.assertTrue(0.5 <= p["gis_acres"] / p["acres"] <= 2.0, p["gis_acres"])
+            self.assertNotIn("acreage_mismatch", p)
+        p = map_checked(square(*A), acres=0.0)  # no tax-record acreage: nothing to compare
+        self.assertNotIn("acreage_mismatch", p)
+
+    def test_normal_parcel_feature_fields_unchanged(self):
+        # The evaluation key (build_eval) reads these from map_checks.
+        p = map_checked(square(*A))
+        self.assertEqual({f: p[f] for f in self.FEATURE_FIELDS}, {
+            "usable_acres": 19.4, "constrained_pct": 3.2, "flood_pct": 3.2, "floodway_pct": 0.0,
+            "wetland_pct": 0.0, "water_pct": 0.0, "easement_pct": 0.0, "protected_pct": 0.0,
+            "exit_miles": 0.77, "rail_ft": None, "rail_owner": None,
+            "industrial_within_1mi": 1})
+        self.assertEqual(p["gis_acres"], 20.07)
+        self.assertNotIn("acreage_mismatch", p)
+
+
+class TinySlopeTests(Offline):
+    """Open ground under one 10 m lidar pixel: 3DEP answers {"statistics": []}
+    every time, so it is not asked, and it is not a failed check."""
+
+    def slope(self, geometry, open_ground=None):
+        self.serve({checks.SLOPE_URL: lambda params: copy.deepcopy(EMPTY_SLOPE)})
+        p = {"parcel_id": "P1", "geometry": geometry}
+        if open_ground is not None:
+            p["_open_ground"] = open_ground
+        checks.slope_checks([p], workers=1)
+        return p
+
+    def assert_skipped(self, p):
+        self.assertEqual(self.session.count(checks.SLOPE_URL), 0)
+        self.assertNotIn("slope_error", p)
+        self.assertTrue(p.get("slope_skipped"))
+        self.assertTrue(checks.too_small_for_slope(p))
+        for key in ("relief_ft", "steep_pct", "mean_slope_pct"):
+            self.assertIsNone(p[key])
+        self.assertNotIn("slope check failed for this parcel", screens.flags(p))
+
+    def test_sub_pixel_polygons_send_no_request(self):
+        for side in (NINE_M2, FIFTY_M2):
+            with self.subTest(side=side):
+                self.assert_skipped(self.slope(square(*A, side_m=side)))
+
+    def test_open_ground_is_what_counts(self):
+        # A normal parcel whose unconstrained ground is a sliver of map.
+        self.assert_skipped(self.slope(square(*A), open_ground=square(*A, side_m=NINE_M2)))
+
+    def test_degenerate_geometry_neither_crashes_nor_asks(self):
+        x, y = A
+        cases = {
+            "zero-area polygon": Polygon([(x, y), (x + 1e-4, y), (x + 2e-4, y), (x, y)]),
+            "degenerate ring": Polygon([(x, y), (x, y), (x, y), (x, y)]),
+            "empty": Polygon(),
+            "line only": LineString([(x, y), (x + 1e-3, y)]),
+            "collection without area": GeometryCollection(
+                [LineString([(x, y), (x + 1e-3, y)]), Point(x, y)]),
+            "collection with a tiny polygon": GeometryCollection(
+                [square(*A, side_m=NINE_M2), LineString([(x, y), (x + 1e-3, y)])]),
+        }
+        for name, geometry in cases.items():
+            with self.subTest(name):
+                self.assert_skipped(self.slope(geometry))
+        with self.subTest("empty open ground and parcel"):
+            self.assert_skipped(self.slope(Polygon(), open_ground=Polygon()))
+
+    def test_normal_parcel_request_and_cache_key_unchanged(self):
+        self.serve({checks.SLOPE_URL: lambda params: copy.deepcopy(GOOD_SLOPE)})
+        p = {"parcel_id": "P1", "geometry": square(*A)}
+        checks.slope_checks([p], workers=1)
+        self.assertNotIn("slope_skipped", p)
+        self.assertEqual(self.session.count(checks.SLOPE_URL), 1)
+        params = self.session.calls[0][1]
+        self.assertEqual(params["pixelSize"],
+                         '{"x": 10, "y": 10, "spatialReference": {"wkid": 3857}}')
+        self.assertEqual(params["renderingRule"], checks.SLOPE_RULE)
+        self.assertEqual(sorted(params), ["f", "geometry", "geometryType", "pixelSize",
+                                          "renderingRule"])
+        # Same key as before this change, so cached slope answers stay warm.
+        self.assertEqual(arcgis._cache_path(checks.SLOPE_URL, params).name,
+                         "badec35260629a3868772e8a075b5f83ef27d405b1507a593a7948b7caa4eb8a.json")
+
+    def test_a_pixel_or_more_is_still_asked(self):
+        for side in (10.5, 40.0):  # just over 100 m², and a box about 40 m wide
+            with self.subTest(side=side):
+                self.serve({checks.SLOPE_URL: lambda params: copy.deepcopy(GOOD_SLOPE)})
+                p = {"parcel_id": "P1", "geometry": square(*A, side_m=side)}
+                checks.slope_checks([p], workers=1)
+                self.assertEqual(self.session.count(checks.SLOPE_URL), 1)
+                self.assertNotIn("slope_skipped", p)
+
+
+class TinyParcelRunTests(RunHarness):
+    """Notes and flags for a sub-pixel parcel next to failed and good slope
+    checks (counts only in notes)."""
+
+    def setUp(self):
+        super().setUp()
+        tiny = county_parcel("14F0003 0003", C, owner="TEST OWNER GAMMA")
+        tiny["geometry"] = square(*C, side_m=NINE_M2)
+        self.tiny = tiny
+
+        def slope(params):
+            west = json.loads(params["geometry"])["rings"][0][0][0]
+            if west > -84.47:
+                raise AssertionError("the sub-pixel parcel was sent to 3DEP")
+            return EMPTY_SLOPE if west > -84.49 else GOOD_SLOPE  # parcel B fails
+        self.routes[checks.SLOPE_URL] = slope
+
+    def ranked_flags(self):
+        with open(self.out / "ranked.csv", newline="") as fh:
+            return {r["parcel_id"]: r["flags"] for r in csv.DictReader(fh)}
+
+    def test_mixed_run_counts_each_kind(self):
+        self.parcels.append(self.tiny)
+        code, log = self.main()
+        self.assertEqual(code, 0)
+        notes = self.notes()
+        self.assertIn("SLOPE CHECK FAILED for 1 of 3 parcels", notes)
+        geometry_note = [n for n in notes.splitlines() if "lidar pixel" in n]
+        self.assertEqual(len(geometry_note), 1)
+        self.assertIn("1 of 3 parcels", geometry_note[0])
+        self.assertNotIn("Re-run later", geometry_note[0])
+        self.assertNotIn("TEST OWNER", notes)
+        self.assertNotIn("TEST OWNER", log)
+        flags = self.ranked_flags()
+        self.assertIn("lidar pixel", flags["14F0003 0003"])
+        self.assertIn("parcel map shows 0.0 acres", flags["14F0003 0003"])
+        self.assertNotIn("slope check failed", flags["14F0003 0003"])
+        self.assertIn("slope check failed", flags["14F0002 0002"])
+        self.assertNotIn("lidar pixel", flags["14F0001 0001"] + flags["14F0002 0002"])
+
+    def test_only_tiny_parcels_is_not_a_failed_slope_check(self):
+        self.parcels[:] = [self.tiny]
+        code, _ = self.main()
+        self.assertEqual(code, 0)
+        notes = self.notes()
+        self.assertNotIn("SLOPE CHECK FAILED", notes)
+        self.assertIn("1 of 1 parcels", notes)
+        self.assertNotIn("Re-run later", notes)
+        self.assertEqual(self.session.count(checks.SLOPE_URL), 0)
+
+    def test_geometry_note_without_slope(self):
+        self.parcels.append(self.tiny)
+        code, _ = self.main("--no-slope")
+        self.assertEqual(code, 0)
+        notes = self.notes()
+        self.assertIn("1 of 3 parcels", notes)
+        self.assertIn("lidar pixel", notes)
+        self.assertIn("lidar pixel", self.ranked_flags()["14F0003 0003"])
+
+
+class OtherReasonsTests(unittest.TestCase):
+    """summary.md lists the 12 most common reject reasons, then the rest."""
+
+    def summary(self, reasons):
+        s = {"county": "Fulton", "run_date": "2026-10-29", "funnel": [("ranked", 0)],
+             "reject_reasons": reasons, "notes": []}
+        return report._summary_md(s, [])
+
+    def test_more_than_twelve_reasons(self):
+        reasons = [(f"reason {i}", 100 - i) for i in range(15)] + [("government-owned", 2)]
+        text = self.summary(reasons)
+        self.assertIn("- 89 — reason 11", text)
+        self.assertNotIn("reason 12", text)
+        self.assertIn("- 263 — other reasons (4 kinds; see rejected.csv)", text)  # 88+87+86+2
+
+    def test_twelve_or_fewer_reasons(self):
+        for n in (0, 3, 12):
+            with self.subTest(n=n):
+                text = self.summary([(f"reason {i}", 50 - i) for i in range(n)])
+                self.assertNotIn("other reasons", text)
+                self.assertEqual(text.count("— reason"), n)
 
 
 if __name__ == "__main__":

@@ -80,10 +80,12 @@ _ASSOCIATION_RE = re.compile(
 # HOMES ASSOC L P" and "LENOX TOWERS ASSOC LTD" are associates.
 _PARTNERSHIP_RE = re.compile(r"\b(L ?L ?L ?P|L ?L ?P|L ?P|LTD)\b")
 # HOA is also a given name ("NGUYEN THI HOA"): it counts only after the
-# first word of a company's name ("HIGH GROVE HOA INC"). POA alone usually
-# means power of attorney, so it never counts.
+# first word of a company's name, which needs a legal form anywhere in it
+# ("HIGH GROVE HOA INC", "... TOWNHOMES INC HOA"). THE doesn't count: it is
+# also a Vietnamese middle name ("NGUYEN THE HOA" is a person). POA alone
+# usually means power of attorney, so it never counts.
 _HOA_RE = re.compile(r"\S \bHOA\b")
-_HOA_COMPANY_RE = re.compile(r"\b(INC|LLC|L L C|CORP|CORPORATION|THE)\b")
+_HOA_COMPANY_RE = re.compile(r"\b(INC|LLC|L L C|CORP|CORPORATION)\b")
 _UTILITY_RE = re.compile(
     # RR / RY only with a company word: "SMITH R R" is a person's initials.
     r"\bRAILWAY\b|\bRAILROAD\b|\bRAIL ROAD\b|\bRWY\b|"

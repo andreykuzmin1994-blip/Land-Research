@@ -38,18 +38,22 @@ from __future__ import annotations
 import __future__
 import argparse
 import ast
+import codecs
 import csv
 import gzip
 import hashlib
 import importlib
 import importlib.util
 import inspect
+import io
 import json
 import math
 import random
+import re
 import subprocess
 import sys
 import time
+import tokenize
 import typing
 from pathlib import Path
 
@@ -77,13 +81,31 @@ WIN_SHARE_TO_KEEP = 0.9
 HIDDEN = ("key", "split", "block")           # never passed to the ranking
 # What rank.py may import (PROGRAM.md: pure, no I/O). math is for smooth curves.
 RANK_IMPORTS = ("__future__", "math", "typing")
-# Builtins, helpers and attributes that open files, run code, or reach module
-# internals or the evaluator's stack frames (str.format can walk attributes).
+# typing is for annotations only. Its other names build classes, metaclasses
+# and forward references (get_origin(Type[int]) is type).
+RANK_TYPING_NAMES = {"Any", "Optional", "Union", "Mapping", "Sequence", "Iterable", "Callable",
+                     "Dict", "List", "Tuple", "Final", "Literal", "TYPE_CHECKING"}
+# Builtins, helpers and attributes that open files, run code, print, build
+# classes (type), or reach module internals or the evaluator's stack frames
+# (str.format can walk attributes).
 RANK_BANNED_NAMES = {"open", "exec", "eval", "compile", "__import__", "globals", "locals", "vars",
                      "getattr", "setattr", "delattr", "breakpoint", "input", "get_type_hints",
                      "ForwardRef", "format", "format_map", "gi_frame", "cr_frame", "ag_frame",
-                     "tb_frame", "f_back", "f_globals", "f_locals", "f_builtins"}
+                     "tb_frame", "f_back", "f_globals", "f_locals", "f_builtins", "type",
+                     "print", "help", "exit", "quit", "license", "credits", "copyright"}
+# Attributes of generators (gi_), coroutines (cr_), async generators (ag_),
+# tracebacks (tb_), frames (f_) and code objects (co_). They lead to the
+# evaluator's frames, or rebuild a function so that it reads an attribute
+# named by a string (gi_code.replace(co_names=...)).
+RANK_FRAME_ATTR = re.compile(r"(gi|cr|ag|tb|f|co)_")
+# Strings that are exactly a dunder, a frame/code attribute or one of these
+# builtins. Defence in depth only: a computed string gets past it.
+RANK_BANNED_STRING_NAMES = {"open", "exec", "eval", "compile", "__import__", "globals", "locals",
+                            "vars", "getattr", "setattr", "delattr", "breakpoint"}
 RANK_BANNED_STRINGS = ("autoresearch/data", "fulton_2016", "experiments.tsv", "best_ranking")
+# What to use instead, in refusal messages.
+RANK_HINTS = {"type": " (use isinstance)", "format": " (use an f-string)",
+              "format_map": " (use an f-string)", "print": " (put reasons in why_site / why_seller)"}
 
 
 def load() -> tuple[list[dict], set[str], dict]:
@@ -188,27 +210,55 @@ def paired_win_share(records: list[dict], positives: set[str], new: list[str],
     return wins / BOOTSTRAP
 
 
-def rank_problems(source: str) -> list[str]:
+def rank_problems(source: str | bytes) -> list[str]:
     """Why rank.py's source breaks PROGRAM.md rules 1-3, if it does.
 
-    rank.py may import only __future__, math and typing (no module objects
-    or private names through them); may not use open, eval, exec, compile,
-    getattr, globals, vars, str.format, frame attributes (gi_frame, f_back,
-    f_locals...) and the like, dunder names, private attributes, or global /
-    nonlocal state; and its strings (docstrings aside) may not name the
-    evaluation files. It reads the source before rank.py is imported. It
-    guards against drift and is not a sandbox.
+    It reads the source before rank.py is imported (bytes are parsed the way
+    the importer compiles them). It refuses:
+    - imports other than __future__, math and typing; typing names outside
+      RANK_TYPING_NAMES; module objects or private names through them;
+    - the names in RANK_BANNED_NAMES (open, eval, exec, compile, getattr,
+      globals, vars, type, print, str.format, frame attributes...), dunder
+      names, and private (_x) or frame/code (gi_, cr_, ag_, tb_, f_, co_)
+      attributes;
+    - match statements, dunder function or class names, class keywords
+      (metaclass=), and dunder or co_ keyword arguments;
+    - binding a dunder name with import ... as or except ... as (import
+      typing as __builtins__ swaps the builtins of later functions);
+    - assigning to or deleting an attribute of an imported module or name
+      (math.isfinite = ...), and global / nonlocal state;
+    - strings (docstrings aside) that name the evaluation files, or that are
+      exactly a dunder, a frame/code attribute or a banned builtin.
+    It guards against drift and is not a sandbox: these are the routes known
+    to read attributes by a string or to reach the evaluator's frames, not
+    every possible one.
     """
     try:
         tree = ast.parse(source)
     except SyntaxError as e:
         return [f"does not parse ({e.msg}, line {e.lineno})"]
+    except ValueError as e:                     # null bytes (Python 3.11)
+        return [f"does not parse ({e})"]
     modules = {name for m in (__future__, math, typing) for name, value in vars(m).items()
                if inspect.ismodule(value)}
+    typing_hint = f" (typing is for annotations: {', '.join(sorted(RANK_TYPING_NAMES))})"
+
+    def dunder(name: str) -> bool:
+        return name[:2] == name[-2:] == "__"
 
     def banned_attr(name: str) -> bool:
-        return name.startswith("_") or name in modules or name in RANK_BANNED_NAMES
+        return (name.startswith("_") or name in modules or name in RANK_BANNED_NAMES
+                or bool(RANK_FRAME_ATTR.match(name)))
 
+    # Each name an import binds, and what it binds ("typing" is the module).
+    bound = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            bound.update({a.asname or a.name.split(".")[0]: a.name for a in node.names})
+        elif isinstance(node, ast.ImportFrom):
+            bound.update({a.asname or a.name: f"{node.module}.{a.name}" for a in node.names})
+    module_names = {name for name, what in bound.items() if what in RANK_IMPORTS}
+    attr_bases = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
     docstrings = {id(node.body[0].value) for node in ast.walk(tree)
                   if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
                                        ast.AsyncFunctionDef))
@@ -216,27 +266,63 @@ def rank_problems(source: str) -> list[str]:
     problems = []
     for node in ast.walk(tree):
         where = f"line {getattr(node, 'lineno', '?')}"
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            # import typing as __builtins__: functions defined after it look up
+            # bare names (sys, operator) in typing's namespace.
+            problems += [f"{where}: imports {a.name} as {a.asname} (no dunder names)"
+                         for a in node.names if a.asname and dunder(a.asname)]
         if isinstance(node, ast.Import):
             problems += [f"{where}: imports {a.name}" for a in node.names
                          if a.name not in RANK_IMPORTS]
         elif isinstance(node, ast.ImportFrom):
             if node.level or node.module not in RANK_IMPORTS:
                 problems.append(f"{where}: imports from {'.' * node.level}{node.module or ''}")
-            problems += [f"{where}: imports {a.name} from {node.module}" for a in node.names
-                         if a.name == "*" or banned_attr(a.name)]
-        elif isinstance(node, ast.Name) and (node.id in RANK_BANNED_NAMES
-                                             or node.id[:2] == node.id[-2:] == "__"):
-            problems.append(f"{where}: uses {node.id}")
-        elif isinstance(node, ast.Attribute) and banned_attr(node.attr):
-            problems.append(f"{where}: uses .{node.attr}")
-        elif isinstance(node, ast.MatchClass):           # case C(attr=x) reads C.attr
-            problems += [f"{where}: uses .{a}" for a in node.kwd_attrs if banned_attr(a)]
+            for a in node.names:
+                if a.name == "*" or banned_attr(a.name):
+                    problems.append(f"{where}: imports {a.name} from {node.module}")
+                elif node.module == "typing" and a.name not in RANK_TYPING_NAMES:
+                    problems.append(f"{where}: imports {a.name} from typing{typing_hint}")
+        elif isinstance(node, ast.Name):
+            if node.id in RANK_BANNED_NAMES or dunder(node.id):
+                problems.append(f"{where}: uses {node.id}{RANK_HINTS.get(node.id, '')}")
+            elif (node.id in module_names and isinstance(node.ctx, ast.Load)
+                  and id(node) not in attr_bases):     # m = math; m.isfinite = ...
+                problems.append(f"{where}: uses the module {node.id} as a value "
+                                f"(use {node.id}.<name>)")
+        elif isinstance(node, ast.Attribute):
+            if banned_attr(node.attr):
+                problems.append(f"{where}: uses .{node.attr}{RANK_HINTS.get(node.attr, '')}")
+            elif (isinstance(node.value, ast.Name) and bound.get(node.value.id) == "typing"
+                  and node.attr not in RANK_TYPING_NAMES):
+                problems.append(f"{where}: uses {node.value.id}.{node.attr}{typing_hint}")
+            if (isinstance(node.ctx, (ast.Store, ast.Del)) and isinstance(node.value, ast.Name)
+                    and node.value.id in bound):
+                problems.append(f"{where}: changes {node.value.id}.{node.attr} (imported modules "
+                                "and names are shared with the evaluator; leave them as they are)")
+        elif isinstance(node, ast.Match):          # a class pattern reads attributes
+            problems.append(f"{where}: uses a match statement (use if/elif)")
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if dunder(node.name):                  # __getattr__, __instancecheck__, ...
+                problems.append(f"{where}: defines {node.name} (no dunder methods or hooks; "
+                                "use plain functions)")
+            if isinstance(node, ast.ClassDef):
+                problems += [f"{where}: class {node.name} takes {k.arg or '**'}= (no class "
+                             "keywords such as metaclass=)" for k in node.keywords]
+        elif (isinstance(node, ast.keyword) and node.arg
+              and (dunder(node.arg) or node.arg.startswith("co_"))):
+            problems.append(f"{where}: passes {node.arg}=")
+        elif isinstance(node, ast.ExceptHandler) and node.name and dunder(node.name):
+            problems.append(f"{where}: binds {node.name} (no dunder names)")
         elif isinstance(node, (ast.Global, ast.Nonlocal)):
             problems.append(f"{where}: keeps state between calls ({', '.join(node.names)})")
         elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
-              and id(node) not in docstrings
-              and any(name in node.value for name in RANK_BANNED_STRINGS)):
-            problems.append(f"{where}: names an evaluation file ({node.value!r})")
+              and id(node) not in docstrings):
+            if any(name in node.value for name in RANK_BANNED_STRINGS):
+                problems.append(f"{where}: names an evaluation file ({node.value!r})")
+            elif (re.fullmatch(r"__\w+__", node.value) or node.value in RANK_BANNED_STRING_NAMES
+                  or re.fullmatch(RANK_FRAME_ATTR.pattern + r"\w+", node.value)):
+                problems.append(f"{where}: string {node.value!r} names a dunder, a frame/code "
+                                "attribute or a refused builtin")
     return problems
 
 
@@ -250,11 +336,21 @@ def _rank_origin() -> str | None:
 
 
 def rank_import_problems() -> list[str]:
-    """rank_problems for the rank.py that would be imported."""
+    """rank_problems for the rank.py that would be imported, read the way the
+    importer reads it: the file's bytes, decoded by their own coding
+    declaration, which must be UTF-8. (Under '# coding: utf-7', text that
+    reads as a comment can decode to a line of code.)"""
     origin = _rank_origin()
     if not origin or Path(origin).resolve() != RANK_FILE.resolve():
         return [f"screener.rank would load from {origin}, not screener/rank.py"]
-    return rank_problems(RANK_FILE.read_text())
+    data = RANK_FILE.read_bytes()
+    try:
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(data).readline)
+    except SyntaxError as e:
+        return [f"has an unreadable coding declaration ({e})"]
+    if codecs.lookup(encoding).name not in ("utf-8", "utf-8-sig"):
+        return [f"declares the {encoding} encoding; rank.py must be UTF-8"]
+    return rank_problems(data)
 
 
 def _git(*args: str) -> str:
