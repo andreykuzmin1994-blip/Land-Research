@@ -1,0 +1,18 @@
+# Land Research settings
+# Fill in the values after the = signs, save this file, then run Install.bat
+# (first time) or "Start Land Research.bat". Keep this file private: it holds
+# your database password. Do not put it in the repository.
+
+# Supabase > your project > Connect > Session pooler connection string
+# (port 5432). Put your real password in place of [YOUR-PASSWORD]; if it has
+# special characters, URL-encode them (@ -> %40, # -> %23, ! -> %21).
+DATABASE_URL=
+
+# The Windows folder where you save CoStar CSV exports. File names must start
+# with submarket_stats_, land_sales_comps_, building_sales_comps_,
+# leasing_comps_ or land_listings_ (for example land_sales_comps_202610.csv).
+COSTAR_FOLDER=C:\Users\YOUR-NAME\Documents\CoStar
+
+# Usually leave these as they are.
+MARKET=atlanta
+REPO_URL=https://github.com/andreykuzmin1994-blip/Land-Research.git
