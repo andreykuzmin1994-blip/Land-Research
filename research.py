@@ -805,12 +805,35 @@ _SQL_INSERT_RESEARCH_LOG_SCORING = (
 # 2.5x inflation rule (state), and the BTS/ground-lease minimum-acreage
 # strategy-fit branches. Phase 5 tests that queued the 4-column tuple
 # are updated to queue the 9-column tuple.
+#
+# CoStar submarket resolution (reviews/19_costar_import): a parcel's
+# submarket is the CoStar submarket whose area (submarkets.bbox, written by
+# costar_import.py from where that submarket's sale comps sit) is nearest
+# the parcel centroid -- 0 m when inside, at most 3 km away; ties go to the
+# smaller area, then the id. Resolved at READ time and never stored, so a
+# discarded experiment leaves no state behind (the purge covers
+# parcel_scores only). With no area in range, the stored parcels.submarket
+# (the discovery corridor name) is kept. Both the per-parcel fetch and the
+# cycle prefetch use this one expression, so the cache and no-cache paths
+# resolve identically.
+_SQL_RESOLVED_SUBMARKET = (
+    "COALESCE(("
+    "SELECT s.submarket_id FROM submarkets s "
+    "WHERE s.market_id = p.market AND s.bbox IS NOT NULL "
+    "AND p.centroid IS NOT NULL "
+    "AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) "
+    "ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), "
+    "ST_Area(s.bbox::geography), s.submarket_id LIMIT 1"
+    "), p.submarket)"
+)
+
 _SQL_FETCH_PARCEL = (
-    "SELECT parcel_id, market, submarket, state, acreage, "
-    "last_sale_date, last_sale_price, assessed_value_total, "
-    "ST_X(centroid)::float AS centroid_lng, "
-    "ST_Y(centroid)::float AS centroid_lat "
-    "FROM parcels WHERE parcel_id = %s"
+    "SELECT p.parcel_id, p.market, " + _SQL_RESOLVED_SUBMARKET + " AS submarket, "
+    "p.state, p.acreage, "
+    "p.last_sale_date, p.last_sale_price, p.assessed_value_total, "
+    "ST_X(p.centroid)::float AS centroid_lng, "
+    "ST_Y(p.centroid)::float AS centroid_lat "
+    "FROM parcels p WHERE p.parcel_id = %s"
 )
 
 # S2 PostGIS query — returns area, bbox area, and aspect ratio in one shot.
@@ -981,10 +1004,13 @@ _SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH = (
 # Phase 13 (R-1317): the distinct non-null submarkets for the cycle's parcel
 # set, used to bound the market-context and land-median prefetch arrays. Keyed
 # off the SAME parcel_ids the scoring loop iterates so the cache never misses a
-# scored parcel's submarket. Raw submarket strings (no normalization, R-1315).
+# scored parcel's submarket. Raw submarket strings (no normalization, R-1315),
+# resolved with the same _SQL_RESOLVED_SUBMARKET as _SQL_FETCH_PARCEL.
 _SQL_DISTINCT_SUBMARKETS_FOR_PARCELS = (
-    "SELECT DISTINCT submarket FROM parcels "
-    "WHERE parcel_id = ANY(%s) AND submarket IS NOT NULL"
+    "SELECT DISTINCT sm FROM ("
+    "SELECT " + _SQL_RESOLVED_SUBMARKET + " AS sm "
+    "FROM parcels p WHERE p.parcel_id = ANY(%s)"
+    ") q WHERE sm IS NOT NULL"
 )
 
 

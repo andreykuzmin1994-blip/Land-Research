@@ -42,6 +42,51 @@ Files that don't match the pattern for their subdirectory are silently
 skipped — they don't fail the cycle, they just don't ingest. Hidden files
 (`.something`) are also skipped.
 
+## CoStar Excel exports (`costar_import.py`)
+
+CoStar's own Excel export does not match the CSV contract above, so
+`costar_import.py` converts it. Run it **between runs only**, then start a
+new run (`make setup` + `make baseline`); the home-machine autopilot does
+this for any new `.xlsx` in your CoStar folder when you use **Start New
+Run**.
+
+```bash
+make costar-import FILE=path/to/ATL_export.xlsx
+```
+
+Sheets are recognized by their headers:
+
+- **Submarket stats** (`Geography Name`, `Concept Name`, quarter columns)
+  become `costar_exports/submarket_stats/submarket_stats_<quarter end>.csv`.
+  Only the last FULL quarter is used (`2026 Q3`), never `QTD` or `EST`
+  (forecast); `report_date` is that quarter's end, so re-importing the same
+  workbook is idempotent. Rows other than `Industrial`, the market total
+  and `(Cluster)` rows are dropped; `Atlanta - GA USA - ` is stripped from
+  names. Rates given as fractions are converted to percents.
+  Approximations: `availability_rate_pct` = `Vacant Available %`;
+  `asking_rent_nnn_psf` = `All Service Type Rent Overall` (CoStar's
+  all-service-type rent, not strictly NNN; the memo still labels it NNN);
+  `proposed_sf` is blank (not in this export; S6 uses under-construction).
+- **Sale comps** (`Submarket Name`, `Parcel Number 1 (Min)`) locate each
+  submarket. Fulton-format parcel numbers (`14F-0134-LL-019-5`) are looked
+  up in the Fulton parcel layer registered in `sources.json` (1 request per
+  second, cached in `costar_exports/.comp_parcel_locations.json`). A
+  submarket with at least 3 located comps (isolated ones, with no other comp
+  of the submarket within 8 km, are dropped) gets `submarkets.bbox` = a
+  300 m buffer around their convex hull, all in one transaction. Areas this
+  tool did not write (a human-seeded bbox) are never overwritten.
+  `research.py` then gives each parcel the submarket whose area is nearest,
+  within 3 km, at read time; parcels further from every area keep their
+  corridor name and score S4/S5/S6 as missing data.
+
+These building sale comps do NOT feed S8 (land basis), which needs
+`land_sales_comps`. Other counties' parcel numbers are not located yet
+(Fulton is the only configured county).
+
+Without a database the stats CSV is still written and the tool exits 2
+("areas not written"). Output shows counts only: CoStar data is licensed
+and stays under the gitignored `costar_exports/`.
+
 ---
 
 ## Phase 6.1 scope

@@ -312,6 +312,18 @@ mirror-restore:  ## Disaster recovery: rebuild a MISSING experiment_log.tsv from
 	@python cli.py --no-color mirror-restore
 
 # ---------------------------------------------------------------------
+# CoStar Excel import (reviews/19_costar_import) -- between runs only
+# ---------------------------------------------------------------------
+.PHONY: costar-import
+costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas. Between runs, before make baseline. FILE=path
+	@if [ -z "$(FILE)" ]; then echo "==> usage: make costar-import FILE=path/to/export.xlsx"; exit 1; fi
+	@if command -v flock >/dev/null && [ -f .experiment_loop.lock ] && ! flock -n .experiment_loop.lock true; then \
+	  echo "==> REFUSED: a loop is running. Import between runs, then start a new run (make setup + make baseline)."; \
+	  exit 1; \
+	fi
+	@python costar_import.py "$(FILE)"
+
+# ---------------------------------------------------------------------
 # Higher-level recipes
 # ---------------------------------------------------------------------
 .PHONY: resume

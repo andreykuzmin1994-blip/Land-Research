@@ -40,6 +40,7 @@ _PIPELINE_MODULES = (
     "runner.py",
     "research.py",
     "costar_ingest.py",
+    "costar_import.py",
     "reporting.py",
     "pipeline_common.py",
     "connector_harness.py",

@@ -41,10 +41,16 @@ check on it with **Status** and stop it with **Stop**.
 | `Stop Land Research.bat` | Stops after the experiment in progress. |
 | `Start New Run.bat` | Starts a fresh run with a new baseline. Use it after `parameters.json` or `prepare.py` change, or when a run ended. |
 
-**CoStar exports:** save the CSVs into your `COSTAR_FOLDER`. Names must start
-with `submarket_stats_`, `land_sales_comps_`, `building_sales_comps_`,
-`leasing_comps_` or `land_listings_`. New files are picked up before the next
-experiment.
+**CoStar exports:** save them into your `COSTAR_FOLDER`.
+
+- CoStar's **Excel export** (`.xlsx` with the submarket stats and sale comps
+  sheets) is imported when you use **Start New Run** (or the first Start),
+  before the run's baseline: it sets the market numbers and where each
+  submarket is. A new workbook during a run waits for the next Start New
+  Run, so a run's experiments are all compared on the same data.
+- **CSV** exports named `submarket_stats_`, `land_sales_comps_`,
+  `building_sales_comps_`, `leasing_comps_` or `land_listings_` are picked
+  up before the next experiment.
 
 ## How the loop works
 

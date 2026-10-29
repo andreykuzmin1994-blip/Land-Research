@@ -139,6 +139,42 @@ sync_costar() {
     done
 }
 
+# CoStar Excel workbooks (.xlsx) are imported only when a NEW run starts,
+# after its branch is cut and before its baseline: stats and submarket
+# areas change what every parcel scores, so importing mid-run would credit
+# the jump to whichever experiment ran next (reviews/19_costar_import).
+xlsx_pending() {
+    local src f key done_list="$STATE/costar_xlsx_imported.txt"
+    [ -n "${COSTAR_FOLDER:-}" ] || return 0
+    case "$COSTAR_FOLDER" in
+        [A-Za-z]:\\*|[A-Za-z]:/*) src=$(wslpath -u "$COSTAR_FOLDER" 2>/dev/null) ;;
+        *) src=$COSTAR_FOLDER ;;
+    esac
+    [ -n "$src" ] && [ -d "$src" ] || return 0
+    touch "$done_list"
+    for f in "$src"/*; do
+        [ -f "$f" ] || continue
+        case "$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')" in *.xlsx) ;; *) continue ;; esac
+        key="$(basename "$f")|$(stat -c '%s.%Y' "$f")"
+        grep -qxF "$key" "$done_list" || printf '%s\t%s\n' "$key" "$f"
+    done
+}
+
+import_workbooks() {
+    local key f rc
+    while IFS=$'\t' read -r key f; do
+        [ -n "$f" ] || continue
+        say "CoStar: importing workbook $(basename "$f")"
+        python costar_import.py "$f" 2>&1 | tee -a "$LOG"
+        rc=${PIPESTATUS[0]}
+        case "$rc" in
+            0) printf '%s\n' "$key" >> "$STATE/costar_xlsx_imported.txt" ;;
+            2) die "CoStar workbook imported without submarket areas (database not reachable); fix and Start New Run again" ;;
+            *) die "CoStar workbook $(basename "$f") was refused; see the message above" ;;
+        esac
+    done < <(xlsx_pending)
+}
+
 # --- git / TSV helpers --------------------------------------------------------
 
 tsv_rows() { [ -f experiment_log.tsv ] && wc -l < experiment_log.tsv || echo 0; }
@@ -254,10 +290,14 @@ start() {
     if [ "$flag" = "--new-run" ] || [ -z "$tag" ] \
         || ! git show-ref --verify --quiet "refs/heads/autoresearch/$tag"; then
         new_run
+        import_workbooks
     else
         git checkout -q "autoresearch/$tag" || die "cannot switch to autoresearch/$tag"
         clean_tree
         say "resuming run autoresearch/$tag"
+        if [ -n "$(xlsx_pending)" ]; then
+            say "CoStar: a new workbook is in your CoStar folder. It is imported when you Start New Run, not mid-run (it would skew the comparison with this run's baseline)."
+        fi
     fi
     recover_unkept
     sync_costar

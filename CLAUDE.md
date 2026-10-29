@@ -30,7 +30,8 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
 - **NEVER edit `program.md`** — human-only strategic direction, at any
   tier, in any session type.
 - **Immutable during a run**: `runner.py`, `costar_ingest.py`,
-  `reporting.py`, `pipeline_common.py`. Between runs, changes there are
+  `costar_import.py`, `reporting.py`, `pipeline_common.py`. Between runs,
+  changes there are
   Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **`research.py` is the agent sandbox** — the ONLY file the agent edits
   during an experiment run. One focused change per experiment, committed

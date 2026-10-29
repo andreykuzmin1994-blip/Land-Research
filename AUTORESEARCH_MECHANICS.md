@@ -79,6 +79,7 @@ This is the equivalent of Karpathy's `train.py`. The agent modifies this file fr
 - `costar_ingest.py` — the CoStar export ETL, frozen to `COSTAR_INGESTION_CONTRACT.md`.
 - `reporting.py` — snapshot and strategy memo rendering.
 - `pipeline_common.py` — shared paths, the `flagged_items` helper, shared SQL.
+- `costar_import.py` (added 2026-10-29, `reviews/19_costar_import/`) — operator tool that converts a CoStar Excel export into the contract's `submarket_stats` CSV and writes `submarkets.bbox` areas from where each submarket's sale comps sit. Run between runs only, before a new run's baseline: importing mid-run would change every later experiment's inputs. `research.py` resolves a parcel's submarket from those areas at read time and never stores it, so a discarded experiment leaves no submarket state behind.
 
 **The critical separation**: `research.py` produces parcel records and sub-scores. `prepare.py` evaluates those records to produce the metric, and `runner.py` runs the loop that records the outcome. The agent can change how it produces the inputs, but it cannot change how they are evaluated or how the ratchet is recorded.
 
