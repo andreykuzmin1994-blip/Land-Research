@@ -156,8 +156,8 @@ xlsx_pending() {
         [ -f "$f" ] || continue
         case "$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')" in *.xlsx) ;; *) continue ;; esac
         key="$(basename "$f")|$(stat -c '%s.%Y' "$f")"
-        grep -qxF "$key" "$done_list" || printf '%s\t%s\n' "$key" "$f"
-    done
+        grep -qxF "$key" "$done_list" || printf '%s\t%s\t%s\n' "$(stat -c '%Y' "$f")" "$key" "$f"
+    done | sort -n | cut -f2-       # oldest first: the newest workbook sets the areas last
 }
 
 import_workbooks() {
@@ -169,7 +169,8 @@ import_workbooks() {
         rc=${PIPESTATUS[0]}
         case "$rc" in
             0) printf '%s\n' "$key" >> "$STATE/costar_xlsx_imported.txt" ;;
-            2) die "CoStar workbook imported without submarket areas (database not reachable); fix and Start New Run again" ;;
+            2) die "CoStar workbook imported without submarket areas (database not reachable); fix it, then Start again" ;;
+            3) die "CoStar workbook not imported: this run already has its baseline. Use Start New Run" ;;
             *) die "CoStar workbook $(basename "$f") was refused; see the message above" ;;
         esac
     done < <(xlsx_pending)
@@ -295,7 +296,11 @@ start() {
         git checkout -q "autoresearch/$tag" || die "cannot switch to autoresearch/$tag"
         clean_tree
         say "resuming run autoresearch/$tag"
-        if [ -n "$(xlsx_pending)" ]; then
+        if ! has_baseline; then
+            # The run was set up but never baselined (e.g. an import failed
+            # after the branch was cut): import now, still before the baseline.
+            import_workbooks
+        elif [ -n "$(xlsx_pending)" ]; then
             say "CoStar: a new workbook is in your CoStar folder. It is imported when you Start New Run, not mid-run (it would skew the comparison with this run's baseline)."
         fi
     fi

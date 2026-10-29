@@ -45,10 +45,12 @@ skipped — they don't fail the cycle, they just don't ingest. Hidden files
 ## CoStar Excel exports (`costar_import.py`)
 
 CoStar's own Excel export does not match the CSV contract above, so
-`costar_import.py` converts it. Run it **between runs only**, then start a
-new run (`make setup` + `make baseline`); the home-machine autopilot does
-this for any new `.xlsx` in your CoStar folder when you use **Start New
-Run**.
+`costar_import.py` converts it. Run it **between runs only**: after
+`make setup` cuts the new run's branch and before `make baseline`. Once the
+current run has its baseline the tool refuses (exit 3), because new stats
+and areas would change what every later experiment scores. The
+home-machine autopilot imports any new `.xlsx` in your CoStar folder at
+that point when you use **Start New Run**.
 
 ```bash
 make costar-import FILE=path/to/ATL_export.xlsx
@@ -74,7 +76,11 @@ Sheets are recognized by their headers:
   submarket with at least 3 located comps (isolated ones, with no other comp
   of the submarket within 8 km, are dropped) gets `submarkets.bbox` = a
   300 m buffer around their convex hull, all in one transaction. Areas this
-  tool did not write (a human-seeded bbox) are never overwritten.
+  tool did not write (a human-seeded bbox) are never overwritten; areas it
+  wrote earlier for submarkets that no longer qualify are cleared.
+  Other counties' parcel numbers can look like Fulton's; they are simply
+  not found (the tool reports the located share and how many submarkets
+  get no area).
   `research.py` then gives each parcel the submarket whose area is nearest,
   within 3 km, at read time; parcels further from every area keep their
   corridor name and score S4/S5/S6 as missing data.

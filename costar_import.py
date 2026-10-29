@@ -1,14 +1,16 @@
 """Import a CoStar Excel export: submarket stats CSV + submarket areas.
 
-Operator tool, run between runs (never by the agent, never mid-run):
+Operator tool, run BETWEEN runs only (never by the agent, never mid-run):
 
     python costar_import.py path/to/ATL_export.xlsx [--no-areas]
     make costar-import FILE=path/to/ATL_export.xlsx
 
-home_machine/autopilot.sh runs it before a NEW run's baseline, so a run's
-baseline and all its experiments see the same CoStar data
-(reviews/19_costar_import, risk 2). Immutable during a run, like
-costar_ingest.py.
+It refuses (exit 3) once the current autoresearch/<tag> run has its
+baseline row: new stats and areas change what every later experiment
+scores, so the jump would be credited to whichever experiment ran next
+(reviews/19_costar_import, risk 2). home_machine/autopilot.sh runs it after
+a NEW run's branch is cut and before its baseline. Immutable during a run,
+like costar_ingest.py.
 
 What it does with the workbook (sheets are found by their headers):
 
@@ -28,21 +30,23 @@ What it does with the workbook (sheets are found by their headers):
    each submarket's comps sit. Fulton-format parcel numbers are located
    through the Fulton parcel layer registered in sources.json (fulton_ga,
    read-only here); each submarket with at least MIN_POINTS located comps
-   gets submarkets.bbox = a 300 m buffer around their convex hull (a comp with
-   no other comp of its submarket within OUTLIER_KM is dropped). research.py assigns
-   each parcel to the nearest area at read time; nothing is stored on
-   parcels.
+   gets submarkets.bbox = a 300 m buffer around their convex hull (a comp
+   with no other comp of its submarket within OUTLIER_KM is dropped).
+   research.py assigns each parcel to the nearest area at read time;
+   nothing is stored on parcels.
 
 Areas are written in ONE transaction, only over areas this tool wrote
 before (notes start with AREA_NOTE_PREFIX) or empty ones: a human-seeded
-bbox is never overwritten. Without a database the CSV is still written and
-the tool exits 2 ("areas not written").
+bbox is never overwritten. A tool-written area whose submarket no longer
+qualifies in the new export is cleared, so no area outlives its data.
+Without a database the CSV is still written and the tool exits 2 ("areas
+not written").
 
 CoStar data is licensed: everything lands under costar_exports/
-(gitignored); the console shows counts only.
+(gitignored); the console shows counts only, never names or values.
 
 Depends only on prepare, costar_ingest and pipeline_common -- never on
-research.py, the agent's sandbox.
+research.py (the agent's sandbox) or runner.py (which imports it).
 """
 
 from __future__ import annotations
@@ -63,6 +67,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import psycopg
 import requests
 
 import costar_ingest
@@ -78,9 +83,14 @@ AREA_BUFFER_M = 300.0
 AREA_NOTE_PREFIX = "costar_import area"
 REQUEST_INTERVAL_S = 1.0          # SR-11: 1 request/second per county host
 MAX_RETRIES = 3
+MAX_PAGES_PER_LOT = 20
 MAX_XLSX_UNCOMPRESSED = 200 * 1024 * 1024
+HEADER_SEARCH_ROWS = 10
 FULTON_ENVELOPE = (-84.95, 33.35, -84.0, 34.25)   # loose lon/lat sanity box
 LOCATION_CACHE = _COSTAR_BASE_DIR / ".comp_parcel_locations.json"
+EXPERIMENT_LOG = _REPO_ROOT / "experiment_log.tsv"
+# Same marker runner._DESCRIPTION_RUN_RE reads (pinned by a test).
+_RUN_MARKER_RE = re.compile(r"(?:^|\s)run=([a-z0-9._-]+)")
 
 STATS_OUT_COLUMNS = (
     "submarket_name", "market", "total_inventory_sf", "vacancy_rate_pct",
@@ -102,6 +112,7 @@ INT_COLUMNS = {"total_inventory_sf", "net_absorption_t12_sf",
 QUARTER_RE = re.compile(r"^(\d{4}) Q([1-4])$")
 # Fulton parcel ids: 2-digit district (+ optional letter), 4-digit land lot,
 # then the rest, once spaces and dashes are removed ('14F0134LL0195').
+# Other counties' ids can share this shape; they simply are not found.
 FULTON_ID_RE = re.compile(r"^(\d{2}[A-Z]?)(\d{4})([A-Z0-9]{3,12})$")
 
 _SQL_AREA_FROM_POINTS = (
@@ -118,21 +129,48 @@ _SQL_UPDATE_SUBMARKET_AREA = (
     "UPDATE submarkets SET bbox = ST_GeomFromEWKT(%s), notes = %s "
     "WHERE submarket_id = %s"
 )
+# Tool-written areas of this market that the new export no longer supports.
+_SQL_CLEAR_STALE_AREAS = (
+    "UPDATE submarkets SET bbox = NULL, notes = NULL "
+    "WHERE market_id = %s AND bbox IS NOT NULL AND notes LIKE %s "
+    "AND NOT (submarket_id = ANY(%s))"
+)
 
 
 class ImportError_(Exception):
-    """A workbook or sheet this tool refuses (message is operator-facing)."""
+    """A workbook, sheet or state this tool refuses (operator-facing message)."""
+
+
+# ---------------------------------------------------------------------------
+# Run-state guard (risk 2)
+# ---------------------------------------------------------------------------
+def run_has_baseline(log_path: Path = EXPERIMENT_LOG) -> bool:
+    """Does the CURRENT autoresearch/<tag> run already have its baseline row?
+
+    Mirrors runner.current_run_has_baseline without importing runner
+    (which imports research, the agent's sandbox).
+    """
+    tag = prepare.current_run_tag()
+    if not tag or not log_path.exists():
+        return False
+    with log_path.open(encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            m = _RUN_MARKER_RE.search(row.get("description") or "")
+            if row.get("status") == "baseline" and m and m.group(1) == tag:
+                return True
+    return False
 
 
 # ---------------------------------------------------------------------------
 # Reading .xlsx with the standard library (SR-10: no new dependency)
 # ---------------------------------------------------------------------------
-_NS = {
-    "m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-    "rel": "http://schemas.openxmlformats.org/package/2006/relationships",
-}
+_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 _CELL_REF_RE = re.compile(r"^([A-Z]+)(\d+)$")
+
+
+def _local(tag: str) -> str:
+    """Element name without its namespace (transitional or strict OOXML)."""
+    return tag.rsplit("}", 1)[-1]
 
 
 def _col_index(letters: str) -> int:
@@ -143,9 +181,30 @@ def _col_index(letters: str) -> int:
 
 
 def _text(el: ET.Element | None) -> str:
+    """Text of a shared/inline string: <t>, or the <t> of each rich-text run
+    <r>; phonetic runs (<rPh>) are not part of the value."""
     if el is None:
         return ""
-    return "".join(t.text or "" for t in el.iter(f"{{{_NS['m']}}}t"))
+    parts = []
+    for child in el:
+        name = _local(child.tag)
+        if name == "t":
+            parts.append(child.text or "")
+        elif name == "r":
+            parts.extend(t.text or "" for t in child if _local(t.tag) == "t")
+    return "".join(parts)
+
+
+def _child(el: ET.Element, name: str) -> ET.Element | None:
+    return next((c for c in el if _local(c.tag) == name), None)
+
+
+def _attr(el: ET.Element, name: str) -> str | None:
+    """Attribute by local name (r:id lives in a namespace)."""
+    for k, v in el.attrib.items():
+        if _local(k) == name:
+            return v
+    return None
 
 
 def read_xlsx(path: Path) -> dict[str, list[list[Any]]]:
@@ -158,55 +217,76 @@ def read_xlsx(path: Path) -> dict[str, list[list[Any]]]:
         if sum(i.file_size for i in zf.infolist()) > MAX_XLSX_UNCOMPRESSED:
             raise ImportError_(f"{path.name} is larger than this tool accepts")
         names = set(zf.namelist())
-
-        shared: list[str] = []
-        if "xl/sharedStrings.xml" in names:
-            root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
-            shared = [_text(si) for si in root.findall("m:si", _NS)]
-
-        rels_root = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
-        targets = {r.get("Id"): r.get("Target", "") for r in rels_root.findall("rel:Relationship", _NS)}
-        wb_root = ET.fromstring(zf.read("xl/workbook.xml"))
+        try:
+            shared: list[str] = []
+            if "xl/sharedStrings.xml" in names:
+                root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+                shared = [_text(si) for si in root if _local(si.tag) == "si"]
+            rels_root = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            targets = {r.get("Id"): r.get("Target", "") for r in rels_root
+                       if _local(r.tag) == "Relationship"}
+            wb_root = ET.fromstring(zf.read("xl/workbook.xml"))
+        except (KeyError, ET.ParseError) as exc:
+            raise ImportError_(f"{path.name} is not a readable workbook") from exc
 
         sheets: dict[str, list[list[Any]]] = {}
-        for sheet in wb_root.findall("m:sheets/m:sheet", _NS):
-            target = targets.get(sheet.get(f"{{{_NS['r']}}}id"), "")
-            target = target.lstrip("/")
+        sheets_el = _child(wb_root, "sheets")
+        for sheet in (sheets_el if sheets_el is not None else []):
+            target = targets.get(_attr(sheet, "id"), "").lstrip("/")
             member = target if target.startswith("xl/") else f"xl/{target}"
             if member not in names:
                 continue
-            sheets[sheet.get("name", "")] = _read_sheet(zf.read(member), shared)
+            try:
+                sheets[sheet.get("name", "")] = _read_sheet(zf.read(member), shared)
+            except ET.ParseError as exc:
+                raise ImportError_(f"a sheet of {path.name} is not readable") from exc
         return sheets
+
+
+def _cell_value(c: ET.Element, shared: Sequence[str]) -> Any:
+    kind = c.get("t", "n")
+    v = _child(c, "v")
+    raw = v.text if v is not None else None
+    if kind == "s" and raw is not None:
+        try:
+            return shared[int(raw)]
+        except (ValueError, IndexError):
+            return None
+    if kind == "inlineStr":
+        return _text(_child(c, "is"))
+    if kind == "b":
+        return raw == "1"
+    if raw in (None, ""):
+        return None
+    if kind == "n":
+        try:
+            return float(raw)
+        except ValueError:
+            return raw
+    return raw                       # str, e (error), d (ISO date): text
 
 
 def _read_sheet(xml: bytes, shared: Sequence[str]) -> list[list[Any]]:
     rows: dict[int, dict[int, Any]] = {}
-    for row in ET.fromstring(xml).iter(f"{{{_NS['m']}}}row"):
-        for c in row.findall("m:c", _NS):
-            m = _CELL_REF_RE.match(c.get("r", ""))
-            if not m:
+    next_row = 1
+    for row in ET.fromstring(xml).iter():
+        if _local(row.tag) != "row":
+            continue
+        r = int(row.get("r") or next_row)
+        next_row = r + 1
+        col = 0
+        for c in row:
+            if _local(c.tag) != "c":
                 continue
-            col, r = _col_index(m.group(1)), int(m.group(2))
-            kind = c.get("t", "n")
-            v = c.find("m:v", _NS)
-            if kind == "s" and v is not None:
-                value: Any = shared[int(v.text)]
-            elif kind == "inlineStr":
-                value = _text(c.find("m:is", _NS))
-            elif kind in ("str", "e"):
-                value = v.text if v is not None else None
-            elif kind == "b":
-                value = v is not None and v.text == "1"
-            elif v is not None and v.text not in (None, ""):
-                value = float(v.text)
-            else:
-                value = None
-            rows.setdefault(r, {})[col] = value
+            m = _CELL_REF_RE.match(c.get("r", ""))
+            if m:
+                col = _col_index(m.group(1))
+            rows.setdefault(r, {})[col] = _cell_value(c, shared)
+            col += 1
     out = []
     for r in sorted(rows):
         cells = rows[r]
-        width = max(cells) + 1
-        out.append([cells.get(i) for i in range(width)])
+        out.append([cells.get(i) for i in range(max(cells) + 1)])
     return out
 
 
@@ -218,10 +298,14 @@ def read_tables(path: Path) -> list[list[list[Any]]]:
     return list(read_xlsx(path).values())
 
 
-def _header_index(rows: list[list[Any]]) -> dict[str, int] | None:
-    if not rows:
-        return None
-    return {str(h).strip(): i for i, h in enumerate(rows[0]) if h is not None}
+def find_header(rows: list[list[Any]], *required: str) -> tuple[dict[str, int], int] | None:
+    """({header: column}, index of the header row) for the first row among
+    the top HEADER_SEARCH_ROWS that holds every ``required`` header."""
+    for i, row in enumerate(rows[:HEADER_SEARCH_ROWS]):
+        hdr = {str(h).strip(): j for j, h in enumerate(row) if h is not None}
+        if all(r in hdr for r in required):
+            return hdr, i
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -240,22 +324,26 @@ def _quarter_end(year: int, q: int) -> date:
             3: date(year, 9, 30), 4: date(year, 12, 31)}[q]
 
 
-def _num(value: Any) -> float | None:
+def _num(value: Any) -> tuple[float | None, bool]:
+    """(number, written with a % sign)."""
     if value is None or value == "":
-        return None
+        return None, False
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        return float(value)
-    s = str(value).replace(",", "").replace("$", "").replace("%", "").strip()
+        return (float(value) if math.isfinite(value) else None), False
+    s = str(value).strip()
+    pct = "%" in s
     try:
-        return float(s)
+        x = float(s.replace(",", "").replace("$", "").replace("%", "").strip())
     except ValueError:
-        return None
+        return None, pct
+    return (x if math.isfinite(x) else None), pct
 
 
 def convert_stats(rows: list[list[Any]]) -> StatsResult:
-    hdr = _header_index(rows)
-    if not hdr or "Geography Name" not in hdr or "Concept Name" not in hdr:
+    found = find_header(rows, "Geography Name", "Concept Name")
+    if not found:
         raise ImportError_("no stats sheet (needs 'Geography Name' and 'Concept Name' columns)")
+    hdr, start = found
     quarters = []
     for name, idx in hdr.items():
         m = QUARTER_RE.match(name)
@@ -267,8 +355,9 @@ def convert_stats(rows: list[list[Any]]) -> StatsResult:
     cls = hdr.get("Property Class Name")
 
     values: dict[str, dict[str, float | None]] = {}
+    percent_cols: set[str] = set()
     clusters: set[str] = set()
-    for row in rows[1:]:
+    for row in rows[start + 1:]:
         cell = lambda i: row[i] if i is not None and i < len(row) else None  # noqa: E731
         if cls is not None and str(cell(cls) or "").strip() != PROPERTY_CLASS:
             continue
@@ -287,16 +376,19 @@ def convert_stats(rows: list[list[Any]]) -> StatsResult:
         column = CONCEPTS[concept][0]
         sub = values.setdefault(name, {})
         if column in sub:
-            raise ImportError_(f"stats sheet repeats '{concept}' for one submarket")
-        sub[column] = _num(cell(qcol))
+            raise ImportError_("stats sheet repeats a concept for one submarket")
+        sub[column], pct = _num(cell(qcol))
+        if pct:
+            percent_cols.add(column)
 
     if not values:
         raise ImportError_("stats sheet has no Atlanta industrial submarket rows")
 
-    # A rate column holds fractions when every value is <= 1 (CoStar's
-    # 0.0867 for 8.67%); otherwise it already is a percent.
-    for concept, (column, is_rate) in CONCEPTS.items():
-        if not is_rate:
+    # A rate column holds fractions when every value is <= 1 and none was
+    # written with a % sign (CoStar's 0.0867 for 8.67%); otherwise it
+    # already is a percent.
+    for column, is_rate in CONCEPTS.values():
+        if not is_rate or column in percent_cols:
             continue
         seen = [v[column] for v in values.values() if v.get(column) is not None]
         if seen and all(0.0 <= x <= 1.0 for x in seen):
@@ -344,14 +436,15 @@ def write_stats_csv(result: StatsResult, base: Path = _COSTAR_BASE_DIR) -> Path:
 # ---------------------------------------------------------------------------
 def comp_parcels(rows: list[list[Any]]) -> dict[str, set[str]]:
     """{submarket name: normalized Fulton-format parcel ids}."""
-    hdr = _header_index(rows)
-    if not hdr or "Submarket Name" not in hdr:
+    found = find_header(rows, "Submarket Name")
+    if not found:
         return {}
+    hdr, start = found
     cols = [hdr[c] for c in ("Parcel Number 1 (Min)", "Parcel Number 2 (Max)") if c in hdr]
     out: dict[str, set[str]] = {}
-    for row in rows[1:]:
-        sub = row[hdr["Submarket Name"]] if hdr["Submarket Name"] < len(row) else None
-        name = str(sub or "").strip()
+    for row in rows[start + 1:]:
+        i = hdr["Submarket Name"]
+        name = str((row[i] if i < len(row) else None) or "").strip()
         if not name:
             continue
         for c in cols:
@@ -416,25 +509,30 @@ class FultonLocator:
                 resp = self.session.get(self.url, params=params, timeout=60)
                 resp.raise_for_status()
                 body = resp.json()
-                if "error" not in body:
+                if isinstance(body, dict) and "error" not in body:
                     return body
             except (requests.RequestException, ValueError):
                 pass
             self.sleep(2 ** attempt)
         raise ImportError_("the Fulton parcel service did not answer; try again later")
 
-    def _fetch_land_lot(self, district: str, land_lot: str) -> dict[str, list[float]]:
+    def _fetch_land_lot(self, district: str, land_lot: str) -> dict[str, list[list[float]]]:
         # district/land_lot come from FULTON_ID_RE (alphanumerics only).
         where = f"ParcelID LIKE '{district}%{land_lot}%'"
         found: dict[str, list[list[float]]] = {}
         offset = 0
-        while True:
+        previous_first = None
+        for _page in range(MAX_PAGES_PER_LOT):
             body = self._get({
                 "where": where, "outFields": "ParcelID", "returnGeometry": "true",
                 "outSR": 4326, "f": "json", "resultOffset": offset,
                 "resultRecordCount": 2000,
             })
             feats = body.get("features") or []
+            first = str(feats[0].get("attributes", {}).get("ParcelID")) if feats else None
+            if feats and first == previous_first:
+                break                      # server ignored resultOffset
+            previous_first = first
             for f in feats:
                 pid = re.sub(r"[^0-9A-Z]", "", str(f.get("attributes", {}).get("ParcelID", "")).upper())
                 pt = _polygon_centroid((f.get("geometry") or {}).get("rings") or [])
@@ -450,13 +548,16 @@ class FultonLocator:
         lots = sorted({m.group(1, 2) for m in (FULTON_ID_RE.match(i) for i in wanted)
                        if f"lot:{m.group(1)}{m.group(2)}" not in self.cache})
         for district, land_lot in lots:
-            for pid, pts in self._fetch_land_lot(district, land_lot).items():
+            got = self._fetch_land_lot(district, land_lot)
+            for pid, pts in got.items():
                 # Exactly one polygon per id, inside Fulton (outSR honoured).
                 ok = (len(pts) == 1
                       and FULTON_ENVELOPE[0] <= pts[0][0] <= FULTON_ENVELOPE[2]
                       and FULTON_ENVELOPE[1] <= pts[0][1] <= FULTON_ENVELOPE[3])
                 self.cache[f"id:{pid}"] = pts[0] if ok else None
-            self.cache[f"lot:{district}{land_lot}"] = True
+            if got:
+                # An empty answer may be transient: ask again next import.
+                self.cache[f"lot:{district}{land_lot}"] = True
         self._save()
         out = {}
         for i in wanted:
@@ -496,44 +597,59 @@ def trim_points(points: Sequence[tuple[float, float]]) -> list[tuple[float, floa
 @dataclass
 class AreaPlan:
     points: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
-    too_few: dict[str, int] = field(default_factory=dict)
+    too_few: dict[str, int] = field(default_factory=dict)      # 1..MIN_POINTS-1 kept
+    none_located: list[str] = field(default_factory=list)
 
 
 def plan_areas(parcels: dict[str, set[str]], located: dict[str, tuple[float, float]]) -> AreaPlan:
     plan = AreaPlan()
     for name, ids in sorted(parcels.items()):
-        pts = trim_points([located[i] for i in sorted(ids) if i in located])
+        raw = [located[i] for i in sorted(ids) if i in located]
+        pts = trim_points(raw)
         if len(pts) >= MIN_POINTS:
             plan.points[name] = pts
-        elif pts:
+        elif raw:
             plan.too_few[name] = len(pts)
+        else:
+            plan.none_located.append(name)
     return plan
 
 
-def write_areas(conn: Any, plan: AreaPlan, today: date) -> dict[str, Any]:
-    """All areas in one transaction (SR-5); never over a human-seeded bbox."""
-    written: dict[str, float] = {}
-    kept_human: list[str] = []
+def write_areas(conn: Any, plan: AreaPlan, today: date,
+                market_name: str = MARKET_NAME) -> dict[str, int]:
+    """All areas in one transaction (SR-5); never over a human-seeded bbox.
+
+    Tool-written areas of this market whose submarket is not in ``plan``
+    are cleared in the same transaction. Returns counts only (SR-8).
+    """
+    counts = {"written": 0, "kept_human_seeded": 0, "cleared_stale": 0, "name_drift": 0}
+    ours: list[str] = []
     with conn.transaction():
         for name, pts in sorted(plan.points.items()):
-            sub_id, _created, _drift = costar_ingest._ensure_submarket(conn, MARKET_NAME, name)
+            sub_id, _created, drift = costar_ingest._ensure_submarket(conn, market_name, name)
+            ours.append(sub_id)
+            counts["name_drift"] += bool(drift)
             with conn.cursor() as cur:
                 cur.execute(_SQL_FETCH_SUBMARKET_AREA_NOTE, (sub_id,))
                 has_bbox, notes = cur.fetchone() or (False, None)
             if has_bbox and not str(notes or "").startswith(AREA_NOTE_PREFIX):
-                kept_human.append(name)
+                counts["kept_human_seeded"] += 1
                 continue
             with conn.cursor() as cur:
                 cur.execute(_SQL_AREA_FROM_POINTS,
                             (AREA_BUFFER_M, [p[0] for p in pts], [p[1] for p in pts]))
-                ewkt, gtype, valid, srid, area_m2 = cur.fetchone()
+                ewkt, gtype, valid, srid, _area_m2 = cur.fetchone()
             if gtype != "POLYGON" or not valid or srid != 4326:
-                raise ImportError_(f"area for {name!r} is not a valid polygon ({gtype})")
+                raise ImportError_(f"a computed area is not a valid polygon ({gtype})")
             note = f"{AREA_NOTE_PREFIX} {today.isoformat()} from {len(pts)} located comps"
             with conn.cursor() as cur:
                 cur.execute(_SQL_UPDATE_SUBMARKET_AREA, (ewkt, note, sub_id))
-            written[name] = round(float(area_m2) / 1e6, 1)
-    return {"written_km2": written, "kept_human_seeded": kept_human}
+            counts["written"] += 1
+        with conn.cursor() as cur:
+            cur.execute(_SQL_CLEAR_STALE_AREAS,
+                        (costar_ingest._slugify(market_name), AREA_NOTE_PREFIX + "%", ours))
+            counts["cleared_stale"] = max(int(getattr(cur, "rowcount", 0) or 0), 0)
+    return counts
 
 
 # ---------------------------------------------------------------------------
@@ -542,48 +658,53 @@ def write_areas(conn: Any, plan: AreaPlan, today: date) -> dict[str, Any]:
 def run(path: Path, *, areas: bool = True, locator: Any = None,
         base: Path = _COSTAR_BASE_DIR, today: date | None = None) -> int:
     today = today or date.today()
+    if run_has_baseline():
+        print("REFUSED: this run already has its baseline. Importing now would change "
+              "what later experiments score. Start a new run first, then import before "
+              "its baseline (Start New Run on the home machine).")
+        return 3
     tables = read_tables(path)
-    stats_rows = next((t for t in tables if (_header_index(t) or {}).keys() >= {"Geography Name", "Concept Name"}), None)
-    comps_rows = next((t for t in tables if "Submarket Name" in (_header_index(t) or {})), None)
+    stats_rows = next((t for t in tables if find_header(t, "Geography Name", "Concept Name")), None)
+    comps_rows = next((t for t in tables if find_header(t, "Submarket Name")), None)
     if stats_rows is None and comps_rows is None:
         print("REFUSED: no CoStar stats or sale-comps sheet found in this file.")
         return 1
 
     if stats_rows is not None:
         stats = convert_stats(stats_rows)
-        dest = write_stats_csv(stats, base)
+        write_stats_csv(stats, base)
         print(f"stats: {len(stats.rows)} submarkets from {stats.quarter} "
-              f"(clusters skipped: {stats.skipped_clusters}) -> "
-              f"{dest.relative_to(base.parent) if base.parent in dest.parents else dest}")
+              f"({stats.skipped_clusters} clusters skipped) -> costar_exports/submarket_stats/")
     if comps_rows is None or not areas:
         return 0
 
     parcels = comp_parcels(comps_rows)
     n_ids = sum(len(v) for v in parcels.values())
-    print(f"areas: {n_ids} Fulton-format comp parcel numbers in {len(parcels)} submarkets")
+    print(f"areas: {n_ids} Fulton-shaped comp parcel numbers in {len(parcels)} submarkets")
     locator = locator or FultonLocator(cache_path=base / LOCATION_CACHE.name)
     located = locator.locate(i for ids in parcels.values() for i in ids)
     plan = plan_areas(parcels, located)
-    print(f"areas: located {len(located)}; {len(plan.points)} submarkets have "
-          f"{MIN_POINTS}+ located comps; {len(plan.too_few)} have fewer (no area)")
+    share = round(100 * len(located) / n_ids) if n_ids else 0
+    print(f"areas: located {len(located)} of {n_ids} ({share}%; other counties' parcels "
+          f"are not in Fulton's records)")
+    print(f"areas: {len(plan.points)} submarkets get an area; {len(plan.too_few)} have "
+          f"fewer than {MIN_POINTS} located comps and {len(plan.none_located)} have none "
+          "(no area: their parcels score submarket data as missing)")
 
     if not prepare.dsn_available():
         print("areas not written: no DATABASE_URL (the stats CSV was written).")
         return 2
     try:
         with prepare.get_connection() as conn:
-            result = write_areas(conn, plan, today)
+            counts = write_areas(conn, plan, today)
             conn.commit()
-    except ImportError_:
-        raise
-    except Exception as exc:                      # DB unreachable etc.
+    except (psycopg.Error, OSError) as exc:
         print(f"areas not written: database error ({type(exc).__name__}). "
               "The stats CSV was written.")
         return 2
-    for name, km2 in sorted(result["written_km2"].items()):
-        print(f"  area {name}: {km2} km2")
-    for name in result["kept_human_seeded"]:
-        print(f"  kept the human-seeded area of {name}")
+    print(f"areas: wrote {counts['written']}, kept {counts['kept_human_seeded']} "
+          f"human-seeded, cleared {counts['cleared_stale']} stale"
+          + (f", {counts['name_drift']} name drifts (see submarkets table)" if counts["name_drift"] else ""))
     return 0
 
 
@@ -598,8 +719,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     try:
         return run(args.file, areas=not args.no_areas)
-    except ImportError_ as exc:
-        print(f"REFUSED: {exc}")
+    except (ImportError_, ValueError) as exc:
+        # ValueError: e.g. a submarket name with no letters or digits
+        # (_slugify). Message only, never cell values in a traceback.
+        print(f"REFUSED: {exc if isinstance(exc, ImportError_) else type(exc).__name__ + ' in the workbook'}")
         return 1
 
 

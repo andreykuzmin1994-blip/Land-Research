@@ -283,19 +283,24 @@ class WriteAreasTests(unittest.TestCase):
         return mock.patch.object(costar_ingest, "_ensure_submarket",
                                  side_effect=lambda c, m, n: (f"atlanta__{costar_ingest._slugify(n)}", False, None))
 
-    def test_writes_tool_areas_and_keeps_human_seeded(self):
+    def test_writes_tool_areas_keeps_human_seeded_and_clears_stale(self):
         conn = _Conn([
             (False, None), ("SRID=4326;POLYGON((0 0,1 0,1 1,0 0))", "POLYGON", True, 4326, 2e6),
             (True, "seeded by hand"),
         ])
         with self._patched():
             out = ci.write_areas(conn, self.plan, date(2026, 10, 29))
-        self.assertEqual(out, {"written_km2": {"Alpha Park": 2.0}, "kept_human_seeded": ["Beta Yard"]})
+        self.assertEqual(out, {"written": 1, "kept_human_seeded": 1, "cleared_stale": 0,
+                               "name_drift": 0})
         self.assertEqual(conn.transactions, 1)
         update = [e for e in conn.executed if e[0] is ci._SQL_UPDATE_SUBMARKET_AREA]
         self.assertEqual(len(update), 1)
         self.assertEqual(update[0][1][2], "atlanta__alpha_park")
         self.assertTrue(update[0][1][1].startswith(ci.AREA_NOTE_PREFIX))
+        clear = [e for e in conn.executed if e[0] is ci._SQL_CLEAR_STALE_AREAS]
+        self.assertEqual(clear, [(ci._SQL_CLEAR_STALE_AREAS,
+                                  ("atlanta", ci.AREA_NOTE_PREFIX + "%",
+                                   ["atlanta__alpha_park", "atlanta__beta_yard"]))])
 
     def test_invalid_geometry_aborts_the_whole_write(self):
         conn = _Conn([(False, None), ("x", "MULTIPOLYGON", True, 4326, 1.0)])
@@ -313,10 +318,92 @@ class RunTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = make_xlsx(Path(d) / "x.xlsx", {"s": stats_rows(), "c": comps})
             base = Path(d) / "costar_exports"
-            with mock.patch.object(ci.prepare, "dsn_available", return_value=False):
+            with mock.patch.object(ci.prepare, "dsn_available", return_value=False), \
+                 mock.patch.object(ci, "run_has_baseline", return_value=False):
                 rc = ci.run(path, locator=locator, base=base)
             self.assertEqual(rc, 2)
             self.assertTrue((base / "submarket_stats" / "submarket_stats_20260930.csv").exists())
+
+
+class ReviewFindingTests(unittest.TestCase):
+    """reviews/19_costar_import post-change findings."""
+
+    def _log(self, d, rows):
+        p = Path(d) / "experiment_log.tsv"
+        with p.open("w", encoding="utf-8", newline="") as fh:
+            fh.write("commit\tmetric\tconfidence\tapi_calls\twall_clock_min\tstatus\tdescription\n")
+            for status, desc in rows:
+                fh.write(f"abc1234\t0\t0.00\t0\t1.0\t{status}\t{desc}\n")
+        return p
+
+    def test_baseline_check_agrees_with_the_runner(self):
+        import runner
+        cases = [
+            [],
+            [("baseline", "baseline | run=atl-x | exp=e1")],
+            [("baseline", "baseline | run=atl-other | exp=e1")],
+            [("crash", "baseline | run=atl-x | exp=e1")],
+            [("baseline", "old row without marker")],
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            for rows in cases:
+                path = self._log(d, rows)
+                with mock.patch.object(ci.prepare, "current_run_tag", return_value="atl-x"), \
+                     mock.patch.object(runner, "_git_current_branch", return_value="autoresearch/atl-x"):
+                    self.assertEqual(ci.run_has_baseline(path),
+                                     runner.current_run_has_baseline(path), rows)
+
+    def test_refuses_once_the_run_has_a_baseline(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = make_xlsx(Path(d) / "x.xlsx", {"s": stats_rows()})
+            with mock.patch.object(ci, "run_has_baseline", return_value=True):
+                self.assertEqual(ci.run(path, base=Path(d) / "out"), 3)
+            self.assertFalse((Path(d) / "out").exists())
+
+    def test_percent_strings_are_not_multiplied(self):
+        rows = stats_rows()
+        for r in rows[1:]:
+            if r[3] == "Vacancy Rate":
+                r[5] = "0.5%"
+        self.assertEqual(ci.convert_stats(rows).rows[0]["vacancy_rate_pct"], "0.5")
+
+    def test_header_need_not_be_the_first_row(self):
+        rows = [["CoStar export"], []] + stats_rows()
+        self.assertEqual(len(ci.convert_stats(rows).rows), 2)
+
+    def test_cells_without_refs_rich_text_and_dates(self):
+        xml = (b'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+               b'<row><c t="inlineStr"><is><r><t>Sub</t></r><r><t>market</t></r>'
+               b'<rPh><t>x</t></rPh></is></c><c t="d"><v>2026-09-30</v></c><c><v>1.5</v></c></row>'
+               b'</sheetData></worksheet>')
+        self.assertEqual(ci._read_sheet(xml, []), [["Submarket", "2026-09-30", 1.5]])
+
+    def test_locator_does_not_cache_an_empty_lot_and_stops_on_repeats(self):
+        same = {"features": [_feature("99Z0001  LL0011", -84.5, 33.7)], "exceededTransferLimit": True}
+        session = mock.Mock()
+        session.get.side_effect = [_Resp({"features": []}), _Resp(same), _Resp(same)]
+        with tempfile.TemporaryDirectory() as d:
+            loc = ci.FultonLocator(session=session, cache_path=Path(d) / "c.json", sleep=lambda s: None)
+            self.assertEqual(loc.locate(["99Z0001LL0011"]), {})
+            self.assertNotIn("lot:99Z0001", loc.cache)
+            self.assertEqual(list(loc.locate(["99Z0001LL0011"])), ["99Z0001LL0011"])
+        self.assertEqual(session.get.call_count, 3)      # repeated page ends paging
+
+    def test_bad_names_are_refused_not_reported_as_database_errors(self):
+        comps = [["Submarket Name", "Parcel Number 1 (Min)"]] + [
+            ["???", f"99Z-0001-LL-00{i}-1"] for i in range(3)]
+        located = {f"99Z0001LL00{i}1": (-84.5 + i * 0.001, 33.7) for i in range(3)}
+        locator = mock.Mock()
+        locator.locate.return_value = located
+        with tempfile.TemporaryDirectory() as d:
+            path = make_xlsx(Path(d) / "x.xlsx", {"c": comps})
+            with mock.patch.object(ci.prepare, "dsn_available", return_value=True), \
+                 mock.patch.object(ci.prepare, "get_connection",
+                                   return_value=contextlib.nullcontext(_Conn([]))), \
+                 mock.patch.object(ci, "run_has_baseline", return_value=False), \
+                 mock.patch.object(ci, "FultonLocator", return_value=locator), \
+                 mock.patch("sys.stdout"):
+                self.assertEqual(ci.main([str(path)]), 1)
 
 
 class ContractTests(unittest.TestCase):
@@ -330,6 +417,10 @@ class ContractTests(unittest.TestCase):
         names |= {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
         self.assertNotIn("research", names)
         self.assertNotIn("runner", names)
+
+    def test_run_marker_regex_matches_the_runner(self):
+        import runner
+        self.assertEqual(ci._RUN_MARKER_RE.pattern, runner._DESCRIPTION_RUN_RE.pattern)
 
     def test_research_resolves_submarket_at_read_time_in_both_paths(self):
         for sql in (research._SQL_FETCH_PARCEL, research._SQL_DISTINCT_SUBMARKETS_FOR_PARCELS):

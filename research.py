@@ -810,7 +810,11 @@ _SQL_INSERT_RESEARCH_LOG_SCORING = (
 # submarket is the CoStar submarket whose area (submarkets.bbox, written by
 # costar_import.py from where that submarket's sale comps sit) is nearest
 # the parcel centroid -- 0 m when inside, at most 3 km away; ties go to the
-# smaller area, then the id. Resolved at READ time and never stored, so a
+# smaller area, then the id. The && prefilter (0.05 deg is over 4.5 km at
+# Atlanta's latitude, so it never drops an area within 3 km) skips the
+# geography distance for far areas: ~2 s instead of ~15 s per 5,000
+# parcels on PostGIS 3.4. 3 km, not inside-only: discovery is Fulton-only,
+# and the Fulton submarkets without an area are far from the corridors. Resolved at READ time and never stored, so a
 # discarded experiment leaves no state behind (the purge covers
 # parcel_scores only). With no area in range, the stored parcels.submarket
 # (the discovery corridor name) is kept. Both the per-parcel fetch and the
@@ -821,6 +825,7 @@ _SQL_RESOLVED_SUBMARKET = (
     "SELECT s.submarket_id FROM submarkets s "
     "WHERE s.market_id = p.market AND s.bbox IS NOT NULL "
     "AND p.centroid IS NOT NULL "
+    "AND s.bbox && ST_Expand(p.centroid, 0.05) "
     "AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) "
     "ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), "
     "ST_Area(s.bbox::geography), s.submarket_id LIMIT 1"
@@ -1006,10 +1011,12 @@ _SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH = (
 # off the SAME parcel_ids the scoring loop iterates so the cache never misses a
 # scored parcel's submarket. Raw submarket strings (no normalization, R-1315),
 # resolved with the same _SQL_RESOLVED_SUBMARKET as _SQL_FETCH_PARCEL.
+# OFFSET 0 keeps the planner from inlining the subquery into the outer
+# filter, which would evaluate the resolver twice per parcel.
 _SQL_DISTINCT_SUBMARKETS_FOR_PARCELS = (
     "SELECT DISTINCT sm FROM ("
     "SELECT " + _SQL_RESOLVED_SUBMARKET + " AS sm "
-    "FROM parcels p WHERE p.parcel_id = ANY(%s)"
+    "FROM parcels p WHERE p.parcel_id = ANY(%s) OFFSET 0"
     ") q WHERE sm IS NOT NULL"
 )
 

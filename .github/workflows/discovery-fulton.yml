@@ -23,6 +23,8 @@ on:
       - 'tests/test_discovery.py'
       - 'tests/test_postgis_smoke.py'
       - 'tests/live_txn_check.py'
+      - 'tests/live_submarket_check.py'
+      - 'costar_import.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -38,6 +40,8 @@ on:
       - 'tests/test_discovery.py'
       - 'tests/test_postgis_smoke.py'
       - 'tests/live_txn_check.py'
+      - 'tests/live_submarket_check.py'
+      - 'costar_import.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -114,3 +118,8 @@ jobs:
       # livetxn-<hex>). This check deletes every row it writes.
       - name: Run live transaction-integrity check
         run: python tests/live_txn_check.py
+
+      # reviews/19_costar_import: the read-time submarket resolver and the
+      # CoStar area writer against real PostGIS. Own market, cleans up.
+      - name: Run live submarket resolution check
+        run: python tests/live_submarket_check.py
