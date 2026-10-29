@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import math
 import re
 import secrets
 import shutil
@@ -435,17 +436,24 @@ def _coerce_optional_decimal(raw: Any) -> tuple[float | None, str | None]:
     if raw is None:
         return None, None
     if isinstance(raw, (int, float)):
-        return float(raw), None
-    s = str(raw).strip()
-    if s == "" or s.upper() in {"N/A", "NA", "NULL", "-"}:
-        return None, None
-    cleaned = s.replace("$", "").replace(",", "").replace("%", "").strip()
-    if cleaned in {"", "-"}:
-        return None, None
-    try:
-        return float(cleaned), None
-    except ValueError:
-        return None, f"unparseable number: {raw!r}"
+        val = float(raw)
+    else:
+        s = str(raw).strip()
+        if s == "" or s.upper() in {"N/A", "NA", "NULL", "-"}:
+            return None, None
+        cleaned = s.replace("$", "").replace(",", "").replace("%", "").strip()
+        if cleaned in {"", "-"}:
+            return None, None
+        try:
+            val = float(cleaned)
+        except ValueError:
+            return None, f"unparseable number: {raw!r}"
+    # 'nan' / 'inf' / '1e400' parse as floats but are not data: NUMERIC would
+    # store NaN/Infinity (PostgreSQL sorts NaN above every number) and int()
+    # cannot convert them at all, which used to crash the whole cycle.
+    if not math.isfinite(val):
+        return None, f"non-finite number: {raw!r}"
+    return val, None
 
 
 def _coerce_optional_int(raw: Any) -> tuple[int | None, str | None]:
@@ -453,6 +461,24 @@ def _coerce_optional_int(raw: Any) -> tuple[int | None, str | None]:
     if err or val is None:
         return None, err
     return int(round(val)), None
+
+
+# Ranges of the PostgreSQL INTEGER / BIGINT columns the int-coerced fields are
+# stored in. Checked on the coerced int that is actually sent, so a value the
+# column cannot hold is a row-level validation error (row skipped + data_gap
+# flag) instead of a failed INSERT that fails the whole file.
+_INT4_RANGE: tuple[int, int] = (-(2 ** 31), 2 ** 31 - 1)
+_INT8_RANGE: tuple[int, int] = (-(2 ** 63), 2 ** 63 - 1)
+
+
+def _int_range_error(
+    label: str, value: int | None, bounds: tuple[int, int],
+) -> str | None:
+    """Return an error string if ``value`` does not fit its target column."""
+    lo, hi = bounds
+    if value is None or lo <= value <= hi:
+        return None
+    return f"{label} out of range [{lo}, {hi}]: {value}"
 
 
 _DATE_FORMATS: tuple[str, ...] = (
@@ -533,6 +559,14 @@ def _validate_submarket_stats_row(
     ):
         if val is not None and val < 0:
             return None, f"{label} must be >= 0: {val}"
+    for label, val in (
+        ("net_absorption_t12_sf", net_absorption_t12_sf),
+        ("under_construction_sf", under_construction_sf),
+        ("proposed_sf", proposed_sf),
+    ):
+        range_err = _int_range_error(label, val, _INT8_RANGE)
+        if range_err:
+            return None, range_err
 
     return (
         {
@@ -586,6 +620,9 @@ def _validate_land_sales_comps_row(
         return None, f"sale_price: {e}"
     if sale_price is None or sale_price <= 0:
         return None, f"sale_price must be > 0: {sale_price}"
+    e = _int_range_error("sale_price", sale_price, _INT8_RANGE)
+    if e:
+        return None, e
 
     acres, e = _coerce_optional_decimal(norm.get("acres"))
     if e:
@@ -643,6 +680,9 @@ def _validate_building_sales_comps_row(
         return None, f"sale_price: {e}"
     if sale_price is None or sale_price <= 0:
         return None, f"sale_price must be > 0: {sale_price}"
+    e = _int_range_error("sale_price", sale_price, _INT8_RANGE)
+    if e:
+        return None, e
 
     building_sf, e = _coerce_optional_decimal(norm.get("building_sf"))
     if e:
@@ -709,6 +749,9 @@ def _validate_leasing_comps_row(
         return None, f"lease_term_months: {e}"
     if lease_term_months is None or lease_term_months <= 0:
         return None, f"lease_term_months must be > 0: {lease_term_months}"
+    e = _int_range_error("lease_term_months", lease_term_months, _INT4_RANGE)
+    if e:
+        return None, e
 
     building_sf_leased, e = _coerce_optional_decimal(norm.get("building_sf_leased"))
     if e:
@@ -783,6 +826,9 @@ def _validate_land_listings_row(
         return None, f"asking_price: {e}"
     if asking_price is not None and asking_price <= 0:
         return None, f"asking_price must be > 0 if populated: {asking_price}"
+    e = _int_range_error("asking_price", asking_price, _INT8_RANGE)
+    if e:
+        return None, e
 
     asking_price_per_acre, e = _coerce_optional_decimal(
         norm.get("asking_price_per_acre"),
@@ -800,6 +846,9 @@ def _validate_land_listings_row(
         return None, f"days_on_market: {e}"
     if days_on_market is not None and days_on_market < 0:
         return None, f"days_on_market must be >= 0: {days_on_market}"
+    e = _int_range_error("days_on_market", days_on_market, _INT4_RANGE)
+    if e:
+        return None, e
 
     return (
         {
@@ -877,6 +926,44 @@ def _read_csv_with_bom(path: Path) -> tuple[list[str], list[dict[str, str]]]:
             padded = list(raw_row) + [""] * max(0, len(headers) - len(raw_row))
             rows.append({headers[i]: padded[i] for i in range(len(headers))})
         return raw_headers, rows
+
+
+def _abort_after_failed_file_block(conn: Any, exc: BaseException) -> bool:
+    """Decide what a failed per-file ``with conn.transaction()`` block leaves.
+
+    The block has already rolled back its own work, and run_ingestion_cycle
+    enters every loader with no transaction open, so that was a top-level
+    ROLLBACK of this file only. The loaders never call ``conn.rollback()``
+    themselves: with an outer transaction open it would also discard every
+    earlier file of the cycle -- files already moved to ARCHIVED/, which is
+    never rescanned.
+
+    Returns True when the cycle must abort instead of quarantining the file:
+    BudgetExceeded is not a file defect, and a broken or closed connection
+    would fail every remaining file too; re-raising leaves this file and the
+    rest in intake for the next cycle (FAILED/ is never rescanned). INERROR
+    means the block's own rollback failed; it is rolled back here (no other
+    file's rows are pending) and logged, so the next file starts clean.
+    """
+    if isinstance(exc, prepare.BudgetExceeded):
+        return True
+    if getattr(conn, "broken", False) is True or getattr(conn, "closed", False) is True:
+        return True
+    status = getattr(getattr(conn, "info", None), "transaction_status", None)
+    status_name = getattr(status, "name", None)
+    if status_name == "UNKNOWN":
+        return True
+    if status_name == "INERROR":
+        log.error(
+            "ingestion: failed file left the transaction aborted; rolling back "
+            "before the next file"
+        )
+        try:
+            conn.rollback()
+        except Exception:
+            log.exception("ingestion: rollback of the aborted transaction failed")
+            return True
+    return False
 
 
 def _load_submarket_stats_file(
@@ -1012,12 +1099,10 @@ def _load_submarket_stats_file(
                 )
     except Exception as exc:
         log.exception("ingestion transaction failed for %s", path.name)
+        if _abort_after_failed_file_block(conn, exc):
+            raise
         summary["status"] = "failed"
         summary["error"] = f"db transaction failed: {exc}"
-        try:
-            conn.rollback()
-        except Exception:
-            pass
         try:
             dest, error_path = _fail_file(
                 path, {"errors": [summary["error"]]},
@@ -1028,6 +1113,9 @@ def _load_submarket_stats_file(
             log.exception("ingestion: failed to quarantine %s", path)
         return summary
 
+    # The rows are committed (top-level block above). If the move fails, the
+    # OSError aborts the cycle and the file stays in intake; its re-ingest is
+    # idempotent (DELETE-then-INSERT) apart from repeated log/flag rows.
     archived = _archive_file(path)
     summary["moved_to"] = str(archived)
     return summary
@@ -1189,12 +1277,10 @@ def _ingest_one_comp_file(
                 )
     except Exception as exc:
         log.exception("ingestion transaction failed for %s (%s)", path.name, export_type)
+        if _abort_after_failed_file_block(conn, exc):
+            raise
         summary["status"] = "failed"
         summary["error"] = f"db transaction failed: {exc}"
-        try:
-            conn.rollback()
-        except Exception:
-            pass
         try:
             dest, error_path = _fail_file(
                 path, {"errors": [summary["error"]]},
@@ -1205,6 +1291,7 @@ def _ingest_one_comp_file(
             log.exception("ingestion: failed to quarantine %s", path)
         return summary
 
+    # Committed before the move; see _load_submarket_stats_file.
     archived = _archive_file(path)
     summary["moved_to"] = str(archived)
     return summary
@@ -1543,6 +1630,14 @@ def run_ingestion_cycle() -> dict[str, Any]:
             summary["aborted"] = True
             summary["abort_reason"] = "cycle_id_collision"
             return summary
+        # End the implicit transaction the collision SELECT opened, so each
+        # loader's per-file `with conn.transaction()` is a top-level
+        # BEGIN/COMMIT rather than a SAVEPOINT: a file's rows are committed
+        # before the file moves to ARCHIVED/ (never rescanned), and a later
+        # file's failure cannot roll them back. Nothing may run on conn
+        # outside a transaction() block from here on, or the blocks become
+        # SAVEPOINTs again (pinned by tests/test_txn_integrity.py).
+        conn.commit()
 
         for export_type, spec in _INGESTION_LOADERS.items():
             files = _scan_export_dir(export_type, spec["pattern"])
@@ -1550,10 +1645,8 @@ def run_ingestion_cycle() -> dict[str, Any]:
                 conn, cycle_id, files,
             )
 
-        # exp: see run_discovery_cycle for the full rationale. Commit the
-        # outer transaction explicitly. The individual loaders do their own
-        # `with conn.transaction()` blocks, but those become SAVEPOINTs once
-        # the cycle_id-collision SELECT has started the outer transaction.
+        # Every file committed in its own block above; this only closes out
+        # a transaction a statement outside the blocks might have opened.
         conn.commit()
 
     return summary

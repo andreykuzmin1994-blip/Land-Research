@@ -99,6 +99,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import secrets
 import threading
@@ -1320,6 +1321,27 @@ def _str_or_none(v: Any) -> str | None:
 # ---------------------------------------------------------------------------
 # Per-parcel processor (R-10, R-24, R-30)
 # ---------------------------------------------------------------------------
+def _abort_cycle_after_failed_block(conn: Any, exc: BaseException) -> bool:
+    """True when a failed per-parcel ``with conn.transaction()`` must abort the cycle.
+
+    Discovery and scoring run each parcel's writes as a SAVEPOINT inside the
+    cycle's one outer transaction, committed once at cycle end. The block has
+    already rolled back to its savepoint, so the per-parcel handlers never
+    call ``conn.rollback()``: that would discard every earlier parcel of the
+    cycle. The cycle cannot continue on a broken/closed connection, or when
+    the savepoint rollback itself failed (INERROR: the outer transaction with
+    the earlier parcels is already aborted and the final COMMIT would quietly
+    roll back); re-raising makes that a loud crash instead of a silently
+    partial cycle. BudgetExceeded always propagates.
+    """
+    if isinstance(exc, prepare.BudgetExceeded):
+        return True
+    if getattr(conn, "broken", False) is True or getattr(conn, "closed", False) is True:
+        return True
+    status = getattr(getattr(conn, "info", None), "transaction_status", None)
+    return getattr(status, "name", None) in ("INERROR", "UNKNOWN")
+
+
 def _process_parcel(
     feature: Mapping[str, Any],
     conn: Any,
@@ -1334,8 +1356,9 @@ def _process_parcel(
     """Run the per-parcel pipeline; return summary status.
 
     Status one of: ``discovery``, ``rejection_h1``, ``rejection_h2``,
-    ``skip_unmappable``. Each call uses its own transaction (R-10): on
-    success, commit; on exception, rollback.
+    ``skip_unmappable``. Each write runs in its own ``with conn.transaction()``
+    block (R-10) -- a SAVEPOINT inside run_discovery_cycle's outer
+    transaction -- so a failure rolls back only this parcel's writes.
     """
     row, wkt, skip_reason, multipolygon = _map_feature_to_parcel(
         feature, mapping, classification, market, corridor_name, raw_response_path,
@@ -1348,12 +1371,10 @@ def _process_parcel(
                     conn, cycle_id, "rejection", market, None,
                     f"unmappable feature: {skip_reason}",
                 )
-        except Exception:
+        except Exception as exc:
             log.exception("failed to log unmappable feature")
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+            if _abort_cycle_after_failed_block(conn, exc):
+                raise
         return "skip_unmappable"
 
     parcel_id = row["parcel_id"]
@@ -1370,12 +1391,10 @@ def _process_parcel(
                         conn, cycle_id, "rejection", market, parcel_id,
                         f"{result.filter_id}: {result.reason}",
                     )
-            except Exception:
+            except Exception as exc:
                 log.exception("failed to log H1/H2 rejection for %s", parcel_id)
-                try:
-                    conn.rollback()
-                except Exception:
-                    pass
+                if _abort_cycle_after_failed_block(conn, exc):
+                    raise
             return f"rejection_{result.filter_id.lower()}"
         if result.action not in ("pass", "flag"):
             log.warning("unknown filter result action=%r for %s", result.action, parcel_id)
@@ -1403,12 +1422,10 @@ def _process_parcel(
                     "multi-polygon parcel reduced to largest outer ring (Phase 3 simplification)",
                     "Phase 4+: convert parcels.geometry column to MultiPolygon and reprocess",
                 )
-    except Exception:
+    except Exception as exc:
         log.exception("transaction failed for parcel %s", parcel_id)
-        try:
-            conn.rollback()
-        except Exception:
-            pass
+        if _abort_cycle_after_failed_block(conn, exc):
+            raise
         return "skip_unmappable"
     return "discovery"
 
@@ -1879,6 +1896,13 @@ def _compute_s10(centroid_lng: float | None, centroid_lat: float | None) -> int 
 # ---------------------------------------------------------------------------
 # Composite + confidence
 # ---------------------------------------------------------------------------
+def _finite_or_none(value: Any) -> Any:
+    """``value`` unchanged, unless it is a non-finite float (NaN, +/-inf): None."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
 def _compute_composite(
     sub_scores: Mapping[str, int | None],
     weights: Mapping[str, int],
@@ -2707,8 +2731,22 @@ def score_parcel(
         s8_score, s8_prov = _compute_s8(conn, parcel, cache=cache)
         sub_scores["S8_land_basis"] = s8_score
 
-        composite = _compute_composite(sub_scores, weights)
-        confidence = _compute_confidence(sub_scores)
+        # Non-finite sub-scores are stored as null (program.md: never
+        # fabricate; null = data unavailable) and get the per-null data_gap
+        # flag below. Normalized BEFORE composite, confidence, strategy fit
+        # and actionability read them: PostgreSQL sorts a NaN NUMERIC above
+        # every number, so a NaN composite would pass the metric's threshold.
+        # Finite values pass through untouched.
+        for name, score in list(sub_scores.items()):
+            if score is not None and _finite_or_none(score) is None:
+                log.warning(
+                    "score_parcel(%s): non-finite %s=%r stored as null",
+                    parcel_id, name, score,
+                )
+                sub_scores[name] = None
+
+        composite = _finite_or_none(_compute_composite(sub_scores, weights))
+        confidence = _finite_or_none(_compute_confidence(sub_scores))
 
         # R-529: strategy fit before actionability — gate 3 consumes it.
         strategy_fit = _compute_strategy_fit(sub_scores, parcel.get("acreage"))
@@ -2743,9 +2781,9 @@ def score_parcel(
                             composite,
                             confidence,
                             actionability,
-                            json.dumps(blockers),
-                            json.dumps(sub_scores),
-                            json.dumps(strategy_fit),
+                            json.dumps(blockers, allow_nan=False),
+                            json.dumps(sub_scores, allow_nan=False),
+                            json.dumps(strategy_fit, allow_nan=False),
                             primary_strategy,
                             notes,
                             run_tag,
@@ -2758,7 +2796,7 @@ def score_parcel(
                         (
                             cycle_id, "scoring", parcel.get("market"), parcel_id,
                             composite, actionability,
-                            json.dumps(strategy_fit), notes,
+                            json.dumps(strategy_fit, allow_nan=False), notes,
                         ),
                     )
                 # One data_gap flag per null sub-score (R-220).
@@ -2803,12 +2841,10 @@ def score_parcel(
                         ),
                         "wait for additional CoStar land sales comps in submarket",
                     )
-        except Exception:
+        except Exception as exc:
             log.exception("scoring transaction failed for parcel %s", parcel_id)
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+            if _abort_cycle_after_failed_block(conn, exc):
+                raise
             return {
                 "parcel_id": parcel_id,
                 "status": "error",

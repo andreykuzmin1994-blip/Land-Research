@@ -22,6 +22,7 @@ on:
       - 'STORAGE_ARCHITECTURE.md'
       - 'tests/test_discovery.py'
       - 'tests/test_postgis_smoke.py'
+      - 'tests/live_txn_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -36,6 +37,7 @@ on:
       - 'STORAGE_ARCHITECTURE.md'
       - 'tests/test_discovery.py'
       - 'tests/test_postgis_smoke.py'
+      - 'tests/live_txn_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -104,3 +106,11 @@ jobs:
 
       - name: Run live-PostGIS smoke test
         run: python tests/test_postgis_smoke.py
+
+      # After the smoke test, which applies the schema this check uses.
+      # Neither depends on the checked-out branch (a pushed
+      # autoresearch/<tag> branch is checked out by name): each reads and
+      # writes under an explicit run tag of its own (smoke-<hex>,
+      # livetxn-<hex>). This check deletes every row it writes.
+      - name: Run live transaction-integrity check
+        run: python tests/live_txn_check.py

@@ -15,18 +15,20 @@ Subcommands (run ``python cli.py --help`` for the full list):
 
     verify              Pretty-print verify_setup(MARKET) results
     db-check            Run prepare.py (Supabase + PostGIS sanity ping)
-    baseline            Bootstrap the baseline experiment row
+    baseline            Record the run's baseline row (lock + verify gated)
     loop                Run experiment_loop with structured output
     status              verify_setup + last 10 TSV rows
     log                 Pretty-print experiment_log.tsv
     db-stats            Per-table row counts and research_log breakdown
     halt / unhalt       Sentinel manipulation
     tail                Live-stream experiment_log.tsv
+    mirror-restore      Rebuild a MISSING experiment_log.tsv from the mirror
 
 Exit codes:
     0   success
     1   generic failure
-    2   setup error (e.g. wrong branch, DATABASE_URL missing)
+    2   setup error (e.g. wrong branch, DATABASE_URL missing) or a refused
+        precondition (mirror-restore over a live experiment_log.tsv)
     3   lock contention (loop already running)
 """
 
@@ -178,16 +180,29 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     import research
     import runner
     print(_c(f"==> running baseline experiment for market={args.market}", _C.BOLD))
-    row = runner.run_baseline_experiment(args.market)
+    try:
+        # Setup Step 5 behind the loop lock + verify_setup; refuses a
+        # 'fail' setup and a second baseline for the same run.
+        row = runner.run_gated_baseline(args.market)
+    except runner.SetupError as exc:
+        print(_status_label("fail") + f"SetupError: {exc}", file=sys.stderr)
+        return 2
+    except runner.LoopLockError as exc:
+        print(_status_label("fail") + f"LoopLockError: {exc}", file=sys.stderr)
+        return 3
     if args.json:
         print(json.dumps(row, indent=2, default=str))
     else:
         _print_baseline_row(row)
-    return 0
+    # A crash/timeout attempt is logged but is not a baseline. Its rows are
+    # purged; if that purge failed, the next baseline purges them first (or
+    # refuses, exit 2, while they cannot be purged).
+    return 0 if row.get("status") == "baseline" else 1
 
 
 def _print_baseline_row(row: Mapping[str, Any]) -> None:
-    print(_status_label("ok") + _c("baseline row written", _C.BOLD))
+    ok = row.get("status") == "baseline"
+    print(_status_label("ok" if ok else "fail") + _c("baseline row written", _C.BOLD))
     for k in ("commit", "metric", "confidence", "wall_clock_min", "status", "description"):
         print(f"  {k}: {row.get(k)}")
 
@@ -221,6 +236,10 @@ def cmd_loop(args: argparse.Namespace) -> int:
         print(_status_label("ok") + _c("loop ended", _C.BOLD))
         for k, v in summary.items():
             print(f"  {k}: {v}")
+        if summary.get("unpurged_experiment_ids"):
+            print(_status_label("warning") + "some non-kept experiments' rows "
+                  "could not be purged (see the ERROR above); the next loop "
+                  "start re-checks them")
     return 0
 
 
@@ -338,6 +357,19 @@ def cmd_unhalt(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mirror_restore(args: argparse.Namespace) -> int:
+    import runner
+    try:
+        summary = runner.restore_experiment_log_from_mirror()
+    except runner.RestoreRefusedError as exc:
+        # Refused before any database connection; one line, no traceback.
+        print(_status_label("fail") + f"mirror-restore refused: {exc}",
+              file=sys.stderr)
+        return 2
+    print(json.dumps(summary, indent=2))
+    return 0
+
+
 def cmd_tail(args: argparse.Namespace) -> int:
     import research
     import runner
@@ -388,7 +420,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("db-check", help="run prepare.py (Supabase + PostGIS ping)")
     p.set_defaults(fn=cmd_db_check)
 
-    p = sub.add_parser("baseline", help="run the baseline experiment for a market")
+    p = sub.add_parser(
+        "baseline",
+        help="record this run's baseline (loop lock + verify_setup gated)",
+    )
     p.add_argument("--market", default="atlanta")
     p.set_defaults(fn=cmd_baseline)
 
@@ -400,7 +435,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--confirmed", action="store_true",
-        help="bypass the Setup Step 6 baseline-confirmation gate",
+        help="human consent to bootstrap a missing baseline and iterate "
+             "without reviewing it first (Setup Step 6)",
     )
     p.set_defaults(fn=cmd_loop)
 
@@ -425,6 +461,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("tail", help="live-stream experiment_log.tsv")
     p.set_defaults(fn=cmd_tail)
+
+    p = sub.add_parser(
+        "mirror-restore",
+        help="rebuild a MISSING experiment_log.tsv from the Postgres mirror "
+             "(refuses, exit 2, when a live TSV exists)",
+    )
+    p.set_defaults(fn=cmd_mirror_restore)
 
     return parser
 

@@ -28,6 +28,32 @@ MARKET  ?= atlanta
 # Empty MAX means NEVER STOP. `make loop MAX=2` caps at 2 iterations.
 MAX     ?=
 
+# Setup Step 6 consent (AUTORESEARCH_MECHANICS.md): the human confirms the
+# run's baseline before the loop iterates. Normal path: `make baseline`,
+# review the row, then `make loop`/`loop-bg`/`daily`. `CONFIRM=1` lets the
+# loop bootstrap a missing baseline and iterate without that review. It
+# counts ONLY as the literal 1 typed on the make command line for that one
+# invocation (an exported CONFIRM in the environment is ignored); it is the
+# human's consent, and the agent never supplies it.
+ifeq ($(origin CONFIRM)|$(strip $(CONFIRM)),command line|1)
+CONFIRM_FLAG := --confirmed
+CONFIRM_FWD  := CONFIRM=1
+else
+CONFIRM_FLAG :=
+CONFIRM_FWD  :=
+endif
+
+# Aligned table of the TSV on stdin. `column` is not installed everywhere
+# (util-linux / bsdmainutils), so fall back to awk (POSIX; `help` uses it
+# too). Rendering must never fail a target: `make baseline` runs `make log`
+# after recording the row, and `orient` is the no-DB light-tier snapshot
+# (no Python, no runner import).
+TSV_ALIGN = { if command -v column >/dev/null 2>&1; then \
+	column -t -s "$$(printf '\t')"; \
+	else \
+	awk -F '\t' '{ n[NR] = NF; for (i = 1; i <= NF; i++) { c[NR, i] = $$i; if (length($$i) > w[i]) w[i] = length($$i) } } END { for (r = 1; r <= NR; r++) { s = ""; for (i = 1; i <= n[r]; i++) s = s (i > 1 ? "  " : "") sprintf("%-" w[i] "s", c[r, i]); sub(/ +$$/, "", s); print s } }'; \
+	fi; }
+
 # ---------------------------------------------------------------------
 # Help (default target)
 # ---------------------------------------------------------------------
@@ -41,6 +67,7 @@ help:  ## Show this help (default target).
 	@printf "  %-12s %s\n" "TAG"     "autoresearch tag (current default: $(TAG))"
 	@printf "  %-12s %s\n" "MARKET"  "target market (current default: $(MARKET))"
 	@printf "  %-12s %s\n" "MAX"     "loop max_iterations (empty = NEVER STOP)"
+	@printf "  %-12s %s\n" "CONFIRM" "1 = human consent to bootstrap a missing baseline unreviewed"
 	@echo ""
 	@echo "Targets:"
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z][a-zA-Z0-9_-]*:.*##/ \
@@ -54,10 +81,14 @@ help:  ## Show this help (default target).
 	@echo "  make db-stats       # per-table row counts"
 	@echo "  make halt           # exit the loop cleanly"
 	@echo ""
+	@echo "New run (new TAG -- make daily starts one each calendar day):"
+	@echo "  make setup          # cut autoresearch/$(TAG) from main (make daily does this too)"
+	@echo "  make baseline       # Setup Step 5: verify + lock, record the run's baseline"
+	@echo "                      # Setup Step 6: review that row, then make daily / loop-bg"
+	@echo "  (human only: append CONFIRM=1 to loop/loop-bg/daily to bootstrap unreviewed)"
+	@echo ""
 	@echo "First-run-only:"
 	@echo "  make db-check       # sanity-check Supabase + PostGIS"
-	@echo "  make setup          # cut autoresearch/$(TAG) from main"
-	@echo "  make loop MAX=2     # bootstrap baseline + 2 iterations (foreground)"
 
 # ---------------------------------------------------------------------
 # Setup phase (AUTORESEARCH_MECHANICS.md "Setup Sequence")
@@ -108,17 +139,25 @@ _assert-autoresearch-branch:
 	fi
 
 .PHONY: baseline
-baseline: _assert-autoresearch-branch  ## Run the baseline experiment for MARKET.
-	@echo "==> running baseline experiment for market=$(MARKET)"
-	@python -c "import json, runner; \
-	row = runner.run_baseline_experiment('$(MARKET)'); \
-	print(json.dumps(row, indent=2, default=str))"
+baseline: _assert-autoresearch-branch  ## Setup Step 5: verify + loop lock, then record this run's baseline (once per run).
+	@echo "==> running baseline experiment for market=$(MARKET) (verify_setup + loop lock first)"
+	@python cli.py --json baseline --market '$(MARKET)' || { rc=$$?; \
+	  echo "==> no baseline recorded for this run (exit $$rc; see above)."; \
+	  echo "    2 = setup refused (verify_setup fail; wrong branch; this run already"; \
+	  echo "        has a baseline -- start a new run with 'make setup TAG=...'; or an"; \
+	  echo "        earlier attempt's rows could not be purged -- 'make db-check', retry);"; \
+	  echo "    3 = a loop holds the lock ('make halt' first);"; \
+	  echo "    1 = the attempt crashed/timed out (row logged; its rows are purged now,"; \
+	  echo "        or before the next attempt evaluates) -- fix, then retry."; \
+	  exit $$rc; }
 	@echo ""
 	@echo "==> baseline row appended to experiment_log.tsv:"
-	@$(MAKE) --no-print-directory log
+	@$(MAKE) --no-print-directory log || echo "==> (could not render the log; the row is recorded -- see 'python cli.py log')"
+	@echo ""
+	@echo "==> Setup Step 6: review the baseline above. Then start the loop: make loop-bg (or make daily / make loop)."
 
 .PHONY: loop
-loop: _assert-autoresearch-branch  ## Run experiment_loop. NEVER STOP unless MAX is set.
+loop: _assert-autoresearch-branch  ## Run experiment_loop (needs this run's baseline, or CONFIRM=1). NEVER STOP unless MAX is set.
 	@if [ -f .halt ]; then \
 	  echo "==> WARNING: .halt sentinel exists — the loop will exit immediately."; \
 	  echo "    Run 'make unhalt' first to clear it."; \
@@ -126,11 +165,14 @@ loop: _assert-autoresearch-branch  ## Run experiment_loop. NEVER STOP unless MAX
 	fi
 	@echo "==> starting experiment_loop(market=$(MARKET), max_iterations=$(if $(MAX),$(MAX),None))"
 	@echo "==> halt with: 'make halt' from another shell, or set EXPERIMENT_LOOP_HALT=1"
-	@MAX="$(MAX)" python -c "import os, runner; \
-m = os.environ.get('MAX', '').strip(); \
-mi = int(m) if m else None; \
-summary = runner.experiment_loop('$(MARKET)', max_iterations=mi, confirmed=True); \
-print(summary)"
+	@python cli.py --no-color loop --market '$(MARKET)' $(if $(MAX),--max '$(MAX)',) $(CONFIRM_FLAG) || { rc=$$?; \
+	  if [ $$rc -eq 2 ]; then \
+	    echo "==> loop refused at setup (see the SetupError above). If this run has no baseline yet:"; \
+	    echo "    make baseline    # record it (verify + lock), review the row, then re-run make loop"; \
+	  elif [ $$rc -eq 3 ]; then \
+	    echo "==> another loop holds the lock: 'make loop-attach' to see it, 'make halt' to stop it."; \
+	  fi; \
+	  exit $$rc; }
 
 .PHONY: halt
 halt:  ## Touch .halt — the running loop exits on next iteration boundary.
@@ -162,9 +204,9 @@ orient:  ## Offline orientation snapshot: contract card + branch/run/TSV state (
 	@if [ -f experiment_log.tsv ]; then \
 	  echo "==> last 5 rows of experiment_log.tsv:"; \
 	  (head -1 experiment_log.tsv; tail -5 experiment_log.tsv | grep -v '^commit\b' || true) \
-	    | column -t -s "$$(printf '\t')"; \
+	    | $(TSV_ALIGN); \
 	else \
-	  echo "==> no experiment_log.tsv yet (no baseline recorded — run 'make baseline' or 'make loop')"; \
+	  echo "==> no experiment_log.tsv yet (no baseline recorded — run 'make baseline', review it, then 'make loop')"; \
 	fi
 	@if [ -f .halt ]; then echo ""; echo "==> NOTE: .halt sentinel is set"; fi
 
@@ -177,16 +219,16 @@ status:  ## Print verify_setup + last 10 rows of experiment_log.tsv.
 	@if [ -f experiment_log.tsv ]; then \
 	  echo "==> last 10 rows of experiment_log.tsv:"; \
 	  (head -1 experiment_log.tsv; tail -10 experiment_log.tsv | grep -v '^commit\b' || true) \
-	    | column -t -s "$$(printf '\t')"; \
+	    | $(TSV_ALIGN); \
 	else \
-	  echo "==> experiment_log.tsv does not exist yet (run 'make baseline' or 'make loop')"; \
+	  echo "==> experiment_log.tsv does not exist yet (run 'make baseline', review it, then 'make loop')"; \
 	fi
 	@if [ -f .halt ]; then echo ""; echo "==> NOTE: .halt sentinel is set"; fi
 
 .PHONY: log
 log:  ## Pretty-print full experiment_log.tsv as an aligned table.
 	@if [ -f experiment_log.tsv ]; then \
-	  column -t -s "$$(printf '\t')" experiment_log.tsv; \
+	  $(TSV_ALIGN) < experiment_log.tsv; \
 	else \
 	  echo "==> no experiment_log.tsv yet"; \
 	fi
@@ -199,32 +241,22 @@ tail:  ## tail -f experiment_log.tsv for live monitoring (Ctrl-C to exit).
 	fi
 	@tail -f experiment_log.tsv
 
+# Delegates to cli.py, which runs the same queries with proper cursor and
+# connection handling (psycopg 3's execute() returns the cursor itself, so
+# an inline python -c one-liner printed Cursor reprs instead of counts).
 .PHONY: db-stats
 db-stats:  ## Per-table row counts (parcels, parcel_scores, research_log, flagged_items).
-	@python -c "\
-import prepare; \
-conn_ctx = prepare.get_connection(); conn = conn_ctx.__enter__(); \
-cur = conn.cursor(); \
-queries = [ \
-    ('parcels',                  'SELECT COUNT(*) FROM parcels'), \
-    ('parcel_scores',            'SELECT COUNT(*) FROM parcel_scores'), \
-    ('parcel_scores actionable', \"SELECT COUNT(*) FROM parcel_scores WHERE actionability='PASS' AND composite_score >= 70\"), \
-    ('research_log',             'SELECT COUNT(*) FROM research_log'), \
-    ('flagged_items',            'SELECT COUNT(*) FROM flagged_items'), \
-    ('submarkets',               'SELECT COUNT(*) FROM submarkets'), \
-]; \
-[print(f'{n:30s}{cur.execute(q) or cur.fetchone()[0]}') for n, q in queries]; \
-print(); \
-cur.execute(\"SELECT action_type, COUNT(*) FROM research_log GROUP BY action_type ORDER BY 2 DESC\"); \
-print('research_log by action_type:'); \
-[print(f'  {a:25s}{n}') for a, n in cur.fetchall()]; \
-conn_ctx.__exit__(None, None, None)"
+	@python cli.py --no-color db-stats
 
 # ---------------------------------------------------------------------
 # Background / tmux loop control (R-733 ergonomic)
 # ---------------------------------------------------------------------
+# The Setup Step 6 pre-flight runs BEFORE tmux is spawned: a refusal inside
+# the session would leave a dead 'loop' session blocking the next loop-bg.
+# MAKEFLAGS is cleared in the session so a tmux server started earlier cannot
+# leak a stale command-line variable; only the explicit literal is forwarded.
 .PHONY: loop-bg
-loop-bg: _assert-autoresearch-branch  ## Start the loop in a detached tmux session named 'loop'.
+loop-bg: _assert-autoresearch-branch  ## Start the loop in a detached tmux session named 'loop' (needs this run's baseline, or CONFIRM=1).
 	@if ! command -v tmux >/dev/null; then \
 	  echo "==> tmux not installed. Run: sudo apt-get install -y tmux"; \
 	  exit 1; \
@@ -237,8 +269,14 @@ loop-bg: _assert-autoresearch-branch  ## Start the loop in a detached tmux sessi
 	  echo "==> WARNING: .halt sentinel exists. Run 'make unhalt' first."; \
 	  exit 1; \
 	fi
+	@if [ -z "$(CONFIRM_FWD)" ] && ! python -c "import sys; import runner; sys.exit(0 if runner.current_run_has_baseline() else 1)"; then \
+	  echo "==> this run has no baseline row in experiment_log.tsv yet (Setup Step 5/6)."; \
+	  echo "    Run 'make baseline', review the row, then re-run this target."; \
+	  echo "    (Bootstrapping without that review takes the human's explicit consent on the command line.)"; \
+	  exit 1; \
+	fi
 	@tmux new-session -d -s loop \
-	  "cd $(CURDIR) && make loop $(if $(MAX),MAX=$(MAX),) 2>&1 | tee /tmp/loop-$$$$.log; echo; echo 'loop ended -- press any key'; read -n 1"
+	  "cd $(CURDIR) && MAKEFLAGS= make loop $(if $(MAX),MAX=$(MAX),) $(CONFIRM_FWD) 2>&1 | tee /tmp/loop-$$$$.log; echo; echo 'loop ended -- press any key'; read -n 1"
 	@echo "==> loop started in detached tmux session 'loop'"
 	@echo "==> attach:  make loop-attach"
 	@echo "==> tail:    make tail"
@@ -271,8 +309,7 @@ mirror-backfill:  ## Reconcile experiment_log.tsv -> Postgres mirror (idempotent
 
 .PHONY: mirror-restore
 mirror-restore:  ## Disaster recovery: rebuild a MISSING experiment_log.tsv from the mirror.
-	@python -c "import json, runner; \
-	print(json.dumps(runner.restore_experiment_log_from_mirror(), indent=2))"
+	@python cli.py --no-color mirror-restore
 
 # ---------------------------------------------------------------------
 # Higher-level recipes
@@ -291,7 +328,7 @@ resume:  ## Switch to today's autoresearch branch (or the most recent) and pull.
 	@$(MAKE) --no-print-directory db-stats
 
 .PHONY: daily
-daily:  ## ONE COMMAND: cut/resume autoresearch/<TAG>, verify infra, kick loop in tmux.
+daily:  ## ONE COMMAND: cut/resume autoresearch/<TAG>, verify infra, kick loop in tmux (refuses until the run has a baseline).
 	@set -euo pipefail; \
 	branch=$$(git rev-parse --abbrev-ref HEAD); \
 	target="autoresearch/$(TAG)"; \
@@ -312,7 +349,7 @@ daily:  ## ONE COMMAND: cut/resume autoresearch/<TAG>, verify infra, kick loop i
 	  bash .devcontainer/post-start.sh; \
 	fi
 	@$(MAKE) --no-print-directory db-check
-	@$(MAKE) --no-print-directory loop-bg
+	@$(MAKE) --no-print-directory loop-bg $(CONFIRM_FWD)
 
 # ---------------------------------------------------------------------
 # Tests + dev hygiene

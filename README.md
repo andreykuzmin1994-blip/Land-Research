@@ -35,7 +35,15 @@ This codebase is operated through `make`. Open the repo in a Codespace and run:
 ```bash
 make daily              # ONE COMMAND: cuts/resumes today's autoresearch branch,
                         # verifies Supabase, kicks the loop in a detached tmux
-                        # session, prints attach + tail commands.
+                        # session, prints attach + tail commands. Refuses
+                        # (before starting tmux) until the run has a baseline.
+
+# New run only (a new branch/TAG — make daily starts one each calendar day;
+# pass TAG=<existing tag> to keep working on an earlier run):
+make baseline           # Setup Step 5: verify_setup + loop lock, then record the
+                        # run's baseline row (refuses a second one for the run).
+                        # Review that row (Setup Step 6), then run make daily
+                        # (or make loop-bg) again.
 
 # In a second terminal:
 make tail               # live-stream experiment_log.tsv as rows land
@@ -67,12 +75,21 @@ already contemplated in the cost table — the repo is a plain git clone +
 `.env` away anywhere). `make loop-bg` prints this warning when it detects
 a Codespace.
 
+**Baseline confirmation (Setup Step 6)**: `make loop`, `make loop-bg` and
+`make daily` only iterate on a run that already has its `baseline` row;
+otherwise they stop and point at `make baseline`. `CONFIRM=1` on the make
+command line (e.g. `make loop MAX=2 CONFIRM=1`) lets the loop bootstrap the
+baseline and start iterating without that review. It is the human's
+consent for that one invocation: the agent never supplies it, and a
+`CONFIRM` exported in the environment is ignored. Experiments (the
+baseline included) are interrupted at 90 minutes and recorded as `timeout`.
+
 **Karpathy iteration loop** (what the agent does between `make loop` runs):
 
 1. Read `experiment_log.tsv`. The most recent `baseline` or `keep` row is the prior anchor.
 2. Form a hypothesis. Edit `research.py` (the only file the agent edits). One focused change.
 3. `git commit -m "exp: <description>"` on the active `autoresearch/<tag>` branch.
-4. `make loop MAX=1` — runs one full cycle, appends a row to `experiment_log.tsv` with the keep-or-revert decision.
+4. `make loop MAX=1` — runs one full cycle, appends a row to `experiment_log.tsv` with the keep-or-revert decision. (Needs the run's confirmed baseline row — see above.)
 5. Read the new row. If `status=keep`, branch advances. If `status=discard`, `git reset --hard HEAD~1`. If `status=crash` or `timeout`, diagnose and retry.
 
 Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) drives the iteration; `make loop` provides the evaluator + decision recording. Auto-revert is intentionally NOT in `make loop` — that's the agent's responsibility (R-723 / D1).
@@ -146,6 +163,52 @@ Code changes are reviewed by blast radius (full definition:
 - **Tier 2** — metric layer, runner decision logic, harness internals, credentials, external integrations: the full three-agent adversarial workflow (risk reviewer → code writer → reviewer-implementer with sole commit authority), each role in a genuinely separate context on the strongest available model.
 
 The recurring risk checklist all tiers verify against lives in `STANDING_RISKS.md` (SR-1 … SR-15) — reviews cite IDs instead of restating it.
+
+## Testing
+
+**Offline suites** — no network, secrets or database (SR-6). Both run on
+every push and pull request (`.github/workflows/offline-tests.yml`):
+
+```bash
+python -m unittest discover -s tests                 # root system (`make tests`)
+python -m unittest discover -s screener/tests -t .   # screener/ (pip install -r screener/requirements.txt)
+```
+
+**Live PostGIS smoke test** — the offline suite never executes SQL;
+`tests/test_postgis_smoke.py` runs the discovery UPSERT and the metric
+query against real PostGIS (in CI: `.github/workflows/discovery-fulton.yml`).
+It writes rows, so point it only at a throwaway local container, never at
+Supabase: it refuses a non-local `DATABASE_URL` unless
+`POSTGIS_SMOKE_ALLOW_NONLOCAL=1`. Pass the DSN inline; don't put it in `.env`.
+
+```bash
+docker run -d --rm --name lr-smoke -e POSTGRES_USER=lr -e POSTGRES_PASSWORD=lr_pw \
+  -e POSTGRES_DB=lr_test -p 127.0.0.1:55432:5432 postgis/postgis:16-3.4
+docker exec lr-smoke pg_isready -h 127.0.0.1 -U lr -d lr_test   # repeat until "accepting connections"
+DATABASE_URL=postgresql://lr:lr_pw@localhost:55432/lr_test python tests/test_postgis_smoke.py
+docker stop lr-smoke
+```
+
+**Live connector harness** — queries Fulton's public ArcGIS server
+(rate-limited, SR-11) and writes a redacted report to `harness_reports/`
+(gitignored). Design: `appendix_a_county_connectors.md` § "Connector Test
+Harness"; in CI: `.github/workflows/harness-fulton.yml`.
+
+```bash
+python connector_harness.py --county fulton --quick
+```
+
+**Screener live trial** — downloads free public map data into
+`screener/cache/` and writes `screener/output/` (both gitignored); see
+`screener/README.md`. The two `evaluate` calls are read-only; `--decide`,
+`--test` and `build_eval` belong to the loop and its humans
+(`screener/autoresearch/PROGRAM.md`).
+
+```bash
+python -m screener.run --limit 200 --refresh
+python -m screener.autoresearch.evaluate             # dev score
+python -m screener.autoresearch.evaluate --control   # what random ranking scores
+```
 
 ## Operating Cost (Estimated)
 

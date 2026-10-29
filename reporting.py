@@ -144,6 +144,12 @@ _SQL_FETCH_OPEN_FLAGS_FOR_PARCEL = (
 )
 
 # R-613: top-N memo highlights ordered by composite_score then scored_at.
+# Exactly ONE latest row per parcel, picked with the metric's tie-break
+# (scored_at DESC, score_id DESC — same as _SQL_FETCH_LATEST_SCORE_FOR_SNAPSHOT
+# and prepare.py's DISTINCT ON). A `scored_at = MAX(scored_at)` match counted
+# every row tied at the maximum (all rows of one scoring cycle share now()).
+# Deliberately UNSCOPED (no run_tag): memos describe the accumulated pipeline
+# (AUTORESEARCH_MECHANICS.md).
 _SQL_FETCH_SCORED_PARCELS_FOR_MEMO = (
     "SELECT ps.parcel_id, p.address, p.county, p.submarket, p.acreage, "
     "p.owner_name, p.owner_type_inferred, "
@@ -153,9 +159,10 @@ _SQL_FETCH_SCORED_PARCELS_FOR_MEMO = (
     "FROM parcel_scores ps "
     "JOIN parcels p USING (parcel_id) "
     "WHERE p.market = %s "
-    "AND ps.scored_at = ("
-    "  SELECT MAX(scored_at) FROM parcel_scores "
-    "  WHERE parcel_id = ps.parcel_id"
+    "AND ps.score_id = ("
+    "  SELECT score_id FROM parcel_scores "
+    "  WHERE parcel_id = ps.parcel_id "
+    "  ORDER BY scored_at DESC, score_id DESC LIMIT 1"
     ") "
     "ORDER BY ps.composite_score DESC NULLS LAST, ps.scored_at DESC"
 )
@@ -832,9 +839,17 @@ def _aggregate_pipeline_composition(
     rows: Sequence[Mapping[str, Any]],
     threshold: float,
 ) -> dict[str, Any]:
-    """Counts and breakdowns for the memo's Pipeline Composition section."""
+    """Counts and breakdowns for the memo's Pipeline Composition section.
+
+    "Actionable" is the memo header's definition: composite >= ``threshold``
+    (the caller's ``prepare.get_parameters()`` value) AND actionability =
+    PASS -- the metric's filter, applied to the memo's (unscoped) rows. A
+    PASS parcel below the threshold, or without a composite, is not
+    actionable.
+    """
     total = len(rows)
-    actionable = [r for r in rows if r.get("actionability") == "PASS"]
+    actionable_count = 0
+    actionable_without_strategy = 0
     by_strategy: dict[str, int] = {k: 0 for k in research._STRATEGY_KEYS}
     by_submarket: dict[str, int] = {}
     by_actionability: dict[str, int] = {}
@@ -850,16 +865,20 @@ def _aggregate_pipeline_composition(
                 above_threshold += 1
         ab = r.get("actionability") or "PENDING"
         by_actionability[ab] = by_actionability.get(ab, 0) + 1
-        if r.get("actionability") == "PASS":
+        if r.get("actionability") == "PASS" and cs is not None and cs >= threshold:
+            actionable_count += 1
             ps = r.get("primary_strategy")
             if ps in by_strategy:
                 by_strategy[ps] = by_strategy[ps] + 1
+            else:
+                actionable_without_strategy += 1
         sub = r.get("submarket") or "(unset)"
         by_submarket[sub] = by_submarket.get(sub, 0) + 1
     avg_composite = (composite_sum / composite_n) if composite_n else 0.0
     return {
         "total_scored": total,
-        "actionable_count": len(actionable),
+        "actionable_count": actionable_count,
+        "actionable_without_strategy": actionable_without_strategy,
         "above_threshold_count": above_threshold,
         "by_strategy": by_strategy,
         "by_submarket": by_submarket,
@@ -935,8 +954,8 @@ def _render_memo_markdown(
         f"- Total scored parcels in {market}: **{agg['total_scored']}**",
         f"- Above composite threshold ({threshold:.0f}): "
         f"**{agg['above_threshold_count']}**",
-        f"- Actionable (passes all four gates): "
-        f"**{agg['actionable_count']}**",
+        f"- Actionable (composite ≥ {threshold:.0f} and passes all four "
+        f"gates): **{agg['actionable_count']}**",
         f"- Average composite score: **{agg['avg_composite']:.1f}**",
     ]
     actionability_breakdown = ", ".join(
@@ -950,8 +969,18 @@ def _render_memo_markdown(
         for k, v in agg["by_strategy"].items()
         if v > 0
     ]
+    if agg["actionable_without_strategy"]:
+        strategy_lines.append(
+            f"- (no primary strategy): {agg['actionable_without_strategy']}"
+        )
     if not strategy_lines:
-        strategy_lines = ["- (no parcels passed actionability)"]
+        if agg["by_actionability"].get("PASS"):
+            strategy_lines = [
+                f"- (no actionable parcels: none that passed actionability "
+                f"reached composite {threshold:.0f})"
+            ]
+        else:
+            strategy_lines = ["- (no parcels passed actionability)"]
     submarket_lines = [
         f"- {sub}: {n}"
         for sub, n in sorted(

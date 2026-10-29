@@ -105,14 +105,16 @@ def fetch(layer: Layer, tiles: list[tuple[float, float, float, float]],
           region: tuple[float, float, float, float]) -> Index:
     """Fetch a layer for the candidate tiles (or the whole region)."""
     envelopes = tiles if layer.tiled else [region]
-    ids: set[int] = set()
-    for env in envelopes:
-        ids.update(arcgis.query_ids(layer.url, layer.where, env))
-    feats = arcgis.fetch_by_ids(layer.url, sorted(ids), layer.fields,
-                                max_offset=layer.max_offset)
+    feats = arcgis.features_in(layer.url, layer.where, envelopes, layer.fields,
+                               max_offset=layer.max_offset)
     items = []
     for f in feats:
         shape = esri_to_shape(f.get("geometry"))
         if shape is not None and not shape.is_empty:
             items.append((shape, f.get("attributes") or {}))
+    if feats and not items:
+        # An empty index would read as "clear" for every parcel. The answer
+        # passed arcgis's checks and is cached, so only --refresh asks again.
+        raise arcgis.ArcGISError(f"{layer.url}: {len(feats)} features came back "
+                                 "without usable geometry; re-run with --refresh")
     return Index(items)

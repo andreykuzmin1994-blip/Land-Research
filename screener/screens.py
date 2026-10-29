@@ -32,6 +32,8 @@ def attribute_rejects(p: dict[str, Any], s: dict[str, Any],
         why.append("already owned by an industrial developer / REIT")
     if ot == "utility" and s.get("exclude_utility_owned", True):
         why.append("railroad / utility owned")
+    if ot == "association" and s.get("exclude_association_owned", True):
+        why.append("owned by a homeowners' / community association (common area)")
     return why
 
 

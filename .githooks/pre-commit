@@ -1,49 +1,45 @@
 #!/usr/bin/env bash
 # Block commits that would put real credentials into env.template.
 # Activate once per clone:  git config core.hooksPath .githooks
+#
+# The rules live in check_env_template.py next to this hook; the CI
+# workflow (.github/workflows/check-env-template.yml) runs the same
+# script, so the two cannot drift. This hook only decides whether the
+# check is needed, streams the checker the STAGED blob (never the worktree
+# file, never via a temp file) and propagates its verdict. It never prints
+# a value from env.template. Keep it bash-3.2 safe (macOS).
 
 set -euo pipefail
 
-# Only run if env.template is among the staged files.
-if ! git diff --cached --name-only | grep -qx "env.template"; then
+# Fast path: a commit that does not touch env.template needs no python.
+# Exit 0 = unchanged, 1 = changed; anything else is an error and falls
+# through to the check (fail closed). Do not gate with `--name-only |
+# grep -q`: under pipefail an early grep exit SIGPIPEs git (status 141),
+# which skipped the check for long staged lists.
+if git diff --cached --quiet -- env.template; then
     exit 0
 fi
 
-# Read the staged version of env.template (handles the "deleted" case too).
-staged_content=$(git show ":env.template" 2>/dev/null || true)
-
-if [ -z "$staged_content" ]; then
-    # File is being deleted; allow.
-    exit 0
-fi
-
-line=$(printf '%s\n' "$staged_content" | grep "^DATABASE_URL=" || true)
-
-if [ -z "$line" ]; then
+refuse() {
+    printf 'pre-commit: refusing to commit env.template: %s\n' "$1" >&2
     cat >&2 <<'EOF'
-pre-commit: env.template is missing the DATABASE_URL= line. Refusing to commit.
-            If you intentionally restructured the file, override with:
-              git commit --no-verify
-EOF
-    exit 1
-fi
-
-# Extract password slot between USER: and @HOST.
-password=$(printf '%s\n' "$line" | sed -E 's|^DATABASE_URL=postgresql://[^:]+:([^@]*)@.*$|\1|')
-
-case "$password" in
-    URL_ENCODED_PASSWORD|CHANGE_ME|PASSWORD|"")
-        ;;
-    *)
-        cat >&2 <<EOF
-pre-commit: env.template's DATABASE_URL appears to contain a real password.
-            Found password slot: "$password"
-            Allowed placeholders: URL_ENCODED_PASSWORD, CHANGE_ME, PASSWORD, or empty.
             Real credentials must only ever go into the gitignored .env file.
             See reviews/02_setup_phase/00_setup_status.md "Incident" section.
             If this is a false positive, override with:
               git commit --no-verify
 EOF
-        exit 1
-        ;;
-esac
+    exit 1
+}
+
+checker="$(dirname -- "$0")/check_env_template.py"
+[ -f "$checker" ] || refuse "checker $checker not found"
+command -v python3 >/dev/null 2>&1 || refuse "python3 not found on PATH"
+
+status=0
+if git cat-file -e ":env.template" 2>/dev/null; then
+    git cat-file blob ":env.template" | python3 -I "$checker" - >&2 || status=$?
+else
+    # Staged deletion: a missing env.template fails, exactly as in CI.
+    python3 -I "$checker" --missing >&2 || status=$?
+fi
+[ "$status" -eq 0 ] || refuse "problems listed above (values are not shown)"

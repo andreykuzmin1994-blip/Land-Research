@@ -42,8 +42,12 @@ snapshots/*.md
 harness_reports/*.json
 harness_reports/markets_dashboard.md
 sources/*/
-results.tsv            # Karpathy's original log name — same never-commit rule
-experiment_log.tsv     # Karpathy AutoResearch experiment log — never commit
+# gitignore has no inline comments: text after a pattern is part of the
+# pattern, so keep every comment on its own line (tests/test_hermetic.py).
+# Karpathy's original log name — same never-commit rule.
+results.tsv
+# Karpathy AutoResearch experiment log — never commit.
+experiment_log.tsv
 
 # CoStar exports (not committed - contains licensed data)
 costar_exports/

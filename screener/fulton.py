@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
+import zlib
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -178,7 +179,16 @@ def read_cama(cache_dir: Path, parcel_ids: set[str], refresh: bool = False
               ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
     """All recorded deeds and the site supplement for the given parcels."""
     zip_path = arcgis.download(CAMA_URL, cache_dir / "fulton_cama.zip",
-                               max_age_days=0 if refresh else 30)
+                               max_age_days=0 if refresh else 30, check=zipfile.is_zipfile)
+    try:
+        return _read_cama_zip(zip_path, parcel_ids)
+    except (zipfile.BadZipFile, KeyError, zlib.error, EOFError, csv.Error) as exc:
+        raise arcgis.ArcGISError(f"the county deed file {zip_path} can't be read ({exc}); "
+                                 "delete it or re-run with --refresh") from None
+
+
+def _read_cama_zip(zip_path: Path, parcel_ids: set[str]
+                   ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
     sales: dict[str, list[dict[str, Any]]] = {pid: [] for pid in parcel_ids}
     supplement: dict[str, dict[str, Any]] = {}
     with zipfile.ZipFile(zip_path) as z:
