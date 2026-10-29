@@ -15,16 +15,17 @@ without asking questions; nobody is watching this session.
    idea the log shows was already discarded unless you change it materially.
    About once every 10 experiments, try something radical.
 4. Make that ONE focused change, in `research.py` only. Never edit any other
-   file. You cannot change how the metric is computed (`prepare.py`,
+   file (your tools only allow editing `research.py`; `.env` is off limits).
+   You cannot change how the metric is computed (`prepare.py`,
    `parameters.json`), and you never add data sources (`sources.json` is
    human-only). If the best idea needs a new source, pick another idea and put
    `NEEDS-SOURCE: <what and why>` in the commit body. Never scrape CoStar.
-5. Run `python -m unittest discover -s tests`. It must pass. Fix your change if
+5. Run exactly `python -m unittest discover -s tests`. It must pass. Fix your change if
    it fails (at most 3 attempts). If it still fails, run
    `git restore research.py` and stop without committing.
-6. Commit exactly once: `git add research.py` and
-   `git commit -m "exp: <what you changed, short, no tabs>"`. Add a body line
-   with your hypothesis.
+6. Commit exactly once, as two commands: `git add research.py`, then
+   `git commit -m "exp: <what you changed, short, no tabs>" -m "<your hypothesis>"`.
+   Do not amend.
 7. Stop. Do NOT run the experiment (`make loop`, `cli.py loop`, baseline), and
    do not push, reset, check out or switch branches. The wrapper does those.
 

@@ -27,7 +27,10 @@ check on it with **Status** and stop it with **Stop**.
      checks the database, and opens Claude Code once so you can sign in
      (type `/exit` when done).
    - It offers to start Land Research automatically when you sign in to
-     Windows, so it resumes after updates and restarts.
+     Windows, so it resumes after updates and restarts. Auto-start only
+     resumes a run you already confirmed, and never one you stopped with
+     Stop. It needs someone to sign in after a restart; Windows Update
+     restarts otherwise leave it stopped until you do.
 
 ## Every day
 
@@ -57,16 +60,23 @@ experiment.
 4. Kept commits are pushed to the run's `autoresearch/<tag>` branch; anything
    else is reverted with `git reset --hard`.
 
-It stops on Stop (`.halt`), after 7 days, after 5 crashed or timed-out
-experiments in a row, or when the database or harness has failed for over an
-hour. Logs: `~/.land-research/autopilot.log` and one file per agent round in
+It stops on Stop (`.halt`), 7 days after the run started (counted across
+restarts), after 5 crashed or timed-out experiments in a row, when Claude Code
+fails 5 rounds in a row (usually an expired sign-in: run `claude` in Ubuntu),
+when the database or harness has failed for over an hour, or if anything but
+the runner changes `experiment_log.tsv`.
+
+Claude Code may edit only `research.py`, cannot read `.env`, and gets a short
+list of allowed git and test commands; the script still checks every commit
+itself, because the check is what the ratchet relies on. Logs: `~/.land-research/autopilot.log` and one file per agent round in
 `~/.land-research/agent-logs/` (inside Ubuntu; from Windows Explorer,
 `\\wsl$\Ubuntu\home\<you>\`).
 
 ## Limits
 
 - The PC must stay on and awake. A restart interrupts the experiment in
-  progress; it is dropped and the next one starts on the next Start.
+  progress; any experiment commit not recorded as kept is dropped on the next
+  Start.
 - An experiment killed mid-way (power cut, the 120-minute safety stop) can
   leave score rows no purge targets (`AUTORESEARCH_MECHANICS.md`, "Purge scope
   and known residue paths").

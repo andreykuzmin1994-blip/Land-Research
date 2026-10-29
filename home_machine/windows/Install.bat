@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 title Land Research - Install
 
-findstr /r /c:"^DATABASE_URL=postgres" settings.txt >nul
+findstr /r /c:"^ *DATABASE_URL *= *postgres" settings.txt >nul
 if errorlevel 1 (
   echo Fill in DATABASE_URL in settings.txt, save it, then run Install.bat again.
   start notepad settings.txt
@@ -35,8 +35,9 @@ if errorlevel 1 (
 echo.
 choice /m "Start Land Research automatically when you sign in to Windows"
 if errorlevel 2 goto done
-powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Startup')+'\Land Research.lnk'); $s.TargetPath='%~dp0Start Land Research.bat'; $s.WorkingDirectory='%~dp0'; $s.WindowStyle=7; $s.Save()"
-echo Added to Windows startup.
+set "LR_DIR=%~dp0"
+powershell -NoProfile -Command "$d=$env:LR_DIR; $s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Startup')+'\Land Research.lnk'); $s.TargetPath=$d+'Start Land Research.bat'; $s.Arguments='--autostart'; $s.WorkingDirectory=$d; $s.WindowStyle=7; $s.Save()"
+echo Added to Windows startup. It resumes the run after you sign in, unless you pressed Stop.
 
 :done
 echo.
