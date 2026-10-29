@@ -154,11 +154,12 @@ parcels (county GIS, 5-50 ac, chosen cities)
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
 against an answer key it can't game: Fulton land (as of the 2016 tax
 digest) that its owner sold in 2016 or later, and that carried a $1M+
-industrial building by 2025. That's 51 sites, spatially split 39 dev / 12
+industrial building by 2025. That's 46 sites, spatially split 34 dev / 12
 test. See `screener/autoresearch/PROGRAM.md`.
 
-Baseline (2026-10-28): the hand-built ranking puts 2 of the 39 dev sites
-in its top 2% (46 parcels). Random ranking averages 0.9. The developer
+Key rebuilt 2026-10-29 after the owner and association screens changed:
+the hand-built ranking puts 2 of the 34 dev sites in its top 2% (45
+parcels). Random ranking averages 0.8. The developer
 sites sit much closer to exits and inside industrial areas, and were
 mostly sold by companies, so there is a lot for the loop to learn.
 

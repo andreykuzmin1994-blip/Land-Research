@@ -12,26 +12,28 @@ in January 2016 with only the public data available then, how many of the
 Fulton parcels that the owner sold, and someone then built an industrial
 building on by 2025, would the ranking have put in its top 2%?
 
-- **Pool:** about 3,300 Fulton parcels (5–50 acres) from the 2016 tax
+- **Pool:** 3,180 Fulton parcels (5–50 acres) from the 2016 tax
   digest that pass the live tool's ownership and land-only screens.
-- **Answer key:** the 51 pool parcels that the 2016 owner sold in 2016 or
+- **Answer key:** the 46 pool parcels that the 2016 owner sold in 2016 or
   later at a real price (at least $50k per the county deed file) and that
   are at least half covered by a 2025-digest parcel carrying $1M+ of
   industrial improvements. Right-of-way deeds and sales to a development
   authority don't count.
-- **Left out:** 44 parcels that got industrial buildings without such a
+- **Left out:** 49 parcels that got industrial buildings without such a
   sale (owner-users, corporate successors, replatted ids) are dropped from
   the pool entirely, so they count neither way.
-- **Splits:** dev (39 positives, about 2,300 parcels) is what the loop
+- **Splits:** dev (34 positives, 2,229 parcels) is what the loop
   sees. Test (12 positives) is sealed: a human checks it every ~20 kept
   experiments. The split is by ~5 km map cell, so test sites are in
   places the loop never saw.
 - **Fixed size:** the top K is fixed at 2% of the pool, so inflating scores
   can't help. Only ranking real sites higher does. The hard screens are
   frozen into the evaluation set.
-- **Baseline (2026-10-28):** 2 hits out of 39 on dev (top 46). Random
-  ranking averages 0.86 (5th–95th percentile 0–3). The hand-built weights
-  are barely better than chance, so there is a lot to learn.
+- **Baseline (key rebuilt 2026-10-29):** 2 hits out of 34 on dev (top
+  45). Random ranking averages 0.81 (5th–95th percentile 0–2). The
+  hand-built weights are barely better than chance, so there is a lot to
+  learn. (The 2026-10-28 key had 51 positives, 39 on dev; scores from it
+  are not comparable.)
 
 Built by `build_eval.py` (humans only, between runs). It writes the frozen
 files in `data/`. Blank in the evaluation set, because their values today
@@ -54,16 +56,18 @@ estate / entity / religious), `owner_state`, `owner_po_box`, `years_held`,
 `sales_count`, `inherited`, `distress_owned`, `last_sale_price`.
 
 It must return `{"score": float, "motivation": float, "why_site": [...],
-"why_seller": [...]}`. **Keep `score` on a 0–100 scale**, with the best
-parcels near the top of it. `--decide` refuses scores outside 0–100,
+"why_seller": [...]}`. **Keep `score` finite and on a 0–100 scale**, with
+the best parcels near the top of it. `--decide` refuses NaN, infinite or
+out-of-range scores,
 because the live score adds a fixed 35% for zoning and slope on the same
 scale. The live tool shows `why_*` in the briefs, so keep them true and
 readable.
 
 ## Rules for the agent
 
-1. Edit **only** `screener/rank.py`. An experiment is one commit that
-   touches only that file; `--decide` refuses anything else.
+1. Edit **only** `screener/rank.py`. An experiment is one commit whose
+   whole diff touches only that file; `--decide` refuses anything else,
+   and refuses untracked files under `screener/`.
 2. Never open the files in `data/`, `experiments.tsv` or
    `best_ranking.json`. The score is the only feedback.
 3. Keep `learned_score` pure and general. No lookups of specific values
@@ -76,6 +80,25 @@ readable.
    context), reward size within 5–50 acres.
 5. Keep `why_site` / `why_seller` honest. They are the user-facing
    explanation of the score.
+
+### What `rank.py` may not use
+
+The evaluator reads `rank.py`'s source and refuses it, before importing
+it and in every mode, if it uses any of:
+
+- imports other than `__future__`, `math` and `typing` (and from `typing`
+  only `Any`, `Optional`, `Union`, `Mapping`, `Sequence`, `Iterable`,
+  `Callable`, `Dict`, `List`, `Tuple`, `Final`, `Literal`,
+  `TYPE_CHECKING`, for annotations);
+- `open`, `eval`, `exec`, `compile`, `getattr`, `globals`, `vars`, `type`,
+  `print`, `str.format`, and other builtins that read files, run code or
+  read attributes by name;
+- private names (`_x`), dunder names, frame or code attributes, dunder
+  methods, class keywords such as `metaclass=`, and `match` statements;
+- `global` / `nonlocal`, or changing an attribute of an imported module;
+- strings that name the evaluation files.
+
+The refusal names the alternative (if/elif, isinstance, plain functions).
 
 The zoning, slope, utilities and incentive terms live in
 `screener/scoring.py`, which the loop may not touch. They are fixed at
@@ -94,7 +117,19 @@ git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
 #   DISCARD -> run the exact `git reset --hard <parent>` it prints
 #   KEEP    -> carry on from here
+#   REFUSED -> see below
 ```
+
+When `--decide` prints REFUSED, it logs nothing:
+
+- commit, untracked-file or purity refusals: fix the commit or `rank.py`
+  and run it again;
+- NaN, infinite or out-of-range scores: fix `rank.py`;
+- "the evaluation itself changed", or a best-run record
+  (`best_ranking.json`) that is missing or doesn't match: **stop and ask a
+  human.** The loop never runs `--new-baseline`. If `best_ranking.json`
+  was lost, a human checks out the best kept commit and re-records it with
+  `--decide --new-baseline`.
 
 A change is kept only if it adds at least one hit over the best kept run
 **and** beats it in at least 90% of clustered bootstrap resamples (whole
