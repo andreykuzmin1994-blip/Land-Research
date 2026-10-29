@@ -64,11 +64,21 @@ _GOVERNMENT_RE = re.compile(
 # owners' word must come right before the association word: ASSOCIATION
 # alone also names banks and trade bodies, and ASSOC alone is often
 # ASSOCIATES. A trailing HOMEOWNERS ("... CROSSING HOMEOWNERS INC") counts.
+# So does any owners' word, misspelt or glued to the word before it ("UNIT
+# OWNERS", "INDUSTRIAL PARK OWNERS", "HOMEOWNRS", "HMOWNERS",
+# "TOWNHOMEOWNERS"), but not TOWERS / POWERS. A planned community's town
+# association counts ("SERENBE TOWN ASSOCIATION", "SERENBETOWN ASSOCIATION"),
+# but not "... TOWN ASSOC", usually ASSOCIATES ("ACKERMAN MIDTOWN ASSOC LTD").
 _ASSOCIATION_RE = re.compile(
     r"\b(HOME ?OWNER(S|'S|S'|S'S| S)?|PROPERTY OWNERS?'?|COMMUNITY|NEIGHBORHOOD|NBHD|"
-    r"CONDOMINIUMS?|CONDOS?|CIVIC|TOWN ?HOMES?|TOWN ?HOUSES?|HOMES) "
-    r"ASS(OCIATION|OCATION|OCIAT|N|OC|O|C)?\b|\bHOME ?OWNERS( INC| THE)*$"
+    r"CONDOMINIUMS?|CONDOS?|CIVIC|TOWN ?HOMES?|TOWN ?HOUSES?|HOMES|"
+    r"[A-Z]*OWNER(S|'S|S'|S'S| S)|[A-Z]*OWNRS|[A-Z]*HOME?OWERS) "
+    r"ASS(OCIATION|OCATION|OCIAT|N|OC|O|C)?\b|\bHOME ?OWNERS( INC| THE)*$|"
+    r"TOWN ASS(OCIATION|OCATION|OCIAT|N)\b"
 )
+# A partnership's legal form wins over any association word: "<builder>
+# HOMES ASSOC L P" and "LENOX TOWERS ASSOC LTD" are associates.
+_PARTNERSHIP_RE = re.compile(r"\b(L ?L ?L ?P|L ?L ?P|L ?P|LTD)\b")
 # HOA is also a given name ("NGUYEN THI HOA"): it counts only after the
 # first word of a company's name ("HIGH GROVE HOA INC"). POA alone usually
 # means power of attorney, so it never counts.
@@ -90,18 +100,22 @@ _INDUSTRIAL_NAME_RE = re.compile(
     r"\bINDUSTRIAL\b|\bLOGISTICS\b|\bDISTRIBUTION\b|\bWAREHOUSE\b|\bCOMMERCE (CENTER|PARK)\b|"
     r"\bTRADE CENTER\b|\bBUSINESS PARK\b|\bINDUSTRIAL PARK\b"
 )
+# A CONFERENCE ASSOCIATION is a church conference's legal body ("SOUTH
+# ATLANTIC CONFERENCE ASSOC"); CONFERENCE alone is not a church word.
 _RELIGIOUS_RE = re.compile(
     r"\b(CHURCH|MINISTRY|MINISTRIES|TEMPLE|MOSQUE|BAPTIST|METHODIST|DIOCESE|CONGREGATION|"
-    r"CEMETERY|TABERNACLE)\b"
+    r"CEMETERY|TABERNACLE|ADVENTISTS?|CONFERENCE ASS(OCIATION|OCIAT|OC|O|N))\b"
 )
 # ADMINISTRATOR / ADMINISTRATRIX, not ADMINISTRATION (agencies are government).
 _ESTATE_RE = re.compile(r"(?<!REAL )\bESTATE\b|\bEST OF\b|\bHEIRS\b|\bDECD\b|\bDECEASED\b|\bEXECUTOR\b|\bEXECUTRIX\b|\bADMINISTRAT(?!I)")
 _TRUST_RE = re.compile(r"\bTRUST\b|\bTRUSTEE\b|\bTRUSTEES\b|\bTR\b|\bTRS\b|\bREVOCABLE\b")
+# ASSOC is ASSOCIATES or ASSOCIATION, a company either way ("FOUR FIFTY
+# PIEDMONT ASSOC", "CHESTER INDUSTRIAL PARK ASSOC L P").
 _ENTITY_RE = re.compile(
     r"\bLLC\b|\bL L C\b|\bINC\b|\bCORP\b|\bCORPORATION\b|\bLP\b|\bLLP\b|\bLTD\b|\bCO\b|"
     r"\bCOMPANY\b|\bPARTNERS\b|\bPARTNERSHIP\b|\bHOLDINGS\b|\bPROPERTIES\b|\bINVESTMENTS?\b|"
     r"\bGROUP\b|\bASSOCIATES\b|\bVENTURES?\b|\bFUND\b|\bREALTY\b|\bENTERPRISES\b|\bASSN\b|"
-    r"\bASSOCIATION\b|\bRETIREMENT\b|\bPENSION\b|\bSYSTEM\b"
+    r"\bASSOC\b|\bASSOCIATION\b|\bRETIREMENT\b|\bPENSION\b|\bSYSTEM\b"
 )
 # A private-entity word overrides government keywords ("CITY OF ATLANTA
 # PARTNERS LP", "PENNSYLVANIA PUBLIC SCHOOL EMPLOYEES RETIREMENT SYSTEM").
@@ -135,7 +149,8 @@ def owner_type(name: str | None) -> str:
         return "utility"
     if _GOVERNMENT_RE.search(n) and not _PRIVATE_SUFFIX_RE.search(n):
         return "government"
-    if _ASSOCIATION_RE.search(n) or (_HOA_RE.search(n) and _HOA_COMPANY_RE.search(n)):
+    if ((_ASSOCIATION_RE.search(n) or (_HOA_RE.search(n) and _HOA_COMPANY_RE.search(n)))
+            and not _PARTNERSHIP_RE.search(n)):
         return "association"
     if _is_religious(n):
         return "religious"

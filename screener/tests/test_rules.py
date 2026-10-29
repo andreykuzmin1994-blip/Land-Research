@@ -584,5 +584,87 @@ class DecideTests(unittest.TestCase):
             self.assertEqual(status()[1:], ["?? screener/helper.py"])
 
 
+class OwnersWordAssociationTests(unittest.TestCase):
+    """Owners' associations the first rule missed among ranked parcels of a
+    full Fulton run, and the partnerships and church bodies that share
+    their words."""
+
+    def test_owners_word_before_association(self):
+        # Misspelt and glued HOMEOWNERS, and OWNERS after any name.
+        for name in (
+            "ASBURY PARK HOMEOWNRS ASSOCIATION INC",
+            "CREEL WALK HOMEOWERS ASSOCIATION INC",
+            "DUPONT COMMONS HOMESOWNERS ASSN INC",
+            "COMMUNITIES AT PRINCETON LAKES HMOWNERS ASSN INC THE",
+            "FIELDSTONE MANOR TOWNHOMEOWNERS ASSOCIATION INC",
+            "CASCADE UNIT OWNERS ASSOCIATION INC",
+            "GIVERNY AT LE JARDIN OWNERS ASSN INC",
+            "TAPESTRY AT LE JARDIN OWNERS ASSOCIATION INC",
+            "VILLAGES OF EAST POINT OWNERS ASSOCIATION INC THE",
+            "OAKLEY INDUSTRIAL PARK OWNERS ASSOCIATION INC",
+            "MAPLE RIDGE LOT OWNERS ASSOC",
+            "DISTRICT OWNERS' ASSOCIATION, INC.",
+            "BIRCH HILL UNIT OWNER'S ASSN INC",
+            "OWNERS ASSOCIATION OF BIRCH HILL INC",
+        ):
+            self.assertEqual(owner_type(name), "association", name)
+
+    def test_town_association(self):
+        # A planned community's town association, also glued to its name.
+        for name in ("SERENBE TOWN ASSOCIATION", "SERENBE TOWN ASSOCIATION INC",
+                     "SERENBE TOWN ASSOCIATION, INC.", "SERENBETOWN ASSOCIATION INC",
+                     "MAPLE TOWN ASSN INC"):
+            self.assertEqual(owner_type(name), "association", name)
+
+    def test_partnerships_stay_out(self):
+        # ASSOC after a place or a town's name is usually ASSOCIATES; a
+        # partnership's legal form wins over any association word.
+        cases = {
+            "ACKERMAN MIDTOWN ASSOC LTD": "entity",
+            "ACME MIDTOWN ASSOC II LLC": "entity",
+            "OLD TOWN ASSOC": "entity",
+            "CHESTER INDUSTRIAL PARK ASSOC": "entity",
+            "CHESTER INDUSTRIAL PARK ASSOC L P": "entity",
+            "CHESTER INDUSTRIAL PARK ASSOCIATES L P": "entity",
+            "FOUR FIFTY PIEDMONT ASSOC": "entity",
+            "LENOX TOWERS ASSOC LTD PART": "entity",
+            "RIVER TOWERS ASSOCIATION INC": "entity",
+            "JONES & BOWERS ASSOC": "entity",
+            "ACME HOMES ASSOC L P": "entity",
+            "ACME OWNERS ASSOC LLLP": "entity",
+            "MAPLE COMMUNITY ASSOC L L P": "entity",
+        }
+        for name, expected in cases.items():
+            self.assertEqual(owner_type(name), expected, name)
+
+    def test_conference_association_is_religious(self):
+        for name in ("SOUTH ATLANTIC CONFERENCE ASSOC",
+                     "SOUTH ATLANTIC CONFERENCE ASSN OF SEVENTH DAY ADVENTISTS",
+                     "SOUTH ATLANTIC CONFERENCE ASSOC OF SEVENTH DAY AVENTISTS",
+                     "SOUTH ATLANTIC CONF ASSN OF SEVENTH DAY ADVENTIST"):
+            self.assertEqual(owner_type(name), "religious", name)
+        # CONFERENCE alone is not a church word.
+        self.assertEqual(owner_type("EXECUTIVE CONFERENCE CTR INC"), "entity")
+        self.assertEqual(owner_type("MAPLE CONFERENCE CENTER LLC"), "entity")
+
+    def test_place_name_association_stays_entity(self):
+        # No owners' or community word: the name alone can't tell an HOA
+        # from a trade body or club, so it keeps the conservative type.
+        for name in ("COLDWATER CREEK ASSOCIATION INC", "GEORGIA MUNICIPAL ASSOCIATION INC",
+                     "BRIGHTER DAYS ASSOCIATION INC"):
+            self.assertEqual(owner_type(name), "entity", name)
+
+    def test_new_forms_are_screened_out(self):
+        for name in ("OAKLEY INDUSTRIAL PARK OWNERS ASSOCIATION INC",
+                     "SERENBETOWN ASSOCIATION INC"):
+            p = parcel(owner=name, owner_type=owner_type(name))
+            why = screens.attribute_rejects(p, SETTINGS, {})
+            self.assertEqual(len(why), 1, name)
+            self.assertIn("association", why[0])
+        p = parcel(owner="CHESTER INDUSTRIAL PARK ASSOC L P",
+                   owner_type=owner_type("CHESTER INDUSTRIAL PARK ASSOC L P"))
+        self.assertEqual(screens.attribute_rejects(p, SETTINGS, {}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

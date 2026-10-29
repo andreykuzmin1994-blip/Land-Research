@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             rejected.append(p)
         else:
             live.append(p)
-    funnel.append(("not built on, not government / developer / exempt", len(live)))
+    funnel.append(("not built on, not government / developer / association / exempt", len(live)))
     log(f"  {len(live):,} pass the ownership and land-only screens")
     if not live:
         log("nothing left to screen")

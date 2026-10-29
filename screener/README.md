@@ -54,7 +54,7 @@ failed: they stay in the list, flagged, without the steep-ground screen.
   owners to exclude). Optional screens: `max_exit_miles` and
   `exclude_hard_entitlement` (drop land zoned and planned residential).
   `exclude_association_owned` drops land held by homeowners', property
-  owners', community, neighborhood, townhome, condominium or civic
+  owners', community, neighborhood, town, townhome, condominium or civic
   associations: subdivision common areas, not land for sale. The owner
   name must pair an owners' word with an association word ("... HOMEOWNERS
   ASSN INC"), or carry HOA inside a company name ("... HOA INC"); ASSOC,
