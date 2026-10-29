@@ -12,11 +12,15 @@ behaviour, so no other test sees them:
 2. The offline suite must not write into the repo: research's raw-response
    cache (``research._SOURCES_DIR``) is redirected to a temp dir by the
    ``tests`` package guard (tests/__init__.py).
-3. The live-PostGIS smoke script refuses non-local databases, and reads
-   the metric scoped to its OWN rows, so its result does not depend on
-   which branch is checked out (an ``autoresearch/<tag>`` branch makes
-   prepare derive a run scope) or on other rows in the database.
+3. The live-PostGIS smoke script refuses non-local databases (without
+   printing a password fragment when the password holds an unencoded
+   '@'), and reads the metric scoped to its OWN rows, so its result does
+   not depend on which branch is checked out (an ``autoresearch/<tag>``
+   branch makes prepare derive a run scope) or on other rows in the
+   database.
 4. The always-on offline CI workflow runs the screener suite too.
+5. The live transaction-integrity check (same CI job, after the smoke
+   test) scores under an explicit run tag and never consults the branch.
 
 Hermetic per SR-6: no network, no DATABASE_URL, no database connection.
 """
@@ -26,6 +30,7 @@ from __future__ import annotations
 import ast
 import io
 import os
+import secrets
 import shutil
 import subprocess
 import unittest
@@ -295,6 +300,107 @@ class TestOfflineWorkflow(unittest.TestCase):
         self.assertIn(
             "python -m unittest discover -s screener/tests -t . -v", workflow
         )
+
+
+def _unencoded_at_dsns(fragment: str, host: str) -> list[str]:
+    """URL DSNs whose password holds an unencoded '@' followed by ``fragment``.
+
+    libpq splits the userinfo at the FIRST '@', so ``fragment`` lands in the
+    host, or (after ':' / '/' / '?') IS the host while the '@' moves on into
+    port / dbname / a query parameter. Built at runtime: no secret literals.
+    """
+    head = secrets.token_hex(3)
+    tail = secrets.token_hex(3)
+    return [
+        f"postgresql://u:{head}@{fragment}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}:{tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}/{tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}?hostaddr={tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}?sslmode={tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@@{fragment}@{host}:5432/postgres",
+        f"postgresql://u:@{fragment}@{host}:5432/postgres",
+    ]
+
+
+class TestSmokeHostGuardNeverPrintsPassword(unittest.TestCase):
+    """SR-8: an unencoded '@' in the password never reaches the refusal.
+
+    libpq splits a URL's ``user:password`` at the FIRST '@', so the rest of
+    such a password becomes (part of) the "host" the guard reports.
+    """
+
+    def test_refusal_never_contains_the_fragment(self) -> None:
+        for host in ("db.example.invalid", "localhost", "127.0.0.1"):
+            fragment = f"frag{secrets.token_hex(4)}"
+            for dsn in _unencoded_at_dsns(fragment, host):
+                with self.subTest(shape=dsn.replace(fragment, "<fragment>")):
+                    buf = io.StringIO()
+                    with _smoke_env(DATABASE_URL=dsn), \
+                            mock.patch.object(smoke.psycopg, "connect") as connect, \
+                            redirect_stdout(buf):
+                        with self.assertRaises(SystemExit) as ctx:
+                            smoke.main()
+                    self.assertNotEqual(ctx.exception.code, 0)
+                    connect.assert_not_called()
+                    self.assertNotIn(fragment, buf.getvalue())
+                    self.assertIn("%40", buf.getvalue())
+
+    def test_env_host_with_stray_at_is_not_printed(self) -> None:
+        fragment = f"frag{secrets.token_hex(4)}"
+        buf = io.StringIO()
+        with _smoke_env(DATABASE_URL="postgresql:///lr_test",
+                        PGHOST=f"{fragment}@db.example.invalid"), \
+                mock.patch.object(smoke.psycopg, "connect") as connect, \
+                redirect_stdout(buf):
+            with self.assertRaises(SystemExit):
+                smoke.main()
+        connect.assert_not_called()
+        self.assertNotIn(fragment, buf.getvalue())
+
+    def test_abstract_socket_and_encoded_at_still_accepted(self) -> None:
+        password = f"{secrets.token_hex(3)}%40{secrets.token_hex(3)}"
+        with _smoke_env(), redirect_stdout(io.StringIO()):
+            for dsn in (
+                "postgresql:///lr_test?host=@lrsocket",  # abstract Unix socket
+                f"postgresql://lr:{password}@localhost:5432/lr_test",
+            ):
+                self.assertFalse(smoke._has_stray_at(dsn), dsn)
+                smoke._require_local_dsn(dsn)  # no SystemExit
+
+
+class TestLiveTxnCheckRunScoping(unittest.TestCase):
+    """tests/live_txn_check.py runs after the smoke step in the same CI job,
+    on pushed ``autoresearch/<tag>`` branches too. It must neither refuse
+    there nor let prepare derive a run scope from the branch: every scoring
+    cycle gets an explicit run tag.
+    """
+
+    SRC = (REPO_ROOT / "tests" / "live_txn_check.py").read_text(encoding="utf-8")
+
+    def test_never_consults_the_checked_out_branch(self) -> None:
+        uses = [
+            node.lineno for node in ast.walk(ast.parse(self.SRC))
+            if (isinstance(node, ast.Attribute) and node.attr == "current_run_tag")
+            or (isinstance(node, ast.Name) and node.id == "current_run_tag")
+        ]
+        self.assertEqual(uses, [], "current_run_tag() makes the result depend "
+                                   "on the checked-out branch")
+
+    def test_scoring_cycles_pass_an_explicit_run_tag(self) -> None:
+        calls = [
+            node for node in ast.walk(ast.parse(self.SRC))
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run_scoring_cycle"
+        ]
+        self.assertTrue(calls)
+        for call in calls:
+            tags = [kw.value for kw in call.keywords if kw.arg == "run_tag"]
+            self.assertEqual(len(tags), 1, f"line {call.lineno}: no run_tag")
+            self.assertFalse(
+                isinstance(tags[0], ast.Constant) and tags[0].value is None,
+                f"line {call.lineno}: run_tag=None derives scope from the branch",
+            )
 
 
 if __name__ == "__main__":

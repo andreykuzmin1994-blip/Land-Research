@@ -107,7 +107,10 @@ jobs:
       - name: Run live-PostGIS smoke test
         run: python tests/test_postgis_smoke.py
 
-      # After the smoke test: it asserts a global unscoped pipeline count,
-      # and this check deletes every row it writes.
+      # After the smoke test, which applies the schema this check uses.
+      # Neither depends on the checked-out branch (a pushed
+      # autoresearch/<tag> branch is checked out by name): each reads and
+      # writes under an explicit run tag of its own (smoke-<hex>,
+      # livetxn-<hex>). This check deletes every row it writes.
       - name: Run live transaction-integrity check
         run: python tests/live_txn_check.py

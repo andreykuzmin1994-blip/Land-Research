@@ -54,7 +54,8 @@ def _nonlocal_hosts(dsn: str) -> list[str]:
     the DSN; no host at all (or a ``/``- or ``@``-prefixed one) is a Unix
     socket. A ``service`` entry resolves from a file this script does not
     read, so it counts as non-local. Raises ``psycopg.ProgrammingError``
-    on an unparseable DSN.
+    on an unparseable DSN. Callers that print the result check
+    ``_has_stray_at`` first: a returned "host" can be a password fragment.
     """
     params = conninfo_to_dict(dsn)
     service = params.get("service") or os.environ.get("PGSERVICE")
@@ -70,20 +71,57 @@ def _nonlocal_hosts(dsn: str) -> list[str]:
     return found
 
 
+def _has_stray_at(dsn: str) -> bool:
+    """True when an '@' sits where libpq's URL split can leave a password tail.
+
+    libpq splits a URL's ``user:password`` at the FIRST '@', so a password
+    holding an unencoded '@' spills its tail into the host
+    (``wordXYZ@db.example.com``) or, when the tail holds ':' / '/' / '?',
+    makes the host itself a password fragment and pushes the '@' into the
+    port, dbname or a query parameter. Printing a host name then prints
+    part of the password (SR-8). A lone leading '@' on a host is an
+    abstract Unix-socket name, not a spill. Raises
+    ``psycopg.ProgrammingError`` on an unparseable DSN.
+    """
+    params = dict(conninfo_to_dict(dsn))
+    for key, env_var in (("host", "PGHOST"), ("hostaddr", "PGHOSTADDR")):
+        params[key] = params.get(key) or os.environ.get(env_var)
+    for key, value in params.items():
+        if key in ("user", "password") or value is None:
+            continue
+        text = str(value)
+        if key == "host":
+            text = ",".join(host.strip()[1:] for host in text.split(","))
+        if "@" in text:
+            return True
+    return False
+
+
 def _require_local_dsn(dsn: str) -> None:
     """Exit unless ``dsn`` is local or the explicit opt-in is set.
 
     Only host names are printed, never the DSN: ``prepare._mask_dsn``
     masks URL-form DSNs only, and the parser's error text can quote
-    key=value fragments such as a password (SR-8).
+    key=value fragments such as a password (SR-8). A DSN with a stray '@'
+    (see ``_has_stray_at``) is refused without printing any host name,
+    since the "host" may be the tail of the password.
     """
     if os.environ.get(_ALLOW_NONLOCAL_ENV_VAR) == "1":
         print(f"WARN: {_ALLOW_NONLOCAL_ENV_VAR}=1 — local-host guard skipped")
         return
     try:
+        stray_at = _has_stray_at(dsn)
         remote = _nonlocal_hosts(dsn)
     except psycopg.Error:
         _fail("DATABASE_URL is not a valid libpq connection string")
+    if stray_at:
+        _fail(
+            "DATABASE_URL has an '@' after its user:password part (an "
+            "unencoded '@' in the password?), so the host is not printed. "
+            "URL-encode '@' in a password as %40, and point DATABASE_URL at "
+            f"a throwaway local PostGIS (or set {_ALLOW_NONLOCAL_ENV_VAR}=1 "
+            f"to override deliberately)."
+        )
     if remote:
         _fail(
             f"refusing to write smoke-test rows to non-local host(s) "

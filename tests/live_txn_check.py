@@ -18,18 +18,25 @@ semantics are PostgreSQL's own:
       metric's tie-break (scored_at DESC, score_id DESC) and stays unscoped.
 
 Invoked from ``.github/workflows/discovery-fulton.yml`` AFTER
-``tests/test_postgis_smoke.py`` (the smoke test asserts a global, unscoped
-pipeline count, and applies the schema this script relies on; run
-``python prepare.py`` first when running this standalone). Every row
-written here carries a per-run token and is deleted in ``finally``; files
-go only to temp dirs; no network calls.
+``tests/test_postgis_smoke.py``, which applies the schema this script
+relies on (run ``python prepare.py`` first when running this standalone).
+Every row written here carries a per-run token and is deleted in
+``finally``; files go only to temp dirs; no network calls.
+
+The scoring checks never derive a run scope from the checked-out branch:
+they pass an explicit throwaway run tag (``livetxn-<token>``) and score
+parcels of a market of their own, so a pushed ``autoresearch/<tag>``
+branch (which CI checks out by name) runs this script unchanged.
 
 Safety (this script writes rows and runs a scoring cycle): DATABASE_URL is
 read from the process environment only, never from ``.env``, and must name
 a local server (localhost / 127.0.0.1 / ::1 / a unix-socket directory),
 re-checked after connecting. Set ``LIVE_TXN_CHECK_ALLOW_NONLOCAL_DB=1`` to
 override deliberately. The scoring step also refuses to run if the cycle
-would select any parcel this script did not create.
+would select any parcel this script did not create. Refusals never print
+a password fragment: libpq splits a URL's ``user:password`` at the FIRST
+'@', so a password holding an unencoded '@' spills into the host, port or
+dbname, and such a DSN is refused without printing those fields (SR-8).
 
 Exit code 0 = pass, 1 = a check failed, 2 = refused to run.
 """
@@ -205,6 +212,35 @@ def _is_local_host(value: str) -> bool:
     return host.startswith("/") or host in _LOCAL_HOST_NAMES or _is_loopback_address(host)
 
 
+_STRAY_AT_REFUSAL = (
+    "DATABASE_URL has an '@' after its user:password part (an unencoded '@' "
+    "in the password?), so its host, port and dbname are not printed; "
+    "URL-encode '@' in a password as %40; refused"
+)
+
+
+def _has_stray_at(parts: Mapping[str, Any], environ: Mapping[str, str]) -> bool:
+    """True when an '@' sits where libpq's URL split can leave a password tail.
+
+    libpq splits a URL's ``user:password`` at the FIRST '@', so a password
+    holding an unencoded '@' spills its tail into the host
+    (``wordXYZ@db.example.com``) or, when the tail holds ':' / '/' / '?',
+    makes the host itself a password fragment and pushes the '@' into the
+    port, dbname or a query parameter. Printing any of those would print
+    part of the password (SR-8). A lone leading '@' on a host is an abstract
+    unix-socket name, not a spill.
+    """
+    for key, value in parts.items():
+        if key in ("user", "password") or value is None:
+            continue
+        text = str(value)
+        if key == "host":
+            text = ",".join(host.strip()[1:] for host in text.split(","))
+        if "@" in text:
+            return True
+    return "@" in str(environ.get("PGHOSTADDR") or "")
+
+
 def check_dsn_is_local(
     dsn: str | None, environ: Mapping[str, str],
 ) -> dict[str, Any]:
@@ -229,6 +265,8 @@ def check_dsn_is_local(
         return parts
     if parts.get("service") or environ.get("PGSERVICE"):
         raise UnsafeTarget("service= / PGSERVICE can redirect the host; refused")
+    if _has_stray_at(parts, environ):
+        raise UnsafeTarget(_STRAY_AT_REFUSAL)
     hosts = str(parts.get("host") or "")
     if not hosts:
         raise UnsafeTarget("DATABASE_URL names no explicit host; refused")
@@ -256,7 +294,13 @@ def check_connection_is_local(conn: Any, environ: Mapping[str, str]) -> None:
 
 
 def describe_target(parts: Mapping[str, Any]) -> str:
-    """Printable target summary: never includes the user or password."""
+    """Printable target summary: never includes the user or password.
+
+    With the opt-in the guard does not run, so a DSN whose password spilled
+    into host/port/dbname reaches here: those fields are then withheld.
+    """
+    if _has_stray_at(parts, {}):
+        return "host/port/dbname not printed (an '@' after the user:password part)"
     return (
         f"host={parts.get('host', '')} port={parts.get('port', '')} "
         f"dbname={parts.get('dbname', '')}"
@@ -596,10 +640,47 @@ def _insert_parcels(dsn: str, created: _Created, market: str,
         conn.commit()
 
 
-def _scoring_selection_is_ours(dsn: str, research: Any, created: _Created) -> list[str]:
-    """Parcels the unscoped scoring cycle would select that we did not create."""
-    selected = [r[0] for r in _rows(dsn, research._SQL_LIST_PARCELS_FOR_SCORING, ("atlanta",))]
-    return [pid for pid in selected if pid not in set(created.parcel_ids)]
+def _scoring_scope(token: str) -> tuple[str, str]:
+    """(market, run_tag) the scoring checks score into, both this run's own.
+
+    The run tag is passed to ``run_scoring_cycle`` explicitly, so the
+    checked-out branch never decides the scope. A fresh tag makes the
+    run-scoped selection pick EVERY parcel of the market with no row in that
+    run (in 'atlanta' that includes the parcel the smoke test leaves behind),
+    so the parcels live in a market of their own, registered only while the
+    cycle runs (see ``_scoring_market``).
+    """
+    return f"{_TOKEN_PREFIX}-{token}-score", f"{_TOKEN_PREFIX}-{token}"
+
+
+@contextmanager
+def _scoring_market(research: Any, market: str) -> Iterator[None]:
+    """Let ``run_scoring_cycle`` accept ``market`` (same counties as atlanta)."""
+    counties = dict(research._MARKET_TO_COUNTIES)
+    counties[market] = list(counties["atlanta"])
+    with _patched(research, "_MARKET_TO_COUNTIES", counties):
+        yield
+
+
+def _foreign_scoring_selection(
+    dsn: str, research: Any, created: _Created, market: str, run_tag: str,
+) -> list[str]:
+    """Parcels the run-scoped scoring cycle would select that we did not create.
+
+    Same SQL and parameters ``run_scoring_cycle`` uses for an explicit tag.
+    """
+    selected = [r[0] for r in _rows(
+        dsn, research._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED, (market, run_tag, run_tag),
+    )]
+    ours = set(created.parcel_ids)
+    return [pid for pid in selected if pid not in ours]
+
+
+def _run_scoring(research: Any, market: str, run_tag: str) -> dict[str, Any]:
+    with _scoring_market(research, market):
+        # experiment_id set too: a tagged row without one makes score_parcel
+        # warn that it is unpurgeable (these rows are deleted in cleanup).
+        return research.run_scoring_cycle(market, run_tag=run_tag, experiment_id=run_tag)
 
 
 def _score_counts(dsn: str, pids: list[str]) -> dict[str, int]:
@@ -611,10 +692,11 @@ def check_scoring_isolation(
     res: _Results, created: _Created, dsn: str, token: str, research: Any,
 ) -> None:
     """(b) a server-side failure in parcel 2's write block drops only parcel 2."""
+    market, run_tag = _scoring_scope(token)
     pids = [f"{_TOKEN_PREFIX}-{token}-s{i}" for i in (1, 2, 3)]
-    _insert_parcels(dsn, created, "atlanta",
+    _insert_parcels(dsn, created, market,
                     [(pid, -84.554 + i * 0.003, 33.554) for i, pid in enumerate(pids)])
-    foreign = _scoring_selection_is_ours(dsn, research, created)
+    foreign = _foreign_scoring_selection(dsn, research, created, market, run_tag)
     if foreign:
         res.check(False, "(b) scoring selection contains only this check's parcels",
                   f"refusing to score {len(foreign)} parcel(s) this check did not create")
@@ -629,7 +711,7 @@ def check_scoring_isolation(
         return original_flag(conn, cycle_id, parcel_id, *args, **kwargs)
 
     with _patched(research, "_flag", _faulting_flag):
-        summary = research.run_scoring_cycle("atlanta")
+        summary = _run_scoring(research, market, run_tag)
     created.cycle_ids.append(summary["cycle_id"])
     by_pid = {p["parcel_id"]: p["status"] for p in summary["parcels"]}
     statuses = {pid: by_pid.get(pid) for pid in pids}
@@ -645,12 +727,13 @@ def check_scoring_nan(
     res: _Results, created: _Created, dsn: str, token: str, research: Any,
 ) -> None:
     """(b) a NaN sub-score is stored as null; nothing non-finite is written."""
+    market, run_tag = _scoring_scope(token)
     pids = [f"{_TOKEN_PREFIX}-{token}-n{i}" for i in (1, 2, 3)]
     nan_lng = -84.5401
-    _insert_parcels(dsn, created, "atlanta", [
+    _insert_parcels(dsn, created, market, [
         (pids[0], -84.545, 33.556), (pids[1], nan_lng, 33.556), (pids[2], -84.535, 33.556),
     ])
-    foreign = _scoring_selection_is_ours(dsn, research, created)
+    foreign = _foreign_scoring_selection(dsn, research, created, market, run_tag)
     if foreign:
         res.check(False, "(b) scoring selection contains only this check's parcels",
                   f"refusing to score {len(foreign)} parcel(s) this check did not create")
@@ -664,10 +747,11 @@ def check_scoring_nan(
         return original_s10(lng, lat)
 
     with _patched(research, "_compute_s10", _nan_s10):
-        summary = research.run_scoring_cycle("atlanta")
+        summary = _run_scoring(research, market, run_tag)
     created.cycle_ids.append(summary["cycle_id"])
-    # The cycle may also re-select an earlier check's unscored parcel; only
-    # this check's parcels are asserted on.
+    # The cycle may also re-select the isolation check's parcels (same
+    # market and run tag, e.g. its failed one); only this check's parcels
+    # are asserted on.
     by_pid = {p["parcel_id"]: p["status"] for p in summary["parcels"]}
     statuses = {pid: by_pid.get(pid) for pid in pids}
     res.check(statuses == {pid: "scored" for pid in pids},
@@ -829,11 +913,6 @@ def main(environ: Mapping[str, str] = os.environ) -> int:
             check_connection_is_local(conn, os.environ)
     except UnsafeTarget as exc:
         print(f"REFUSED: {exc}")
-        return 2
-
-    if prepare.current_run_tag() is not None:
-        print("REFUSED: an autoresearch/<tag> branch is checked out; scoring "
-              "here would stamp rows into that run")
         return 2
 
     res = _Results()

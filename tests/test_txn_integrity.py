@@ -29,13 +29,17 @@ from __future__ import annotations
 
 import enum
 import importlib.util
+import io
 import json
 import logging
 import math
+import os
+import secrets
 import shutil
+import sys
 import tempfile
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -1507,6 +1511,502 @@ class TestLiveCheckGuard(unittest.TestCase):
         text = self.live.describe_target(parts)
         self.assertNotIn("s3cret", text)
         self.assertNotIn("lr:", text)
+
+
+# ===========================================================================
+# tests/live_txn_check.py — never prints a password fragment (SR-8)
+# ===========================================================================
+def _unencoded_at_dsns(fragment: str, host: str) -> list[str]:
+    """URL DSNs whose password holds an unencoded '@' followed by ``fragment``.
+
+    libpq splits the userinfo at the FIRST '@', so ``fragment`` lands in the
+    host, or (after ':' / '/' / '?') IS the host while the '@' moves on into
+    port / dbname / a query parameter. Built at runtime: no secret literals.
+    """
+    head = secrets.token_hex(3)
+    tail = secrets.token_hex(3)
+    return [
+        f"postgresql://u:{head}@{fragment}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}:{tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}/{tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}?hostaddr={tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@{fragment}?sslmode={tail}@{host}:5432/postgres",
+        f"postgresql://u:{head}@@{fragment}@{host}:5432/postgres",
+        f"postgresql://u:@{fragment}@{host}:5432/postgres",
+    ]
+
+
+class _FakeLiveConn:
+    """psycopg connection stand-in for live_txn_check.main's guard steps."""
+
+    def __init__(self) -> None:
+        self.info = mock.Mock(host="localhost", hostaddr="127.0.0.1")
+
+    def __enter__(self) -> "_FakeLiveConn":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        return None
+
+
+@contextmanager
+def _live_os_environ(dsn: str) -> Iterator[None]:
+    """os.environ with DATABASE_URL=dsn and no libpq redirections."""
+    with mock.patch.dict("os.environ", {"DATABASE_URL": dsn}):
+        for key in ("PGSERVICE", "PGHOSTADDR", "LIVE_TXN_CHECK_ALLOW_NONLOCAL_DB"):
+            os.environ.pop(key, None)
+        yield
+
+
+class TestLiveCheckNeverPrintsPasswordFragment(unittest.TestCase):
+    """An unencoded '@' in the password never reaches a refusal or summary."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with mock.patch("psycopg.connect", side_effect=AssertionError("connect at import")):
+            cls.live = _load_live_check()
+
+    def test_guard_refusal_never_contains_the_fragment(self) -> None:
+        for host in ("db.example.invalid", "localhost", "127.0.0.1"):
+            fragment = f"frag{secrets.token_hex(4)}"
+            for dsn in _unencoded_at_dsns(fragment, host):
+                with self.subTest(shape=dsn.replace(fragment, "<fragment>")):
+                    with self.assertRaises(self.live.UnsafeTarget) as ctx:
+                        self.live.check_dsn_is_local(dsn, {})
+                    self.assertNotIn(fragment, str(ctx.exception))
+
+    def test_main_refuses_without_printing_the_fragment_or_connecting(self) -> None:
+        fragment = f"frag{secrets.token_hex(4)}"
+        for dsn in _unencoded_at_dsns(fragment, "db.example.invalid"):
+            with self.subTest(shape=dsn.replace(fragment, "<fragment>")):
+                buf = io.StringIO()
+                with _live_os_environ(dsn), \
+                        mock.patch("psycopg.connect", side_effect=AssertionError("connected")), \
+                        redirect_stdout(buf):
+                    self.assertEqual(self.live.main({"DATABASE_URL": dsn}), 2)
+                self.assertNotIn(fragment, buf.getvalue())
+                self.assertIn("REFUSED", buf.getvalue())
+
+    def test_opt_in_target_description_withholds_spilled_fields(self) -> None:
+        fragment = f"frag{secrets.token_hex(4)}"
+        opt_in = {"LIVE_TXN_CHECK_ALLOW_NONLOCAL_DB": "1"}
+        for dsn in _unencoded_at_dsns(fragment, "db.example.invalid"):
+            with self.subTest(shape=dsn.replace(fragment, "<fragment>")):
+                parts = self.live.check_dsn_is_local(dsn, opt_in)
+                self.assertNotIn(fragment, self.live.describe_target(parts))
+
+    def test_abstract_socket_host_stays_recognizable(self) -> None:
+        # A lone leading '@' is an abstract unix-socket name, not a spill.
+        with self.assertRaises(self.live.UnsafeTarget) as ctx:
+            self.live.check_dsn_is_local("host=@lrsocket dbname=x", {})
+        self.assertIn("@lrsocket", str(ctx.exception))
+        self.assertNotIn("user:password", str(ctx.exception))
+
+    def test_encoded_at_in_password_is_unaffected(self) -> None:
+        password = f"{secrets.token_hex(3)}%40{secrets.token_hex(3)}"
+        self.live.check_dsn_is_local(f"postgresql://lr:{password}@localhost:5432/lr_test", {})
+
+
+# ===========================================================================
+# tests/live_txn_check.py — branch-proof scoring scope
+# ===========================================================================
+class TestLiveCheckRunScope(unittest.TestCase):
+    """The live check scores under an explicit throwaway run tag, so a pushed
+    ``autoresearch/<tag>`` branch (CI checks it out by name) changes nothing:
+    no refusal, no rows stamped into that run, no branch-derived selection.
+    """
+
+    DSN = "postgresql://lr:lr_pw@localhost:5432/lr_test"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with mock.patch("psycopg.connect", side_effect=AssertionError("connect at import")):
+            cls.live = _load_live_check()
+
+    def test_main_runs_on_an_autoresearch_branch(self) -> None:
+        live = self.live
+        check_names = [
+            "check_ingestion_isolation", "check_ingestion_validation",
+            "check_scoring_isolation", "check_scoring_nan",
+            "check_discovery_isolation", "check_memo_latest_row",
+        ]
+        checks = {name: mock.Mock(name=name) for name in check_names}
+        buf = io.StringIO()
+        with _live_os_environ(self.DSN), \
+                mock.patch("psycopg.connect", return_value=_FakeLiveConn()), \
+                mock.patch.object(prepare, "dsn_available", return_value=True), \
+                mock.patch.object(prepare, "get_connection",
+                                  lambda: _yield_conn(_FakeLiveConn())), \
+                mock.patch.object(prepare, "current_run_tag", return_value="ci-check"), \
+                mock.patch.object(live, "_scalar", return_value=1), \
+                mock.patch.object(live, "_cleanup") as cleanup, \
+                mock.patch.multiple(live, **checks), \
+                mock.patch.object(sys, "path", list(sys.path)), \
+                redirect_stdout(buf):
+            rc = live.main({"DATABASE_URL": self.DSN})
+        self.assertEqual(rc, 0, buf.getvalue())
+        self.assertNotIn("REFUSED", buf.getvalue())
+        for name, check in checks.items():
+            self.assertEqual(check.call_count, 1, name)
+        cleanup.assert_called_once()
+
+    def _fake_research(self, calls: list[dict[str, Any]]) -> Any:
+        fake = mock.Mock(spec=[])
+        fake._SQL_LIST_PARCELS_FOR_SCORING = research._SQL_LIST_PARCELS_FOR_SCORING
+        fake._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED = (
+            research._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED
+        )
+        fake._MARKET_TO_COUNTIES = {"atlanta": ["fulton"]}
+        fake._flag = lambda *args, **kwargs: None
+        fake._compute_s10 = lambda lng, lat: None
+
+        def run_scoring_cycle(market: str, **kwargs: Any) -> dict[str, Any]:
+            calls.append({"market": market, "registered": dict(fake._MARKET_TO_COUNTIES),
+                          **kwargs})
+            return {"cycle_id": "score-x", "parcels": []}
+
+        fake.run_scoring_cycle = run_scoring_cycle
+        return fake
+
+    def _run_check(self, check_name: str, foreign: list[str]) -> tuple[list, list, Any]:
+        """Run one scoring check with the DB calls faked; return (calls, rows, res)."""
+        live = self.live
+        token = secrets.token_hex(3)
+        calls: list[dict[str, Any]] = []
+        queries: list[tuple[str, tuple]] = []
+        inserted: list[tuple[str, list]] = []
+        fake = self._fake_research(calls)
+
+        def fake_rows(dsn: str, sql: str, params: tuple) -> list[tuple]:
+            queries.append((sql, params))
+            if sql == research._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED:
+                return [(pid,) for pid in foreign]
+            return []
+
+        def fake_insert(dsn: str, created: Any, market: str, parcels: list) -> None:
+            inserted.append((market, [p[0] for p in parcels]))
+            created.parcel_ids += [p[0] for p in parcels]
+
+        res = live._Results()
+        created = live._Created()
+        with mock.patch.object(live, "_rows", fake_rows), \
+                mock.patch.object(live, "_scalar", return_value=0), \
+                mock.patch.object(live, "_insert_parcels", fake_insert), \
+                redirect_stdout(io.StringIO()):
+            getattr(live, check_name)(res, created, self.DSN, token, fake)
+        self.assertEqual(fake._MARKET_TO_COUNTIES, {"atlanta": ["fulton"]})  # restored
+        return calls, queries, (token, inserted, res)
+
+    def test_scoring_checks_pass_an_explicit_run_tag_and_own_market(self) -> None:
+        for check_name in ("check_scoring_isolation", "check_scoring_nan"):
+            with self.subTest(check=check_name):
+                calls, queries, (token, inserted, _) = self._run_check(check_name, [])
+                self.assertEqual(len(calls), 1)
+                call = calls[0]
+                run_tag = call.get("run_tag")
+                self.assertEqual(run_tag, f"livetxn-{token}")
+                self.assertTrue(call.get("experiment_id"))
+                market = call["market"]
+                self.assertNotEqual(market, "atlanta")
+                self.assertIn(token, market)
+                self.assertEqual(inserted, [(market, inserted[0][1])])
+                self.assertIn(market, call["registered"])
+                # The foreign-parcel guard reads the selection the cycle uses.
+                self.assertIn(
+                    (research._SQL_LIST_PARCELS_FOR_SCORING_RUN_SCOPED,
+                     (market, run_tag, run_tag)),
+                    queries,
+                )
+                self.assertNotIn(research._SQL_LIST_PARCELS_FOR_SCORING,
+                                 [sql for sql, _ in queries])
+
+    def test_foreign_parcel_in_run_scoped_selection_blocks_scoring(self) -> None:
+        for check_name in ("check_scoring_isolation", "check_scoring_nan"):
+            with self.subTest(check=check_name):
+                calls, _, (_, _, res) = self._run_check(check_name, ["fulton-not-ours"])
+                self.assertEqual(calls, [])
+                self.assertEqual(len(res.failures), 1)
+
+
+# ===========================================================================
+# The runner's real budget interrupt (runner._ExperimentBudgetInterrupt)
+# ===========================================================================
+def _budget_interrupt() -> BaseException:
+    import runner
+
+    return runner._ExperimentBudgetInterrupt("experiment budget exceeded")
+
+
+class TestExperimentBudgetInterrupt(unittest.TestCase):
+    """runner's SIGALRM handler raises ``_ExperimentBudgetInterrupt`` (a
+    BaseException), not ``prepare.BudgetExceeded``: it must pass through the
+    per-file / per-parcel handlers unchanged -- never swallowed, never
+    converted, never quarantining the in-flight unit.
+
+    Ingestion commits per file, so files before the interrupt stay committed
+    and archived. Scoring and discovery commit once at cycle end, so an
+    interrupted cycle commits nothing; the handlers must still leave the
+    earlier parcels' writes intact (no rollback of the shared transaction).
+    Each case runs twice: the interrupt during a statement, and the same
+    with the block's own ROLLBACK failing (psycopg: "another command is
+    already in progress", as seen live).
+    """
+
+    def _interrupting(self, conn: PgFake, sql_hit: str, *, match: Callable[[tuple], bool],
+                      rollback_fails: bool) -> BaseException:
+        interrupt = _budget_interrupt()
+
+        def fail(sql: str, params: tuple) -> BaseException | None:
+            if sql == sql_hit and match(params):
+                conn.fail_next_block_rollback = rollback_fails
+                return interrupt
+            return None
+
+        conn.fail_when = fail
+        return interrupt
+
+    def test_ingestion_mid_file_interrupt(self) -> None:
+        for rollback_fails in (False, True):
+            with self.subTest(rollback_fails=rollback_fails), _temp_costar_base() as base:
+                first = _stage(base, "submarket_stats", "submarket_stats_20260420.csv",
+                               [_row("submarket_stats")])
+                second = _stage(base, "land_sales_comps", "land_sales_comps_202603.csv",
+                                [_row("land_sales_comps")])
+                third = _stage(base, "leasing_comps", "leasing_comps_202603.csv",
+                               [_row("leasing_comps")])
+                conn = PgFake(responder=_ingest_responder)
+                interrupt = self._interrupting(
+                    conn, costar_ingest._SQL_INSERT_LAND_SALES, match=lambda p: True,
+                    rollback_fails=rollback_fails,
+                )
+                with self.assertRaises(BaseException) as ctx:
+                    _run_cycle(conn)
+                self.assertIs(ctx.exception, interrupt)
+                # The earlier file: committed, then archived.
+                self.assertEqual(_ingestion_logged_files(conn.committed), {first.name})
+                self.assertEqual(len(_committed_sql(conn, costar_ingest._SQL_INSERT_MARKET_CONTEXT)), 1)
+                archived = _dir_files(base, "ARCHIVED")
+                self.assertEqual(len(archived), 1)
+                self.assertTrue(archived[0].startswith(first.stem), archived)
+                # The in-flight file (and the unreached one) stay in intake:
+                # not quarantined, no .error.json, nothing of it committed.
+                self.assertEqual(_dir_files(base, "FAILED"), [])
+                self.assertEqual(_dir_files(base, "FAILED", ".error.json"), [])
+                self.assertEqual(_intake_files(base), sorted([second.name, third.name]))
+                self.assertEqual(_committed_sql(conn, costar_ingest._SQL_INSERT_LAND_SALES), [])
+                self.assertEqual(conn.rollback_calls, 0)
+
+    def test_scoring_mid_parcel_interrupt(self) -> None:
+        for rollback_fails in (False, True):
+            with self.subTest(rollback_fails=rollback_fails):
+                parcels, geometry, blocks = _golden_scenario()
+                conn = PgFake(_scoring_responder(parcels, geometry, blocks))
+                interrupt = self._interrupting(
+                    conn, research._SQL_INSERT_PARCEL_SCORE, match=lambda p: p[0] == "g-2",
+                    rollback_fails=rollback_fails,
+                )
+                with self.assertRaises(BaseException) as ctx:
+                    _run_scoring(conn)
+                self.assertIs(ctx.exception, interrupt)
+                # Not swallowed into an 'error' parcel: the cycle stopped at
+                # g-2, never reached g-3, and never committed.
+                fetched = [p[0] for s, p in conn.executed if s == research._SQL_FETCH_PARCEL]
+                self.assertEqual(fetched, ["g-1", "g-2"])
+                self.assertEqual(conn.commit_calls, 0)
+                self.assertEqual(conn.committed, [])
+                self.assertEqual(conn.rollback_calls, 0)
+                # g-1's writes are untouched in the cycle's transaction; the
+                # in-flight g-2 left none behind.
+                pending = [p[0] for s, p in conn._pending if s == research._SQL_INSERT_PARCEL_SCORE]
+                self.assertEqual(pending, ["g-1"])
+
+    def test_discovery_mid_parcel_interrupt(self) -> None:
+        schema = {"fields": [{"name": name} for name in _DISCOVERY_MAPPING.values()]}
+        features = [_feature("A"), _feature("B", lng=-84.55), _feature("C", lng=-84.546)]
+        sources = {"county_parcel_data": {"fulton_ga": {
+            "service_url": "https://example.test/MapServer",
+            "parcel_layer_id": 11,
+            "field_mapping": dict(_DISCOVERY_MAPPING),
+        }}}
+
+        class _Session:
+            closed = False
+
+            def get(self, url: str, params: Any = None, timeout: Any = None) -> dict:
+                if url.endswith("/11"):
+                    return schema
+                return {"features": features, "exceededTransferLimit": False}
+
+            def close(self) -> None:
+                self.closed = True
+
+        for rollback_fails in (False, True):
+            with self.subTest(rollback_fails=rollback_fails):
+                session = _Session()
+                cycle_ids: list[str] = []
+                original_make_id = research._make_cycle_id
+
+                def make_id(county: str) -> str:
+                    cycle_ids.append(original_make_id(county))
+                    return cycle_ids[-1]
+
+                conn = PgFake(lambda s, p: (0,))
+                interrupt = self._interrupting(
+                    conn, research._SQL_UPSERT_PARCEL, match=lambda p: p[0] == "fulton-B",
+                    rollback_fails=rollback_fails,
+                )
+                with _patch_connection(conn), \
+                        mock.patch.object(prepare, "verify_parameters_unchanged"), \
+                        mock.patch.object(prepare, "get_parameters",
+                                          return_value=_DISCOVERY_PARAMS), \
+                        mock.patch.object(research, "_load_sources_json",
+                                          return_value=sources), \
+                        mock.patch.object(research, "_DiscoverySession",
+                                          return_value=session), \
+                        mock.patch.object(research, "_make_cycle_id", make_id), \
+                        mock.patch.dict(research._HARNESS_GATE_CACHE), \
+                        mock.patch.object(research.connector_harness, "run_harness_for_county",
+                                          return_value={"overall_health": "healthy"}):
+                    try:
+                        with self.assertRaises(BaseException) as ctx:
+                            research.run_discovery_cycle("atlanta")
+                    finally:
+                        for cycle_id in cycle_ids:
+                            shutil.rmtree(research._SOURCES_DIR / cycle_id, ignore_errors=True)
+                self.assertIs(ctx.exception, interrupt)
+                self.assertTrue(session.closed)
+                # Not swallowed (no skip of B and on to C), not converted into
+                # the KeyboardInterrupt abort path (no abort row, no commit).
+                upserts = [p[0] for s, p in conn.executed if s == research._SQL_UPSERT_PARCEL]
+                self.assertEqual(upserts, ["fulton-A", "fulton-B"])
+                log_notes = [p[4] for s, p in conn.executed
+                             if s == research._SQL_INSERT_RESEARCH_LOG]
+                self.assertFalse(any("KeyboardInterrupt" in str(n) for n in log_notes))
+                self.assertEqual(conn.commit_calls, 0)
+                self.assertEqual(conn.committed, [])
+                self.assertEqual(conn.rollback_calls, 0)
+                pending = [p[0] for s, p in conn._pending if s == research._SQL_UPSERT_PARCEL]
+                self.assertEqual(pending, ["fulton-A"])
+
+
+# ===========================================================================
+# Strategy memo: "Actionable" is composite >= threshold AND PASS
+# ===========================================================================
+def _memo_rows(threshold: float) -> list[dict[str, Any]]:
+    return [
+        {"parcel_id": "m-1", "composite_score": threshold + 5, "actionability": "PASS",
+         "primary_strategy": "land_bank", "submarket": "s"},
+        {"parcel_id": "m-2", "composite_score": threshold - 10, "actionability": "PASS",
+         "primary_strategy": "spec", "submarket": "s"},
+        {"parcel_id": "m-3", "composite_score": threshold - 20, "actionability": "PASS",
+         "primary_strategy": None, "submarket": "s"},
+        {"parcel_id": "m-4", "composite_score": threshold + 2, "actionability": "PASS",
+         "primary_strategy": None, "submarket": "s"},
+        {"parcel_id": "m-5", "composite_score": threshold + 10,
+         "actionability": "FAIL:strategy", "primary_strategy": None, "submarket": "s"},
+        {"parcel_id": "m-6", "composite_score": None, "actionability": "PASS",
+         "primary_strategy": "bts", "submarket": "s"},
+    ]
+
+
+def _memo_section(md: str, heading: str) -> list[str]:
+    lines = md.splitlines()
+    start = lines.index(heading) + 1
+    out: list[str] = []
+    for line in lines[start:]:
+        if not line.strip():
+            break
+        out.append(line)
+    return out
+
+
+class TestMemoActionableCount(unittest.TestCase):
+    """The memo's actionable count matches its own header (and the metric)."""
+
+    STRATEGY_HEADING = "**By primary strategy (actionable parcels):**"
+
+    def setUp(self) -> None:
+        self.params = dict(prepare.get_parameters())
+        self.threshold = float(self.params["composite_threshold"])
+
+    def _render(self, rows: list[dict[str, Any]]) -> str:
+        return reporting._render_memo_markdown(
+            "atlanta", None, rows, [], [], params=self.params, today="2026-10-29",
+        )
+
+    def test_aggregate_counts_pass_at_or_above_threshold_only(self) -> None:
+        rows = _memo_rows(self.threshold)
+        rows.append({"parcel_id": "m-7", "composite_score": self.threshold,
+                     "actionability": "PASS", "primary_strategy": "spec",
+                     "submarket": "s"})  # exactly at the threshold counts (>=)
+        agg = reporting._aggregate_pipeline_composition(rows, self.threshold)
+        self.assertEqual(agg["actionable_count"], 3)  # m-1, m-4, m-7
+        self.assertEqual(agg["by_strategy"]["land_bank"], 1)
+        self.assertEqual(agg["by_strategy"]["spec"], 1)  # m-7, not m-2
+        self.assertEqual(agg["by_strategy"]["bts"], 0)  # m-6 has no composite
+        self.assertEqual(agg["actionable_without_strategy"], 1)  # m-4
+        self.assertEqual(agg["by_actionability"]["PASS"], 6)
+
+    def test_actionable_line_matches_header_definition(self) -> None:
+        md = self._render(_memo_rows(self.threshold))
+        t = f"{self.threshold:.0f}"
+        self.assertIn(f"> **Threshold**: composite ≥ {t} AND actionability = PASS", md)
+        actionable = [ln for ln in md.splitlines() if ln.startswith("- Actionable")]
+        self.assertEqual(
+            actionable, [f"- Actionable (composite ≥ {t} and passes all four gates): **2**"],
+        )
+        strategy = _memo_section(md, self.STRATEGY_HEADING)
+        self.assertEqual(strategy, ["- Land Bank: 1", "- (no primary strategy): 1"])
+
+    def test_pass_without_primary_strategy_is_not_reported_as_no_pass(self) -> None:
+        rows = [
+            {"parcel_id": f"n-{i}", "composite_score": self.threshold + 5,
+             "actionability": "PASS", "primary_strategy": None, "submarket": "s"}
+            for i in (1, 2)
+        ]
+        strategy = _memo_section(self._render(rows), self.STRATEGY_HEADING)
+        self.assertEqual(strategy, ["- (no primary strategy): 2"])
+
+    def test_pass_below_threshold_only(self) -> None:
+        rows = [{"parcel_id": "b-1", "composite_score": self.threshold - 5,
+                 "actionability": "PASS", "primary_strategy": "spec", "submarket": "s"}]
+        md = self._render(rows)
+        self.assertIn("passes all four gates): **0**", md)
+        strategy = _memo_section(md, self.STRATEGY_HEADING)
+        self.assertEqual(len(strategy), 1)
+        self.assertIn("no actionable parcels", strategy[0])
+        self.assertNotIn("no parcels passed actionability", strategy[0])
+
+    def test_no_pass_at_all_keeps_original_text(self) -> None:
+        rows = [{"parcel_id": "f-1", "composite_score": self.threshold + 5,
+                 "actionability": "FAIL:strategy", "primary_strategy": None,
+                 "submarket": "s"}]
+        strategy = _memo_section(self._render(rows), self.STRATEGY_HEADING)
+        self.assertEqual(strategy, ["- (no parcels passed actionability)"])
+
+    def test_threshold_is_read_through_prepare_get_parameters(self) -> None:
+        # SR-3: generate_strategy_memo(params=None) takes the threshold from
+        # prepare.get_parameters(), never from parameters.json on disk.
+        params = dict(self.params)
+        params["composite_threshold"] = 50
+        memo_row = ("p-60", "1 Test Rd", "fulton", "s", 12.0, "OWNER", "llc",
+                    60.0, 0.5, "PASS", "{}", "{}", "{}", "spec", None)
+
+        def responder(sql: str, p: tuple) -> Any:
+            if sql == reporting._SQL_FETCH_SCORED_PARCELS_FOR_MEMO:
+                return [memo_row]
+            return None
+
+        conn = PgFake(responder)
+        with tempfile.TemporaryDirectory() as td, \
+                mock.patch.object(prepare, "verify_parameters_unchanged"), \
+                mock.patch.object(prepare, "get_parameters", return_value=params) as getp:
+            path = reporting.generate_strategy_memo("atlanta", conn=conn, output_dir=Path(td),
+                                                    today="2026-10-29")
+            text = path.read_text(encoding="utf-8")
+        getp.assert_called()
+        self.assertIn("- Actionable (composite ≥ 50 and passes all four gates): **1**", text)
+        self.assertIn("- Spec Development: 1", text)
 
 
 if __name__ == "__main__":

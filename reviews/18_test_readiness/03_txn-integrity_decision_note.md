@@ -178,3 +178,17 @@
     rows.
   - The check exits 2 on an `autoresearch/*` branch, where the smoke step
     already fails.
+    - **Correction (2026-10-29):** that premise stopped holding once this
+      track was integrated with the tier0 track. Tier0 made the smoke step
+      branch-proof (an explicit `smoke-<hex>` run tag), so on every pushed
+      `autoresearch/<tag>` branch touching the workflow's paths (CI checks
+      it out by name) this refusal alone turned the live-postgis job red.
+      The refusal is gone. The scoring checks now pass an explicit
+      throwaway run tag (`livetxn-<token>`) and score parcels in a market of
+      their own. The foreign-parcel guard reads that same run-scoped
+      selection, because in `atlanta` a fresh tag would also select the
+      smoke test's leftover parcel. The check exits 0 on such a branch and
+      stamps nothing into the run. The script docstring and the workflow
+      comment, which said the smoke test "asserts a global, unscoped
+      pipeline count", were corrected too (see
+      `10_tests-ci-reporting_decision_note.md`).
