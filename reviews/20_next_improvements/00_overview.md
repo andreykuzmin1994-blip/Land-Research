@@ -16,6 +16,7 @@
 | 01 | research: idempotent data_gap flags; baseline diagnosis note | 1 | `01_*`, `02_*` |
 | 02 | research: per-parcel error on a failed ad-hoc gap read; Tier 1 note | 1 | `02_*` (reviewer finding 1) |
 | 03 | notes: noise floor, proposed keep rule, overview | docs | `03_*`, this file |
+| 04 | notes: real CoStar Land export what-if | docs | `04_*` |
 
 ## Results
 
