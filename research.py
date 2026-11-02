@@ -2896,15 +2896,16 @@ def score_parcel(
             f"S10={sub_scores['S10_incentives']}"
         )[:480]
 
-        # Idempotent data_gap flags: the cycle's set, or (direct/ad-hoc
-        # call, no registered cycle) this parcel's open gaps.
-        open_gaps = _OPEN_DATA_GAPS_BY_CYCLE.get(cycle_id)
-        if open_gaps is None:
-            open_gaps = _load_open_data_gaps(conn, parcel_ids=[parcel_id])
         written: list[tuple[str, str]] = []
         market_name = parcel.get("market") or ""
 
         try:
+            # Idempotent data_gap flags: the cycle's set, or (direct/ad-hoc
+            # call, no registered cycle) this parcel's open gaps -- read
+            # inside the try so a failed read is a per-parcel error.
+            open_gaps = _OPEN_DATA_GAPS_BY_CYCLE.get(cycle_id)
+            if open_gaps is None:
+                open_gaps = _load_open_data_gaps(conn, parcel_ids=[parcel_id])
             with conn.transaction():
                 with conn.cursor() as cur:
                     cur.execute(
