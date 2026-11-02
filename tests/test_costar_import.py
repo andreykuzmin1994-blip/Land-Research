@@ -312,9 +312,12 @@ class WriteAreasTests(unittest.TestCase):
 class RunTests(unittest.TestCase):
     def test_without_database_writes_csv_and_exits_2(self):
         comps = [["Submarket Name", "Parcel Number 1 (Min)"],
-                 ["Alpha Park", "99Z-0001-LL-001-1"]]
+                 ["Alpha Park", "99Z-0001-LL-001-1"], ["Alpha Park", "99Z-0001-LL-002-1"],
+                 ["Alpha Park", "99Z-0001-LL-003-1"]]
         locator = mock.Mock()
-        locator.locate.return_value = {}
+        locator.locate.return_value = {"99Z0001LL0011": (-84.45, 33.62),
+                                       "99Z0001LL0021": (-84.46, 33.63),
+                                       "99Z0001LL0031": (-84.44, 33.61)}
         with tempfile.TemporaryDirectory() as d:
             path = make_xlsx(Path(d) / "x.xlsx", {"s": stats_rows(), "c": comps})
             base = Path(d) / "costar_exports"
@@ -428,6 +431,301 @@ class ContractTests(unittest.TestCase):
         self.assertTrue(research._SQL_RESOLVED_SUBMARKET.startswith("COALESCE((SELECT"))
         src = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
         self.assertNotRegex(src, r"(?i)UPDATE\s+parcels\s+SET\s+submarket")
+
+
+# ---------------------------------------------------------------------------
+# Land sales sheet (reviews/20_next_improvements/05_*). Synthetic rows only.
+# ---------------------------------------------------------------------------
+LAND_HEADER = ["Property Address", "Property Type", "Land Area AC", "Sale Price", "Sale Date",
+               "Sale Status", "Price Per AC Land", "Zoning", "Submarket Name",
+               "Property County", "Buyer (True) Company", "Seller (True) Company",
+               "Proposed Use", "Latitude", "Longitude"]
+TODAY = date(2026, 11, 2)
+SERIAL_2026_03_02 = (date(2026, 3, 2) - date(1899, 12, 30)).days
+
+
+def land_row(**kw):
+    row = {"Property Address": "1 Test Way", "Property Type": "Land", "Land Area AC": 10,
+           "Sale Price": 1_000_000, "Sale Date": SERIAL_2026_03_02, "Sale Status": "Sold",
+           "Price Per AC Land": 100_000, "Zoning": "M-1", "Submarket Name": "Somewhere",
+           "Property County": "Testa County", "Buyer (True) Company": "Buyer Co",
+           "Seller (True) Company": "Seller Co", "Proposed Use": "Industrial",
+           "Latitude": 33.70, "Longitude": -84.50}
+    row.update(kw)
+    return [row[h] for h in LAND_HEADER]
+
+
+class _LandCur:
+    def __init__(self, conn):
+        self.conn = conn
+        self.rowcount = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def execute(self, sql, params=None):
+        self.conn.executed.append((sql, params))
+        self._result = self.conn.answer(sql, params)
+        self.rowcount = self.conn.rowcounts.get(sql, 0)
+
+    def fetchone(self):
+        return self._result[0] if self._result else None
+
+    def fetchall(self):
+        return list(self._result)
+
+
+class _LandConn:
+    def __init__(self, n_areas=2, assign=None, rowcounts=None):
+        self.n_areas = n_areas
+        self.assign = assign
+        self.rowcounts = rowcounts or {}
+        self.executed = []
+        self.transactions = 0
+        self.commits = 0
+
+    def answer(self, sql, params):
+        if sql == ci._SQL_COUNT_MARKET_AREAS:
+            return [(self.n_areas,)]
+        if sql == ci._SQL_ASSIGN_POINTS_TO_AREAS:
+            n = len(params[2])
+            return self.assign(n) if self.assign else [(i, "atlanta__alpha") for i in range(1, n + 1)]
+        return []
+
+    def cursor(self):
+        return _LandCur(self)
+
+    @contextlib.contextmanager
+    def transaction(self):
+        self.transactions += 1
+        yield
+
+    def commit(self):
+        self.commits += 1
+
+    def run(self, sql):
+        return [p for s, p in self.executed if s == sql]
+
+
+class LandClassifierTests(unittest.TestCase):
+    def test_zoning_entitlement_table(self):
+        industrial = ["M-1", "M1", "M-2", "M", "LM", "LI", "L-I", "HI", "I", "I-1", "I2", "I GI",
+                      "MIA", "P-M", "M-1A", "LI-1", "I-MIX", "PD-I", "IND", "Industrial",
+                      "Light Industrial", "m1/c1", "LI & GC", "LI/WS", "M, Some County",
+                      "I-L", "IL", "IH"]
+        not_industrial = ["", None, "O-I", "OI", "MU", "MU-2", "MHP", "MD", "MIX", "H-B",
+                          "R-100", "A1", "AG1", "C-2", "CUP", "N/Av", "MUR", "HDMU", "LR",
+                          "Data Center Use", "TCMU", "RM8"]
+        for z in industrial:
+            self.assertTrue(ci.is_industrial_zoning(z), z)
+        for z in not_industrial:
+            self.assertFalse(ci.is_industrial_zoning(z), z)
+
+    def test_land_sheet_detection_excludes_building_and_area_sheets(self):
+        self.assertTrue(ci.is_land_sheet([LAND_HEADER]))
+        for extra in ("RBA", "Building SF", "Year Built", "Parcel Number 1 (Min)"):
+            self.assertFalse(ci.is_land_sheet([LAND_HEADER + [extra]]), extra)
+        self.assertFalse(ci.is_land_sheet([["Submarket Name", "Parcel Number 1 (Min)"]]))
+
+
+class LandConversionTests(unittest.TestCase):
+    def test_keeps_only_sold_entitled_located_5_to_50_acre_land(self):
+        rows = [LAND_HEADER,
+                land_row(),
+                land_row(**{"Property Type": "Retail", "Property Address": "2"}),
+                land_row(**{"Sale Status": "Under Contract", "Property Address": "3"}),
+                land_row(**{"Sale Date": None, "Property Address": "4"}),
+                land_row(**{"Sale Date": "2027-01-05", "Property Address": "5"}),
+                land_row(**{"Sale Price": None, "Property Address": "6"}),
+                land_row(**{"Land Area AC": 60, "Price Per AC Land": None, "Property Address": "7"}),
+                land_row(**{"Land Area AC": 4, "Price Per AC Land": None, "Property Address": "8"}),
+                land_row(**{"Latitude": None, "Property Address": "9"}),
+                land_row(**{"Latitude": 40.7, "Longitude": -74.0, "Property Address": "10"}),
+                land_row(**{"Zoning": "AG1", "Property Address": "11"}),
+                land_row(**{"Property Address": "12 Lot Rd (Part of a 3 Property Sale)"}),
+                land_row(**{"Price Per AC Land": 150_000, "Property Address": "13"}),
+                land_row(**{"Property Address": "1 TEST WAY."}),
+                land_row(**{"Property Address": "14", "Sale Date": "2025-12-01"}),
+                land_row(**{"Property Address": "15", "Sale Date": "6/30/2025"}),
+                [None] * len(LAND_HEADER)]
+        out = ci.convert_land(rows, today=TODAY)
+        self.assertEqual([r["address"] for r in out.rows], ["1 Test Way", "14", "15"])
+        self.assertEqual(out.dropped, {
+            "not land": 1, "not sold": 1, "no sale date": 1, "future sale date": 1,
+            "no price or acres": 1, "outside 5-50 acres": 2, "no location": 1,
+            "location outside Georgia": 1, "not industrially zoned": 1,
+            "part of a portfolio or multi-property sale": 1,
+            "price per acre disagrees with price / acres": 1,
+            "duplicate address and date": 1})
+        first = out.rows[0]
+        self.assertEqual(first["sale_date"], "2026-03-02")
+        self.assertEqual(first["price_per_acre"], 100_000.0)
+        self.assertEqual(first["county"], "Testa")
+        self.assertEqual([r["sale_date"] for r in out.rows[1:]], ["2025-12-01", "2025-06-30"])
+
+    def test_date_systems(self):
+        self.assertEqual(ci._sale_date(SERIAL_2026_03_02, False), date(2026, 3, 2))
+        self.assertEqual(ci._sale_date(SERIAL_2026_03_02 - 1462, True), date(2026, 3, 2))
+        self.assertEqual(ci._sale_date("2026-03-02 00:00:00", False), date(2026, 3, 2))
+        for bad in (None, True, "", "soon", "13/45/2026", float("nan"), 0):
+            self.assertIsNone(ci._sale_date(bad, False), bad)
+
+    def test_date1904_flag_is_read_from_the_workbook(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = make_xlsx(Path(d) / "x.xlsx", {"land": [LAND_HEADER, land_row()]})
+            self.assertFalse(ci.xlsx_date1904(path))
+            with zipfile.ZipFile(path) as z:
+                parts = {n: z.read(n) for n in z.namelist()}
+            parts["xl/workbook.xml"] = parts["xl/workbook.xml"].replace(
+                b"<sheets>", b'<workbookPr date1904="1"/><sheets>')
+            with zipfile.ZipFile(path, "w") as z:
+                for n, b in parts.items():
+                    z.writestr(n, b)
+            self.assertTrue(ci.xlsx_date1904(path))
+            self.assertEqual(ci.read_xlsx(path)["land"][1][LAND_HEADER.index("Sale Date")],
+                             float(SERIAL_2026_03_02))
+
+    def test_sale_status_column_is_required(self):
+        header = [h for h in LAND_HEADER if h != "Sale Status"]
+        with self.assertRaises(ci.ImportError_):
+            ci.convert_land([header], today=TODAY)
+
+
+class WriteLandTests(unittest.TestCase):
+    def rows(self, n=2):
+        return [dict(ci.convert_land([LAND_HEADER, land_row()], today=TODAY).rows[0],
+                     address=f"{i} Test Way") for i in range(n)]
+
+    def test_replaces_tool_rows_in_one_transaction_and_counts(self):
+        conn = _LandConn(assign=lambda n: [(1, "atlanta__alpha"), (2, None)],
+                         rowcounts={ci._SQL_DELETE_TOOL_LAND_COMPS: 7})
+        out = ci.write_land(conn, self.rows(), TODAY)
+        self.assertEqual(out, {"deferred": 0, "assigned": 1, "no_area": 1, "submarkets": 1,
+                               "replaced": 7})
+        self.assertEqual(conn.transactions, 1)
+        self.assertEqual(conn.run(ci._SQL_DELETE_TOOL_LAND_COMPS), [(ci.LAND_ORIGIN, "atlanta")])
+        (ins,) = conn.run(costar_ingest._SQL_INSERT_LAND_SALES)
+        self.assertEqual(ins[0], "0 Test Way")
+        self.assertEqual(ins[3], "atlanta__alpha")
+        self.assertIsNone(ins[1])                      # parcel_id
+        raw = __import__("json").loads(ins[-1])
+        self.assertEqual(raw["import_origin"], ci.LAND_ORIGIN)
+        self.assertEqual((raw["latitude"], raw["longitude"]), (33.70, -84.50))
+        (assign,) = conn.run(ci._SQL_ASSIGN_POINTS_TO_AREAS)
+        self.assertEqual(assign[:2], ("atlanta", ci.LAND_ASSIGN_RADIUS_M))
+        self.assertEqual(assign[2], [-84.5, -84.5])    # x = longitude
+        self.assertEqual(assign[3], [33.7, 33.7])
+
+    def test_no_areas_defers_and_touches_nothing(self):
+        conn = _LandConn(n_areas=0)
+        out = ci.write_land(conn, self.rows(), TODAY)
+        self.assertEqual(out["deferred"], 1)
+        self.assertEqual([s for s, _ in conn.executed], [ci._SQL_COUNT_MARKET_AREAS])
+
+    def test_empty_rows_are_refused(self):
+        with self.assertRaises(ci.ImportError_):
+            ci.write_land(_LandConn(), [], TODAY)
+
+    def test_assignment_rule_is_the_parcel_resolver_rule(self):
+        sql = ci._SQL_ASSIGN_POINTS_TO_AREAS
+        for clause in ("s.market_id = %s AND s.bbox IS NOT NULL",
+                       "ST_DWithin(s.bbox::geography, t.pt::geography, %s)",
+                       "ORDER BY ST_Distance(s.bbox::geography, t.pt::geography), "
+                       "ST_Area(s.bbox::geography), s.submarket_id LIMIT 1",
+                       "ST_MakePoint(u.x, u.y)", "WITH ORDINALITY"):
+            self.assertIn(clause, sql)
+        self.assertEqual(ci.LAND_ASSIGN_RADIUS_M, 3000)
+
+
+class LandRunTests(unittest.TestCase):
+    def _run(self, sheets, conn=None, dsn=True, baseline=False, base=None, **kw):
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        path = make_xlsx(Path(d) / "x.xlsx", sheets)
+        base = base or Path(d) / "costar_exports"
+
+        @contextlib.contextmanager
+        def get_conn():
+            yield conn
+
+        with mock.patch.object(ci.prepare, "dsn_available", return_value=dsn), \
+             mock.patch.object(ci.prepare, "get_connection", get_conn), \
+             mock.patch.object(ci, "run_has_baseline", return_value=baseline), \
+             mock.patch("sys.stdout"):
+            rc = ci.run(path, base=base, today=TODAY, **kw)
+        return rc, base
+
+    def test_land_only_workbook_writes_comps_and_never_touches_areas(self):
+        conn = _LandConn()
+        rc, base = self._run({"land": [LAND_HEADER, land_row()]}, conn)
+        self.assertEqual(rc, 0)
+        sqls = [s for s, _ in conn.executed]
+        self.assertNotIn(ci._SQL_CLEAR_STALE_AREAS, sqls)
+        self.assertNotIn(ci._SQL_UPDATE_SUBMARKET_AREA, sqls)
+        self.assertEqual(len(conn.run(costar_ingest._SQL_INSERT_LAND_SALES)), 1)
+        self.assertTrue((base / ci.LAND_SNAPSHOT_NAME).is_file())
+        self.assertEqual(conn.commits, 1)
+
+    def test_refused_after_baseline_before_any_land_work(self):
+        conn = _LandConn()
+        rc, base = self._run({"land": [LAND_HEADER, land_row()]}, conn, baseline=True)
+        self.assertEqual(rc, 3)
+        self.assertEqual(conn.executed, [])
+        self.assertFalse((base / ci.LAND_SNAPSHOT_NAME).exists())
+
+    def test_without_database_saves_snapshot_and_exits_2(self):
+        rc, base = self._run({"land": [LAND_HEADER, land_row()]}, None, dsn=False)
+        self.assertEqual(rc, 2)
+        self.assertTrue((base / ci.LAND_SNAPSHOT_NAME).is_file())
+
+    def test_no_areas_flag_skips_land_entirely(self):
+        conn = _LandConn()
+        rc, base = self._run({"land": [LAND_HEADER, land_row()]}, conn, areas=False)
+        self.assertEqual(rc, 0)
+        self.assertEqual(conn.executed, [])
+        self.assertFalse((base / ci.LAND_SNAPSHOT_NAME).exists())
+
+    def test_nothing_qualifying_is_refused_and_writes_nothing(self):
+        conn = _LandConn()
+        with self.assertRaises(ci.ImportError_):
+            self._run({"land": [LAND_HEADER, land_row(Zoning="R-100")]}, conn)
+        self.assertEqual(conn.executed, [])
+
+    def test_redrawn_areas_reassign_the_saved_land_sales(self):
+        conn = _LandConn()
+        rc, base = self._run({"land": [LAND_HEADER, land_row()]}, conn)
+        comps = [["Submarket Name", "Parcel Number 1 (Min)"],
+                 ["Alpha Park", "99Z-0001-LL-001-1"], ["Alpha Park", "99Z-0001-LL-002-1"],
+                 ["Alpha Park", "99Z-0001-LL-003-1"]]
+        locator = mock.Mock()
+        locator.locate.return_value = {"99Z0001LL0011": (-84.45, 33.62),
+                                       "99Z0001LL0021": (-84.46, 33.63),
+                                       "99Z0001LL0031": (-84.44, 33.61)}
+        conn2 = _LandConn()
+        with mock.patch.object(ci, "write_areas", return_value={
+                "written": 1, "kept_human_seeded": 0, "cleared_stale": 0, "name_drift": 0}) as wa:
+            rc, _ = self._run({"c": comps}, conn2, base=base, locator=locator)
+        self.assertEqual(rc, 0)
+        wa.assert_called_once()
+        self.assertEqual(len(conn2.run(costar_ingest._SQL_INSERT_LAND_SALES)), 1)
+        self.assertEqual(conn2.run(ci._SQL_DELETE_TOOL_LAND_COMPS), [(ci.LAND_ORIGIN, "atlanta")])
+
+    def test_unlocatable_area_comps_leave_areas_and_land_alone(self):
+        comps = [["Submarket Name", "Parcel Number 1 (Min)"], ["Alpha Park", "99Z-0001-LL-001-1"]]
+        locator = mock.Mock()
+        locator.locate.return_value = {}
+        conn = _LandConn()
+        rc, _ = self._run({"c": comps}, conn, locator=locator)
+        self.assertEqual(rc, 0)
+        self.assertEqual(conn.executed, [])
+
+    def test_write_areas_with_an_empty_plan_writes_and_clears_nothing(self):
+        conn = _Conn([])
+        self.assertEqual(ci.write_areas(conn, ci.AreaPlan(), TODAY)["cleared_stale"], 0)
+        self.assertEqual(conn.executed, [])
 
 
 if __name__ == "__main__":
