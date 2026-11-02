@@ -124,3 +124,58 @@
 4. **Decide on the converter.** Whether to make the Land-export
    conversion a permanent part of `costar_import.py` is Tier 2. The
    scratch converter used here was not committed.
+
+## Follow-up: the same export with coordinates
+
+The operator re-exported the same 483 sales with `Latitude` / `Longitude`,
+which are filled on every row. The filters are unchanged (10 ac and up, all
+uses). Measured against the 1,075 discovered parcels on local PostGIS:
+
+**Which submarket's sales sit nearest each corridor.**
+- **South corridor:** every parcel's nearest sale is in North Clayton/Airport,
+  about 1.4 km away on average. That confirms the earlier mapping.
+- **West corridor:** split across several submarkets. 327 parcels are
+  nearest to a Douglasville/Lithia Springs sale, 168 to West Atlanta and 67
+  to West Midtown; the rest are nearest to North Clayton/Airport or
+  Cumberland/Galleria.
+- So the what-if above, which treated the whole west corridor as
+  Douglasville/Lithia Springs, over-simplified it. Names such as West
+  Midtown and Cumberland/Galleria also suggest that the Land export uses
+  CoStar's general geographies, not its industrial submarkets. That makes
+  matching by name to the industrial stats unreliable.
+
+**Industrial land sales near each corridor** (sold, 5–50 ac, industrial
+secondary type or M/I/LI zoning; within R km of any corridor parcel):
+
+| R | South corridor | West corridor |
+|---|----------------|---------------|
+| 3 km | 2 | 2 |
+| 5 km | 5 | 3 |
+| 10 km | 8 | 4 |
+| 15 km | 8 | 8 |
+
+**S8 if each parcel used the industrial sales within a radius** (at least
+3 sales, the same bands; a projection, not a run):
+
+| Radius | South: parcels with ≥3 sales | South: S8 = 10 | West: parcels with ≥3 sales | West: S8 = 10 |
+|--------|------------------------------|----------------|-----------------------------|---------------|
+| 10 km | 479 of 495 | 297 | 216 of 580 | 121 |
+| 15 km | 495 of 495 | 322 | 503 of 580 | 233 |
+
+Dropping the 5–50 ac cap (keeping industrial, sold) adds a few sales: at
+10 km the west corridor rises to 313 parcels with ≥3 sales.
+
+**What the coordinates make possible.** Comps can now be placed
+spatially, so name matching is no longer needed. There are two routes,
+both for the operator to choose:
+- **(a) Assign by area.** `costar_import.py` assigns each land sale to the
+  industrial stats area it falls in. That is a Tier 2 tooling change, and
+  it still leaves a west corridor with very few sales per area.
+- **(b) Use a radius.** S8 uses the industrial sales within a radius of the
+  parcel. That is a `research.py` change, so it is the loop's to try as an
+  experiment, once the converted CSV keeps the coordinates. The ingest
+  table would need somewhere to keep them; `raw` already stores the whole
+  row.
+
+**Recommendation:** (b). About 15 km is the smallest radius that gives
+nearly every parcel at least 3 industrial sales.
