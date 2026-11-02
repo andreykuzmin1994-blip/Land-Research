@@ -1,0 +1,5 @@
+# Windows batch files and the home-machine settings template keep CRLF;
+# shell scripts keep LF so they run inside WSL.
+*.bat text eol=crlf
+home_machine/windows/settings.txt text eol=crlf
+*.sh text eol=lf

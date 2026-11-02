@@ -44,9 +44,10 @@ COSTAR_INGEST_PY_SRC = (REPO_ROOT / "costar_ingest.py").read_text(encoding="utf-
 REPORTING_PY_SRC = (REPO_ROOT / "reporting.py").read_text(encoding="utf-8")
 RUNNER_PY_SRC = (REPO_ROOT / "runner.py").read_text(encoding="utf-8")
 PIPELINE_COMMON_PY_SRC = (REPO_ROOT / "pipeline_common.py").read_text(encoding="utf-8")
+COSTAR_IMPORT_PY_SRC = (REPO_ROOT / "costar_import.py").read_text(encoding="utf-8")
 ALL_PIPELINE_PY_SRC = "\n".join(
     (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC, REPORTING_PY_SRC,
-     RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC)
+     RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC, COSTAR_IMPORT_PY_SRC)
 )
 # Merged module AST spanning every pipeline module, for whole-surface
 # static checks (each file is parsed separately, then bodies spliced,
@@ -55,7 +56,8 @@ ALL_PIPELINE_AST = ast.Module(
     body=[
         node
         for source in (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC,
-                       REPORTING_PY_SRC, RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC)
+                       REPORTING_PY_SRC, RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC,
+                       COSTAR_IMPORT_PY_SRC)
         for node in ast.parse(source).body
     ],
     type_ignores=[],

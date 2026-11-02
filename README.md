@@ -30,6 +30,10 @@ For live repo state, run `make status` (setup checks + last TSV rows) — prose 
 
 ## Quick Start (Operator)
 
+**Home Windows PC (recommended for long runs):** see `home_machine/README.md` —
+fill in `settings.txt`, run `Install.bat` once, then double-click
+`Start Land Research.bat`.
+
 This codebase is operated through `make`. Open the repo in a Codespace and run:
 
 ```bash

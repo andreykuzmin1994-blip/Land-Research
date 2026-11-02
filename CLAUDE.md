@@ -30,7 +30,8 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
 - **NEVER edit `program.md`** — human-only strategic direction, at any
   tier, in any session type.
 - **Immutable during a run**: `runner.py`, `costar_ingest.py`,
-  `reporting.py`, `pipeline_common.py`. Between runs, changes there are
+  `costar_import.py`, `reporting.py`, `pipeline_common.py`. Between runs,
+  changes there are
   Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **`research.py` is the agent sandbox** — the ONLY file the agent edits
   during an experiment run. One focused change per experiment, committed
@@ -89,7 +90,8 @@ backstory.
 
 Real credentials only ever go in `.env` (gitignored). The CI workflow at
 `.github/workflows/validate-phase1.yml` re-runs `python prepare.py` against
-the live Supabase project on every push that touches `prepare.py`,
-`parameters.json`, `requirements.txt`, or `STORAGE_ARCHITECTURE.md`. It
-needs a `DATABASE_URL` repository secret — set it once in GitHub Settings
--> Secrets and variables -> Actions.
+a throwaway PostGIS service container on every push that touches
+`prepare.py`, `parameters.json`, `requirements.txt`, or
+`STORAGE_ARCHITECTURE.md`. It needs no secrets. The live Supabase project
+is checked by `make verify` / `make status` from a Codespace with the real
+`DATABASE_URL`.
