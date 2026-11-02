@@ -1006,6 +1006,37 @@ _SQL_FLAGGED_ACTIONABILITY_BLOCK_BATCH = (
     "ORDER BY parcel_id, flagged_at DESC, flag_id DESC"
 )
 
+# Idempotent data_gap flags (reviews/20_next_improvements/02_*). Every
+# discovery re-flags the H3..H10 stubs for every parcel it sees, and every
+# scoring re-flags each null sub-score, so an unattended run appended the
+# same open data_gap rows experiment after experiment (159,311 rows after 13
+# experiments in the 2026-10-28 e2e run). A data_gap flag is now written only
+# when no OPEN data_gap flag with the same parcel and the same description
+# exists. pipeline_common._flag stores 'cycle=<id>; <description>', so the
+# key strips everything up to the first '; ' (cycle ids never contain one).
+# A resolved/dismissed flag does not count: a gap that persists re-opens.
+# Read ONCE per cycle into a set (flagged_items has no parcel_id index and
+# the DDL is prepare.py's, so a per-insert NOT EXISTS would seq-scan the
+# table ~19k times per experiment). Cycle-level rows (parcel_id NULL:
+# harness=degraded, partial corridor) are events and still append.
+_SQL_OPEN_DATA_GAP_DESCRIPTION = (
+    "CASE WHEN strpos(description, '; ') > 0 "
+    "THEN substr(description, strpos(description, '; ') + 2) "
+    "ELSE description END"
+)
+_SQL_OPEN_DATA_GAP_KEYS_FOR_MARKET = (
+    "SELECT DISTINCT parcel_id, " + _SQL_OPEN_DATA_GAP_DESCRIPTION + " "
+    "FROM flagged_items "
+    "WHERE flag_type = 'data_gap' AND status = 'open' "
+    "  AND parcel_id IS NOT NULL AND market = %s"
+)
+_SQL_OPEN_DATA_GAP_KEYS_FOR_PARCELS = (
+    "SELECT DISTINCT parcel_id, " + _SQL_OPEN_DATA_GAP_DESCRIPTION + " "
+    "FROM flagged_items "
+    "WHERE flag_type = 'data_gap' AND status = 'open' "
+    "  AND parcel_id = ANY(%s)"
+)
+
 # Phase 13 (R-1317): the distinct non-null submarkets for the cycle's parcel
 # set, used to bound the market-context and land-median prefetch arrays. Keyed
 # off the SAME parcel_ids the scoring loop iterates so the cache never misses a
@@ -1093,6 +1124,57 @@ def _log_research(
             _SQL_INSERT_RESEARCH_LOG,
             (cycle_id, action_type, market, parcel_id, notes),
         )
+
+
+# Open data_gap keys (parcel_id, description) per running cycle, loaded once
+# at cycle start by run_discovery_cycle / run_scoring_cycle and removed when
+# the cycle ends. A cycle that is not registered here (a direct call to
+# _process_parcel) writes every flag, as before.
+_OPEN_DATA_GAPS_BY_CYCLE: dict[str, set[tuple[str, str]]] = {}
+
+
+def _load_open_data_gaps(
+    conn: Any,
+    *,
+    market: str | None = None,
+    parcel_ids: Sequence[str] | None = None,
+) -> set[tuple[str, str]]:
+    """Keys of the OPEN data_gap flags of one market, or of ``parcel_ids``."""
+    if parcel_ids is not None:
+        pids = list(parcel_ids)
+        if not pids:
+            return set()
+        sql, args = _SQL_OPEN_DATA_GAP_KEYS_FOR_PARCELS, (pids,)
+    else:
+        sql, args = _SQL_OPEN_DATA_GAP_KEYS_FOR_MARKET, (market,)
+    with conn.cursor() as cur:
+        cur.execute(sql, args)
+        rows = cur.fetchall()
+    return {(str(r[0]), str(r[1])) for r in rows if r[0] is not None and r[1] is not None}
+
+
+def _flag_data_gap_once(
+    conn: Any,
+    cycle_id: str,
+    parcel_id: str,
+    market: str,
+    description: str,
+    suggested_resolution: str,
+    open_gaps: set[tuple[str, str]] | None,
+    written: list[tuple[str, str]],
+) -> None:
+    """Write a parcel's data_gap flag unless the same one is already open.
+
+    ``open_gaps`` None = no dedup information: always write. ``written``
+    collects the keys inserted inside the caller's transaction; the caller
+    adds them to ``open_gaps`` only AFTER that transaction succeeded, so a
+    rolled-back insert is never treated as present.
+    """
+    key = (parcel_id, description)
+    if open_gaps is not None and (key in open_gaps or key in written):
+        return
+    _flag(conn, cycle_id, parcel_id, market, "data_gap", description, suggested_resolution)
+    written.append(key)
 
 
 def _count_log_rows(conn: Any, cycle_id: str) -> int:
@@ -1433,7 +1515,11 @@ def _process_parcel(
             log.warning("unknown filter result action=%r for %s", result.action, parcel_id)
 
     # All reject filters passed. UPSERT parcel + log discovery + emit
-    # accumulated flags inside one per-parcel transaction (R-10).
+    # accumulated flags inside one per-parcel transaction (R-10). A flag
+    # already open for this parcel is not written again (idempotent
+    # data_gap flags, see _SQL_OPEN_DATA_GAP_KEYS_FOR_MARKET).
+    open_gaps = _OPEN_DATA_GAPS_BY_CYCLE.get(cycle_id)
+    written: list[tuple[str, str]] = []
     try:
         with conn.transaction():
             _upsert_parcel(conn, row, wkt)
@@ -1443,18 +1529,20 @@ def _process_parcel(
             )
             for result in filter_results:
                 if result.action == "flag":
-                    _flag(
-                        conn, cycle_id, parcel_id, market,
-                        "data_gap", result.reason,
+                    _flag_data_gap_once(
+                        conn, cycle_id, parcel_id, market, result.reason,
                         f"Phase 4: resolve {result.filter_id} for parcel_id={parcel_id}",
+                        open_gaps, written,
                     )
             if multipolygon:
-                _flag(
+                _flag_data_gap_once(
                     conn, cycle_id, parcel_id, market,
-                    "data_gap",
                     "multi-polygon parcel reduced to largest outer ring (Phase 3 simplification)",
                     "Phase 4+: convert parcels.geometry column to MultiPolygon and reprocess",
+                    open_gaps, written,
                 )
+        if open_gaps is not None:
+            open_gaps.update(written)
     except Exception as exc:
         log.exception("transaction failed for parcel %s", parcel_id)
         if _abort_cycle_after_failed_block(conn, exc):
@@ -1612,6 +1700,9 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
                 summary["abort_reason"] = "cycle_id_collision"
                 return summary
 
+            # Idempotent data_gap flags: one read of the market's open gaps.
+            _OPEN_DATA_GAPS_BY_CYCLE[cycle_id] = _load_open_data_gaps(conn, market=market)
+
             try:
                 summary["per_county"] = _run_for_counties(
                     counties, session, conn, cycle_id, market, sources, params, summary,
@@ -1643,6 +1734,7 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
             # cycle's work is rolled back.
             conn.commit()
     finally:
+        _OPEN_DATA_GAPS_BY_CYCLE.pop(cycle_id, None)
         session.close()
 
     return summary
@@ -2804,7 +2896,16 @@ def score_parcel(
             f"S10={sub_scores['S10_incentives']}"
         )[:480]
 
+        written: list[tuple[str, str]] = []
+        market_name = parcel.get("market") or ""
+
         try:
+            # Idempotent data_gap flags: the cycle's set, or (direct/ad-hoc
+            # call, no registered cycle) this parcel's open gaps -- read
+            # inside the try so a failed read is a per-parcel error.
+            open_gaps = _OPEN_DATA_GAPS_BY_CYCLE.get(cycle_id)
+            if open_gaps is None:
+                open_gaps = _load_open_data_gaps(conn, parcel_ids=[parcel_id])
             with conn.transaction():
                 with conn.cursor() as cur:
                     cur.execute(
@@ -2832,48 +2933,55 @@ def score_parcel(
                             json.dumps(strategy_fit, allow_nan=False), notes,
                         ),
                     )
-                # One data_gap flag per null sub-score (R-220).
+                # One data_gap flag per null sub-score (R-220), unless the
+                # same flag is already open for this parcel.
                 for name in _SUB_SCORE_NAMES:
                     if sub_scores.get(name) is not None:
                         continue
                     pretty, source = _SUB_SCORE_PROVENANCE[name]
-                    _flag(
-                        conn, cycle_id, parcel_id, parcel.get("market") or "",
-                        "data_gap",
+                    _flag_data_gap_once(
+                        conn, cycle_id, parcel_id, market_name,
                         f"{name} ({pretty}) unjoined: pending later-phase data wiring ({source})",
                         f"wire {source} for parcel_id={parcel_id}",
+                        open_gaps, written,
                     )
                 # R-514: market_context staleness flag (informational only).
+                # The description names the as_of date, not the age in days,
+                # so the same stale row is one open flag, not one per day.
                 staleness = mc.get("staleness_days")
                 if staleness is not None and staleness > _MARKET_CONTEXT_STALENESS_DAYS:
-                    _flag(
-                        conn, cycle_id, parcel_id, parcel.get("market") or "",
-                        "data_gap",
-                        f"market_context stale by {staleness}d ({mc.get('provenance')})",
+                    _flag_data_gap_once(
+                        conn, cycle_id, parcel_id, market_name,
+                        (
+                            f"market_context older than {_MARKET_CONTEXT_STALENESS_DAYS}d "
+                            f"({mc.get('provenance')})"
+                        ),
                         "trigger CoStar submarket_stats refresh",
+                        open_gaps, written,
                     )
                 # R-519: S6 submarket-grain approximation flag.
                 if sub_scores["S6_competing_pipeline"] is not None:
-                    _flag(
-                        conn, cycle_id, parcel_id, parcel.get("market") or "",
-                        "data_gap",
+                    _flag_data_gap_once(
+                        conn, cycle_id, parcel_id, market_name,
                         "S6 approximated at submarket grain; program.md spec is 5-mi radius",
                         "Phase 11+: implement radius-search facility for S6",
+                        open_gaps, written,
                     )
                 # R-524: S8 sample-size shortfall flag. Only meaningful when the
                 # parcel actually has a submarket — otherwise S8's null is
                 # already covered by the per-subscore data_gap flag above.
                 if s8_prov.get("n_below_min") and parcel.get("submarket"):
-                    _flag(
-                        conn, cycle_id, parcel_id, parcel.get("market") or "",
-                        "data_gap",
+                    _flag_data_gap_once(
+                        conn, cycle_id, parcel_id, market_name,
                         (
                             f"S8 land-basis median has only {s8_prov.get('median_n')} "
                             f"comps in submarket={parcel.get('submarket')} "
                             f"(< {_S8_MIN_LAND_COMPS} required)"
                         ),
                         "wait for additional CoStar land sales comps in submarket",
+                        open_gaps, written,
                     )
+            open_gaps.update(written)
         except Exception as exc:
             log.exception("scoring transaction failed for parcel %s", parcel_id)
             if _abort_cycle_after_failed_block(conn, exc):
@@ -2982,15 +3090,22 @@ def run_scoring_cycle(
         # cache=None path (the bit-identical guarantee, proven by the
         # cache-vs-no-cache equivalence tests).
         cache = _prefetch_cycle_cache(conn, market, parcel_ids)
+        # Idempotent data_gap flags: one read of these parcels' open gaps.
+        _OPEN_DATA_GAPS_BY_CYCLE[cycle_id] = _load_open_data_gaps(
+            conn, parcel_ids=parcel_ids,
+        )
 
-        for pid in parcel_ids:
-            result = score_parcel(
-                pid, conn=conn, cycle_id=cycle_id, params=params, cache=cache,
-                run_tag=run_tag, experiment_id=experiment_id,
-            )
-            status = result.get("status", "error")
-            summary["counts"][status] = summary["counts"].get(status, 0) + 1
-            summary["parcels"].append(result)
+        try:
+            for pid in parcel_ids:
+                result = score_parcel(
+                    pid, conn=conn, cycle_id=cycle_id, params=params, cache=cache,
+                    run_tag=run_tag, experiment_id=experiment_id,
+                )
+                status = result.get("status", "error")
+                summary["counts"][status] = summary["counts"].get(status, 0) + 1
+                summary["parcels"].append(result)
+        finally:
+            _OPEN_DATA_GAPS_BY_CYCLE.pop(cycle_id, None)
 
         # exp: see run_discovery_cycle for the full rationale. Commit the
         # outer transaction explicitly so SAVEPOINTs from score_parcel

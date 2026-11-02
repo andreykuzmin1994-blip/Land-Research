@@ -84,6 +84,10 @@ class FakeCursor:
             return self._fetchone_returns.pop(0)
         return (0,)
 
+    def fetchall(self) -> list[tuple]:
+        # Only the cycle-start open data_gap read uses fetchall: no rows.
+        return []
+
     def __enter__(self) -> "FakeCursor":
         return self
 
@@ -734,11 +738,16 @@ class TestHappyPathDryRun(unittest.TestCase):
         sqls = [s for s, _ in fake.all_executes]
         self.assertTrue(any("INSERT INTO parcels" in s for s in sqls))
         self.assertTrue(any("ON CONFLICT (parcel_id) DO UPDATE" in s for s in sqls))
-        # Each parcel got eight flag rows (H3, H4, H5, H6, H7, H8, H9, H10).
-        flag_rows = [s for s, _ in fake.all_executes if "flagged_items" in s]
-        # 4 parcels x 8 flags (H3, H4, H5, H6, H7, H8, H9, H10) = 32 minimum
-        # (multipolygon flag may add more) (R-105).
-        self.assertGreaterEqual(len(flag_rows), 32)
+        # Each parcel got eight flag rows (H3, H4, H5, H6, H7, H8, H9, H10)
+        # (R-105). Both corridors return the SAME two features, and a flag
+        # already written for a parcel in this cycle is not written again
+        # (idempotent data_gap flags), so 2 unique parcels x 8 = 16 inserts,
+        # after one read of the open data_gap flags.
+        flag_rows = [s for s, _ in fake.all_executes if s.startswith("INSERT INTO flagged_items")]
+        self.assertEqual(len(flag_rows), 16)
+        gap_reads = [s for s, _ in fake.all_executes
+                     if s == research._SQL_OPEN_DATA_GAP_KEYS_FOR_MARKET]
+        self.assertEqual(len(gap_reads), 1)
 
 
 # ---------------------------------------------------------------------------

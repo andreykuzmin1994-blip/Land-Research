@@ -1850,7 +1850,9 @@ class TestExperimentBudgetInterrupt(unittest.TestCase):
                     cycle_ids.append(original_make_id(county))
                     return cycle_ids[-1]
 
-                conn = PgFake(lambda s, p: (0,))
+                # The open data_gap read returns no rows; every other
+                # statement answers (0,) as before.
+                conn = PgFake(lambda s, p: [] if s == research._SQL_OPEN_DATA_GAP_KEYS_FOR_MARKET else (0,))
                 interrupt = self._interrupting(
                     conn, research._SQL_UPSERT_PARCEL, match=lambda p: p[0] == "fulton-B",
                     rollback_fails=rollback_fails,

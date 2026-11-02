@@ -215,6 +215,70 @@ def main() -> int:
             )
         print("OK: no deprecated '(none)' sentinels in flagged_items")
 
+        # Step 4b (reviews/20_next_improvements/02_*): data_gap flags are
+        # idempotent. The SQL that strips 'cycle=<id>; ' from stored
+        # descriptions must give back the descriptions research.py writes,
+        # so a second discovery cycle over the same parcel adds no row; a
+        # resolved flag no longer counts, so the gap re-opens exactly once.
+        conn.commit()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT parcel_id FROM flagged_items "
+                "WHERE flag_type = 'data_gap' AND description LIKE %s LIMIT 1",
+                (f"cycle={cycle_id}; %",),
+            )
+            row = cur.fetchone()
+        if not row:
+            _fail("step 2 wrote no data_gap flag to test idempotency with")
+        gap_parcel = row[0]
+        _count_sql = (
+            "SELECT COUNT(*) FROM flagged_items "
+            "WHERE parcel_id = %s AND flag_type = 'data_gap'"
+        )
+
+        def _gap_rows() -> int:
+            with conn.cursor() as cur:
+                cur.execute(_count_sql, (gap_parcel,))
+                return int(cur.fetchone()[0])
+
+        def _second_cycle() -> str:
+            cid = research._make_cycle_id("fulton")
+            research._OPEN_DATA_GAPS_BY_CYCLE[cid] = research._load_open_data_gaps(
+                conn, market="atlanta",
+            )
+            try:
+                st = research._process_parcel(
+                    feature, conn, cid, "south_fulton_campbellton", "atlanta",
+                    mapping, classification, params,
+                    raw_response_path="/tmp/cache/smoke.json",
+                )
+            finally:
+                research._OPEN_DATA_GAPS_BY_CYCLE.pop(cid, None)
+            conn.commit()
+            if st != "discovery":
+                _fail(f"second _process_parcel returned {st!r}")
+            return cid
+
+        before = _gap_rows()
+        keys = research._load_open_data_gaps(conn, parcel_ids=[gap_parcel])
+        if not any(d.startswith("H3 ") for _p, d in keys):
+            _fail(f"open data_gap keys lost their description: {sorted(keys)[:3]}")
+        _second_cycle()
+        if _gap_rows() != before:
+            _fail(f"re-discovery added data_gap rows: {before} -> {_gap_rows()}")
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE flagged_items SET status = 'resolved' "
+                "WHERE parcel_id = %s AND flag_type = 'data_gap' "
+                "AND status = 'open' AND description LIKE %s",
+                (gap_parcel, "%H3 %"),
+            )
+        conn.commit()
+        _second_cycle()
+        if _gap_rows() != before + 1:
+            _fail(f"a resolved gap should re-open once: {before} -> {_gap_rows()}")
+        print(f"OK: data_gap flags idempotent ({before} rows kept; a resolved gap re-opens once)")
+
     # Step 5 (Phase 13, R-1323): exercise the metric's DISTINCT ON tie-break
     # for real. The fake-cursor offline suite cannot run SQL, so the live DB is
     # the only place the latest-per-parcel selection is validated. Insert THREE

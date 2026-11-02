@@ -85,8 +85,34 @@ Sheets are recognized by their headers:
   within 3 km, at read time; parcels further from every area keep their
   corridor name and score S4/S5/S6 as missing data.
 
-These building sale comps do NOT feed S8 (land basis), which needs
-`land_sales_comps`. Other counties' parcel numbers are not located yet
+- **Land sales** (a CoStar *Land* export) become S8 land comps. A sheet
+  counts as Land when it has `Land Area AC`, `Sale Price`, `Sale Date`,
+  `Zoning`, `Latitude` and `Longitude`, and no `Parcel Number 1 (Min)`,
+  `RBA`, `Building SF` or `Year Built` column. `Sale Status` is required.
+  Add Latitude/Longitude in CoStar's column picker before exporting.
+  - **Kept:** sold land sales of 5–50 acres whose **zoning** is industrial
+    (M, M-1, LI, HI, I-2, MIA, …). CoStar's "Secondary Type" is ignored,
+    because entitlement drives price.
+  - **Dropped:** portfolio rows ("Part of a N Property …"), duplicates, and
+    rows whose $/acre disagrees with price ÷ acres. The console reports
+    counts per reason.
+  - **Assignment:** each sale goes to the submarket area a parcel at the
+    same point would get (nearest within 3 km). CoStar's land submarket
+    names are general geographies that do not match the industrial stats,
+    so they are not used.
+  - **Storage:** the comps are written straight to `sales_comps` in one
+    transaction that replaces this tool's earlier land rows. Hand-delivered
+    `land_sales_comps_*.csv` rows are untouched.
+  - **Snapshot:** the kept sales are saved in
+    `costar_exports/.land_sales_snapshot.json`. If no areas exist yet, they
+    wait there (exit 0), and any later workbook that redraws the areas
+    assigns them again.
+  - **Coverage:** check the "farther than 3 km from every area" count. S8
+    needs at least 3 comps in a parcel's submarket.
+  - Details: `reviews/20_next_improvements/05_*`.
+
+The building sale comps do NOT feed S8 (land basis); only the Land sheet
+above or a `land_sales_comps` CSV does. Other counties' parcel numbers are not located yet
 (Fulton is the only configured county).
 
 Without a database the stats CSV is still written and the tool exits 2

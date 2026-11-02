@@ -6,6 +6,9 @@ The offline suite only drives fakes; this runs the real SQL:
       _SQL_DISTINCT_SUBMARKETS_FOR_PARCELS: a parcel inside an area, ~2 km
       from it, ~5 km from it (keeps its stored value), and inside two
       overlapping areas (the smaller one wins); both queries agree.
+  (c) costar_import.write_land: land sales at the same points as the
+      parcels in (a) go to the same areas (the 5 km one to none), and a
+      second import replaces the first (reviews/20_next_improvements/05_*).
   (b) costar_import.write_areas: writes a valid 4326 Polygon from points,
       keeps a human-seeded bbox, and clears a stale tool-written area, in
       one transaction.
@@ -43,6 +46,15 @@ _SQL_INSERT_PARCEL = (
 _SQL_AREA_STATE = (
     "SELECT submarket_id, GeometryType(bbox), ST_IsValid(bbox), ST_SRID(bbox), notes "
     "FROM submarkets WHERE market_id = %s ORDER BY submarket_id"
+)
+_SQL_LAND_STATE = (
+    "SELECT address, submarket_id FROM sales_comps WHERE comp_type = 'land' "
+    "AND submarket_id IN (SELECT submarket_id FROM submarkets WHERE market_id = %s) "
+    "ORDER BY address"
+)
+_SQL_DELETE_COMPS = (
+    "DELETE FROM sales_comps WHERE submarket_id IN "
+    "(SELECT submarket_id FROM submarkets WHERE market_id = %s)"
 )
 _SQL_DELETE_PARCELS = "DELETE FROM parcels WHERE market = %s"
 _SQL_DELETE_SUBMARKETS = "DELETE FROM submarkets WHERE market_id = %s"
@@ -98,6 +110,24 @@ def main() -> int:
             expect("prefetch agrees with per-parcel fetch",
                    sorted(r[0] for r in cur.fetchall()), sorted(set(want.values())))
 
+        # (c) write_land at the parcels' points: same areas as the resolver.
+        land = [{"address": pid, "county": "Fulton", "acres": 10.0, "sale_date": "2026-01-15",
+                 "sale_price": 1_000_000, "price_per_acre": 100_000.0, "buyer_name": None,
+                 "seller_name": None, "zoning": "M-1", "intended_use": None,
+                 "latitude": y, "longitude": x} for pid, (x, y) in parcels.items()]
+        for attempt in (1, 2):                     # the second import replaces the first
+            with psycopg.connect(dsn) as conn:
+                lc = costar_import.write_land(conn, land, date(2026, 11, 2), market_name)
+                conn.commit()
+        expect("write_land counts (second import)", lc,
+               {"deferred": 0, "assigned": 3, "no_area": 1, "submarkets": 2, "replaced": 3,
+                "already_delivered": 0, "kept_previous": 0})
+        with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
+            cur.execute(_SQL_LAND_STATE, (market,))
+            expect("land comps go where the parcels resolve",
+                   dict(cur.fetchall()),
+                   {pid: sub for pid, sub in want.items() if sub != "corridor_x"})
+        with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
             # (b) write_areas: human-seeded kept, stale tool area cleared.
             cur.execute(_SQL_INSERT_AREA, (human, market, "Human", -84.4, 33.4, -84.3, 33.5, "by hand"))
             cur.execute(_SQL_INSERT_AREA, (stale, market, "Stale", -84.4, 33.6, -84.3, 33.7,
@@ -120,6 +150,7 @@ def main() -> int:
     finally:
         with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
             cur.execute(_SQL_DELETE_PARCELS, (market,))
+            cur.execute(_SQL_DELETE_COMPS, (market,))
             cur.execute(_SQL_DELETE_SUBMARKETS, (market,))
             cur.execute(_SQL_DELETE_MARKET, (market,))
         print("OK: cleaned up this check's rows")
