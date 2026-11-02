@@ -144,7 +144,14 @@ LAND_SNAPSHOT_NAME = ".land_sales_snapshot.json"   # under gitignored costar_exp
 _ZONING_SPLIT_RE = re.compile(r"[\s,/&;()]+")
 _INDUSTRIAL_TOKEN_RE = re.compile(
     r"^(M|M-?\d{1,2}[A-Z]?|LM|LI(-?\d)?|L-I|IL|I-L|HI|IH|I|I-?\d{1,2}[A-Z]?|GI|MIA|"
-    r"P-M|PD-I|I-MIX|IND)$")
+    r"P-M|PD-I|I-MIX|IND|IG|IP)$")
+_BARE_TOKENS = ("I", "M")                          # count only as the first token
+# 'O&I', 'O / I', 'O-I' (office-institutional) are one code, never a bare 'I'.
+_OFFICE_INSTITUTIONAL_RE = re.compile(r"\bO\s*[&/-]\s*I\b")
+# Proposed, pending or negated entitlement is not entitlement (review #4).
+_NOT_ENTITLED_RE = re.compile(r"\b(REZON\w*|PROPOSED|PENDING|NON-?\s*INDUSTRIAL|NOT\s+INDUSTRIAL)\b")
+LAND_MAX_PRICE = 10_000_000_000                   # $10B: far above any land sale
+LAND_MAX_PER_ACRE = 20_000_000                    # $20M/acre
 _PORTFOLIO_RE = re.compile(r"(?i)\bpart of an? \d+ property")
 
 _SQL_COUNT_MARKET_AREAS = (
@@ -163,6 +170,12 @@ _SQL_ASSIGN_POINTS_TO_AREAS = (
     "FROM (SELECT u.i, ST_SetSRID(ST_MakePoint(u.x, u.y), 4326) AS pt "
     "FROM unnest(%s::float8[], %s::float8[]) WITH ORDINALITY AS u(x, y, i)) t "
     "ORDER BY t.i"
+)
+# Land rows delivered another way (a land_sales_comps CSV): never counted twice.
+_SQL_OTHER_LAND_KEYS = (
+    "SELECT address, sale_date FROM sales_comps WHERE comp_type = 'land' "
+    "AND COALESCE(raw->>'import_origin', '') <> %s "
+    "AND submarket_id IN (SELECT submarket_id FROM submarkets WHERE market_id = %s)"
 )
 _SQL_DELETE_TOOL_LAND_COMPS = (
     "DELETE FROM sales_comps WHERE comp_type = 'land' AND raw->>'import_origin' = %s "
@@ -718,15 +731,19 @@ def is_industrial_zoning(zoning: Any) -> bool:
     Entitlement drives land price, so CoStar's 'Secondary Type' is not used.
     'industrial' anywhere counts; otherwise one token (split on spaces and
     , / & ; ( )) must be an industrial code: 'M1/C1', 'LI & GC' and
-    'M, DeKalb County' count, 'O-I', 'MU', 'MHP' and 'MD' do not. A bare
-    'I' or 'M' counts (Georgia codes); that is the known false-positive risk.
+    'M, DeKalb County' count; 'O-I', 'O&I', 'MU', 'MHP' and 'MD' do not. A
+    bare 'I' or 'M' counts only as the first token ('PUD Phase I' does not),
+    and proposed, pending or negated text ('rezoning to M-1',
+    'non-industrial') never counts.
     """
     text = str(zoning or "").strip().upper()
-    if not text:
+    if not text or _NOT_ENTITLED_RE.search(text):
         return False
     if "INDUSTRIAL" in text:
         return True
-    return any(_INDUSTRIAL_TOKEN_RE.match(t) for t in _ZONING_SPLIT_RE.split(text) if t)
+    tokens = [t for t in _ZONING_SPLIT_RE.split(_OFFICE_INSTITUTIONAL_RE.sub("OI", text)) if t]
+    return any(_INDUSTRIAL_TOKEN_RE.match(t) and (t not in _BARE_TOKENS or i == 0)
+               for i, t in enumerate(tokens))
 
 
 def is_land_sheet(rows: list[list[Any]]) -> bool:
@@ -778,6 +795,10 @@ def _finite(value: Any) -> float | None:
     return v if v is not None and math.isfinite(v) else None
 
 
+def _address_key(address: Any) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(address or "").upper())
+
+
 @dataclass
 class LandResult:
     rows: list[dict[str, Any]]
@@ -799,7 +820,7 @@ def convert_land(rows: list[list[Any]], *, today: date, date1904: bool = False) 
         return row[i] if i is not None and i < len(row) else None
 
     kept: list[dict[str, Any]] = []
-    seen: set[tuple[str, date]] = set()
+    seen: set[tuple[str, date, float]] = set()
     dropped: dict[str, int] = {}
 
     def drop(reason: str) -> None:
@@ -821,6 +842,8 @@ def convert_land(rows: list[list[Any]], *, today: date, date1904: bool = False) 
         price, acres = _finite(get(row, "Sale Price")), _finite(get(row, "Land Area AC"))
         if price is None or price <= 0 or acres is None or acres <= 0:
             drop("no price or acres"); continue
+        if price > LAND_MAX_PRICE or price / acres > LAND_MAX_PER_ACRE:
+            drop("implausible price"); continue
         if not LAND_MIN_AC <= acres <= LAND_MAX_AC:
             drop("outside 5-50 acres"); continue
         lat, lon = _finite(get(row, "Latitude")), _finite(get(row, "Longitude"))
@@ -839,7 +862,7 @@ def convert_land(rows: list[list[Any]], *, today: date, date1904: bool = False) 
         costar_per_acre = _finite(get(row, "Price Per AC Land"))
         if costar_per_acre is not None and abs(costar_per_acre - per_acre) > PER_ACRE_TOLERANCE * per_acre:
             drop("price per acre disagrees with price / acres"); continue
-        key = (re.sub(r"[^A-Z0-9]", "", address.upper()) or f"{lat:.5f},{lon:.5f}", sold)
+        key = (_address_key(address) or f"{lat:.5f},{lon:.5f}", sold, round(acres, 1))
         if key in seen:
             drop("duplicate address and date"); continue
         seen.add(key)
@@ -900,7 +923,8 @@ def write_land(conn: Any, rows: list[dict[str, Any]], today: date,
     nothing is touched ('deferred': the snapshot is assigned later).
     """
     market_id = costar_ingest._slugify(market_name)
-    counts = {"deferred": 0, "assigned": 0, "no_area": 0, "submarkets": 0, "replaced": 0}
+    counts = {"deferred": 0, "assigned": 0, "no_area": 0, "submarkets": 0, "replaced": 0,
+              "already_delivered": 0, "kept_previous": 0}
     if not rows:
         raise ImportError_("no industrial land sale qualifies; land comps left unchanged")
     with conn.transaction():
@@ -917,14 +941,26 @@ def write_land(conn: Any, rows: list[dict[str, Any]], today: date,
                          [float(r["latitude"]) for r in rows]))
             assigned = cur.fetchall()
         with conn.cursor() as cur:
-            cur.execute(_SQL_DELETE_TOOL_LAND_COMPS, (LAND_ORIGIN, market_id))
-            counts["replaced"] = max(int(getattr(cur, "rowcount", 0) or 0), 0)
-        subs: set[str] = set()
+            cur.execute(_SQL_OTHER_LAND_KEYS, (LAND_ORIGIN, market_id))
+            delivered = {(_address_key(a), str(d)) for a, d in cur.fetchall()}
+        todo: list[tuple[dict[str, Any], str]] = []
         for ordinal, submarket_id in assigned:
             r = rows[int(ordinal) - 1]
             if submarket_id is None:
                 counts["no_area"] += 1
-                continue
+            elif (_address_key(r.get("address")), str(r["sale_date"])) in delivered:
+                counts["already_delivered"] += 1
+            else:
+                todo.append((r, submarket_id))
+        if not todo:
+            # Never trade the earlier comps for nothing (review #1).
+            counts["kept_previous"] = 1
+            return counts
+        with conn.cursor() as cur:
+            cur.execute(_SQL_DELETE_TOOL_LAND_COMPS, (LAND_ORIGIN, market_id))
+            counts["replaced"] = max(int(getattr(cur, "rowcount", 0) or 0), 0)
+        subs: set[str] = set()
+        for r, submarket_id in todo:
             raw = {"import_origin": LAND_ORIGIN, "imported_on": today.isoformat(),
                    "latitude": r["latitude"], "longitude": r["longitude"],
                    "intended_use": r.get("intended_use")}
@@ -977,9 +1013,6 @@ def run(path: Path, *, areas: bool = True, locator: Any = None,
         if land is not None:
             print("land: not written (--no-areas: no database writes).")
         return 0
-    if land is not None:
-        save_land_snapshot(land.rows, base, today)
-
     plan: AreaPlan | None = None
     if comps_rows is not None:
         parcels = comp_parcels(comps_rows)
@@ -999,6 +1032,14 @@ def run(path: Path, *, areas: bool = True, locator: Any = None,
             plan = None
     if plan is None and land is None:
         return 0
+    # Saved land sales go again when the areas move (R-3). Read BEFORE the
+    # areas are written: an unreadable snapshot must not block every Start.
+    land_rows: list[dict[str, Any]] | None = land.rows if land is not None else None
+    if land_rows is None:
+        try:
+            land_rows = load_land_snapshot(base)
+        except ImportError_ as exc:
+            print(f"land: {exc}; the areas are imported without it.")
 
     if not prepare.dsn_available():
         print("areas and land comps not written: no DATABASE_URL"
@@ -1013,18 +1054,27 @@ def run(path: Path, *, areas: bool = True, locator: Any = None,
                       f"human-seeded, cleared {counts['cleared_stale']} stale"
                       + (f", {counts['name_drift']} name drifts (see submarkets table)"
                          if counts["name_drift"] else ""))
-            # New land sales, or the saved ones again when the areas moved (R-3).
-            land_rows = land.rows if land is not None else load_land_snapshot(base)
             if land_rows:
                 lc = write_land(conn, land_rows, today)
                 conn.commit()
+                if land is not None:          # only once it was written or deferred
+                    save_land_snapshot(land.rows, base, today)
                 if lc["deferred"]:
                     print("land: saved; no submarket areas exist yet, so the sales are "
                           "assigned when a workbook with sale comps is imported.")
+                elif lc["kept_previous"]:
+                    print(f"land: no sale lies within 3 km of an area ({lc['no_area']}) or each "
+                          f"was already delivered ({lc['already_delivered']}); the earlier "
+                          "land comps are kept unchanged.")
                 else:
                     print(f"land: {lc['assigned']} sales in {lc['submarkets']} submarket areas "
                           f"({lc['no_area']} farther than 3 km from every area; "
-                          f"{lc['replaced']} earlier tool-imported land comps replaced)")
+                          f"{lc['already_delivered']} already delivered by a land_sales_comps "
+                          f"CSV; {lc['replaced']} earlier tool-imported land comps replaced)")
+    except psycopg.DataError as exc:
+        print(f"REFUSED: a value in the workbook does not fit the database ({type(exc).__name__}); "
+              "nothing more was written.")
+        return 1
     except (psycopg.Error, OSError) as exc:
         print(f"areas or land comps not written: database error ({type(exc).__name__})."
               + (" The stats CSV was written." if stats_rows is not None else ""))

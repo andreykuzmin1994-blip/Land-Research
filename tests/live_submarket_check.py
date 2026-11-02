@@ -120,7 +120,8 @@ def main() -> int:
                 lc = costar_import.write_land(conn, land, date(2026, 11, 2), market_name)
                 conn.commit()
         expect("write_land counts (second import)", lc,
-               {"deferred": 0, "assigned": 3, "no_area": 1, "submarkets": 2, "replaced": 3})
+               {"deferred": 0, "assigned": 3, "no_area": 1, "submarkets": 2, "replaced": 3,
+                "already_delivered": 0, "kept_previous": 0})
         with psycopg.connect(dsn, autocommit=True) as conn, conn.cursor() as cur:
             cur.execute(_SQL_LAND_STATE, (market,))
             expect("land comps go where the parcels resolve",

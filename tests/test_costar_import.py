@@ -515,8 +515,11 @@ class LandClassifierTests(unittest.TestCase):
         industrial = ["M-1", "M1", "M-2", "M", "LM", "LI", "L-I", "HI", "I", "I-1", "I2", "I GI",
                       "MIA", "P-M", "M-1A", "LI-1", "I-MIX", "PD-I", "IND", "Industrial",
                       "Light Industrial", "m1/c1", "LI & GC", "LI/WS", "M, Some County",
-                      "I-L", "IL", "IH"]
-        not_industrial = ["", None, "O-I", "OI", "MU", "MU-2", "MHP", "MD", "MIX", "H-B",
+                      "I-L", "IL", "IH", "IG", "IP", "M (conditional)"]
+        not_industrial = ["O&I", "O & I", "O/I", "PUD Phase I", "A-1 (Tract I)", "Unit I",
+                          "Non-Industrial", "not industrial", "R-1 rezoning to industrial",
+                          "R-1 (rezoning to M-1 pending)", "Proposed LI",
+                          "", None, "O-I", "OI", "MU", "MU-2", "MHP", "MD", "MIX", "H-B",
                           "R-100", "A1", "AG1", "C-2", "CUP", "N/Av", "MUR", "HDMU", "LR",
                           "Data Center Use", "TCMU", "RM8"]
         for z in industrial:
@@ -604,7 +607,7 @@ class WriteLandTests(unittest.TestCase):
                          rowcounts={ci._SQL_DELETE_TOOL_LAND_COMPS: 7})
         out = ci.write_land(conn, self.rows(), TODAY)
         self.assertEqual(out, {"deferred": 0, "assigned": 1, "no_area": 1, "submarkets": 1,
-                               "replaced": 7})
+                               "replaced": 7, "already_delivered": 0, "kept_previous": 0})
         self.assertEqual(conn.transactions, 1)
         self.assertEqual(conn.run(ci._SQL_DELETE_TOOL_LAND_COMPS), [(ci.LAND_ORIGIN, "atlanta")])
         (ins,) = conn.run(costar_ingest._SQL_INSERT_LAND_SALES)
@@ -676,10 +679,10 @@ class LandRunTests(unittest.TestCase):
         self.assertEqual(conn.executed, [])
         self.assertFalse((base / ci.LAND_SNAPSHOT_NAME).exists())
 
-    def test_without_database_saves_snapshot_and_exits_2(self):
+    def test_without_database_exits_2_and_saves_nothing(self):
         rc, base = self._run({"land": [LAND_HEADER, land_row()]}, None, dsn=False)
         self.assertEqual(rc, 2)
-        self.assertTrue((base / ci.LAND_SNAPSHOT_NAME).is_file())
+        self.assertFalse((base / ci.LAND_SNAPSHOT_NAME).exists())
 
     def test_no_areas_flag_skips_land_entirely(self):
         conn = _LandConn()
@@ -726,6 +729,77 @@ class LandRunTests(unittest.TestCase):
         conn = _Conn([])
         self.assertEqual(ci.write_areas(conn, ci.AreaPlan(), TODAY)["cleared_stale"], 0)
         self.assertEqual(conn.executed, [])
+
+
+class LandReviewFindingTests(unittest.TestCase):
+    """reviews/20_next_improvements/05_* adversarial post-change findings."""
+
+    def rows(self, n=2):
+        return [dict(ci.convert_land([LAND_HEADER, land_row()], today=TODAY).rows[0],
+                     address=f"{i} Test Way") for i in range(n)]
+
+    def test_1_nothing_assigned_keeps_the_earlier_comps(self):
+        conn = _LandConn(assign=lambda n: [(i, None) for i in range(1, n + 1)])
+        out = ci.write_land(conn, self.rows(), TODAY)
+        self.assertEqual((out["kept_previous"], out["no_area"]), (1, 2))
+        self.assertEqual(conn.run(ci._SQL_DELETE_TOOL_LAND_COMPS), [])
+        self.assertEqual(conn.run(costar_ingest._SQL_INSERT_LAND_SALES), [])
+
+    def test_2_implausible_prices_are_dropped(self):
+        out = ci.convert_land([LAND_HEADER,
+                               land_row(**{"Sale Price": 1e20, "Price Per AC Land": None}),
+                               land_row(**{"Sale Price": 5e8, "Price Per AC Land": None,
+                                           "Property Address": "2"})], today=TODAY)
+        self.assertEqual(out.rows, [])
+        self.assertEqual(out.dropped, {"implausible price": 2})
+
+    def test_2_snapshot_is_saved_only_after_the_database_write(self):
+        class Boom(_LandConn):
+            def answer(self, sql, params):
+                if sql == costar_ingest._SQL_INSERT_LAND_SALES:
+                    raise ci.psycopg.errors.NumericValueOutOfRange("x")
+                return super().answer(sql, params)
+        rc, base = LandRunTests._run(self, {"land": [LAND_HEADER, land_row()]}, Boom())
+        self.assertEqual(rc, 1)                       # a data error is a refusal, not exit 2
+        self.assertFalse((base / ci.LAND_SNAPSHOT_NAME).exists())
+
+    def test_3_unreadable_snapshot_never_blocks_the_areas(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        (d / ci.LAND_SNAPSHOT_NAME).write_text("{not json", encoding="utf-8")
+        comps = [["Submarket Name", "Parcel Number 1 (Min)"],
+                 ["Alpha Park", "99Z-0001-LL-001-1"], ["Alpha Park", "99Z-0001-LL-002-1"],
+                 ["Alpha Park", "99Z-0001-LL-003-1"]]
+        locator = mock.Mock()
+        locator.locate.return_value = {"99Z0001LL0011": (-84.45, 33.62),
+                                       "99Z0001LL0021": (-84.46, 33.63),
+                                       "99Z0001LL0031": (-84.44, 33.61)}
+        conn = _LandConn()
+        with mock.patch.object(ci, "write_areas", return_value={
+                "written": 1, "kept_human_seeded": 0, "cleared_stale": 0, "name_drift": 0}) as wa:
+            rc, _ = LandRunTests._run(self, {"c": comps}, conn, base=d, locator=locator)
+        self.assertEqual(rc, 0)
+        wa.assert_called_once()
+        self.assertEqual(conn.executed, [])
+
+    def test_5_sales_already_delivered_by_csv_are_not_counted_twice(self):
+        class Delivered(_LandConn):
+            def answer(self, sql, params):
+                if sql == ci._SQL_OTHER_LAND_KEYS:
+                    return [("0 TEST WAY", date(2026, 3, 2))]
+                return super().answer(sql, params)
+        conn = Delivered()
+        out = ci.write_land(conn, self.rows(), TODAY)
+        self.assertEqual((out["assigned"], out["already_delivered"]), (1, 1))
+        (ins,) = conn.run(costar_ingest._SQL_INSERT_LAND_SALES)
+        self.assertEqual(ins[0], "1 Test Way")
+
+    def test_6_same_road_same_day_different_tracts_are_both_kept(self):
+        out = ci.convert_land([LAND_HEADER,
+                               land_row(**{"Property Address": "Highway 85"}),
+                               land_row(**{"Property Address": "Highway 85", "Land Area AC": 40,
+                                           "Sale Price": 4_000_000})], today=TODAY)
+        self.assertEqual(len(out.rows), 2)
 
 
 if __name__ == "__main__":
