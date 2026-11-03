@@ -90,7 +90,8 @@ Sheets are recognized by their headers:
   `Zoning`, `Latitude` and `Longitude`, and no `Parcel Number 1 (Min)`,
   `RBA`, `Building SF` or `Year Built` column. `Sale Status` is required.
   Add Latitude/Longitude in CoStar's column picker before exporting.
-  - **Kept:** sold land sales of 5–50 acres whose **zoning** is industrial
+  - **Kept:** sold land sales of 10–50 acres from the last 22 months
+    (counted back from the import date) whose **zoning** is industrial
     (M, M-1, LI, HI, I-2, MIA, …). CoStar's "Secondary Type" is ignored,
     because entitlement drives price.
   - **Dropped:** portfolio rows ("Part of a N Property …"), duplicates, and

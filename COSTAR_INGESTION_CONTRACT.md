@@ -46,7 +46,10 @@ The agent depends on five recurring CoStar exports plus one on-demand export. Ea
 **Cadence**: First Monday of each month
 **Format**: CSV
 **Filename pattern**: `land_sales_comps_{YYYYMM}.csv`
-**Filter**: Industrial-zoned land sales, target counties, last 24 months, 5–50 acre range
+**Filter**: Industrial-zoned land sales, target counties, last 22 months, 10–50 acre range
+(operator's choice, 2026-11: smaller sites are not targets, and older sales
+predate the current rate environment; `costar_import.py` applies the same
+filter to a CoStar Land export)
 
 **Required fields per row** (one row per transaction):
 - `address` — Property address

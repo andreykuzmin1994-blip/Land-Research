@@ -545,6 +545,8 @@ class LandConversionTests(unittest.TestCase):
                 land_row(**{"Sale Price": None, "Property Address": "6"}),
                 land_row(**{"Land Area AC": 60, "Price Per AC Land": None, "Property Address": "7"}),
                 land_row(**{"Land Area AC": 4, "Price Per AC Land": None, "Property Address": "8"}),
+                land_row(**{"Land Area AC": 9.9, "Price Per AC Land": None, "Property Address": "8b"}),
+                land_row(**{"Sale Date": "2024-12-31", "Property Address": "old"}),
                 land_row(**{"Latitude": None, "Property Address": "9"}),
                 land_row(**{"Latitude": 40.7, "Longitude": -74.0, "Property Address": "10"}),
                 land_row(**{"Zoning": "AG1", "Property Address": "11"}),
@@ -558,7 +560,8 @@ class LandConversionTests(unittest.TestCase):
         self.assertEqual([r["address"] for r in out.rows], ["1 Test Way", "14", "15"])
         self.assertEqual(out.dropped, {
             "not land": 1, "not sold": 1, "no sale date": 1, "future sale date": 1,
-            "no price or acres": 1, "outside 5-50 acres": 2, "no location": 1,
+            "no price or acres": 1, "outside 10-50 acres": 3, "no location": 1,
+            "older than 22 months": 1,
             "location outside Georgia": 1, "not industrially zoned": 1,
             "part of a portfolio or multi-property sale": 1,
             "price per acre disagrees with price / acres": 1,
@@ -568,6 +571,23 @@ class LandConversionTests(unittest.TestCase):
         self.assertEqual(first["price_per_acre"], 100_000.0)
         self.assertEqual(first["county"], "Testa")
         self.assertEqual([r["sale_date"] for r in out.rows[1:]], ["2025-12-01", "2025-06-30"])
+
+    def test_22_month_window_is_counted_back_from_the_import_date(self):
+        self.assertEqual(ci.months_before(date(2026, 11, 2), 22), date(2025, 1, 2))
+        self.assertEqual(ci.months_before(date(2026, 12, 31), 22), date(2025, 2, 28))
+        self.assertEqual(ci.months_before(date(2026, 1, 15), 13), date(2024, 12, 15))
+        rows = [LAND_HEADER, land_row(**{"Sale Date": "2025-01-02", "Property Address": "a"}),
+                land_row(**{"Sale Date": "2025-01-01", "Property Address": "b"})]
+        out = ci.convert_land(rows, today=TODAY)
+        self.assertEqual([r["address"] for r in out.rows], ["a"])
+        self.assertEqual(out.dropped, {"older than 22 months": 1})
+
+    def test_replayed_snapshot_is_refiltered_by_size_and_age(self):
+        base = dict(ci.convert_land([LAND_HEADER, land_row()], today=TODAY).rows[0])
+        rows = [dict(base, address="ok"), dict(base, address="small", acres=6.0),
+                dict(base, address="old", sale_date="2024-12-01"), "junk"]
+        keep, n = ci.refilter_snapshot(rows, TODAY)
+        self.assertEqual(([r["address"] for r in keep], n), (["ok"], 3))
 
     def test_date_systems(self):
         self.assertEqual(ci._sale_date(SERIAL_2026_03_02, False), date(2026, 3, 2))

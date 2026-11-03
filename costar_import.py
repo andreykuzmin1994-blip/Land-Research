@@ -38,7 +38,8 @@ What it does with the workbook (sheets are found by their headers):
 3. Land sales sheet (a CoStar Land export: 'Land Area AC', 'Sale Price',
    'Sale Date', 'Zoning', 'Latitude', 'Longitude', with no parcel-number or
    building columns) -> S8 land comps (reviews/20_next_improvements/05_*).
-   Only SOLD land sales of 5-50 acres on INDUSTRIAL zoning count (zoning,
+   Only SOLD land sales of 10-50 acres from the last 22 months on
+   INDUSTRIAL zoning count (zoning,
    not CoStar's 'Secondary Type': entitlement drives price); portfolio rows,
    duplicates and rows whose $/acre disagrees with price / acres are
    dropped. Each sale goes to the area research.py would give a parcel at
@@ -130,12 +131,15 @@ QUARTER_RE = re.compile(r"^(\d{4}) Q([1-4])$")
 FULTON_ID_RE = re.compile(r"^(\d{2}[A-Z]?)(\d{4})([A-Z0-9]{3,12})$")
 
 # Land sales sheet (reviews/20_next_improvements/05_*). Industrial land
-# only (zoning decides), 5-50 acres per COSTAR_INGESTION_CONTRACT.md Export 2.
+# only (zoning decides), 10-50 acres, sold in the last 22 months: the
+# operator's choice (smaller sites are not targets; older sales predate the
+# current rate environment). COSTAR_INGESTION_CONTRACT.md Export 2.
 LAND_HEADERS = ("Land Area AC", "Sale Price", "Sale Date", "Zoning", "Latitude", "Longitude")
 # A sheet with any of these is a building/area-comps sheet, never Land (R-1).
 LAND_EXCLUDING_HEADERS = ("Parcel Number 1 (Min)", "RBA", "Building SF", "Year Built")
-LAND_MIN_AC = 5.0
+LAND_MIN_AC = 10.0
 LAND_MAX_AC = 50.0
+LAND_MAX_AGE_MONTHS = 22                          # counted back from the import date
 PER_ACRE_TOLERANCE = 0.05
 GEORGIA_BOX = (-85.7, 30.3, -80.8, 35.1)          # lon_min, lat_min, lon_max, lat_max
 LAND_ASSIGN_RADIUS_M = 3000                        # = research._SQL_RESOLVED_SUBMARKET
@@ -790,6 +794,14 @@ def _sale_date(value: Any, date1904: bool) -> date | None:
     return None
 
 
+def months_before(day: date, months: int) -> date:
+    """The same day ``months`` calendar months earlier (clamped to month end)."""
+    y, m = divmod(day.year * 12 + day.month - 1 - months, 12)
+    m += 1
+    nxt = date(y + (m == 12), m % 12 + 1, 1)
+    return date(y, m, min(day.day, (nxt - timedelta(days=1)).day))
+
+
 def _finite(value: Any) -> float | None:
     v, _ = _num(value)
     return v if v is not None and math.isfinite(v) else None
@@ -819,6 +831,7 @@ def convert_land(rows: list[list[Any]], *, today: date, date1904: bool = False) 
         i = hdr.get(name)
         return row[i] if i is not None and i < len(row) else None
 
+    oldest = months_before(today, LAND_MAX_AGE_MONTHS)
     kept: list[dict[str, Any]] = []
     seen: set[tuple[str, date, float]] = set()
     dropped: dict[str, int] = {}
@@ -839,13 +852,15 @@ def convert_land(rows: list[list[Any]], *, today: date, date1904: bool = False) 
             drop("no sale date"); continue
         if sold > today:
             drop("future sale date"); continue
+        if sold < oldest:
+            drop(f"older than {LAND_MAX_AGE_MONTHS} months"); continue
         price, acres = _finite(get(row, "Sale Price")), _finite(get(row, "Land Area AC"))
         if price is None or price <= 0 or acres is None or acres <= 0:
             drop("no price or acres"); continue
         if price > LAND_MAX_PRICE or price / acres > LAND_MAX_PER_ACRE:
             drop("implausible price"); continue
         if not LAND_MIN_AC <= acres <= LAND_MAX_AC:
-            drop("outside 5-50 acres"); continue
+            drop(f"outside {LAND_MIN_AC:g}-{LAND_MAX_AC:g} acres"); continue
         lat, lon = _finite(get(row, "Latitude")), _finite(get(row, "Longitude"))
         if lat is None or lon is None:
             drop("no location"); continue
@@ -911,6 +926,17 @@ def load_land_snapshot(base: Path) -> list[dict[str, Any]] | None:
     if not isinstance(rows, list):
         raise ImportError_("the saved land sales snapshot is unreadable; re-import the Land export")
     return rows
+
+
+def refilter_snapshot(rows: list[dict[str, Any]], today: date) -> tuple[list[dict[str, Any]], int]:
+    """Saved sales replayed later must still pass today's size and age rules."""
+    oldest = months_before(today, LAND_MAX_AGE_MONTHS).isoformat()
+    keep = [r for r in rows
+            if isinstance(r, dict)
+            and isinstance(r.get("acres"), (int, float))
+            and LAND_MIN_AC <= r["acres"] <= LAND_MAX_AC
+            and oldest <= str(r.get("sale_date") or "") <= today.isoformat()]
+    return keep, len(rows) - len(keep)
 
 
 def write_land(conn: Any, rows: list[dict[str, Any]], today: date,
@@ -1040,6 +1066,14 @@ def run(path: Path, *, areas: bool = True, locator: Any = None,
             land_rows = load_land_snapshot(base)
         except ImportError_ as exc:
             print(f"land: {exc}; the areas are imported without it.")
+        if land_rows:
+            land_rows, n_old = refilter_snapshot(land_rows, today)
+            if n_old:
+                print(f"land: {n_old} saved sales no longer pass the size or "
+                      f"{LAND_MAX_AGE_MONTHS}-month rule and are left out.")
+            if not land_rows:
+                print("land: no saved sale still qualifies; the land comps are left as they are. "
+                      "Import a new Land export.")
 
     if not prepare.dsn_available():
         print("areas and land comps not written: no DATABASE_URL"
