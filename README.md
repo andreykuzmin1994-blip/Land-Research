@@ -184,6 +184,51 @@ Verification checklist, per jurisdiction, before flipping it to
   `fid` entry; a South Fulton parcel carrying `M-1A` from Fulton layer 34
   reads `unknown` (S9 stub). None in today's data.
 
+## Building projections (site fit)
+
+`site_fit.py` (`reviews/22_site_fit/`) projects, per parcel, the largest
+building of each of the operator's prototypes that fits:
+`building_prototypes.json` holds the cross-dock (1,000 x 520 ft, 40 ft
+clear, docks both sides), front-load and rear-load (640 x 260 ft, 36 ft
+clear, docks one side) prototypes, each with a 130 ft truck court and 55 ft
+trailer parking per dock side, 12 ft dock spacing and 60 ft end clearance
+(the operator's SiteFit tool defaults). It is human-owned, frozen at load,
+and checked against git HEAD by the runner, like `zoning_rules.json`.
+
+How a projection is made: the parcel is buffered inward in PostGIS (SRID
+2240, feet) by one uniform setback, the largest front/side/rear setback of
+its zoning district in `zoning_rules.json`, or 25 ft when no district rule
+applies (frontage is unknown). Each prototype keeps its depth and shrinks
+its length in 40 ft steps (down to 600 ft cross-dock, 400 ft front/rear)
+until its whole envelope (building + courts + trailer parking) fits at
+some orientation; a district's lot coverage cap steps it down further.
+Docks and trailer stalls follow SiteFit's formulas. Not modelled, and said
+so on every projection: residential buffers, height limits, car parking,
+truck drives, flood (H4) and wetlands (H6).
+
+Where it shows: the snapshot's **Development Potential** section
+(buildable area, max building SF, a table per prototype) and one line per
+memo highlight. Where it counts: BTS strategy fit uses "projected building
+>= 150K SF" instead of the 8.61-acre proxy, but **only** for parcels whose
+zoning jurisdiction is `verified`; while all rules are draft the metric is
+unchanged. After verifying a jurisdiction, or after editing
+`building_prototypes.json` between runs, start a new run and baseline.
+
+Operator command (read-only on the database; prints no owner names or
+addresses):
+
+```bash
+make site-fit ARGS='--parcel "fulton-14 0144  LL0215"'   # one parcel
+make site-fit ARGS='--top 10'                            # the 10 highest composites
+make site-fit ARGS='--top 10 --export'                   # + SiteFit study files
+```
+
+`--export` writes `site_fit_studies/<parcel>-<hash>.sitefit.json`
+(gitignored) holding the parcel boundary (largest part), the applied
+setback on every edge and the fitted building, to open in SiteFit and
+refine by hand. Keep the SiteFit tool file itself out of the repo
+(`SiteFit.html` is gitignored).
+
 ## Repository Structure
 
 ```
@@ -202,6 +247,7 @@ land-site-selector/
 ├── parameters.json                    — Scoring weights and filter thresholds (IMMUTABLE during run)
 ├── sources.json                       — Registry of data source URLs (LOCKED — agent never writes)
 ├── zoning_rules.json                  — Human-owned zoning facts per jurisdiction/district (agent never writes)
+├── building_prototypes.json           — Human-owned building prototypes from the operator's SiteFit tool (agent never writes)
 ├── connector_registry.json            — Harness-only config overlay (test bboxes, expected extents)
 ├── prepare.py                         — IMMUTABLE: metric calculation, DDL, frozen parameters
 ├── research.py                        — Agent sandbox — the ONLY file the agent modifies in a run
@@ -212,6 +258,7 @@ land-site-selector/
 ├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import (operator, between runs)
 ├── zoning.py                          — IMMUTABLE during run: loads + freezes zoning_rules.json, classifies districts
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
+├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)
