@@ -8,8 +8,8 @@ The offline suite drives fakes; this runs the real SQL on a real PostGIS:
       would match both (the regression it guards against); with seq scans
       disabled the plan uses the GIST index on parcels.geometry.
   (b) zoning_import: the TEMP-table overlay (ST_MakeValid, geography areas)
-      ranks a majority, a split, a tie (alphabetical) and a sliver
-      correctly; the UPDATE writes only zoning columns; a second plan
+      ranks a majority, a split, a tie (alphabetical), a sliver and
+      overlapping polygons of one district (counted once) correctly; the UPDATE writes only zoning columns; a second plan
       changes 0 rows; the parcel count is unchanged.
   (c) research's stored-zoning reads parse what the import wrote.
 
@@ -130,7 +130,7 @@ def check_overlay(conn: Any, zi: Any, zoning: Any, research: Any, res: Results) 
     import math
     dx = half / (M_PER_DEG_LAT * math.cos(math.radians(lat)))
     dy = half / M_PER_DEG_LAT
-    centres = {f"lz-P{i}": _east(lng, lat, 300.0 * i) for i in range(4)}
+    centres = {f"lz-P{i}": _east(lng, lat, 300.0 * i) for i in range(5)}
     with conn.cursor() as cur:
         for pid, x in centres.items():
             w = _square(x, lat, half)
@@ -148,6 +148,12 @@ def check_overlay(conn: Any, zi: Any, zoning: Any, research: Any, res: Results) 
         {"attributes": {"Z": "M-2"}, "geometry": {"rings": box("lz-P2", -0.5, 0.5)}},   # tie
         {"attributes": {"Z": "C-1"}, "geometry": {"rings": box("lz-P2", 0.5, 1.5)}},
         {"attributes": {"Z": "AG-1"}, "geometry": {"rings": box("lz-P3", 0.9, 1.5)}},   # 10% sliver
+        # Finding 4: two OVERLAPPING M-2 polygons (40% and 45%; union 45%)
+        # against R-3 at 55%. Summing would give M-2 85% (winner, not split);
+        # the union gives R-3 55%, split.
+        {"attributes": {"Z": "M-2"}, "geometry": {"rings": box("lz-P4", -0.5, 0.40)}},
+        {"attributes": {"Z": "M-2"}, "geometry": {"rings": box("lz-P4", -0.5, 0.45)}},
+        {"attributes": {"Z": "R-3"}, "geometry": {"rings": box("lz-P4", 0.45, 1.5)}},
     ]
     src = zi.ZoningSource("live_overlay", "live", "zoning", "overlay", ("south_fulton",),
                           "https://live.test/0", None, "Z", None, False)
@@ -156,9 +162,23 @@ def check_overlay(conn: Any, zi: Any, zoning: Any, research: Any, res: Results) 
     before = _count(conn)
     r = zi.match_overlay(conn, src, feats, group)
     got = {pid: (a[0], a[2]) for pid, a in r.assigned.items()}
-    res.check(got == {"lz-P0": ("M-1", False), "lz-P1": ("R-3", True), "lz-P2": ("C-1", True)},
-              f"(b) overlay: majority, split and tie ranked ({len(got)} assigned, want 3)")
-    res.check((r.slivers, r.split) == (1, 2), f"(b) overlay: {r.slivers} sliver, {r.split} split")
+    res.check(got == {"lz-P0": ("M-1", False), "lz-P1": ("R-3", True), "lz-P2": ("C-1", True),
+                      "lz-P4": ("R-3", True)},
+              f"(b) overlay: majority, split, tie and overlapping same-district polygons "
+              f"ranked ({len(got)} assigned, want 4)")
+    res.check((r.slivers, r.split) == (1, 3), f"(b) overlay: {r.slivers} sliver, {r.split} split")
+    conn.rollback()                      # drop match_overlay's TEMP rows first
+    with conn.cursor() as cur:
+        cur.execute(zi._SQL_CREATE_TEMP)
+        for f in feats:
+            cur.execute(zi._SQL_INSERT_POLY, ("live_overlay", f["attributes"]["Z"], None,
+                                              zi.esri_rings_to_geojson(f["geometry"]["rings"])))
+        cur.execute(zi._SQL_OVERLAY, (["lz-P4"], "live_overlay"))
+        shares = {row[1]: float(row[3]) / float(row[4]) for row in cur.fetchall()}
+    conn.rollback()
+    res.check(abs(shares.get("M-2", 0) - 0.45) < 0.01 and abs(shares.get("R-3", 0) - 0.55) < 0.01,
+              f"(b) overlapping M-2 polygons counted once: M-2 {shares.get('M-2', 0):.2f}, "
+              f"R-3 {shares.get('R-3', 0):.2f} (want 0.45 / 0.55)")
     plan = zi.build_plan(stored, {p: "south_fulton" for p in group}, [src], {src.key: r})
     with conn.cursor() as cur:
         cur.execute(_SQL_PARCEL_ROWS)
@@ -168,7 +188,7 @@ def check_overlay(conn: Any, zi: Any, zoning: Any, research: Any, res: Results) 
     with conn.cursor() as cur:
         cur.execute(_SQL_PARCEL_ROWS)
         after = {row[0]: row[1:] for row in cur.fetchall()}
-    res.check(n == 3 and _count(conn) == before, f"(b) {n} rows updated, parcel count unchanged")
+    res.check(n == 4 and _count(conn) == before, f"(b) {n} rows updated, parcel count unchanged")
     res.check(all(after[p][2] == lu_before[p] for p in group), "(b) last_updated untouched")
     st = {p: zoning.parse_stored(after[p][0], after[p][1]) for p in group}
     res.check(st["lz-P0"].district == "M-1" and st["lz-P3"] is None,
@@ -185,7 +205,7 @@ def check_overlay(conn: Any, zi: Any, zoning: Any, research: Any, res: Results) 
         market_rows = cur.fetchall()
     conn.rollback()
     cls = zoning.classify_stored(*rows["lz-P0"]).cls
-    res.check(cls == "by_right" and len(market_rows) == 6,
+    res.check(cls == "by_right" and len(market_rows) == 7,
               f"(c) research reads the imported zoning ({len(market_rows)} rows with provenance)")
 
 
