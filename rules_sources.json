@@ -18,7 +18,7 @@
       "terms_url": null,
       "terms_reviewed_by": null,
       "terms_reviewed_on": null,
-      "note": "Official Union City site. Akamai returned 403 (also for robots.txt) from the survey egress on 2026-11-05: unreachable there; may work from the operator's machine."
+      "note": "Official Union City site. Akamai returned 403 (also for robots.txt) to the survey on 2026-11-05; robots.txt and the PDF answered at the first live run the same day. The tool treats any Akamai 403 as unreachable."
     },
     "services3.arcgis.com": {
       "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
@@ -298,7 +298,7 @@
       "priority": 1,
       "conditions_suffix_regex": null,
       "conditions_note": "No conditions suffix convention known.",
-      "note": "The Zoneomics page for Union City is a stub (no ordinance text): not registered. The official PDF is the only source; Akamai blocked it from the survey egress.",
+      "note": "The Zoneomics page for Union City is a stub (no ordinance text): not registered. The official PDF is the only source.",
       "sources": [
         {
           "key": "uc_zoning_ordinance_pdf",
@@ -306,16 +306,26 @@
           "url": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf",
           "format": "pdf",
           "source_class": "official",
-          "parser": "llm_prose",
-          "note": "February 18, 2025 revision (unofficial reference copy per its cover). Section markers unverified: the file was unreachable when this entry was written.",
+          "parser": "label_value",
+          "note": "February 18, 2025 revision (its cover calls it an unofficial reference copy). Akamai blocked it from the survey egress; it was reachable at the first live run (2026-11-05). Sec. 6-13 D. Dimensional Requirements is a numbered label: value list.",
           "sections": [
             {
-              "id": "m1_district",
-              "label": "M-1 Light Industrial District (dimensional requirements)",
-              "start": "M-1",
-              "end": "M-2",
+              "id": "m1_dimensional",
+              "label": "Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "start": ["6-13 M-1 Light Industrial.", "D. Dimensional Requirements."],
+              "end": "6-14 M-2 Manufacturing and Heavy Industrial.",
+              "pick": "last",
               "district": "M-1",
-              "config": {"fields": ["front_setback_ft", "side_setback_ft", "rear_setback_ft", "min_lot_area_sqft", "min_lot_width_ft", "min_lot_frontage_ft", "max_height_ft", "max_lot_coverage_pct"]}
+              "config": {"labels": [
+                {"label": "Lot area", "field": "min_lot_area_sqft"},
+                {"label": "Lot width and frontage", "field": "min_lot_width_ft"},
+                {"label": "Lot width and frontage", "field": "min_lot_frontage_ft"},
+                {"label": "Front yard setback", "field": "front_setback_ft"},
+                {"label": "Rear yard setback", "field": "rear_setback_ft"},
+                {"label": "Side yard setback", "field": "side_setback_ft"},
+                {"label": "Height", "field": "max_height_ft"},
+                {"label": "Lot coverage", "field": "max_lot_coverage_pct"}
+              ]}
             }
           ]
         }
