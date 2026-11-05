@@ -3046,9 +3046,12 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         return EXIT_REFUSED
     _print_counts(res, rows)
     if flags is not None:
-        print(f"flags: {len(flags.conditions_on_file)} parcel(s) with conditions on file "
-              f"(pull by hand), {len(flags.other_cases)} other case hit(s), "
-              f"{len(flags.layer_failures)} case layer(s) not checked")
+        cof = {x["parcel_id"] for x in flags.conditions_on_file}
+        oth = {x["parcel_id"] for x in flags.other_cases}
+        print(f"flags: {len(cof)} parcel(s) with conditions on file ({len(flags.conditions_on_file)} "
+              f"hit(s); pull by hand), {len(oth)} parcel(s) with other cases "
+              f"({len(flags.other_cases)} hit(s)), {len(flags.layer_failures)} case layer(s) not "
+              "checked")
     if fetcher is not None and not args.offline:
         print("requests: " + ", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items())))
     print(f"wrote candidate and report under {out_path.parent.name}/ (never zoning_rules.json)")
