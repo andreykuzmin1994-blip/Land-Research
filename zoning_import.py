@@ -49,6 +49,13 @@ What it does
    entitlement class against zoning_rules.json) -- never a parcel id, an
    owner, or a feature attribute.
 
+Exit codes: 0 imported; 1 refused (sources.json key missing/malformed,
+Fulton parcel layer down); 2 no database / database error; 3 a run has its
+baseline; 4 imported, but at least one zoning source with candidate
+parcels FAILED (named on the last line; its parcels kept their previous
+values), so a wrapper that checks the exit code cannot mistake a partial
+import for a full one.
+
 HTTP: 1 request/second per host, bounded retries with back-off, Retry-After
 honoured and capped, descriptive User-Agent, no cache (SR-11).
 
@@ -130,15 +137,18 @@ _SQL_INSERT_POLY = (
     "(%s, %s, %s, ST_CollectionExtract(ST_MakeValid("
     "ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)), 3))"
 )
-# Per parcel and district: summed overlap and the parcel's own area, both
-# on the spheroid (geography, square metres).
+# Per parcel and district: the area of the UNION of that district's pieces
+# inside the parcel (so overlapping polygons of one district are counted
+# once: review finding 4) and the parcel's own area, both on the spheroid
+# (geography, square metres).
 _SQL_OVERLAY = (
     "WITH pg AS ("
     "  SELECT parcel_id, ST_CollectionExtract(ST_MakeValid(geometry), 3) AS g "
     "  FROM parcels WHERE parcel_id = ANY(%s) AND geometry IS NOT NULL"
     ") "
     "SELECT pg.parcel_id, z.district, MIN(z.descr), "
-    "SUM(ST_Area(ST_Intersection(pg.g, z.geom)::geography)), "
+    "ST_Area(ST_Union(ST_CollectionExtract("
+    "ST_Intersection(pg.g, z.geom), 3))::geography), "
     "MAX(ST_Area(pg.g::geography)) "
     "FROM pg JOIN zoning_import_polys z "
     "ON z.src = %s AND z.geom && pg.g AND ST_Intersects(z.geom, pg.g) "
@@ -612,8 +622,10 @@ def match_join(src: ZoningSource, feats: Sequence[Mapping[str, Any]],
 def rank_overlay(rows: Iterable[Sequence[Any]]) -> dict[str, tuple[str, str | None, float]]:
     """parcel_id -> (district, desc, share) from _SQL_OVERLAY rows.
 
-    Largest summed overlap wins; ties go to the alphabetically first
-    district (deterministic)."""
+    Largest overlap wins; ties go to the alphabetically first district
+    (deterministic). The share is clamped to 1.0 as a backstop: the SQL
+    already unions each district's pieces, so only rounding can push it
+    over."""
     per: dict[str, list[tuple[float, str, str | None, float]]] = {}
     for pid, district, desc, area, parea in rows:
         per.setdefault(pid, []).append((float(area or 0.0), str(district),
@@ -622,7 +634,7 @@ def rank_overlay(rows: Iterable[Sequence[Any]]) -> dict[str, tuple[str, str | No
     for pid, items in per.items():
         items.sort(key=lambda t: (-t[0], t[1]))
         area, district, desc, parea = items[0]
-        out[pid] = (district, desc, area / parea if parea > 0 else 0.0)
+        out[pid] = (district, desc, min(1.0, area / parea) if parea > 0 else 0.0)
     return out
 
 
@@ -779,7 +791,9 @@ def run(*, sources_path: Path = SOURCES_PATH, session: ZoningSession | None = No
         today: date | None = None, check_open_run: bool = True,
         log_path: Path = EXPERIMENT_LOG) -> int:
     """0 = imported, 1 = refused (config / parcel layer), 2 = database
-    unavailable or error, 3 = refused: a run has its baseline."""
+    unavailable or error, 3 = refused: a run has its baseline, 4 = imported
+    but at least one zoning source with candidate parcels FAILED (its
+    parcels kept their previous values; review finding 5)."""
     today = today or date.today()
     tag = prepare.current_run_tag()
     if tsv_has_baseline(tag, log_path):
@@ -887,6 +901,11 @@ def run(*, sources_path: Path = SOURCES_PATH, session: ZoningSession | None = No
     print("requests: " + ", ".join(f"{h} {k}" for h, k in sorted(session.requests.items())))
     print("Re-run make zoning-import at every new run; zoning_rules.json edits are between "
           "runs only.")
+    failed = sorted(k for k, r in results.items() if r.failed and r.candidates)
+    if failed:
+        print(f"{len(failed)} zoning source(s) FAILED: {', '.join(failed)}; their parcels kept "
+              "their previous zoning. Exit 4.")
+        return 4
     return 0
 
 

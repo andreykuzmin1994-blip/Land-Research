@@ -1117,6 +1117,7 @@
       },
       "county_ordinance": "Fulton County Zoning Resolution",
       "county_ordinance_url": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf",
+      "county_as_of": "Art. X adopted 3-7-1990 with amendments",
       "districts": {
         "M-1": {
           "name": "M-1 Light Industrial (Fulton County)",

@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import ast
 import json
+import os
+import subprocess
 import tempfile
 import types
 import unittest
 from pathlib import Path
 from unittest import mock
 
+import tests  # noqa: F401 — suite guards (REAL_VERIFY_RULES_COMMITTED)
 import zoning
 from zoning_helpers import REPO_ROOT, patch_rules, repo_rules, state_from, stored, verified
 
@@ -299,7 +302,59 @@ class StoredEncodingTests(unittest.TestCase):
         self.assertNotIn("; ", t)
         self.assertLess(len(t), 160)
         self.assertEqual(zoning.h3_description(None, None),
-                         "H3 zoning not imported: run make zoning-import between runs")
+                         zoning.H3_NOT_IMPORTED)
+
+
+class CommittedRulesTests(unittest.TestCase):
+    """Review finding 3: the runner compares the file with git HEAD."""
+
+    def _git(self, repo: Path, *args: str) -> None:
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
+                       env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
+
+    def test_clean_dirty_untracked_and_missing(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td)
+            self._git(repo, "init", "-q")
+            rules = repo / "zoning_rules.json"
+            tests.REAL_VERIFY_RULES_COMMITTED(rules)            # absent on disk and in HEAD
+            rules.write_bytes(b'{"a": 1}\n')
+            with self.assertRaises(zoning.ZoningRulesChanged):
+                tests.REAL_VERIFY_RULES_COMMITTED(rules)        # untracked
+            self._git(repo, "add", "zoning_rules.json")
+            self._git(repo, "commit", "-q", "-m", "rules")
+            tests.REAL_VERIFY_RULES_COMMITTED(rules)            # committed == disk
+            rules.write_bytes(b'{"a": 2}\n')
+            with self.assertRaises(zoning.ZoningRulesChanged):
+                tests.REAL_VERIFY_RULES_COMMITTED(rules)        # uncommitted edit
+            rules.unlink()
+            with self.assertRaises(zoning.ZoningRulesChanged):
+                tests.REAL_VERIFY_RULES_COMMITTED(rules)        # deleted
+
+    def test_outside_a_repository_fails_loud(self):
+        with tempfile.TemporaryDirectory() as td:
+            with mock.patch.dict(os.environ, {"GIT_CEILING_DIRECTORIES": str(Path(td).parent)}):
+                with self.assertRaises(zoning.ZoningRulesChanged):
+                    tests.REAL_VERIFY_RULES_COMMITTED(Path(td) / "zoning_rules.json")
+
+    def test_the_repo_file_is_committed(self):
+        tests.REAL_VERIFY_RULES_COMMITTED()
+
+
+class MemoTextTests(unittest.TestCase):
+    """Findings 9/11: the memo never shows the raw provenance string."""
+
+    def test_imported_value_is_decoded(self):
+        z, d = stored("atlanta", "atlanta_zoning", "I-1-C", True, "Light Industrial")
+        t = zoning.memo_text(z, d)
+        self.assertNotIn(zoning.STORED_PREFIX, t)
+        self.assertNotIn(" | ", t)
+        self.assertEqual(t, "I-1-C (atlanta, conditions of zoning, split-zoned): by_right, "
+                            "rules draft; source atlanta_zoning: Light Industrial")
+        t = zoning.memo_text(None, zoning.no_source_description("palmetto"))
+        self.assertEqual(t, "no machine-readable zoning for palmetto (check with the city)")
+        self.assertEqual(zoning.memo_text("AG-1", "Agricultural"), "AG-1 — Agricultural")
 
 
 class BoundaryTests(unittest.TestCase):

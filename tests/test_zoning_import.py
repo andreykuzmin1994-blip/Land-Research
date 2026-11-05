@@ -287,6 +287,30 @@ class SnippetAndConfigTests(unittest.TestCase):
             if s.role == "flu":
                 self.assertIsNone(s.zoning_field, s.key)
 
+    def test_snippet_matches_the_screener_sources_exactly(self):
+        # Findings 6/7: same URL, kind, fields and jurisdictions as
+        # screener/fulton.py ZONING_SOURCES (the city of South Fulton layer
+        # does NOT serve FID; Fulton layer 34 does).
+        from screener import fulton
+        name_to_key = {fulton.JURISDICTIONS[t]: k for t, k in zi.TAXDIST_TO_JURISDICTION.items()}
+        snip = json.loads(SNIPPET.read_text(encoding="utf-8"))["zoning_sources"]
+        by_url: dict[str, list] = {}
+        for e in snip:
+            by_url.setdefault(e["url"], []).append(e)
+        self.assertEqual(set(by_url), {s["url"] for s in fulton.ZONING_SOURCES})
+        for src in fulton.ZONING_SOURCES:
+            want = sorted(name_to_key[n] for n in src["jurisdictions"])
+            for e in by_url[src["url"]]:
+                self.assertEqual(sorted(e["jurisdictions"]), want, e["key"])
+                self.assertEqual(e["kind"], src["kind"], e["key"])
+                for f in ("id_field", "id_trim_last", "desc_field"):
+                    if e["role"] == "zoning" or f == "id_field":
+                        self.assertEqual(e.get(f) or None, src.get(f) or None, (e["key"], f))
+                field_name = "zoning_field" if e["role"] == "zoning" else "flu_field"
+                self.assertEqual(e[field_name], src[field_name], e["key"])
+        sf = next(e for e in snip if e["key"] == "south_fulton_zoning")
+        self.assertEqual(sf["jurisdictions"], ["south_fulton"])
+
     def test_absent_key_exits_1(self):
         code, out, http = _run(StoreConn(_parcels()), World(), sources=_sources(drop_key=True))
         self.assertEqual(code, 1)
@@ -429,8 +453,10 @@ class EndToEndTests(unittest.TestCase):
             else:
                 world.fail["fb.example.test"] = _Resp({"error": {"code": 400, "message": OWNER}})
             code, out, _ = _run(conn, world)
-            self.assertEqual(code, 0, breaker)
+            self.assertEqual(code, 4, breaker)                 # finding 5: not a silent 0
             self.assertIn("source fb: FAILED, nothing used", out, breaker)
+            self.assertIn("1 zoning source(s) FAILED: fb;", out.splitlines()[-1], breaker)
+            self.assertEqual(conn.commits, 1, breaker)          # the other sources' rows commit
             self.assertEqual(conn.committed["fulton-P3"][0], "M-1", breaker)   # prior value kept
             self.assertEqual(conn.committed["fulton-P1"][0], "M-1", breaker)   # other sources fine
             _assert_counts_only(self, out)
@@ -441,6 +467,7 @@ class EndToEndTests(unittest.TestCase):
         conn.committed = dict(conn.parcels)
         world.fb_rows = []
         code, out, _ = _run(conn, world)
+        self.assertEqual(code, 4)
         self.assertIn("source fb: FAILED", out)            # 0% < the 50% match floor
         self.assertEqual(conn.committed["fulton-P3"][0], "M-1")
 
@@ -518,6 +545,16 @@ class OverlayTests(unittest.TestCase):
         self.assertEqual(r["a"][0], "M-1")            # tie -> alphabetical
         self.assertAlmostEqual(r["a"][2], 0.4)
         self.assertEqual(r["b"][:1], ("R-3",))
+
+    def test_share_is_clamped_and_the_sql_unions_each_district(self):
+        # Finding 4: overlapping polygons of one district are unioned in SQL
+        # (counted once); the share is clamped at 1.0 as a backstop.
+        r = zi.rank_overlay([("a", "M-2", None, 2420.0, 1000.0)])
+        self.assertEqual(r["a"], ("M-2", None, 1.0))
+        self.assertIn("ST_Area(ST_Union(ST_CollectionExtract(ST_Intersection(pg.g, z.geom), 3))"
+                      "::geography)", zi._SQL_OVERLAY)
+        self.assertNotIn("SUM(", zi._SQL_OVERLAY)
+        self.assertIn("GROUP BY pg.parcel_id, z.district", zi._SQL_OVERLAY)
 
     def test_match_overlay_split_and_sliver(self):
         src = zi.ZoningSource("sf_zoning", "SF", "zoning", "overlay", ("south_fulton",),

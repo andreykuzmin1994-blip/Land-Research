@@ -23,6 +23,7 @@ from typing import Any, Mapping, Sequence
 
 import prepare
 import research
+import zoning  # protected: renders imported zoning for the memo (reviews/21_zoning)
 from pipeline_common import (
     _REPO_ROOT,
     _SQL_FETCH_SUBMARKET_NAME,
@@ -237,6 +238,19 @@ def _md_cell(value: Any, default: str = "—") -> str:
         return default
     s = str(value).strip()
     return s if s else default
+
+
+def _zoning_line(parcel: Mapping[str, Any]) -> str:
+    """'zoning — description', or for a value written by zoning_import the
+    decoded district/jurisdiction/class (never the raw provenance string;
+    reviews/21_zoning findings 9 and 11)."""
+    z, d = parcel.get("zoning"), parcel.get("zoning_description")
+    try:
+        if zoning.parse_stored(z, d) is not None:
+            return zoning.memo_text(z, d, parcel.get("parcel_id"))
+    except Exception:  # rendering must never break the memo
+        log.exception("zoning memo line failed; rendering the raw columns")
+    return f"{_md_cell(z)} — {_md_cell(d)}"
 
 
 def _coerce_json_field(v: Any) -> dict[str, Any]:
@@ -781,7 +795,7 @@ def _render_snapshot_markdown(
 - **Frontage**: not yet wired (Phase 11+ wires DOT road classification)
 
 ### Zoning & Entitlements
-- **Current zoning**: {_md_cell(parcel.get("zoning"))} — {_md_cell(parcel.get("zoning_description"))}
+- **Current zoning**: {_zoning_line(parcel)}
 - **Land use code**: {_md_cell(parcel.get("land_use_code"))} — {_md_cell(parcel.get("land_use_description"))}
 - **Required action**: not yet wired (Phase 11+ wires zoning ordinance review)
 - **Estimated entitlement timeline**: —

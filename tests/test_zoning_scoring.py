@@ -1,8 +1,11 @@
 """research.py zoning wiring: S9, H3, upsert, freeze, protection (reviews/21_zoning).
 
 Offline (SR-6). The headline guarantee (Z-03): with every jurisdiction's
-rules 'draft', scoring is byte-identical to research.py before zoning
-existed (commit ba4a780), proven against a checked-in golden record.
+rules 'draft', scoring is byte-identical to research.py with zoning absent
+(a differential test on the CURRENT research.py, so scoring experiments
+stay keepable; review finding 1). The one-off proof against the
+pre-zoning commit ba4a780 is tests/zoning_golden_check.py (not in the
+suite).
 """
 
 from __future__ import annotations
@@ -22,37 +25,84 @@ import zoning
 import zoning_golden_case as golden
 from zoning_helpers import REPO_ROOT, patch_rules, stored, verified
 
-GOLDEN = Path(__file__).parent / "fixtures" / "zoning" / golden.GOLDEN_NAME
-
-
 def _canon(x):
     return json.loads(json.dumps(x, sort_keys=True, default=str))
 
 
-class ByteIdenticalWhileDraftTests(unittest.TestCase):
-    """Z-03, Z-26: no new query, no changed value, while all rules are draft."""
+def _fold(node):
+    """The string value of a constant expression ('a' 'b', 'a' + 'b',
+    f-string literal parts joined), or None."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        a, b = _fold(node.left), _fold(node.right)
+        return a + b if a is not None and b is not None else (a or b)
+    if isinstance(node, ast.JoinedStr):
+        return " ".join(v.value for v in node.values
+                        if isinstance(v, ast.Constant) and isinstance(v.value, str))
+    return None
+
+
+def _all_strings(tree):
+    out = []
+    for n in ast.walk(tree):
+        v = _fold(n)
+        if v:
+            out.append(v)
+    return out
+
+
+@contextmanager
+def zoning_absent():
+    """research.py as if zoning did not exist: nothing verified, every
+    classification unknown. The rules state itself is untouched (no
+    'rules unavailable' cycle event)."""
+    unk = zoning.Classification(zoning.UNKNOWN, False, "zoning absent (test)")
+    with mock.patch.object(zoning, "any_verified", lambda: False), \
+            mock.patch.object(zoning, "classify_stored", lambda *a, **k: unk), \
+            mock.patch.object(zoning, "classify", lambda *a, **k: unk), \
+            mock.patch.object(zoning, "jurisdiction_status", lambda *a, **k: "none"):
+        yield
+
+
+class DraftEqualsAbsentTests(unittest.TestCase):
+    """Z-03, Z-26 as a DIFFERENTIAL test (review finding 1).
+
+    Each test compares the CURRENT research.py with itself: once with the
+    real all-draft zoning_rules.json, once with zoning absent. So it pins
+    'draft rules change nothing' without freezing the rest of scoring: an
+    experiment that changes S2/S8/S10, the composite, actionability, notes
+    or the scoring queries moves both sides alike and still passes. (The
+    one-off proof against the pre-zoning commit is
+    tests/zoning_golden_check.py, a review artefact outside the suite.)
+    """
 
     @classmethod
     def setUpClass(cls):
-        cls.golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
+        with zoning_absent():
+            cls.absent = _canon(golden.run_case(research))
 
-    def test_repo_rules_all_draft_match_the_pre_zoning_golden_exactly(self):
+    def test_repo_rules_all_draft_equal_zoning_absent_exactly(self):
         self.assertFalse(zoning.any_verified())
         got = _canon(golden.run_case(research))
-        self.assertEqual(got["per_parcel"], self.golden["per_parcel"])
-        self.assertEqual(got["cycle"], self.golden["cycle"])
+        self.assertEqual(got["per_parcel"], self.absent["per_parcel"])
+        self.assertEqual(got["cycle"], self.absent["cycle"])
 
-    def _assert_scores_identical(self, got):
-        for pid, rec in self.golden["per_parcel"].items():
+    def _assert_scores_identical(self, got, *, same_queries=True):
+        for pid, rec in self.absent["per_parcel"].items():
             g = got["per_parcel"][pid]
             self.assertEqual(g["result"], rec["result"], pid)
             self.assertEqual(g["parcel_score_inserts"], rec["parcel_score_inserts"], pid)
             self.assertEqual(g["research_log_notes"], rec["research_log_notes"], pid)
-            self.assertEqual(g["executed"], rec["executed"], pid)
-        gc, rc = got["cycle"], self.golden["cycle"]
+            if same_queries:
+                self.assertEqual(g["executed"], rec["executed"], pid)
+        gc, rc = got["cycle"], self.absent["cycle"]
         self.assertEqual(gc["summary"], rc["summary"])
         self.assertEqual(gc["parcel_score_inserts"], rc["parcel_score_inserts"])
         self.assertEqual(gc["research_log_notes"], rc["research_log_notes"])
+
+    def _assert_one_extra_cycle_event(self, got):
+        gc, rc = got["cycle"], self.absent["cycle"]
         extra = [e for e in gc["executed"] if e not in rc["executed"]]
         self.assertEqual(len(extra), 1, extra)            # the one cycle-level event
         self.assertIn("zoning rules unavailable", extra[0][1][3])
@@ -63,21 +113,40 @@ class ByteIdenticalWhileDraftTests(unittest.TestCase):
         with patch_rules(problem="zoning_rules.json is missing"):
             got = _canon(golden.run_case(research))
         self._assert_scores_identical(got)
+        self._assert_one_extra_cycle_event(got)
 
     def test_malformed_rules_file_degrades_to_the_stub(self):
         with patch_rules(problem="zoning_rules.json is not valid UTF-8 JSON"):
             got = _canon(golden.run_case(research))
         self._assert_scores_identical(got)
+        self._assert_one_extra_cycle_event(got)
+
+    def test_draft_classes_never_reach_a_score_even_when_read(self):
+        # Force the zoning reads on while every jurisdiction stays draft: the
+        # stored districts ARE read and classified, and no score moves.
+        with mock.patch.object(zoning, "any_verified", lambda: True):
+            got = _canon(golden.run_case(research))
+        self._assert_scores_identical(got, same_queries=False)
+        sqls = [e[0] for e in got["cycle"]["executed"]]
+        self.assertIn(research._SQL_STORED_ZONING_BATCH, sqls)
 
     def test_verified_rules_elsewhere_do_not_move_these_parcels(self):
         # A verified jurisdiction with none of the fixture's districts in it
         # adds the batched zoning read, but no score changes.
         with patch_rules(verified("east_point")):
             got = _canon(golden.run_case(research))
-        for pid, rec in self.golden["per_parcel"].items():
-            if pid == "fulton-Z07":
-                continue  # East Point 'I1' is unlisted -> unknown -> stub anyway
+        for pid, rec in self.absent["per_parcel"].items():
+            # East Point 'I1' is unlisted -> unknown -> stub anyway
             self.assertEqual(got["per_parcel"][pid]["result"], rec["result"], pid)
+
+    def test_the_suite_pins_no_frozen_scoring_golden(self):
+        # Finding 1: no suite test compares research.py's scoring output to a
+        # frozen file; the frozen proof lives outside unittest discovery.
+        needles = ("golden_scores" + "_head", "GOLDEN" + "_NAME")
+        for f in Path(__file__).parent.glob("test_*.py"):
+            text = f.read_text(encoding="utf-8")
+            for n in needles:
+                self.assertFalse(n in text, (f.name, n))
 
 
 class ComputeS9Tests(unittest.TestCase):
@@ -226,11 +295,69 @@ class CycleEntryFreezeTests(unittest.TestCase):
 class DiscoveryTests(unittest.TestCase):
     """Z-06, Z-15, decision 5a."""
 
-    def test_upsert_keeps_imported_zoning(self):
+    def test_upsert_cannot_write_zoning(self):
+        # Review finding 2: the upsert does not name the zoning columns at
+        # all, so a new row gets NULL and a conflict keeps the stored value
+        # whatever the row dict carries (decision 5a, made structural).
         sql = research._SQL_UPSERT_PARCEL
-        self.assertIn("zoning = COALESCE(EXCLUDED.zoning, parcels.zoning)", sql)
-        self.assertIn("zoning_description = COALESCE(EXCLUDED.zoning_description, "
-                      "parcels.zoning_description)", sql)
+        self.assertFalse(re.search(r"(?i)zoning", sql), "upsert names a zoning column")
+        cols = sql.split("(", 1)[1].split(")", 1)[0]
+        n_cols = len([c for c in cols.split(",") if c.strip()])
+        values = sql.split("VALUES (", 1)[1].split(") ON CONFLICT", 1)[0]
+        self.assertEqual(n_cols, values.count("%s") + values.count("NOW()"))
+
+    def test_upsert_ignores_zoning_in_the_row(self):
+        executed = []
+
+        class Cur:
+            def execute(self, sql, params=()):
+                executed.append((sql, tuple(params)))
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return None
+
+        class Conn:
+            def cursor(self):
+                return Cur()
+
+        z, d = stored("atlanta", "atlanta_zoning", "I-1", desc="Light Industrial")
+        row = {"parcel_id": "fulton-x", "county": "fulton", "state": "GA", "market": "atlanta",
+               "zoning": z, "zoning_description": d}
+        research._upsert_parcel(Conn(), row, "POLYGON((0 0,0 1,1 1,0 0))")
+        (sql, params), = executed
+        self.assertEqual(sql, research._SQL_UPSERT_PARCEL)
+        self.assertEqual(len(params), sql.count("%s"))
+        self.assertNotIn(z, params)
+        self.assertNotIn(d, params)
+
+    def test_research_never_builds_import_provenance(self):
+        # Finding 2(b): the provenance encoders are the import tool's alone.
+        src = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        attrs = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)
+                 and isinstance(n.value, ast.Name) and n.value.id == "zoning"}
+        for banned in ("encode_stored", "no_source_description", "STORED_PREFIX", "_FIELD_SEP",
+                       "_clean", "__file__", "__spec__", "__loader__", "_STATE", "_load_state"):
+            self.assertNotIn(banned, attrs, banned)
+        self.assertFalse([s for s in _all_strings(tree) if zoning.STORED_PREFIX in s])
+        self.assertNotIn("getattr(zoning", src.replace(" ", ""))
+        self.assertNotIn("vars(zoning", src.replace(" ", ""))
+        self.assertNotIn("zoning.__dict__", src)
+
+    def test_no_research_string_writes_parcels_zoning(self):
+        # Finding 2(c): EVERY string in research.py (module constants, inline
+        # execute() literals, constant concatenations, f-string parts) -- no
+        # UPDATE of parcels and no assignment to a zoning column anywhere.
+        tree = ast.parse((REPO_ROOT / "research.py").read_text(encoding="utf-8"))
+        for text in _all_strings(tree):
+            self.assertFalse(re.search(r"(?i)\bUPDATE\s+(ONLY\s+)?(public\.)?parcels\b", text),
+                             text[:80])
+            self.assertFalse(re.search(r"(?i)\bzoning(_description)?\s*=", text), text[:80])
+            self.assertFalse(re.search(r"(?i)INSERT\s+INTO\s+(public\.)?parcels\b[^;]*\bzoning",
+                                       text), text[:80])
 
     def test_mapped_row_never_carries_zoning(self):
         reg = json.loads((REPO_ROOT / "sources.json").read_text(encoding="utf-8"))
@@ -245,18 +372,12 @@ class DiscoveryTests(unittest.TestCase):
             self.assertIsNone(row["zoning"])
             self.assertIsNone(row["zoning_description"])
 
-    def test_only_the_upsert_assigns_zoning_columns(self):
-        tree = ast.parse((REPO_ROOT / "research.py").read_text(encoding="utf-8"))
-        for node in tree.body:
-            if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name) \
-                    and node.targets[0].id.startswith("_SQL_"):
-                name = node.targets[0].id
-                sql = getattr(research, name)
-                if not isinstance(sql, str):
-                    continue
-                if re.search(r"(?i)\bzoning(_description)?\s*=", sql) or \
-                        re.search(r"(?i)UPDATE\s+parcels", sql):
-                    self.assertEqual(name, "_SQL_UPSERT_PARCEL", name)
+    def test_module_sql_constants_never_assign_zoning(self):
+        for name in dir(research):
+            sql = getattr(research, name)
+            if name.startswith("_SQL_") and isinstance(sql, str):
+                self.assertFalse(re.search(r"(?i)\bzoning(_description)?\s*=", sql), name)
+                self.assertFalse(re.search(r"(?i)UPDATE\s+parcels", sql), name)
 
     def test_h3_never_rejects_and_reads_the_stored_zoning(self):
         params = prepare.get_parameters()
@@ -267,7 +388,8 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(research._h3_flag({"_stored_zoning": (z, d), "zoning": None}, None, params).reason,
                          "H3 zoning M-1 (south_fulton): by_right, rules draft")
         self.assertEqual(research._h3_flag({"zoning": "M-2"}, None, params).reason,
-                         "H3 zoning not imported: run make zoning-import between runs")
+                         zoning.H3_NOT_IMPORTED)
+        self.assertIn("not imported or not matched", zoning.H3_NOT_IMPORTED)
 
     def test_h3_flag_is_a_deduplicated_data_gap_across_cycles(self):
         from test_data_gap_flags import _Conn  # answer-by-SQL fake
@@ -317,6 +439,40 @@ class DiscoveryTests(unittest.TestCase):
                 self.assertEqual(ast.literal_eval(node.args[4]), "data_gap", node.lineno)
         self.assertNotRegex((REPO_ROOT / "research.py").read_text(),
                             r"(?i)INSERT\s+INTO\s+flagged_items")
+
+
+class RunnerAndReportingTests(unittest.TestCase):
+    """Findings 3, 9, 11 (protected modules, between-runs change)."""
+
+    def test_evaluate_checks_the_committed_rules_before_any_cycle(self):
+        import runner
+        boom = zoning.ZoningRulesChanged("differs from git HEAD")
+        with mock.patch.object(zoning, "verify_rules_committed", side_effect=boom) as v, \
+                mock.patch.object(research, "run_discovery_cycle",
+                                  side_effect=AssertionError("discovery ran")), \
+                mock.patch.object(research, "run_scoring_cycle",
+                                  side_effect=AssertionError("scoring ran")):
+            with self.assertRaises(zoning.ZoningRulesChanged):
+                runner.evaluate("atlanta", skip_ingestion=True, skip_memo=True,
+                                run_tag="t", experiment_id="e")
+        v.assert_called_once_with()
+        src = (REPO_ROOT / "runner.py").read_text(encoding="utf-8")
+        body = src.split("def evaluate(", 1)[1].split("\n    try:", 1)[0]
+        self.assertLess(body.index("prepare.verify_parameters_unchanged()"),
+                        body.index("zoning.verify_rules_committed()"))
+
+    def test_memo_renders_imported_zoning_decoded(self):
+        import reporting
+        z, d = stored("atlanta", "atlanta_zoning", "I-1", desc="Light Industrial")
+        line = reporting._zoning_line({"zoning": z, "zoning_description": d})
+        self.assertEqual(line, "I-1 (atlanta): by_right, rules draft; source atlanta_zoning: "
+                               "Light Industrial")
+        self.assertEqual(reporting._zoning_line({"zoning": "AG-1",
+                                                 "zoning_description": "Agricultural"}),
+                         "AG-1 — Agricultural")
+        self.assertEqual(reporting._zoning_line({}), "— — —")
+        src = (REPO_ROOT / "reporting.py").read_text(encoding="utf-8")
+        self.assertIn("- **Current zoning**: {_zoning_line(parcel)}", src)
 
 
 class ProtectionTests(unittest.TestCase):

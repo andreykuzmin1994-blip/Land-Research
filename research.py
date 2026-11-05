@@ -684,7 +684,7 @@ def _h3_flag(
     try:
         text = zoning.h3_description(stored[0], stored[1], parcel.get("parcel_id"))
     except Exception:  # never let H3 break discovery
-        text = "H3 zoning not imported: run make zoning-import between runs"
+        text = zoning.H3_NOT_IMPORTED
     return _FilterResult("flag", "H3", text)
 
 
@@ -1068,7 +1068,7 @@ _SQL_UPSERT_PARCEL = (
     "INSERT INTO parcels ("
     "parcel_id, county, state, market, submarket, "
     "address, owner_name, owner_mailing_address, owner_type_inferred, "
-    "acreage, land_sf, zoning, zoning_description, "
+    "acreage, land_sf, "
     "land_use_code, land_use_description, "
     "assessed_value_land, assessed_value_improvement, assessed_value_total, "
     "fair_market_value, tax_year, tax_amount, tax_status, "
@@ -1080,7 +1080,7 @@ _SQL_UPSERT_PARCEL = (
     ") VALUES ("
     "%s, %s, %s, %s, %s, "
     "%s, %s, %s, %s, "
-    "%s, %s, %s, %s, "
+    "%s, %s, "
     "%s, %s, "
     "%s, %s, %s, "
     "%s, %s, %s, %s, "
@@ -1097,8 +1097,6 @@ _SQL_UPSERT_PARCEL = (
     "owner_type_inferred = EXCLUDED.owner_type_inferred, "
     "acreage = EXCLUDED.acreage, "
     "land_sf = EXCLUDED.land_sf, "
-    "zoning = COALESCE(EXCLUDED.zoning, parcels.zoning), "
-    "zoning_description = COALESCE(EXCLUDED.zoning_description, parcels.zoning_description), "
     "land_use_code = EXCLUDED.land_use_code, "
     "land_use_description = EXCLUDED.land_use_description, "
     "assessed_value_land = EXCLUDED.assessed_value_land, "
@@ -1122,8 +1120,10 @@ _SQL_UPSERT_PARCEL = (
 )
 
 # Zoning (reviews/21_zoning). zoning/zoning_description are written ONLY by
-# the between-runs operator tool zoning_import.py; discovery's upsert keeps
-# them (COALESCE above, and the mapped row carries None). Read-only here.
+# the between-runs operator tool zoning_import.py. Discovery's upsert does
+# not name those columns at all (an INSERT leaves them NULL, a conflict
+# leaves them untouched), so nothing in this sandbox can write them; tests
+# pin that (review finding 2). Read-only here.
 # Discovery: one read per cycle of the market's imported zoning, for H3.
 _SQL_STORED_ZONING_FOR_MARKET = (
     "SELECT parcel_id, zoning, zoning_description FROM parcels "
@@ -1260,8 +1260,6 @@ def _upsert_parcel(conn: Any, row: Mapping[str, Any], wkt: str) -> None:
         row.get("owner_type_inferred"),
         row.get("acreage"),
         row.get("land_sf"),
-        row.get("zoning"),
-        row.get("zoning_description"),
         row.get("land_use_code"),
         row.get("land_use_description"),
         row.get("assessed_value_land"),
@@ -2080,7 +2078,12 @@ _S9_BY_RIGHT: int = 10
 _S9_CONDITIONAL: int = 7
 _S9_REZONING_WITH_PRECEDENT: int = 4
 _S9_REZONING: int = 1
-# Precedent: an industrially zoned (by_right, verified) parcel within 1 mile.
+# Precedent: an industrially zoned (by_right, verified) parcel within 1 mile
+# (operator decision, reviews/21_zoning). This is NOT the 2-mile
+# parameters.json actionability_thresholds.rezoning_precedent_radius_miles
+# used by the entitlement gate (program.md); the two are independent. The
+# 1 mile is pinned by tests/test_zoning_scoring.py, so changing it is a
+# deliberate, visible experiment.
 _S9_PRECEDENT_RADIUS_M: float = 1609.344
 # Degree pad for the index pre-filter; 1 mile is <= 0.0175 deg of longitude
 # at Atlanta's latitude, so 0.03 is a safe superset.

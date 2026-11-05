@@ -116,8 +116,10 @@ One-time setup (sources.json is human-only):
 2. Copy its `"zoning_sources": [...]` list into `sources.json` as a new
    key **inside** `county_parcel_data.fulton_ga` (next to
    `field_mapping`), not directly under `county_parcel_data`. The order of
-   the list is the precedence order (South Fulton's city layer before
-   Fulton layer 34). Commit it like any `sources.json` change.
+   the list is the precedence order (for South Fulton parcels, the city
+   layer before Fulton layer 34; Fulton Industrial District parcels are
+   served by layer 34 only, exactly as in `screener/fulton.py`). Commit it
+   like any `sources.json` change.
 
 Then:
 
@@ -138,7 +140,18 @@ unchanged / unmatched).
 
 Exit codes: 0 imported, 1 refused (sources.json key missing or malformed,
 Fulton parcel layer down), 2 no database / database error, 3 a run has its
-baseline.
+baseline, 4 imported **but at least one zoning source failed** (named on
+the last line; that source's parcels kept their previous zoning, the other
+sources' rows were written). Treat 4 as "re-run when the source is back",
+not as success.
+
+The overlay counts each district once even where a city layer has
+overlapping polygons of the same district. Parcels the import could not
+match (and parcels never imported) carry the H3 text "zoning not imported
+or not matched by any zoning source". The first discovery after this
+change opens one new H3 `data_gap` flag per parcel (the text changed);
+the old "H3 zoning unjoined" flags stay open until resolved by hand. They
+do not feed the metric.
 
 **Zoning rules.** `zoning_rules.json` holds, per jurisdiction, a `status`
 (`draft` or `verified`) and, per district, the warehouse/distribution use
@@ -150,7 +163,26 @@ jurisdiction's rules: check them against the official ordinance, set
 `unlisted_districts` (`not_permitted` or `unknown`), update the
 all-draft expectation in `tests/test_zoning.py`, and commit **between
 runs**; then start a new run and baseline (the change moves S9 and the
-metric).
+metric). The runner refuses to run an experiment while
+`zoning_rules.json` differs from the committed version (git HEAD), so an
+uncommitted edit fails loud instead of becoming a silent baseline.
+
+Verification checklist, per jurisdiction, before flipping it to
+`verified`:
+
+- every district's warehouse/distribution status and citation against
+  the current official ordinance;
+- `unlisted_districts`;
+- Atlanta I-1/I-2: the BeltLine 500 ft exception (Sec. 16-36.007) ships
+  as `location_conditions` effect `ignored`, which the draft never stated;
+  choose `ignored` or `downgrade_to_conditional`;
+- Atlanta `-C` parcels (conditions of zoning, e.g. `I-1-C`) score as their
+  base district (by right = S9 10 once verified); the draft says their
+  site conditions may override the defaults; check those parcels by hand
+  or accept the default knowingly;
+- South Fulton: the county `M-1A` -> `M-1` conversion exists only on the
+  `fid` entry; a South Fulton parcel carrying `M-1A` from Fulton layer 34
+  reads `unknown` (S9 stub). None in today's data.
 
 ## Repository Structure
 

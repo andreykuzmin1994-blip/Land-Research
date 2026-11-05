@@ -49,6 +49,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 import types
 from dataclasses import dataclass
 from pathlib import Path
@@ -84,6 +85,11 @@ KNOWN_JURISDICTIONS = frozenset({
 })
 
 STORED_PREFIX = "zoning_import v1"
+# H3 text for a parcel with no import provenance: never imported, imported
+# but not matched by any source, or a zoning value written by something
+# other than zoning_import (review finding 10).
+H3_NOT_IMPORTED = ("H3 zoning not imported or not matched by any zoning source "
+                   "(make zoning-import between runs)")
 _FIELD_SEP = " | "
 _KEY_RE = re.compile(r"^[a-z0-9_]{1,40}$")
 _MAX_CODE = 40
@@ -247,6 +253,48 @@ def verify_rules_unchanged(path: Path | None = None) -> None:
             "zoning_rules.json changed since this process loaded it. Edits to the "
             "zoning rules are between-runs only: stop the loop, start a new run and "
             "baseline (reviews/21_zoning/02_risk_review.md, Z-01)."
+        )
+
+
+def _git(args: list[str], cwd: Path) -> str | None:
+    """stdout of a git command, or None when it fails (no git, not a repo,
+    path not in HEAD)."""
+    try:
+        out = subprocess.run(["git", "-C", str(cwd), *args], capture_output=True,
+                             text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def verify_rules_committed(path: Path | None = None) -> None:
+    """Raise ZoningRulesChanged unless the file on disk is the committed one.
+
+    ``verify_rules_unchanged`` compares against this process's import-time
+    bytes, so a NEW process started after an uncommitted edit (a crashed
+    experiment that was skipped, a restart, a revert of research.py only)
+    would take the edited bytes as its baseline. This compares the working
+    file's git blob id with ``HEAD:zoning_rules.json`` instead; the runner
+    calls it before every experiment (review finding 3). Missing on disk
+    AND absent from HEAD passes. Anything git cannot confirm fails loud.
+    """
+    p = (path or RULES_PATH).resolve()
+    repo = p.parent
+    top = _git(["rev-parse", "--show-toplevel"], repo)
+    if top is None:
+        raise ZoningRulesChanged(
+            "cannot confirm zoning_rules.json against git HEAD (git unavailable or "
+            "not a repository); the runner needs the committed rules file")
+    rel = p.relative_to(Path(top).resolve()).as_posix()
+    committed = _git(["rev-parse", "--verify", "--quiet", f"HEAD:{rel}"], repo)
+    on_disk = _git(["hash-object", "--", str(p)], repo) if p.exists() else None
+    if committed is None and on_disk is None:
+        return
+    if committed != on_disk:
+        raise ZoningRulesChanged(
+            "zoning_rules.json differs from the committed version (git HEAD). Edits "
+            "to the zoning rules are between-runs only: commit them, then start a new "
+            "run and baseline; or restore the file (git checkout -- zoning_rules.json)."
         )
 
 
@@ -430,7 +478,7 @@ def h3_description(zoning: Any, zoning_description: Any,
     """Stable, short, sanitised H3 data_gap text (no dates; Z-15)."""
     st = parse_stored(zoning, zoning_description)
     if st is None:
-        return "H3 zoning not imported: run make zoning-import between runs"
+        return H3_NOT_IMPORTED
     if st.district is None:
         return f"H3 zoning not machine-readable for {st.jurisdiction}: check with the city"
     c = classify(st.jurisdiction, st.district, parcel_id)
@@ -442,3 +490,30 @@ def h3_description(zoning: Any, zoning_description: Any,
     tail = f" ({', '.join(extra)})" if extra else ""
     return (f"H3 zoning {_clean(st.district, _MAX_CODE)} ({st.jurisdiction}): {c.cls}, "
             f"rules {jurisdiction_status(st.jurisdiction)}{tail}")
+
+
+def memo_text(zoning: Any, zoning_description: Any,
+              parcel_id: str | None = None) -> str:
+    """Human-readable zoning line for the strategy memo (review findings 9/11).
+
+    An imported value renders as 'I-1 (atlanta, split-zoned): by_right,
+    rules draft; source atlanta_zoning: Light Industrial' instead of the raw
+    provenance string. A value without provenance renders as before:
+    'zoning — description'.
+    """
+    st = parse_stored(zoning, zoning_description)
+    if st is None:
+        return f"{zoning if zoning is not None else '—'} — " \
+               f"{zoning_description if zoning_description is not None else '—'}"
+    if st.district is None:
+        return f"no machine-readable zoning for {st.jurisdiction} (check with the city)"
+    c = classify(st.jurisdiction, st.district, parcel_id)
+    extra = [st.jurisdiction]
+    if c.has_conditions:
+        extra.append("conditions of zoning")
+    if st.split:
+        extra.append("split-zoned")
+    desc = str(zoning_description).split(_FIELD_SEP)[-1]
+    tail = f": {desc}" if desc and desc != "-" else ""
+    return (f"{_clean(st.district, _MAX_CODE)} ({', '.join(extra)}): {c.cls}, rules "
+            f"{jurisdiction_status(st.jurisdiction)}; source {st.source}{tail}")

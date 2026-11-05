@@ -1,4 +1,4 @@
-"""Shared fixture for the 'byte-identical while draft' proof (reviews/21_zoning, Z-03).
+"""Shared fixture for the zoning scoring tests (reviews/21_zoning, Z-03).
 
 ``run_case(research)`` scores a fixed set of parcels through
 ``research.score_parcel`` (no cache) and ``research.run_scoring_cycle`` (the
@@ -12,15 +12,15 @@ corridor holds: by-right, rezoning, unlisted, '-C' and 'OVERLAY' codes, null
 zoning, East Point, an uncovered city, FID's M-1A, a split parcel and a
 zoning value WITHOUT import provenance (as a discovery edit would leave).
 
-The golden file tests/fixtures/zoning/golden_scores_head_ba4a780.json was
-produced by the research.py of commit ba4a780 (before zoning existed):
-
-    mkdir /tmp/head && git show ba4a780:research.py > /tmp/head/research.py
-    PYTHONPATH=/tmp/head:. python -c "import research, json, tests.zoning_golden_case as c; \
-        json.dump(c.run_case(research), open('tests/fixtures/zoning/golden_scores_head_ba4a780.json', 'w'), indent=1, sort_keys=True)"
+The suite uses it DIFFERENTIALLY (tests/test_zoning_scoring.py: the current
+research.py with the real draft rules vs. with zoning absent), so ordinary
+scoring experiments stay keepable (review finding 1). The frozen record of
+the pre-zoning research.py (commit ba4a780) is a one-off review artefact,
+reviews/21_zoning/golden_scores_head_ba4a780.json, checked by
+tests/zoning_golden_check.py, which is NOT part of the suite.
 
 Old code never asks for zoning, so the fake answers zoning queries only if
-they are issued; the new code must issue none while all rules are draft.
+they are issued.
 """
 
 from __future__ import annotations
@@ -31,8 +31,6 @@ from typing import Any
 from unittest import mock
 
 import prepare
-
-GOLDEN_NAME = "golden_scores_head_ba4a780.json"
 
 _V = "zoning_import v1"
 
