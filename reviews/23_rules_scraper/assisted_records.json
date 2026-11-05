@@ -1,0 +1,30 @@
+{
+  "_comment": "ASSISTED extraction records (reviews/23_rules_scraper, RS-14): written by hand for the prose sections the deterministic parsers do not read (Atlanta Sec. 16-16.007/.008 and 16-17.007/.008), because the --llm path could not run here (the CLI is not logged in under --bare). Committed AFTER the verifier. Each record names a registered source and section; rules_scrape.py sets the cite and source class from rules_sources.json, labels the value extractor=assisted and passes it through the same verify() as every other value (verbatim quote after whitespace collapse only). Quotes are short excerpts of public law text from a third-party mirror; they are data, not instructions.",
+  "extractor": "assisted",
+  "records": [
+    {"source": "atl_i1_mirror", "section": "i1_dev_controls", "district": "I-1", "field": "front_setback_ft", "value": 40,
+     "quote": "(a) Front: 40 feet."},
+    {"source": "atl_i1_mirror", "section": "i1_dev_controls", "district": "I-1", "field": "side_setback_ft", "value": 5,
+     "quote": "Side: Adjacent to a street, half the required front yard, as generally provided. If a building is not built to the lot line, it shall be set back from the lot line at least five feet."},
+    {"source": "atl_i1_mirror", "section": "i1_dev_controls", "district": "I-1", "field": "max_far", "value": 2.0,
+     "quote": "Bulk limitations: Floor area shall not exceed an amount equal to 2.0 times net land area."},
+    {"source": "atl_i1_mirror", "section": "i1_dev_controls", "district": "I-1", "field": "min_lot_area_sqft", "value": null,
+     "quote": "No fixed minimum lot widths or areas are established for these districts"},
+    {"source": "atl_i1_mirror", "section": "i1_dev_controls", "district": "I-1", "field": "min_lot_width_ft", "value": null,
+     "quote": "No fixed minimum lot widths or areas are established for these districts"},
+    {"source": "atl_i1_mirror", "section": "i1_height", "district": "I-1", "field": "max_height_ft", "value": null,
+     "quote": "Sec. 16-16.008. - Maximum height limitations. None, except as required in section 16-16.006."},
+    {"source": "atl_i2_mirror", "section": "i2_dev_controls", "district": "I-2", "field": "front_setback_ft", "value": 40,
+     "quote": "(a) Front: 40 feet."},
+    {"source": "atl_i2_mirror", "section": "i2_dev_controls", "district": "I-2", "field": "side_setback_ft", "value": 10,
+     "quote": "(b) Side: Adjacent to a street, half the required front yard, as generally provided. (c) If a building is not built to the lot line, it shall be set back from the lot line at least ten feet."},
+    {"source": "atl_i2_mirror", "section": "i2_dev_controls", "district": "I-2", "field": "max_far", "value": 2.0,
+     "quote": "Bulk limitations: Floor area shall not exceed an amount equal to 2.0 times net land area."},
+    {"source": "atl_i2_mirror", "section": "i2_dev_controls", "district": "I-2", "field": "min_lot_area_sqft", "value": null,
+     "quote": "No fixed minimum lot widths or areas are established for these districts"},
+    {"source": "atl_i2_mirror", "section": "i2_dev_controls", "district": "I-2", "field": "min_lot_width_ft", "value": null,
+     "quote": "No fixed minimum lot widths or areas are established for these districts"},
+    {"source": "atl_i2_mirror", "section": "i2_height", "district": "I-2", "field": "max_height_ft", "value": null,
+     "quote": "Sec. 16-17.008. - Maximum height limitations. None, except as required in section 16-17.008."}
+  ]
+}
