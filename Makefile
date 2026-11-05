@@ -320,6 +320,13 @@ costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas + industri
 	@python costar_import.py "$(FILE)"
 
 # ---------------------------------------------------------------------
+# Zoning import (reviews/21_zoning) -- between runs only
+# ---------------------------------------------------------------------
+.PHONY: zoning-import
+zoning-import:  ## Write parcels.zoning from the city/county zoning layers in sources.json. Between runs, before make baseline (refuses after it).
+	@python zoning_import.py $(ARGS)
+
+# ---------------------------------------------------------------------
 # Higher-level recipes
 # ---------------------------------------------------------------------
 .PHONY: resume

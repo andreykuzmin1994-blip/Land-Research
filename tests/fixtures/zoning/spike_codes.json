@@ -1,0 +1,480 @@
+{
+ "_comment": "Distinct (jurisdiction, district code) pairs of the 1,075 corridor parcels from the 2026-11-05 spike (reviews/21_zoning/00_design.md). Codes and counts only.",
+ "codes": [
+  {
+   "jurisdiction": "atlanta",
+   "code": "C-1",
+   "parcels": 5
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "C-1-C",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "C-2",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "FCR-3",
+   "parcels": 10
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "HC-20D",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "I-1",
+   "parcels": 26
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "I-1-C",
+   "parcels": 8
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "I-2",
+   "parcels": 15
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "I-MIX",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "I-Mix-C",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MR-2",
+   "parcels": 5
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MR-2-C",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MR-3",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MR-3-C",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MR-4A",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MR-4B",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MRC-1",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MRC-2",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MRC-2-C",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MRC-3",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "MRC-3-C",
+   "parcels": 5
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "O-I",
+   "parcels": 8
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "PD-H",
+   "parcels": 9
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "PD-MU",
+   "parcels": 16
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "R-2A",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "R-3",
+   "parcels": 39
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "R-4",
+   "parcels": 60
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "R-4A",
+   "parcels": 24
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "RG-2",
+   "parcels": 7
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "RG-2-C",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "RG-3",
+   "parcels": 57
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "RG-3-C",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "SPI-21 SA8",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "SPI-4 SA1",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "atlanta",
+   "code": "SPI-4 SA2",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "AG",
+   "parcels": 50
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "C-2",
+   "parcels": 18
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "M-1",
+   "parcels": 22
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "M-2",
+   "parcels": 65
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": null,
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "O&I",
+   "parcels": 10
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "P&O",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "PD",
+   "parcels": 30
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-1",
+   "parcels": 13
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-2",
+   "parcels": 8
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-2 OVERLAY",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-3",
+   "parcels": 6
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-3 OVERLAY",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-4 OVERLAY",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "R-CT",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "RM-12",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "fairburn",
+   "code": "RM-36",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "fid",
+   "code": "C-2",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "fid",
+   "code": "M-2",
+   "parcels": 19
+  },
+  {
+   "jurisdiction": "fid",
+   "code": null,
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "fid",
+   "code": "R-1",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "fid",
+   "code": "R-5",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "A",
+   "parcels": 5
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "A-1",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "A-L",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "AG-1",
+   "parcels": 67
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "C-1",
+   "parcels": 9
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "C-2",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "CUP",
+   "parcels": 15
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "M-1",
+   "parcels": 95
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "M-2",
+   "parcels": 91
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "MIX",
+   "parcels": 10
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "NUP",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": null,
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "O-I",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "R-3",
+   "parcels": 35
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "R-3A",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "R-4",
+   "parcels": 7
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "R-5",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "R-5A",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "R-6",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "SH",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "SUB-A",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "south_fulton",
+   "code": "TR",
+   "parcels": 8
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "GC",
+   "parcels": 31
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "M-1",
+   "parcels": 16
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "MHP",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "NC",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": null,
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "O-I",
+   "parcels": 13
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "PUD",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "R-1",
+   "parcels": 4
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "R-2",
+   "parcels": 5
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "R-3",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "R-4",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "R-6",
+   "parcels": 3
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "RM",
+   "parcels": 15
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "RMD-1",
+   "parcels": 1
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "TCMF",
+   "parcels": 2
+  },
+  {
+   "jurisdiction": "union_city",
+   "code": "TCMU",
+   "parcels": 11
+  }
+ ]
+}
