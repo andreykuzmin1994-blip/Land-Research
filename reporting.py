@@ -491,13 +491,36 @@ def _projection_reason(p: Any) -> str:
         p.status, _md_cell(p.reason))
 
 
+def _bts_use_text(p: Any, used: bool) -> str:
+    """Whether scoring uses this projection for BTS, and how. A verified
+    jurisdiction with a default setback is used but never passes (finding 6)."""
+    if not used:
+        return f"no ({p.rules_label})"
+    if not p.setback_from_rules:
+        return "yes, rated N/A (default setback is not a verified rule)"
+    return "yes (verified rules)"
+
+
+# One footnote under the memo highlights (review finding 8): what no
+# projection deducts, stated once rather than on every line.
+_PROJECTION_FOOTNOTE = (
+    "_Building projections (operator SiteFit prototypes, reviews/22_site_fit): "
+    + "; ".join((site_fit.RES_BUFFERS, site_fit.FLOOD_WETLANDS, site_fit.DETENTION,
+                 site_fit.CAR_PARKING, site_fit.FIT_RULE))
+    + "; height not checked._"
+)
+
+
 def _projection_summary(p: Any, used: bool) -> str:
     """One line for the memo highlights."""
     if not isinstance(p, site_fit.Projection):
         return "Projected max building: — (projection unavailable)."
     best = site_fit.best_fit(p)
-    tag = (f"{p.rules_label}; used for BTS: {'yes' if used else 'no'}; "
-           f"{site_fit.FLOOD_WETLANDS}")
+    sb = f"setback {p.setback_ft:g} ft all sides; " if p.setback_ft is not None else ""
+    use = "no" if not used else ("yes" if p.setback_from_rules
+                                 else "yes, rated N/A (default setback)")
+    tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "
+           f"{site_fit.FLOOD_WETLANDS}; adjacency buffers not applied")
     if best is None:
         return f"Projected max building: — ({_projection_reason(p)}; {tag})."
     return f"Projected max building: {_fmt_sf(best.building_sf)} {best.label} ({tag})."
@@ -519,10 +542,7 @@ def _render_development_potential(parcel: Mapping[str, Any], p: Any) -> str:
                     f"{best.width_ft:g} ft, {p.rules_label})")
     else:
         max_line = f"— ({_projection_reason(p)})"
-    if used:
-        bts = "used for BTS: yes (verified rules)"
-    else:
-        bts = f"used for BTS: no ({p.rules_label})"
+    bts = f"used for BTS: {_bts_use_text(p, used)}"
     lines = [
         f"- **Estimated buildable area**: 40% coverage of land per program.md: {forty}; "
         f"net of setbacks: {net}",
@@ -1130,6 +1150,8 @@ def _render_memo_markdown(
                 line += " " + _projection_summary(
                     projections.get(r.get("parcel_id")), bool(r.get("_bts_projection_used")))
             top_lines.append(line)
+        if projections is not None:
+            top_lines += ["", _PROJECTION_FOOTNOTE]
         top_md = "\n".join(top_lines)
     else:
         top_md = "_No actionable or qualified parcels in this cycle._"

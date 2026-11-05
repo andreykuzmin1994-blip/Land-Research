@@ -109,7 +109,7 @@ class FakeConn:
                                  if p in conn.zoning_rows]
                 elif sql == site_fit._SQL_BUFFERED_FOR_FIT:
                     self.rows = []
-                    for p in params[1]:
+                    for p in params[-1]:
                         if p not in conn.inner:
                             continue
                         gross, gj, area = conn.inner[p]
@@ -403,6 +403,25 @@ class FitterTests(unittest.TestCase):
         self.assertEqual(fitted([rect(0, 0, 399.9, 450)])[445.0], None)    # below the minimum
         self.assertEqual(fitted([rect(0, 0, 5000, 450)])[445.0], 640.0)    # capped at L
 
+    def test_v_sided_rhombus_interior_optimum(self):
+        # Review finding 4: the best slab is centred on y = 0, where no vertex
+        # lies on the slab's edges. By hand: 1200 * (1 - 150/480) = 825 free
+        # at 0 degrees, so lattice 800 (vertex events alone gave 720).
+        ring = [(0, 0), (600, -480), (1200, 0), (600, 480)]
+        got = site_fit.fit_lengths([ring], [(300.0, lattice(200, 1000))])[300.0]
+        self.assertEqual(got[0], 800.0)
+        self.assertGreaterEqual(got[1].length_free, 800.0)
+        self.assertLessEqual(got[1].length_free, 825.0)
+        self.assertTrue(_brute_force_ok([ring], 300.0, 800.0, got[1]))
+
+    def test_candidate_positions_are_deterministic_and_inside(self):
+        ys = site_fit._candidate_ys([0.0, 100.0, 480.0], 300.0, 0.01, 0.02, 179.98)
+        self.assertEqual(ys, sorted(set(ys)))
+        self.assertTrue(all(0.02 <= y <= 179.98 for y in ys))
+        self.assertIn(0.02, ys)
+        self.assertIn(179.98, ys)
+        self.assertGreaterEqual(len(ys), site_fit._Y_SAMPLES)
+
     def test_rotated_rectangle(self):
         a = math.radians(33.0)
         r = [(x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a))
@@ -499,6 +518,24 @@ class RulesTests(unittest.TestCase):
         for (j, code), sb in want.items():
             self.assertEqual(self.rules(j, code).setback_ft, sb, (j, code))
 
+    def test_height_note_on_every_rules_path(self):
+        # Review finding 13: the height statement is there even without a rule.
+        note = "height not checked (clear 40/36 ft; no district maximum in the rules)"
+        self.assertIn(note, self.rules(None, None).notes)
+        self.assertIn(note, self.rules("atlanta", "R-4").notes)      # unlisted district
+        self.assertIn(note, self.rules("atlanta", "I-1").notes)      # max_height_ft null
+        self.assertIn("height not checked (clear 40/36 ft; district max 48)",
+                      self.rules("fairburn", "PD").notes)
+
+    def test_rules_unavailable_is_named(self):
+        # Review finding 12: a rules load failure is not "no district rule".
+        with patch_rules(problem="zoning_rules.json schema: verified_by missing"):
+            r = self.rules("south_fulton", "M-1")
+        self.assertEqual(r.setback_ft, 25.0)
+        self.assertEqual(r.label, "zoning rules unavailable")
+        self.assertTrue(r.setback_source.startswith("default (zoning rules unavailable: "))
+        self.assertFalse(r.from_rules)
+
     def test_labels_and_nulls(self):
         r = self.rules("south_fulton", "M-1")
         self.assertEqual(r.setback_source, "max(front/side/rear), south_fulton M-1")
@@ -517,15 +554,39 @@ class RulesTests(unittest.TestCase):
         self.assertEqual(self.rules("union_city", "M-1").setback_ft, 50)     # not 75 + 20
         self.assertEqual(self.rules("fairburn", "M-1").setback_ft, 35)       # ROW buffer ignored
         src = (REPO_ROOT / "site_fit.py").read_text(encoding="utf-8")
-        self.assertNotIn("residential_adjacency_buffer_ft", src)
-        self.assertNotIn("buffer_along", src)
+        self.assertNotIn("buffer_along", src)   # no key is special-cased
+
+    def test_every_listed_buffer_is_named_not_applied(self):
+        # Review finding 2: Fairburn M-1's 50 ft buffer toward ANY other
+        # district (Sec. 80-372) is larger than its 35 ft setback and is not
+        # applied; the projection names it (and every other buffer key)
+        # instead of calling the omission "residential" only.
+        fb = self.rules("fairburn", "M-1")
+        self.assertEqual(fb.setback_ft, 35)
+        self.assertIn("buffers listed for fairburn M-1, not applied: "
+                      "buffer_abutting_other_districts 50 ft, "
+                      "buffer_along_all_public_ROW 25 ft (within the 35 ft setback), "
+                      "side_rear_yard_abutting_residential 50 ft", fb.notes)
+        sf = self.rules("south_fulton", "M-1")
+        self.assertIn("buffers listed for south_fulton M-1, not applied: "
+                      "plus_improvement_setback 10 ft (within the 40 ft setback), rear 100 ft, "
+                      "side 50 ft", sf.notes)
+        uc = self.rules("union_city", "M-1")
+        self.assertTrue(any(n.startswith("buffers listed for union_city M-1") and
+                            "buffer 75 ft" in n for n in uc.notes))
+        self.assertFalse([n for n in self.rules("fairburn", "PD").notes if "buffer" in n])
+        self.assertNotIn("neighbour zoning not in DB", site_fit.RES_BUFFERS)
+        self.assertIn("only candidate parcels are stored", site_fit.RES_BUFFERS)
 
     def test_coverage_far_and_height(self):
         fb = self.rules("fairburn", "M-1")
         self.assertEqual(fb.cap_pct, 60.0)
         self.assertIn("height not checked (clear 40/36 ft; district max 48)", fb.notes)
         self.assertIsNone(self.rules("south_fulton", "M-1").cap_pct)
-        self.assertEqual(self.rules("atlanta", "I-1").cap_pct, 200.0)       # FAR 2.0, never binds
+        at = self.rules("atlanta", "I-1")                                  # FAR 2.0: no cap
+        self.assertIsNone(at.cap_pct)
+        self.assertEqual(at.cap_text, "no lot coverage cap in the rules")
+        self.assertTrue(any("does not limit a one-story footprint" in n for n in at.notes))
         self.assertEqual(self.rules("union_city", "M-1").cap_pct, 80.0)
 
     def test_same_code_different_jurisdiction(self):
@@ -566,7 +627,8 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(p.setback_ft, 40)
         sql, params = conn.executed[1]
         self.assertEqual(sql, site_fit._SQL_BUFFERED_FOR_FIT)
-        self.assertEqual(params, (40.0, ["a"]))
+        self.assertEqual(params, site_fit._buffered_params(40.0, ["a"]))
+        self.assertEqual((params[1], params[5], params[-1]), (40.0, 40.0, ["a"]))
         got = {f.key: (f.length_ft, f.building_sf, f.docks, f.trailer_stalls, f.coverage_pct,
                        f.binding) for f in p.fits}
         self.assertEqual(got["cross"], (1000.0, 520_000, 148, 166, 52.0, "full size"))
@@ -605,10 +667,14 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(r["n"].status, "no_geometry")
         self.assertEqual(r["e"].status, "empty_after_setbacks")
         self.assertEqual(r["z"].status, "no_geometry")
+        with mock.patch.object(site_fit, "_STATE", site_fit._State(None, None, "missing")):
+            r = dict(r, u=site_fit.project_parcel(conn, "u"))
+        self.assertEqual(r["u"].status, "unavailable")
         for p in r.values():
-            self.assertIn(site_fit.FLOOD_WETLANDS, p.constraints)
-            self.assertIn(site_fit.RES_BUFFERS, p.constraints)
+            for needle in site_fit.NOT_MODELLED:    # finding 7: detention included
+                self.assertIn(needle, p.constraints)
             self.assertFalse(site_fit.meets_bts_footprint(p))
+        self.assertIn(site_fit.DETENTION, site_fit.NOT_MODELLED)
         self.assertIsNone(site_fit.data_gap_text(r["e"]))       # nothing fits: correct N/A
         self.assertIn("no_geometry", site_fit.data_gap_text(r["n"]))
 
@@ -683,15 +749,88 @@ class ProjectionTests(unittest.TestCase):
         self.assertFalse(site_fit.meets_bts_footprint(None))
 
     def test_bts_threshold_boundary(self):
-        def proj(sf):
+        def proj(sf, issue=True, from_rules=True):
             f = site_fit.PrototypeFit("front", "front-load", sf is not None, False, 600.0, 260.0,
                                       445.0, sf, 41, 50, 10.0, "geometry", 0.0)
-            return site_fit.Projection("a", "ok", "projected", "verified rules", True, 40.0, "",
-                                       10 ** 6, 10 ** 6, None, (f,), ())
+            p = site_fit.Projection("a", "ok", "projected", "verified rules", True, 40.0, "",
+                                    10 ** 6, 10 ** 6, None, (f,), (),
+                                    setback_from_rules=from_rules)
+            return site_fit._issue(p) if issue else p
         self.assertTrue(site_fit.meets_bts_footprint(proj(150_000)))
         self.assertFalse(site_fit.meets_bts_footprint(proj(149_999)))
         self.assertFalse(site_fit.meets_bts_footprint(proj(None)))
         self.assertEqual(site_fit.BTS_MIN_FOOTPRINT_SF, 150_000)
+        # Finding 6: a default setback is never a BTS input.
+        self.assertFalse(site_fit.meets_bts_footprint(proj(520_000, from_rules=False)))
+
+    def test_a_projection_built_outside_the_module_never_passes(self):
+        # Review finding 3: direct construction (the research.py forgery
+        # repro), a copy, dataclasses.replace and a subclass all fail.
+        import copy
+        import dataclasses
+        f = site_fit.PrototypeFit("cross", "cross-dock", True, True, 1000.0, 520.0, 890.0,
+                                  520_000, 148, 166, 10.0, "full size", 0.0)
+        forged = site_fit.Projection("x", "ok", "projected", "verified rules", True, 25.0, "",
+                                     1, 1, None, (f,), (), setback_from_rules=True)
+        self.assertFalse(site_fit.meets_bts_footprint(forged))
+        real = site_fit._issue(dataclasses.replace(forged))
+        self.assertTrue(site_fit.meets_bts_footprint(real))
+        self.assertFalse(site_fit.meets_bts_footprint(copy.copy(real)))
+        self.assertFalse(site_fit.meets_bts_footprint(dataclasses.replace(real)))
+        self.assertFalse(site_fit.meets_bts_footprint(type(real)(*[
+            getattr(real, k) for k in site_fit.Projection.__dataclass_fields__])))
+
+    def test_verified_district_without_setbacks_is_not_a_bts_input(self):
+        # Review finding 6: Fairburn PD (not_permitted -> REZONING, passes
+        # the S9 gate) has no setbacks; its 25 ft default is labelled and
+        # never passes the BTS test, however large the fit.
+        pd = stored("fairburn", "fairburn_zoning", "PD")
+        conn = FakeConn({"a": pd}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+        with patch_rules(verified("fairburn")):
+            site_fit._FIT_CACHE.clear()
+            p = site_fit.project_parcel(conn, "a")
+        self.assertEqual((p.status, p.setback_ft, p.rules_verified, p.setback_from_rules),
+                         ("ok", 25.0, True, False))
+        self.assertEqual(p.rules_label, "verified jurisdiction, default setback")
+        self.assertEqual(site_fit.max_building_sf(p), 520_000)
+        self.assertFalse(site_fit.meets_bts_footprint(p))
+        with patch_rules(verified("fairburn")):
+            site_fit._FIT_CACHE.clear()
+            conn = FakeConn({"a": FB_M1}, {"a": (2_000_000, inner_rect(1300, 1100), 1.0)})
+            m1 = site_fit.project_parcel(conn, "a")
+        self.assertEqual((m1.rules_label, m1.setback_from_rules), ("verified rules", True))
+        self.assertTrue(site_fit.meets_bts_footprint(m1))
+
+    def test_too_complex_ring_is_an_error_not_an_unbounded_search(self):
+        # Review finding 5: a 1,000-vertex strip 440 ft wide (nothing fits,
+        # so every angle would be searched; about 13 s uncapped) is refused
+        # in well under a second.
+        n = 1000
+        top = [(2_000_000 + 3 * i, 1_300_440 + 5 * math.sin(i)) for i in range(n // 2)]
+        bot = [(2_000_000 + 3 * i, 1_300_000 + 5 * math.sin(i)) for i in reversed(range(n // 2))]
+        conn = FakeConn({"a": SF_M1}, {"a": (900_000, geojson([top + bot]), 600_000.0)})
+        t = time.perf_counter()
+        p = site_fit.project_parcel(conn, "a")
+        self.assertLess(time.perf_counter() - t, 1.0)
+        self.assertEqual(p.status, "error")
+        self.assertIn("too complex (1000 vertices > 600)", p.reason)
+        self.assertFalse(site_fit.meets_bts_footprint(p))
+        self.assertIn("too complex", site_fit.data_gap_text(p))
+
+    def test_simplification_in_postgis_is_conservative_and_stated(self):
+        sql = site_fit._SQL_BUFFERED_FOR_FIT
+        self.assertIn("ST_SimplifyPreserveTopology(ST_Buffer(t, -1.0 * (%s::float8 + 2.0 * "
+                      "%s::float8)), %s::float8)", sql)
+        self.assertIn("ST_Area(inner_g)", sql)       # buildable area is the unsimplified one
+        self.assertEqual(sql.count("%s"), len(site_fit._buffered_params(40.0, ["a"])))
+        self.assertEqual(site_fit._buffered_params(40.0, ["a"]),
+                         (400, 40.0, 1.0, 1.0, 400, 40.0, ["a"]))
+        row = ("a", 1_000_000 / site_fit.SQFT_PER_M2, False, 300_000.0,
+               inner_rect(700, 460), True)
+        p = site_fit._project_row("a", site_fit._rules_for(SF_M1, "a", site_fit.load_prototypes()),
+                                  row, site_fit.load_prototypes())
+        self.assertEqual(p.status, "ok")
+        self.assertIn(site_fit.SIMPLIFIED, p.constraints)
 
     def test_worst_case_runtime_bound(self):
         # SF-12: a 324-vertex irregular buildable area (the landtest maximum
@@ -772,7 +911,7 @@ class BoundaryTests(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom):
                 mods.add((node.module or "").split(".")[0])
         allowed = {"__future__", "hashlib", "json", "math", "re", "subprocess", "types",
-                   "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning"}
+                   "weakref", "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning"}
         self.assertEqual(mods - allowed, set())
 
     def test_requirements_unchanged(self):
@@ -854,6 +993,8 @@ class CliTests(unittest.TestCase):
             self.assertNotIn(s, out + text)
         self.assertIn(site_fit.FLOOD_WETLANDS, out)
         self.assertIn(site_fit.FLOOD_WETLANDS, text)
+        self.assertIn(site_fit.DETENTION, text)
+        self.assertIn("(open it in SiteFit: Studies > Open file…)", out)   # finding 14
         self.assertTrue(conn.read_only)
         # the CLI's reads are site_fit's: parcel id, geometry, zoning only
         for sql, _ in conn.executed:

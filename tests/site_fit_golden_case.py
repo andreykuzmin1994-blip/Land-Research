@@ -144,7 +144,8 @@ def responder(research: Any, *, site_fit_errors: bool = False):
         if sql == sf_buffer:
             if site_fit_errors:
                 raise RuntimeError("injected")
-            rows = [buffered_row(p, float(params[0])) for p in params[1]]
+            setback = float(params[1] if len(params) > 2 else params[0])
+            rows = [buffered_row(p, setback) for p in params[-1]]
             return [r for r in rows if r is not None]
         with mock.patch.dict(base_parcels, PARCELS, clear=False):
             return zg.responder(research)(sql, params)

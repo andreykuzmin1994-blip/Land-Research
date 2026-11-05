@@ -223,6 +223,27 @@ def synthetic(conn: Any, res: Results) -> None:
     conn.rollback()
     check_placements(conn, pr, res, "(d)")
     check_export(conn, pr, res)
+    # (e) review finding 5: a 1,400 ft parcel whose south edge carries 1,000
+    # small waves is simplified in PostGIS (deeper buffer), projected quickly,
+    # and every placement is still covered by the UNSIMPLIFIED buffer.
+    xs = [x0 + 30000 + 1.4 * i for i in range(1001)]
+    south = [(x, y0 + 3.0 * math.sin(i * 0.9)) for i, x in enumerate(xs)]
+    ring = south + [(xs[-1], y0 + 1400.0), (xs[0], y0 + 1400.0), south[0]]
+    wavy = "POLYGON((" + ",".join(f"{x:.3f} {y:.3f}" for x, y in ring) + "))"
+    with conn.cursor() as cur:
+        cur.execute(_SQL_INSERT_FT, ("ls-WAVY", 45.0, wavy, wavy))
+    conn.commit()
+    site_fit._FIT_CACHE.clear()
+    t = time.monotonic()
+    wv = site_fit.project_parcels(conn, ["ls-WAVY"])
+    dt = time.monotonic() - t
+    w = wv["ls-WAVY"]
+    res.check(w.status == "ok" and site_fit.SIMPLIFIED in w.constraints and dt < 10.0,
+              f"(e) 1,000-vertex edge: {w.status}, simplified "
+              f"{site_fit.SIMPLIFIED in w.constraints}, {dt:.1f} s, max building "
+              f"{site_fit.max_building_sf(w)} SF")
+    conn.rollback()
+    check_placements(conn, wv, res, "(e)")
 
 
 def corpus(conn: Any, res: Results) -> None:

@@ -197,8 +197,9 @@ class TruthTableTests(unittest.TestCase):
         if sf is not None:
             fits = (site_fit.PrototypeFit("front", "front-load", True, False, 600.0, 260.0, 445.0,
                                           sf, 41, 50, 10.0, "geometry", 0.0),)
-        return site_fit.Projection("p", "ok", "projected", "verified rules", True, 40.0, "",
-                                   10 ** 6, 10 ** 6, None, fits, ())
+        return site_fit._issue(site_fit.Projection(
+            "p", "ok", "projected", "verified rules", True, 40.0, "", 10 ** 6, 10 ** 6, None,
+            fits, (), setback_from_rules=True))
 
     def test_table(self):
         for gate in ("verified", "draft", "unknown"):
@@ -344,6 +345,54 @@ class StaticResearchTests(unittest.TestCase):
         self.assertEqual(len(proxy_lines), 1)
         self.assertEqual(lines, proxy_lines)
 
+    # Review findings 1 and 3: the checks above see only ``site_fit.<attr>``,
+    # so research.py must reach site_fit in no other way (tests/static_guards).
+    BANNED = {"Projection", "PrototypeFit", "_Placement", "_State", "_Rules", "_ISSUED",
+              "_issue", "_FIT_CACHE", "_STATE", "BTS_MIN_FOOTPRINT_SF"}
+    REPROS = {
+        "alias": "import site_fit as _sf\n_sf.BTS_MIN_FOOTPRINT_SF = 1\n",
+        "from_import": "def _inflate(pid):\n    from site_fit import Projection as _P, "
+                       "PrototypeFit as _F\n    return _P(pid)\n",
+        "from_cache": "from site_fit import _FIT_CACHE\n",
+        "importlib": "import importlib\n_m = importlib.import_module('site_fit')\n",
+        "sys_modules": "import sys\nsys.modules['site_fit'].BTS_MIN_FOOTPRINT_SF = 1\n",
+        "getattr_computed": "_s = getattr(site_fit, '_ST' + 'ATE')\n",
+        "bare_ref": "x = site_fit\n",
+        "vars": "vars(site_fit)['BTS_MIN_FOOTPRINT_SF'] = 1\n",
+        "dunder_dict": "site_fit.project_parcel.__globals__['BTS_MIN_FOOTPRINT_SF'] = 1\n",
+        "reexport": "import reporting\nreporting.site_fit.BTS_MIN_FOOTPRINT_SF = 1\n",
+        "reexport_getattr": "import connector_harness\ngetattr(connector_harness, 'site_fit')\n",
+        "dunder_import": "__import__('site_fit').BTS_MIN_FOOTPRINT_SF = 1\n",
+        "exec": "exec('import site_fit as s')\n",
+        "shadow": "def f(site_fit):\n    return site_fit.project_parcel(1, 2)\n",
+        "construct_by_type": "def f(p):\n    return type(p)(*p.__dict__.values())\n",
+    }
+
+    def problems(self, src):
+        import static_guards
+        return static_guards.module_reference_problems(src, "site_fit", self.ALLOWED,
+                                                       self.BANNED)
+
+    def test_research_reaches_site_fit_only_through_the_allowed_attributes(self):
+        self.assertEqual(self.problems(self.SRC), [])
+
+    def test_the_reviewer_repros_fail_the_guard(self):
+        for name, extra in self.REPROS.items():
+            src = self.SRC.replace("import site_fit  #", extra + "import site_fit  #", 1)
+            self.assertNotEqual(self.problems(src), [], name)
+        self.assertNotEqual(self.problems(self.SRC.replace("import site_fit  #", "#", 1)), [])
+
+    def test_a_forged_projection_never_passes_at_runtime(self):
+        # Finding 3's exact repro, executed: built outside site_fit, it fails.
+        ns = {}
+        exec("from site_fit import Projection as _P, PrototypeFit as _F\n"
+             "def _inflate(pid):\n"
+             "    f = _F('cross', 'cross-dock', True, True, 1000.0, 520.0, 890.0, 520000, 148, "
+             "166, 10.0, 'full size', 0.0)\n"
+             "    return _P(pid, 'ok', 'projected', 'verified rules', True, 25.0, '', 1, 1, "
+             "None, (f,), (), setback_from_rules=True)\n", ns)
+        self.assertFalse(site_fit.meets_bts_footprint(ns["_inflate"]("x")))
+
     def test_bts_branch_is_one_guarded_switch(self):
         body = self.SRC.split("def _assess_strategy_bts(", 1)[1].split("\ndef ", 1)[0]
         self.assertIn("if projection is not None:\n        if not site_fit.meets_bts_footprint"
@@ -450,11 +499,15 @@ class ReportingTests(unittest.TestCase):
             "",
             "- **Constraints applied**: setback 40 ft all sides = max(front/side/rear), "
             "south_fulton M-1, draft rules; full envelope (building + truck courts + trailer "
-            "parking) inside the setback line; truck drive and circulation not modelled; no lot "
-            "coverage cap in the rules; height not checked (clear 40/36 ft; district max 100 ft "
-            "or 8 stories, whichever is higher); residential buffers not applied (neighbour "
-            "zoning not in DB); flood/wetlands not deducted (H4/H6 not wired); car parking not "
-            "modelled",
+            "parking) inside the setback line, stricter than SiteFit, which lets courts and "
+            "trailer parking sit in the setback; truck drive and circulation not modelled; no "
+            "lot coverage cap in the rules; buffers listed for south_fulton M-1, not applied: "
+            "plus_improvement_setback 10 ft (within the 40 ft setback), rear 100 ft, side 50 ft; "
+            "height not checked (clear 40/36 ft; district max 100 ft or 8 stories, whichever is "
+            "higher); adjacency buffers not applied (residential or other-district neighbours; "
+            "neighbour zoning in the DB is incomplete: only candidate parcels are stored); "
+            "flood/wetlands not deducted (H4/H6 not wired); stormwater detention not deducted "
+            "(no detention pond placed); car parking not modelled",
         ])
         self.assertEqual(self.render(p), want_draft)
         self.assertEqual(self.render(p), self.render(p))          # deterministic
@@ -481,13 +534,45 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(reporting._render_development_potential({}, None),
                          "- **Building projection**: — (projection unavailable)")
 
+    def test_used_for_bts_label_matches_the_scoring_gate(self):
+        # Review finding 9: the memo's protected copy of the gate must agree
+        # with research._zoning_verified on every class and rules status.
+        import reporting
+        from zoning_helpers import patch_rules, stored, verified
+        rules = zoning.load_rules()["jurisdictions"]
+        cases = [(stored(j, f"{j}_zoning", c), f"{j}-{c}") for j, jj in rules.items()
+                 for c in list(jj["districts"]) + ["R-4", "ZZ-9"]]
+        cases += [(("M-1", None), "raw"), ((None, None), "none"), (("", "-"), "blank")]
+        seen = set()
+        for data in (None, verified(*rules), verified("south_fulton", "fairburn")):
+            with patch_rules(data):
+                for (z, d), pid in cases:
+                    want = research._zoning_verified((z, d), pid)
+                    got = reporting._used_for_bts({"parcel_id": pid, "zoning": z,
+                                                   "zoning_description": d})
+                    self.assertEqual(got, want, (pid, data is None))
+                    seen.add(want)
+        self.assertEqual(seen, {True, False})
+
+    def test_memo_footnote_lists_what_projections_leave_out(self):
+        # Review finding 8: buffers (and the other not-modelled items) are
+        # stated in the memo, once, under the highlights.
+        import reporting
+        for needle in (site_fit.RES_BUFFERS, site_fit.FLOOD_WETLANDS, site_fit.DETENTION,
+                       site_fit.CAR_PARKING, site_fit.FIT_RULE, "height not checked"):
+            self.assertIn(needle, reporting._PROJECTION_FOOTNOTE)
+        src = (REPO_ROOT / "reporting.py").read_text(encoding="utf-8")
+        self.assertIn("if projections is not None:\n            top_lines += [\"\", "
+                      "_PROJECTION_FOOTNOTE]", src)
+
     def test_memo_line(self):
         import reporting
         from test_site_fit import inner_rect
         p = self.proj({"a": (1_000_000, inner_rect(700, 460), 322_000.0)})
         self.assertEqual(reporting._projection_summary(p, False),
-                         "Projected max building: 166,400 SF front-load (draft rules; used for "
-                         "BTS: no; flood/wetlands not deducted (H4/H6 not wired)).")
+                         "Projected max building: 166,400 SF front-load (draft rules; setback "
+                         "40 ft all sides; used for BTS: no; flood/wetlands not deducted (H4/H6 "
+                         "not wired); adjacency buffers not applied).")
         self.assertEqual(reporting._projection_summary(None, False),
                          "Projected max building: — (projection unavailable).")
 

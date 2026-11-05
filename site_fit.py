@@ -35,10 +35,21 @@ drives and circulation are not modelled.
 Setbacks: parcel frontage is unknown, so the uniform setback is the
 largest non-null front/side/rear value of the parcel's district, applied on
 every side; 25 ft (the file's ``default_setback_ft``) when no district rule
-applies. Residential buffers are NOT applied (neighbour zoning is not in
-the database), and flood (H4) and wetlands (H6) are NOT deducted; every
-projection says so. Coverage is building SF over the parcel's gross
-geography area.
+applies. A default setback is never a BTS input, even in a verified
+jurisdiction. Adjacency buffers (residential or other-district neighbours)
+are NOT applied: the database stores only candidate parcels, so neighbour
+zoning is incomplete; each buffer the district's rules list is named in the
+projection. Flood (H4), wetlands (H6) and stormwater detention are NOT
+deducted; every projection says so. Coverage is building SF over the
+parcel's gross geography area.
+
+The fitted length is a lower bound: the slab sweep tries every vertex event
+plus a fixed grid of positions, each checked exactly, so a
+reported fit always holds, but an optimum between those positions can be
+missed by up to one grid step. Buffered rings above
+``_SIMPLIFY_ABOVE_VERTICES`` are simplified in PostGIS inside a deeper
+buffer (conservative); above ``_MAX_FIT_VERTICES`` the projection is an
+error ("too complex") instead of an unbounded search.
 
 Units: SRID 2240 is in US survey feet; treating them as international feet
 is off by 2 ppm (0.002 ft on a 1,000 ft wall). Web Mercator is never used
@@ -53,6 +64,7 @@ import math
 import re
 import subprocess
 import types
+import weakref
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 from datetime import date
@@ -78,12 +90,29 @@ _ANGLE_GRID_DEG = 2.0
 _EDGE_ANGLES_MAX = 32
 _EDGE_ANGLE_MIN_LEN_FT = 30.0
 _FIT_CACHE_MAX = 4096
+# Extra slab positions per angle and depth (reviews/22_site_fit, finding 4):
+# a fixed grid over the feasible y-range, added to the vertex events.
+_Y_SAMPLES = 64
+# Complexity bounds (finding 5): rings with more vertices than this are
+# simplified in PostGIS (tolerance _SIMPLIFY_TOL_FT inside an extra
+# 2 x tolerance inward buffer, so the result stays inside the setback line);
+# a ring still above _MAX_FIT_VERTICES is not searched.
+_SIMPLIFY_ABOVE_VERTICES = 400
+_SIMPLIFY_TOL_FT = 1.0
+_MAX_FIT_VERTICES = 600
 
 FLOOD_WETLANDS = "flood/wetlands not deducted (H4/H6 not wired)"
-RES_BUFFERS = "residential buffers not applied (neighbour zoning not in DB)"
+RES_BUFFERS = ("adjacency buffers not applied (residential or other-district neighbours; "
+               "neighbour zoning in the DB is incomplete: only candidate parcels are stored)")
+DETENTION = "stormwater detention not deducted (no detention pond placed)"
 CAR_PARKING = "car parking not modelled"
 FIT_RULE = ("full envelope (building + truck courts + trailer parking) inside the setback "
-            "line; truck drive and circulation not modelled")
+            "line, stricter than SiteFit, which lets courts and trailer parking sit in the "
+            "setback; truck drive and circulation not modelled")
+SIMPLIFIED = (f"buffered ring simplified for fitting ({_SIMPLIFY_TOL_FT:g} ft, inside an extra "
+              f"{2 * _SIMPLIFY_TOL_FT:g} ft setback)")
+# Every projection carries these, whatever its status (tests pin it).
+NOT_MODELLED = (RES_BUFFERS, FLOOD_WETLANDS, DETENTION, CAR_PARKING)
 
 OK = "ok"
 EMPTY = "empty_after_setbacks"
@@ -453,6 +482,23 @@ def _bad_prefix(chords, target):
     return out
 
 
+def _candidate_ys(vys: Sequence[float], depth: float, tol: float, lo_y: float,
+                  hi_y: float) -> list[float]:
+    """Slab bottoms to try: every vertex event (a vertex on the slab's top or
+    bottom edge) and a fixed grid of ``_Y_SAMPLES`` steps over
+    [lo_y, hi_y] (always a superset of the old event-only candidates, so no
+    fit gets shorter). Interior optima of V-sided
+    shapes fall between events (finding 4); the extra positions find them to
+    within one step. Each position is still checked exactly."""
+    events = sorted({round(v, 6) for y in vys for v in (y + 2 * tol, y - depth - 2 * tol)
+                     if lo_y <= v <= hi_y})
+    out = set(events)
+    span = hi_y - lo_y
+    if span >= 0:
+        out.update(round(lo_y + span * k / _Y_SAMPLES, 6) for k in range(_Y_SAMPLES + 1))
+    return sorted(v for v in out if lo_y <= v <= hi_y)
+
+
 def fit_lengths(rings: Sequence[Sequence[tuple[float, float]]],
                 specs: Sequence[tuple[float, Sequence[float]]],
                 tol: float = TOL_FT) -> dict[float, tuple[float, _Placement] | None]:
@@ -462,9 +508,10 @@ def fit_lengths(rings: Sequence[Sequence[tuple[float, float]]],
     when the rectangle, widened by ``tol`` on every side, has no boundary
     edge of ANY ring inside it and its centre is inside the region (even-odd,
     so holes and multipart parcels are respected): exact containment, on the
-    conservative side. Candidate positions are the vertex events of a slab
-    sweep at every angle of ``_angles``; first placement found wins ties
-    (angle ascending, then y ascending), so results are deterministic.
+    conservative side. Candidate positions are ``_candidate_ys`` (vertex
+    events and a fixed grid) at every angle of ``_angles``,
+    so the result is a lower bound; first placement found wins ties (angle
+    ascending, then y ascending), so results are deterministic.
     """
     pts = [p for r in rings for p in r]
     result: dict[float, tuple[float, _Placement] | None] = {d: None for d, _ in specs}
@@ -503,8 +550,7 @@ def fit_lengths(rings: Sequence[Sequence[tuple[float, float]]],
             if width < target + 2 * tol or ymax - ymin < depth + 4 * tol:
                 continue
             lo_y, hi_y = ymin + 2 * tol, ymax - depth - 2 * tol
-            cands = sorted({round(v, 6) for y in vys for v in (y + 2 * tol, y - depth - 2 * tol)
-                            if lo_y <= v <= hi_y})
+            cands = _candidate_ys(vys, depth, tol, lo_y, hi_y)
             bad = _bad_prefix(chords, target)
             for y0 in cands:
                 i0 = bisect_left(lines_y, y0)
@@ -568,26 +614,70 @@ class _Rules:
     verified: bool
     label: str
     notes: tuple[str, ...]
+    from_rules: bool = False   # the setback is a district value, not the default
+
+
+VERIFIED_LABEL = "verified rules"
+DRAFT_LABEL = "draft rules"
+VERIFIED_DEFAULT_LABEL = "verified jurisdiction, default setback"
+NO_RULE_LABEL = "no district rule"
+RULES_UNAVAILABLE_LABEL = "zoning rules unavailable"
+
+
+def _height_note(data: Mapping[str, Any], height: Any) -> str:
+    """Height is never checked; the note is on every projection (finding 13)."""
+    clears = sorted({_fmt_ft(float(data["prototypes"][k]["clear"])) for k in PROTOTYPE_KEYS},
+                    key=float, reverse=True)
+    limit = (f"district max {_clean(height, 50)}" if height is not None
+             else "no district maximum in the rules")
+    return f"height not checked (clear {'/'.join(clears)} ft; {limit})"
+
+
+def _buffer_notes(dims: Mapping[str, Any], where: str, setback: float) -> list[str]:
+    """Name every buffer the district's rules list (finding 2): none is
+    applied, because neighbour zoning is incomplete in the database."""
+    raw = _value(dims, "residential_adjacency_buffer_ft")
+    if raw is None:
+        return []
+    items = raw.items() if isinstance(raw, Mapping) else [("buffer", raw)]
+    parts = []
+    for k, v in sorted(items, key=lambda kv: str(kv[0])):
+        n = _num(v)
+        if n is None:
+            parts.append(f"{_clean(k, 40)} {_clean(v, 40)}")
+        elif n <= setback:
+            parts.append(f"{_clean(k, 40)} {_fmt_ft(n)} ft (within the {_fmt_ft(setback)} ft "
+                         f"setback)")
+        else:
+            parts.append(f"{_clean(k, 40)} {_fmt_ft(n)} ft")
+    return [f"buffers listed for {where}, not applied: " + ", ".join(parts)]
 
 
 def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
                data: Mapping[str, Any]) -> _Rules:
     """SF-09: uniform setback = max(non-null front/side/rear) on all sides;
     the 25 ft default when no district rule applies. Buffer keys are never
-    folded in (SF-10)."""
+    folded in (SF-10), but each is named. A default setback is never a
+    verified value (finding 6): ``from_rules`` is False and the label says so."""
     default = float(data["default_setback_ft"])
     dist = zoning.district_for_stored(stored[0], stored[1], parcel_id) if stored else None
     notes: list[str] = []
     if dist is None:
+        problem = zoning.rules_problem()
+        if problem is not None:
+            return _Rules(default, f"default (zoning rules unavailable: {_clean(problem, 80)})",
+                          None, "no lot coverage cap (zoning rules unavailable)", False,
+                          RULES_UNAVAILABLE_LABEL, (_height_note(data, None),))
         return _Rules(default, "default (no district rule)", None,
-                      "no lot coverage cap (no district rule)", False, "no district rule",
-                      ())
-    label = "verified rules" if dist.verified else "draft rules"
+                      "no lot coverage cap (no district rule)", False, NO_RULE_LABEL,
+                      (_height_note(data, None),))
     where = f"{dist.table_jurisdiction} {_clean(dist.district, 40)}"
     dims = dist.dimensions
     if dims is None:
+        label = VERIFIED_DEFAULT_LABEL if dist.verified else DRAFT_LABEL
         return _Rules(default, f"default (district {where} not listed in the rules)", None,
-                      "no lot coverage cap in the rules", dist.verified, label, ())
+                      "no lot coverage cap in the rules", dist.verified, label,
+                      (_height_note(data, None),))
     vals = []
     for key in ("front_setback_ft", "side_setback_ft", "rear_setback_ft"):
         raw = _value(dims, key)
@@ -599,9 +689,15 @@ def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
         else:
             vals.append(v)
     if vals:
-        setback, source = max(vals), f"max(front/side/rear), {where}"
+        setback, source, from_rules = max(vals), f"max(front/side/rear), {where}", True
     else:
-        setback, source = default, f"default ({where} has no numeric front/side/rear setback)"
+        setback = default
+        source = f"default ({where} has no numeric front/side/rear setback)"
+        from_rules = False
+    if dist.verified:
+        label = VERIFIED_LABEL if from_rules else VERIFIED_DEFAULT_LABEL
+    else:
+        label = DRAFT_LABEL
     caps = []
     cov = _num(_value(dims, "max_lot_coverage_pct"))
     if cov is not None and 0 < cov <= 100:
@@ -609,19 +705,20 @@ def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
     elif _value(dims, "max_lot_coverage_pct") is not None:
         notes.append(f"max_lot_coverage_pct of {where} is not a usable number: not applied")
     far = _num(_value(dims, "max_far"))
-    if far is not None and far > 0:
+    # A FAR of 1.0 or more never limits a one-story footprint, so it is no cap
+    # (finding 12: Atlanta's FAR 2.0 is not a "200%" coverage cap).
+    if far is not None and 0 < far < 1.0:
         caps.append((far * 100.0, f"max FAR {_fmt_ft(far)} (one-story footprint), {where}"))
+    elif far is not None and far >= 1.0:
+        notes.append(f"max FAR {_fmt_ft(far)} of {where} does not limit a one-story footprint")
     if caps:
         cap_pct, cap_text = min(caps)
     else:
         cap_pct, cap_text = None, "no lot coverage cap in the rules"
-    height = _value(dims, "max_height_ft")
-    if height is not None:
-        clears = sorted({_fmt_ft(float(data["prototypes"][k]["clear"])) for k in PROTOTYPE_KEYS},
-                        key=float, reverse=True)
-        notes.append(f"height not checked (clear {'/'.join(clears)} ft; district max "
-                     f"{_clean(height, 50)})")
-    return _Rules(setback, source, cap_pct, cap_text, dist.verified, label, tuple(notes))
+    notes.extend(_buffer_notes(dims, where, setback))
+    notes.append(_height_note(data, _value(dims, "max_height_ft")))
+    return _Rules(setback, source, cap_pct, cap_text, dist.verified, label, tuple(notes),
+                  from_rules)
 
 
 # ---------------------------------------------------------------------------
@@ -661,8 +758,22 @@ class Projection:
     fits: tuple[PrototypeFit, ...]
     constraints: tuple[str, ...]
     multipart: bool = False
+    setback_from_rules: bool = False
     _origin: tuple[float, float] | None = None
     _geometry: str | None = field(default=None, repr=False, compare=False)
+
+
+# Projections this module built (finding 3). meets_bts_footprint accepts
+# only these, so a Projection constructed anywhere else (research.py, a
+# copy, dataclasses.replace) can never pass the BTS test. Keyed by id() with
+# weak values: an entry disappears with its object, so a reused id never
+# matches a different object.
+_ISSUED: "weakref.WeakValueDictionary[int, Projection]" = weakref.WeakValueDictionary()
+
+
+def _issue(p: Projection) -> Projection:
+    _ISSUED[id(p)] = p
+    return p
 
 
 def _base_constraints(rules: _Rules | None) -> list[str]:
@@ -673,21 +784,22 @@ def _base_constraints(rules: _Rules | None) -> list[str]:
         out.append(FIT_RULE)
         out.append(rules.cap_text)
         out.extend(rules.notes)
-    out.extend((RES_BUFFERS, FLOOD_WETLANDS, CAR_PARKING))
+    out.extend(NOT_MODELLED)
     return out
 
 
 def _empty(pid: str, status: str, reason: str, rules: _Rules | None,
-           gross: int | None = None) -> Projection:
-    return Projection(
+           gross: int | None = None, extra: Sequence[str] = ()) -> Projection:
+    return _issue(Projection(
         parcel_id=pid, status=status, reason=reason,
-        rules_label=rules.label if rules else "no district rule",
+        rules_label=rules.label if rules else NO_RULE_LABEL,
         rules_verified=rules.verified if rules else False,
         setback_ft=rules.setback_ft if rules else None,
         setback_source=rules.setback_source if rules else "",
         gross_sf=gross, buildable_sf=0 if status == EMPTY else None,
         coverage_cap_pct=rules.cap_pct if rules else None, fits=(),
-        constraints=tuple(_base_constraints(rules)))
+        constraints=tuple(_base_constraints(rules)) + tuple(extra),
+        setback_from_rules=rules.from_rules if rules else False))
 
 
 def max_building_sf(p: Any) -> int | None:
@@ -700,9 +812,13 @@ def max_building_sf(p: Any) -> int | None:
 
 def meets_bts_footprint(p: Any) -> bool:
     """program.md BTS: the parcel accommodates a >= 150K SF footprint. True
-    ONLY for a projection of this module with status ok, rules verified,
-    and a fitted prototype of at least BTS_MIN_FOOTPRINT_SF."""
-    if type(p) is not Projection or not p.rules_verified:
+    ONLY for a projection this module built (``_ISSUED``), with status ok,
+    rules verified, the setback taken from the district's rules (never the
+    default, finding 6), and a fitted prototype of at least
+    BTS_MIN_FOOTPRINT_SF."""
+    if type(p) is not Projection or _ISSUED.get(id(p)) is not p:
+        return False
+    if not p.rules_verified or not p.setback_from_rules:
         return False
     best = max_building_sf(p)
     return best is not None and best >= BTS_MIN_FOOTPRINT_SF
@@ -728,16 +844,31 @@ _SQL_ZONING_FOR_FIT = (
 # Inward setback buffer in PostGIS (Z-10: spatial work belongs in PostGIS):
 # made valid like S2, transformed to SRID 2240 (US survey feet), buffered by
 # -setback, returned as GeoJSON rounded to 0.01 ft. Gross area is geography
-# (square metres) of the same made-valid geometry.
+# (square metres) of the same made-valid geometry; the buildable area is the
+# unsimplified buffer. A ring with more than _SIMPLIFY_ABOVE_VERTICES points
+# (finding 5) is fitted on ST_SimplifyPreserveTopology(tolerance t) of the
+# parcel buffered by -(setback + 2t): every point of that simplification is
+# within 2t of the deeper buffer, so it stays inside the setback line.
+# Parameters: (setback, vertex limit, setback, t, t, vertex limit, ids).
 _SQL_BUFFERED_FOR_FIT = (
-    "SELECT parcel_id, gross_m2, ST_IsEmpty(inner_g), ST_Area(inner_g), "
-    "ST_AsGeoJSON(inner_g, 2) "
-    "FROM (SELECT parcel_id, ST_Area(geography(g)) AS gross_m2, "
-    "ST_Buffer(ST_Transform(g, 2240), -1.0 * %s::float8) AS inner_g "
+    "SELECT parcel_id, gross_m2, ST_IsEmpty(fit_g), ST_Area(inner_g), "
+    "ST_AsGeoJSON(fit_g, 2), simplified "
+    "FROM (SELECT parcel_id, gross_m2, inner_g, "
+    "CASE WHEN ST_NPoints(inner_g) > %s THEN ST_SimplifyPreserveTopology("
+    "ST_Buffer(t, -1.0 * (%s::float8 + 2.0 * %s::float8)), %s::float8) ELSE inner_g END AS fit_g, "
+    "(ST_NPoints(inner_g) > %s) AS simplified "
+    "FROM (SELECT parcel_id, t, ST_Area(geography(g)) AS gross_m2, "
+    "ST_Buffer(t, -1.0 * %s::float8) AS inner_g "
+    "FROM (SELECT parcel_id, g, ST_Transform(g, 2240) AS t "
     "FROM (SELECT parcel_id, ST_CollectionExtract(ST_MakeValid(geometry), 3) AS g "
     "FROM parcels WHERE parcel_id = ANY(%s) AND geometry IS NOT NULL) v "
-    "WHERE NOT ST_IsEmpty(g)) b"
+    "WHERE NOT ST_IsEmpty(g)) w) b) c"
 )
+
+
+def _buffered_params(setback: float, ids: Sequence[str]) -> tuple:
+    return (_SIMPLIFY_ABOVE_VERTICES, setback, _SIMPLIFY_TOL_FT, _SIMPLIFY_TOL_FT,
+            _SIMPLIFY_ABOVE_VERTICES, setback, list(ids))
 
 
 def _rings_from_geojson(text: Any) -> list[list[list[tuple[float, float]]]]:
@@ -866,19 +997,26 @@ def _project_row(pid: str, rules: _Rules, row: Sequence[Any] | None,
     gross = float(row[1]) * SQFT_PER_M2
     if gross <= 0:
         return _empty(pid, NO_GEOMETRY, "parcel geometry has no area", rules)
+    simplified = bool(row[5]) if len(row) > 5 else False
+    extra = (SIMPLIFIED,) if simplified else ()
     if row[2] or row[4] is None:
-        return _empty(pid, EMPTY, "nothing left inside the setbacks", rules, int(round(gross)))
+        return _empty(pid, EMPTY, "nothing left inside the setbacks", rules, int(round(gross)),
+                      extra)
+    nverts = sum(len(r) for part in _rings_from_geojson(str(row[4])) for r in part)
+    if nverts > _MAX_FIT_VERTICES:
+        return _empty(pid, ERROR, f"buffered geometry too complex ({nverts} vertices > "
+                      f"{_MAX_FIT_VERTICES})", rules, int(round(gross)), extra)
     fits, multipart, origin = _fits_for(str(row[4]), gross, rules, data)
-    constraints = _base_constraints(rules)
+    constraints = _base_constraints(rules) + list(extra)
     if multipart:
         constraints.append("multipart buildable area: each envelope fitted inside one part")
-    return Projection(
+    return _issue(Projection(
         parcel_id=pid, status=OK, reason="projected", rules_label=rules.label,
         rules_verified=rules.verified, setback_ft=rules.setback_ft,
         setback_source=rules.setback_source, gross_sf=int(round(gross)),
         buildable_sf=int(round(float(row[3] or 0.0))), coverage_cap_pct=rules.cap_pct,
-        fits=fits, constraints=tuple(constraints), multipart=multipart, _origin=origin,
-        _geometry=str(row[4]))
+        fits=fits, constraints=tuple(constraints), multipart=multipart,
+        setback_from_rules=rules.from_rules, _origin=origin, _geometry=str(row[4])))
 
 
 def _flood_wetland_exclusions(parcel_id: str) -> list[Any]:
@@ -947,7 +1085,8 @@ def project_parcels(conn: Any, parcel_ids: Iterable[str]) -> Mapping[str, Projec
     for setback in sorted(groups):
         group = groups[setback]
         try:
-            rows = {r[0]: r for r in _query(conn, _SQL_BUFFERED_FOR_FIT, (setback, group))
+            rows = {r[0]: r for r in _query(conn, _SQL_BUFFERED_FOR_FIT,
+                                            _buffered_params(setback, group))
                     if len(r) >= 5}
         except Exception as exc:
             for pid in group:

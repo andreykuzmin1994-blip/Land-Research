@@ -485,7 +485,7 @@ def cmd_site_fit(args: argparse.Namespace) -> int:
             "constraints": list(projections[pid].constraints),
         } for pid in ids}, indent=2, sort_keys=True))
     for w in written:
-        print(f"wrote {w} (open it in SiteFit: menu > open study)")
+        print(f"wrote {w} (open it in SiteFit: Studies > Open file…)")
     return 0
 
 
