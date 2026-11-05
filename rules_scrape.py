@@ -2844,6 +2844,40 @@ def compute_flags(conn: Any, reg: Registry, fetcher: PoliteFetcher | None,
     return fr
 
 
+def loop_running(path: Path | None = None) -> bool:
+    """Is an experiment loop holding its lock? (RS-05)
+
+    The runner's lock file stays on disk after a loop ends, so its
+    existence proves nothing: probe the flock without creating the file.
+    A held exclusive lock -> True. Without fcntl (Windows) the file's
+    existence is taken as a running loop (fail safe). The probe takes a
+    shared lock for an instant; a loop starting in that instant refuses
+    with LoopLockError and can simply be started again.
+    """
+    p = path or Path(os.environ.get("EXPERIMENT_LOOP_LOCK_PATH") or LOOP_LOCK_PATH)
+    if not p.exists():
+        return False
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover -- Windows
+        return True
+    try:
+        fd = os.open(str(p), os.O_RDONLY)
+    except OSError:
+        return True
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    except OSError:
+        return True
+    else:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(fd)
+
+
 def _dsn_host_local() -> bool:
     try:
         host = urlparse(prepare._get_connection_dsn()).hostname or ""
@@ -2881,7 +2915,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         cache: Cache | None = None, llm_runner: Callable[..., Any] | None = None,
         connect: Callable[[], Any] | None = None, today: date | None = None,
         registry_path: Path = REGISTRY_PATH, log_path: Path = EXPERIMENT_LOG,
-        loop_lock: Path = LOOP_LOCK_PATH) -> int:
+        loop_lock: Path | None = None) -> int:
     today = today or date.today()
     try:
         reg = load_registry(registry_path)
@@ -2917,7 +2951,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
             connect = prepare.get_connection
         conn_ctx = connect
     cache = cache or Cache()
-    loop_running = loop_lock.exists()
+    loop_on = loop_running(loop_lock)
     if fetcher is None and not args.offline:
         fetcher = PoliteFetcher(max_requests=args.max_requests)
     assisted: list[Record] = []
@@ -2943,7 +2977,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
             for sig in reg.signals:
                 if not sig.enabled or (args.jurisdiction and sig.jurisdiction not in args.jurisdiction):
                     continue
-                if loop_running:
+                if loop_on:
                     gis[sig.key] = {"reason": "not queried: experiment loop lock present"}
                 elif args.offline or fetcher is None:
                     gis[sig.key] = {"reason": "not queried: offline"}
@@ -2960,7 +2994,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
                         print(f"REFUSED: {why}. --flags reads the database only between runs.")
                         return EXIT_RUN_OPEN
                     flags = compute_flags(conn, reg, None if args.offline else fetcher,
-                                          loop_running)
+                                          loop_on)
             except BudgetExceeded:
                 raise
             except Exception as exc:  # psycopg errors: the class name only

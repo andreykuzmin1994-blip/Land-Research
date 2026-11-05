@@ -1287,9 +1287,16 @@ class WatchTests(TmpDirTest):
         self.assertEqual(rs.compare_signal("x", None), "unknown")
 
     def test_watch_refuses_gis_while_the_loop_runs(self):  # RS-05
+        import fcntl
         p = self.write_registry()
         lock = self.tmp / ".experiment_loop.lock"
         lock.write_text("")
+        self.assertFalse(rs.loop_running(lock))            # a left-over file is not a loop
+        self.assertFalse(rs.loop_running(self.tmp / "absent"))
+        fd = os.open(str(lock), os.O_WRONLY)
+        self.addCleanup(os.close, fd)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)      # what runner._acquire_loop_lock holds
+        self.assertTrue(rs.loop_running(lock))
         f, http, _ = fetcher(routes_for(ALL_PAGES))
         with contextlib.redirect_stdout(io.StringIO()):
             rs.run(self.args("--watch"), fetcher=f, cache=self.cache, registry_path=p, loop_lock=lock)
@@ -1697,6 +1704,9 @@ class ProtectionTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         log = tmp / "experiment_log.tsv"
         rows = []
+        env = mock.patch.dict(os.environ, {"EXPERIMENT_LOOP_LOCK_PATH": str(tmp / "loop.lock")})
+        env.start()
+        self.addCleanup(env.stop)
         with mock.patch.object(runner, "verify_setup", return_value=setup), \
                 mock.patch.object(runner, "_evaluate_with_budget",
                                   side_effect=AssertionError("experiment ran")), \
