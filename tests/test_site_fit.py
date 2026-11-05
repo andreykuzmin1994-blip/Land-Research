@@ -694,8 +694,9 @@ class ProjectionTests(unittest.TestCase):
         self.assertEqual(site_fit.BTS_MIN_FOOTPRINT_SF, 150_000)
 
     def test_worst_case_runtime_bound(self):
-        # SF-12: a 324-vertex irregular buildable area (the landtest maximum)
-        # that fits NOTHING, the costliest case (every angle searched).
+        # SF-12: a 324-vertex irregular buildable area (the landtest maximum
+        # vertex count) where neither depth reaches full size, so every angle
+        # is searched. About 0.2 s here; the bound leaves slack for CI.
         ring = [(2_000_000 + x, 1_300_000 + y) for x, y in _wobbly(324, 330, seed=5, amp=0.3)]
         conn = FakeConn({"a": SF_M1}, {"a": (500_000, geojson([ring]), 300_000.0)})
         t = time.perf_counter()
