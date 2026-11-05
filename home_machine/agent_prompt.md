@@ -26,7 +26,11 @@ without asking questions; nobody is watching this session.
    never write `building_prototypes.json`, never edit `site_fit.py`, and
    take projected building SF only from `site_fit.project_parcel` /
    `project_parcels`, tested only with `site_fit.meets_bts_footprint` (no
-   arithmetic on the result, no other arguments). If the best idea needs a new source, pick another idea and put
+   arithmetic on the result, no other arguments). The zoning-code scraper
+   is an operator tool: never run or edit `rules_scrape.py`, never write
+   `rules_sources.json`, and never read its candidate or cache
+   (`rules_out/`, `rules_cache/`, `reviews/23_rules_scraper/`) from
+   `research.py`. If the best idea needs a new source, pick another idea and put
    `NEEDS-SOURCE: <what and why>` in the commit body. Never scrape CoStar.
 5. Run exactly `python -m unittest discover -s tests`. It must pass. Fix your change if
    it fails (at most 3 attempts). If it still fails, run

@@ -40,10 +40,18 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
   from git HEAD. Edits are between runs only; once any zoning jurisdiction
   is verified, an edit (or a `site_fit.py` change) moves BTS ratings and
   needs a new run + baseline (`reviews/22_site_fit/`).
+- **NEVER edit `rules_sources.json`** — the human-owned source registry
+  of the zoning-code scraper `rules_scrape.py` (between-runs operator
+  tool). It is not a scoring input, but it decides which pages are read
+  and fed to an extractor: `rules_scrape.py` freezes it by SHA-256 and
+  the runner refuses to start an experiment while it differs from git
+  HEAD (`reviews/23_rules_scraper/`). The scraper only ever writes a
+  CANDIDATE under `rules_out/`; a human applies values to
+  `zoning_rules.json` by hand, between runs.
 - **Immutable during a run**: `runner.py`, `costar_ingest.py`,
   `costar_import.py`, `reporting.py`, `pipeline_common.py`, `zoning.py`,
-  `zoning_import.py`, `site_fit.py`. Between runs, changes there are
-  Tier 2 (`STANDING_RISKS.md` § "Change tiers").
+  `zoning_import.py`, `site_fit.py`, `rules_scrape.py`. Between runs,
+  changes there are Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **`research.py` is the agent sandbox** — the ONLY file the agent edits
   during an experiment run. One focused change per experiment, committed
   as `exp: <description>` on the `autoresearch/<tag>` branch;
