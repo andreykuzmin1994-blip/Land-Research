@@ -50,10 +50,12 @@ ZONING_PY_SRC = (REPO_ROOT / "zoning.py").read_text(encoding="utf-8")
 ZONING_IMPORT_PY_SRC = (REPO_ROOT / "zoning_import.py").read_text(encoding="utf-8")
 # reviews/22_site_fit: the protected site-fit module joins them too (SF-19).
 SITE_FIT_PY_SRC = (REPO_ROOT / "site_fit.py").read_text(encoding="utf-8")
+# reviews/23_rules_scraper: the protected rules scraper joins them too (RS-07).
+RULES_SCRAPE_PY_SRC = (REPO_ROOT / "rules_scrape.py").read_text(encoding="utf-8")
 ALL_PIPELINE_PY_SRC = "\n".join(
     (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC, REPORTING_PY_SRC,
      RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC, COSTAR_IMPORT_PY_SRC,
-     ZONING_PY_SRC, ZONING_IMPORT_PY_SRC, SITE_FIT_PY_SRC)
+     ZONING_PY_SRC, ZONING_IMPORT_PY_SRC, SITE_FIT_PY_SRC, RULES_SCRAPE_PY_SRC)
 )
 # Merged module AST spanning every pipeline module, for whole-surface
 # static checks (each file is parsed separately, then bodies spliced,
@@ -64,7 +66,7 @@ ALL_PIPELINE_AST = ast.Module(
         for source in (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC,
                        REPORTING_PY_SRC, RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC,
                        COSTAR_IMPORT_PY_SRC, ZONING_PY_SRC, ZONING_IMPORT_PY_SRC,
-                       SITE_FIT_PY_SRC)
+                       SITE_FIT_PY_SRC, RULES_SCRAPE_PY_SRC)
         for node in ast.parse(source).body
     ],
     type_ignores=[],
@@ -182,7 +184,7 @@ class TestStaticChecks(unittest.TestCase):
     def test_no_immutable_writes(self) -> None:
         """R-01: no pipeline module writes parameters.json / sources.json / program.md."""
         forbidden_paths = ("parameters.json", "program.md", "zoning_rules.json",
-                           "building_prototypes.json")
+                           "building_prototypes.json", "rules_sources.json")
         # sources.json is read; just ensure no open(..., 'w') against any of these.
         tree = ALL_PIPELINE_AST
         for node in ast.walk(tree):
@@ -787,7 +789,7 @@ class TestPhase31ImmutableWritesStrict(unittest.TestCase):
     The original test only caught open(<Constant>, <Constant 'w'>)."""
 
     FORBIDDEN = ("parameters.json", "program.md", "sources.json", "zoning_rules.json",
-                 "building_prototypes.json")
+                 "building_prototypes.json", "rules_sources.json")
 
     def test_strict_no_immutable_writes(self) -> None:
         tree = ALL_PIPELINE_AST

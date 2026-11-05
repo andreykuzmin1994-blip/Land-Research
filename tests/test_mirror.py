@@ -44,6 +44,7 @@ _PIPELINE_MODULES = (
     "zoning.py",
     "zoning_import.py",
     "site_fit.py",
+    "rules_scrape.py",
     "reporting.py",
     "pipeline_common.py",
     "connector_harness.py",

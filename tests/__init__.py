@@ -76,3 +76,13 @@ if not hasattr(site_fit, "_SUITE_REAL_VERIFY_PROTOTYPES_COMMITTED"):
     site_fit._SUITE_REAL_VERIFY_PROTOTYPES_COMMITTED = site_fit.verify_prototypes_committed
     site_fit.verify_prototypes_committed = lambda path=None: None
 REAL_VERIFY_PROTOTYPES_COMMITTED = site_fit._SUITE_REAL_VERIFY_PROTOTYPES_COMMITTED
+
+# Fifth guard -- committed rules_sources.json check (reviews/23_rules_scraper,
+# RS-07/RS-08), the same pattern for the scraper's human-owned registry.
+# tests/test_rules_scrape.py calls the real function on the repo's own file.
+import runner  # noqa: E402
+
+if not hasattr(runner, "_SUITE_REAL_VERIFY_RULES_SOURCES_COMMITTED"):
+    runner._SUITE_REAL_VERIFY_RULES_SOURCES_COMMITTED = runner.verify_rules_sources_committed
+    runner.verify_rules_sources_committed = lambda path=None: None
+REAL_VERIFY_RULES_SOURCES_COMMITTED = runner._SUITE_REAL_VERIFY_RULES_SOURCES_COMMITTED
