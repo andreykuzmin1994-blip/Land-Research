@@ -1757,8 +1757,11 @@ def parse_label_value(section: Section) -> ParseResult:
     lines = section.text.split("\n")
     for item in cfg["labels"]:
         label = norm_ws(item["label"])
+        # label, optional qualifying words (', as measured from ...'), then a
+        # separator (':', '—', '–', ' - ', '|' of a two-column table, '...').
         rx = re.compile(r"\s+".join(re.escape(w) for w in label.split())
-                        + r"(?:\s*[-–—:]|\s*\.{2,}|[^|]{0,80}?\s*\|)\s*(?P<val>.*)$", re.I)
+                        + r"(?:(?!\s-\s)[^|:–—]){0,80}?\s*(?:[:–—|]|\s-\s|\s*\.{2,})"
+                        + r"\s*(?P<val>.*)$", re.I)
         hit = None
         for ln in lines:
             m = rx.search(ln)
