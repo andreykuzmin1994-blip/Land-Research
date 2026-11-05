@@ -202,9 +202,20 @@ applies (frontage is unknown). Each prototype keeps its depth and shrinks
 its length in 40 ft steps (down to 600 ft cross-dock, 400 ft front/rear)
 until its whole envelope (building + courts + trailer parking) fits at
 some orientation; a district's lot coverage cap steps it down further.
-Docks and trailer stalls follow SiteFit's formulas. Not modelled, and said
-so on every projection: residential buffers, height limits, car parking,
-truck drives, flood (H4) and wetlands (H6).
+Docks and trailer stalls follow SiteFit's formulas. The fit rule is
+stricter than SiteFit's own check (which lets truck courts and trailer
+parking sit in the setback), so a study refined in SiteFit may hold a
+longer building. Not modelled, and said so on every projection:
+adjacency buffers (residential or other-district neighbours; each buffer
+the district's rules list is named), height (the clear height is stated,
+with the district maximum when the rules have one), stormwater detention
+(SiteFit's default pond is 400 x 200 ft, about 1.8 ac, and is not
+placed), car parking, truck drives, flood (H4) and wetlands (H6). A
+setback that is the 25 ft default is never a BTS input, even in a verified
+jurisdiction ("verified jurisdiction, default setback": BTS N/A). Very
+complex buffered outlines are simplified in PostGIS inside a slightly
+deeper buffer (stated on the projection); beyond 600 vertices the
+projection is an error rather than a slow search.
 
 Where it shows: the snapshot's **Development Potential** section
 (buildable area, max building SF, a table per prototype) and one line per
@@ -225,8 +236,8 @@ make site-fit ARGS='--top 10 --export'                   # + SiteFit study files
 
 `--export` writes `site_fit_studies/<parcel>-<hash>.sitefit.json`
 (gitignored) holding the parcel boundary (largest part), the applied
-setback on every edge and the fitted building, to open in SiteFit and
-refine by hand. Keep the SiteFit tool file itself out of the repo
+setback on every edge and the fitted building, to open in SiteFit
+(Studies > Open file…) and refine by hand. Keep the SiteFit tool file itself out of the repo
 (`SiteFit.html` is gitignored).
 
 ## Repository Structure

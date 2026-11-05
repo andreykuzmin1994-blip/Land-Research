@@ -75,8 +75,12 @@ once zoning is verified, in BTS strategy fit.
 
 ## Not modelled (stated on every projection)
 
-Residential buffers (neighbour zoning is not in the database: parcels are
-only discovered 5-50 ac candidates), height limits (noted when the
-district has one), car parking, truck drives and circulation, flood (H4)
-and wetlands (H6). The H4/H6 hook is the private
+Adjacency buffers, residential or toward other districts (neighbour
+coverage in the database is incomplete: only discovered 5-50 ac candidates
+are stored; each buffer the district's rules list is named on the
+projection), height (always stated: the clear height, plus the district
+maximum when the rules have one), stormwater detention (SiteFit's default
+400 x 200 ft pond is not placed), car parking, truck drives and
+circulation, flood (H4) and wetlands (H6). Amended after the post-change
+review (03_decision_note.md, findings 2, 7, 11, 13). The H4/H6 hook is the private
 `site_fit._flood_wetland_exclusions`, which returns nothing today.
