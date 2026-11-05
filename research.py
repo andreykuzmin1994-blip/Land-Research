@@ -13,7 +13,11 @@ Python file the agent edits while the experiment loop is active. The agent:
       :mod:`reporting`, :mod:`pipeline_common`, :mod:`zoning`,
       ``zoning_import.py``, or any spec ``.md`` file,
     - never writes the human-owned ``zoning_rules.json`` and reads zoning
-      facts only through :mod:`zoning` (reviews/21_zoning).
+      facts only through :mod:`zoning` (reviews/21_zoning),
+    - never modifies :mod:`site_fit`, never reads or writes the human-owned
+      ``building_prototypes.json``, and gets building projections only from
+      ``site_fit.project_parcel`` / ``project_parcels`` and tests them only
+      with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit).
 
 ============================================================================
 WHAT LIVES HERE (post-split experiment surface)
@@ -122,6 +126,7 @@ import requests
 import prepare  # noqa: F401 — re-exported intentionally for the agent.
 import connector_harness
 import zoning  # protected: rules facts + classifier (reviews/21_zoning)
+import site_fit  # protected: building projections (reviews/22_site_fit)
 from pipeline_common import (
     _COSTAR_BASE_DIR,  # noqa: F401 — re-exported for backwards compatibility.
     _REPO_ROOT,
@@ -1738,6 +1743,7 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
     # R-03: SHA-256 sentinel — fail-loud on mid-run parameters mutation.
     prepare.verify_parameters_unchanged()
     zoning.verify_rules_unchanged()  # Z-01: same sentinel for zoning_rules.json
+    site_fit.verify_prototypes_unchanged()  # SF-04: building_prototypes.json
     params = prepare.get_parameters()  # R-02: read once, pass through.
     sources = _load_sources_json()
 
@@ -2136,6 +2142,33 @@ def _needs_precedent(stored: Sequence[Any] | None, parcel_id: str | None) -> boo
     return c.verified and c.cls == zoning.REZONING
 
 
+def _zoning_verified(stored: Sequence[Any] | None, parcel_id: str | None) -> bool:
+    """The S9 gate: the parcel's stored zoning resolves to a verified
+    jurisdiction AND a known class (by_right / conditional / rezoning)."""
+    if stored is None:
+        return False
+    try:
+        c = zoning.classify_stored(stored[0], stored[1], parcel_id)
+    except Exception:
+        return False
+    return c.verified and c.cls in (zoning.BY_RIGHT, zoning.CONDITIONAL, zoning.REZONING)
+
+
+def _fetch_projection(
+    conn: Any, parcel_id: str, stored: Sequence[Any] | None, *,
+    cache: "_CycleCache | None" = None,
+) -> Any:
+    """The site_fit projection, ONLY for a parcel that passes the S9 gate
+    (verified jurisdiction, known class); None otherwise, so draft/unknown parcels keep
+    the acreage proxy and issue no extra query (reviews/22_site_fit, SF-01).
+    ``stored`` is None whenever no rules are verified at all."""
+    if not _zoning_verified(stored, parcel_id):
+        return None
+    if cache is not None and cache.projection is not None and parcel_id in cache.projection:
+        return cache.projection[parcel_id]
+    return site_fit.project_parcel(conn, parcel_id)
+
+
 def _fetch_stored_zoning(
     conn: Any, parcel_id: str, *, cache: "_CycleCache | None" = None,
 ) -> tuple[Any, Any] | None:
@@ -2366,6 +2399,9 @@ class _CycleCache:
     # None = not prefetched (the per-parcel query runs if needed).
     stored_zoning: dict[str, tuple] | None = None
     precedent: dict[str, bool] | None = None
+    # reviews/22_site_fit: site_fit projections, prefetched ONLY for parcels
+    # whose zoning jurisdiction is verified; None = not prefetched.
+    projection: Mapping[str, Any] | None = None
 
 
 def _prefetch_cycle_cache(
@@ -2445,8 +2481,12 @@ def _prefetch_cycle_cache(
             for row in cur.fetchall():
                 if _is_industrial_precedent(row[1:4]):
                     precedent[row[0]] = True
+    # reviews/22_site_fit (SF-01): projections only for verified parcels.
+    verified_ids = [p for p in pid_list if _zoning_verified(stored_zoning.get(p), p)]
+    projection = site_fit.project_parcels(conn, verified_ids) if verified_ids else {}
     return _CycleCache(market_context, land_median, actionability_block,
-                       stored_zoning=stored_zoning, precedent=precedent)
+                       stored_zoning=stored_zoning, precedent=precedent,
+                       projection=projection)
 
 
 # ---------------------------------------------------------------------------
@@ -2621,6 +2661,8 @@ _STRATEGY_KEYS: tuple[str, ...] = (
 # R-535 / R-538: BTS minimum acreage from program.md "150K SF footprint at
 # 40% coverage" → 150_000 / 0.40 = 375_000 SF land = 8.6 acres (43560 SF/ac).
 _BTS_MIN_ACRES: float = 150_000.0 / 0.40 / 43_560.0  # ≈ 8.61
+# reviews/22_site_fit (SF-02): ground lease keeps this acreage proxy for every
+# parcel; only BTS uses the site_fit projection, and only when verified.
 
 
 def _ge(score: int | None, threshold: int) -> bool:
@@ -2636,11 +2678,21 @@ def _lt(score: int | None, threshold: int) -> bool:
 def _assess_strategy_bts(
     sub_scores: Mapping[str, int | None],
     acreage: float | None,
+    projection: Any = None,
 ) -> str:
     """BTS Development fit. R-535. STRONG unreachable while S9 is the
     moderate stub (=5). MODERATE: S9>=4 AND S4>=6 AND S5>=7 AND
-    acreage>=8.6. Otherwise WEAK. N/A: acreage<8.6."""
-    if not acreage or float(acreage) < _BTS_MIN_ACRES:
+    acreage>=8.6. Otherwise WEAK. N/A: acreage<8.6.
+
+    reviews/22_site_fit (SF-02): ``projection`` is passed ONLY for a parcel
+    whose zoning jurisdiction is verified; then the program.md ">= 150K SF
+    footprint" test is the protected site_fit.meets_bts_footprint (a failed
+    or missing projection is N/A, never the acreage proxy). Without a
+    projection the acreage proxy below is unchanged."""
+    if projection is not None:
+        if not site_fit.meets_bts_footprint(projection):
+            return "N/A"
+    elif not acreage or float(acreage) < _BTS_MIN_ACRES:
         return "N/A"
     s4 = sub_scores.get("S4_submarket_vacancy")
     s5 = sub_scores.get("S5_submarket_absorption")
@@ -2737,6 +2789,7 @@ def _assess_strategy_flip(
 def _compute_strategy_fit(
     sub_scores: Mapping[str, int | None],
     acreage: float | None,
+    projection: Any = None,
 ) -> dict[str, str]:
     """Aggregate the five strategy assessments into a JSONB-shaped dict.
 
@@ -2749,7 +2802,7 @@ def _compute_strategy_fit(
     NOT serialise the dict directly.
     """
     return {
-        "bts": _assess_strategy_bts(sub_scores, acreage),
+        "bts": _assess_strategy_bts(sub_scores, acreage, projection),
         "spec": _assess_strategy_spec(sub_scores, acreage),
         "land_bank": _assess_strategy_land_bank(sub_scores, acreage),
         "ground_lease": _assess_strategy_ground_lease(sub_scores, acreage),
@@ -2982,6 +3035,7 @@ def score_parcel(
     if params is None:
         prepare.verify_parameters_unchanged()
         zoning.verify_rules_unchanged()
+        site_fit.verify_prototypes_unchanged()
         params = prepare.get_parameters()
     if cycle_id is None:
         cycle_id = _make_scoring_cycle_id("adhoc")
@@ -3058,7 +3112,11 @@ def score_parcel(
         confidence = _finite_or_none(_compute_confidence(sub_scores))
 
         # R-529: strategy fit before actionability — gate 3 consumes it.
-        strategy_fit = _compute_strategy_fit(sub_scores, parcel.get("acreage"))
+        # reviews/22_site_fit: verified-zoning parcels only get a projection.
+        projection = _fetch_projection(conn, parcel_id, stored_zoning, cache=cache)
+        strategy_fit = _compute_strategy_fit(
+            sub_scores, parcel.get("acreage"), projection=projection,
+        )
         primary_strategy = _select_primary_strategy(strategy_fit)
 
         # R-533: synthetic deal-killer evidence from flagged_items.
@@ -3129,6 +3187,17 @@ def score_parcel(
                         f"wire {source} for parcel_id={parcel_id}",
                         open_gaps, written,
                     )
+                # reviews/22_site_fit (SF-14): a verified parcel whose
+                # projection failed is BTS N/A plus one data_gap flag.
+                if projection is not None:
+                    gap = site_fit.data_gap_text(projection)
+                    if gap is not None:
+                        _flag_data_gap_once(
+                            conn, cycle_id, parcel_id, market_name, gap,
+                            "check the parcel geometry and the site-fit prototypes "
+                            "between runs (reviews/22_site_fit)",
+                            open_gaps, written,
+                        )
                 # R-514: market_context staleness flag (informational only).
                 # The description names the as_of date, not the age in days,
                 # so the same stale row is one open flag, not one per day.
@@ -3233,6 +3302,7 @@ def run_scoring_cycle(
 
     prepare.verify_parameters_unchanged()
     zoning.verify_rules_unchanged()  # Z-01: a mid-run rules edit fails loud
+    site_fit.verify_prototypes_unchanged()  # SF-04: same for the prototypes
     params = prepare.get_parameters()
     cycle_id = _make_scoring_cycle_id(market)
     if run_tag is None:

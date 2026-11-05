@@ -462,6 +462,64 @@ def classify(jurisdiction_key: str | None, district: Any,
     return Classification(cls, verified, reason, conditions)
 
 
+@dataclass(frozen=True)
+class District:
+    """The rules entry a stored parcel resolves to (reviews/22_site_fit).
+
+    ``table_jurisdiction`` is where the district was found (FID resolves to
+    South Fulton's table unless the parcel is listed as unincorporated);
+    ``dimensions`` is the frozen ``dimensions`` mapping, or None when the
+    district is not listed in that table. ``verified`` follows the same rule
+    as ``classify`` (both jurisdictions verified when governed).
+    """
+    jurisdiction: str
+    table_jurisdiction: str
+    district: str
+    verified: bool
+    dimensions: Mapping[str, Any] | None
+
+
+def district_for_stored(zoning: Any, zoning_description: Any,
+                        parcel_id: str | None = None) -> District | None:
+    """Resolve a parcel's stored zoning to its rules entry; None when there is
+    no import provenance, no district, or no rules for the jurisdiction.
+
+    The same lookup as ``classify`` (governing jurisdiction, district
+    conversions, code normalisation), so site_fit's setbacks always come
+    from the district that S9 classifies. Never raises.
+    """
+    rules = _STATE.rules
+    st = parse_stored(zoning, zoning_description)
+    if rules is None or st is None or st.district is None:
+        return None
+    jurs = rules["jurisdictions"]
+    j = jurs.get(st.jurisdiction)
+    if j is None:
+        return None
+    base, _conditions = normalize(st.district)
+    if base is None:
+        return None
+    verified = j.get("status") == "verified"
+    table, table_key = j, st.jurisdiction
+    if "governing_jurisdiction" in j:
+        gov = j.get("governing_jurisdiction")
+        own = parcel_id is not None and parcel_id in (j.get("unincorporated_parcel_ids") or ())
+        if gov != "self" and not own:
+            g = jurs.get(gov) if isinstance(gov, str) else None
+            if g is None:
+                return None
+            conv = {normalize(a)[0]: normalize(b)[0]
+                    for a, b in (j.get("district_conversions") or {}).items()}
+            base = conv.get(base, base)
+            table, table_key = g, gov
+            verified = verified and g.get("status") == "verified"
+    districts = {normalize(k)[0]: v for k, v in (table.get("districts") or {}).items()}
+    d = districts.get(base)
+    dims = d.get("dimensions") if isinstance(d, Mapping) else None
+    return District(st.jurisdiction, table_key, base, verified,
+                    dims if isinstance(dims, Mapping) else None)
+
+
 def classify_stored(zoning: Any, zoning_description: Any,
                     parcel_id: str | None = None) -> Classification:
     """Classify a parcel from its stored columns; no provenance -> unknown."""

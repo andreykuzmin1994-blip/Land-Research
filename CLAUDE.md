@@ -34,9 +34,15 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
   citations). `zoning.py` freezes it by SHA-256 at load, like
   `parameters.json`: edits (above all draft → verified) are between runs
   only and need a new run + baseline (`reviews/21_zoning/`).
+- **NEVER edit `building_prototypes.json`** — the operator's building
+  prototypes (copied from their SiteFit tool). `site_fit.py` freezes it by
+  SHA-256 at load and the runner refuses an experiment while it differs
+  from git HEAD. Edits are between runs only; once any zoning jurisdiction
+  is verified, an edit (or a `site_fit.py` change) moves BTS ratings and
+  needs a new run + baseline (`reviews/22_site_fit/`).
 - **Immutable during a run**: `runner.py`, `costar_ingest.py`,
   `costar_import.py`, `reporting.py`, `pipeline_common.py`, `zoning.py`,
-  `zoning_import.py`. Between runs, changes there are
+  `zoning_import.py`, `site_fit.py`. Between runs, changes there are
   Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **`research.py` is the agent sandbox** — the ONLY file the agent edits
   during an experiment run. One focused change per experiment, committed

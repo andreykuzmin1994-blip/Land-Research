@@ -1,0 +1,65 @@
+{
+  "_comment": "HUMAN-OWNED (reviews/22_site_fit). The operator's building prototypes, copied from the defaults of their own SiteFit site-planning tool. site_fit.py loads this file once per process and freezes it by SHA-256; the runner refuses an experiment while it differs from git HEAD. The agent never edits it. A human edits it only between runs; once any zoning jurisdiction is verified, an edit changes BTS ratings, so start a new run and baseline afterwards. All lengths in feet.",
+  "schema_version": 1,
+  "source": "operator SiteFit tool defaults",
+  "as_of": "2026-11-05",
+  "fit_rule": "The full envelope (building L x W plus, per dock side, truck court and trailer parking) must lie inside the setback-buffered buildable area. Truck drives and circulation are not modelled. Each prototype keeps its depth and shrinks its length in step_ft steps, from L down to min_length_ft, at the best orientation.",
+  "step_ft": 40,
+  "default_setback_ft": 25,
+  "prototypes": {
+    "cross": {
+      "label": "cross-dock",
+      "type": "cross",
+      "L": 1000,
+      "W": 520,
+      "clear": 40,
+      "court": 130,
+      "trailerOn": true,
+      "trailer": 55,
+      "stall": 12,
+      "doorSp": 12,
+      "endClr": 60,
+      "min_length_ft": 600,
+      "min_length_note": "600 ft keeps the building at least as long as it is deep (L >= W = 520); 600 x 520 = 312,000 SF"
+    },
+    "front": {
+      "label": "front-load",
+      "type": "front",
+      "L": 640,
+      "W": 260,
+      "clear": 36,
+      "court": 130,
+      "trailerOn": true,
+      "trailer": 55,
+      "stall": 12,
+      "doorSp": 12,
+      "endClr": 60,
+      "min_length_ft": 400,
+      "min_length_note": "400 x 260 = 104,000 SF, the first lattice length at or above 100K SF"
+    },
+    "rear": {
+      "label": "rear-load",
+      "type": "rear",
+      "L": 640,
+      "W": 260,
+      "clear": 36,
+      "court": 130,
+      "trailerOn": true,
+      "trailer": 55,
+      "stall": 12,
+      "doorSp": 12,
+      "endClr": 60,
+      "min_length_ft": 400,
+      "min_length_note": "400 x 260 = 104,000 SF, the first lattice length at or above 100K SF"
+    }
+  },
+  "parking": {
+    "car": {"W": 500, "D": 124, "sw": 9, "sd": 18, "aisle": 24},
+    "trailer": {"W": 600, "D": 190, "sw": 12, "sd": 55, "aisle": 80}
+  },
+  "detention": {"L": 400, "W": 200, "depth": 6, "slope": 4},
+  "road": {
+    "truck": {"width": 30, "radius": 60},
+    "car": {"width": 24, "radius": 30}
+  }
+}

@@ -347,6 +347,25 @@ class DiscoveryTests(unittest.TestCase):
         self.assertNotIn("vars(zoning", src.replace(" ", ""))
         self.assertNotIn("zoning.__dict__", src)
 
+    def test_research_reaches_zoning_only_as_zoning_dot_public_name(self):
+        # reviews/22_site_fit review finding 1, applied to zoning: the scan
+        # above sees only ``zoning.<attr>``; an alias, a from-import, a bare
+        # reference or a reflective lookup must fail too.
+        import static_guards
+        src = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
+        banned = {"encode_stored", "no_source_description", "STORED_PREFIX", "_FIELD_SEP",
+                  "_STATE", "_load_state", "RULES_PATH"}
+        allowed = {n for n in dir(zoning) if not n.startswith("_")} - banned
+        check = lambda s: static_guards.module_reference_problems(s, "zoning", allowed, banned)
+        self.assertEqual(check(src), [])
+        for extra in ("import zoning as _z\n", "from zoning import encode_stored\n",
+                      "x = zoning\n", "getattr(zoning, 'enc' + 'ode_stored')\n",
+                      "import sys\nsys.modules['zoning']\n", "vars(zoning)\n",
+                      "import importlib\n", "zoning._STATE = None\n",
+                      "import runner\nrunner.zoning.encode_stored\n"):
+            bad = src.replace("import zoning  #", extra + "import zoning  #", 1)
+            self.assertNotEqual(check(bad), [], extra)
+
     def test_no_research_string_writes_parcels_zoning(self):
         # Finding 2(c): EVERY string in research.py (module constants, inline
         # execute() literals, constant concatenations, f-string parts) -- no
@@ -480,7 +499,7 @@ class ProtectionTests(unittest.TestCase):
 
     PIPELINE = ("research.py", "runner.py", "costar_ingest.py", "costar_import.py",
                 "reporting.py", "pipeline_common.py", "zoning.py", "zoning_import.py",
-                "connector_harness.py", "cli.py", "prepare.py")
+                "connector_harness.py", "cli.py", "prepare.py", "site_fit.py")
 
     def test_no_pipeline_module_writes_zoning_rules(self):
         writers = {"write_text", "write_bytes", "dump", "replace", "rename", "copy",

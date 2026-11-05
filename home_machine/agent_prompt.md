@@ -22,7 +22,11 @@ without asking questions; nobody is watching this session.
    `zoning_rules.json` (not even at runtime from `research.py`), never edit
    `zoning.py` or `zoning_import.py`, and never set `parcels.zoning` from
    discovery; read zoning only through `zoning.py`. S9 may use only rules a
-   human marked "verified". If the best idea needs a new source, pick another idea and put
+   human marked "verified". Building prototypes are human-owned as well:
+   never write `building_prototypes.json`, never edit `site_fit.py`, and
+   take projected building SF only from `site_fit.project_parcel` /
+   `project_parcels`, tested only with `site_fit.meets_bts_footprint` (no
+   arithmetic on the result, no other arguments). If the best idea needs a new source, pick another idea and put
    `NEEDS-SOURCE: <what and why>` in the commit body. Never scrape CoStar.
 5. Run exactly `python -m unittest discover -s tests`. It must pass. Fix your change if
    it fails (at most 3 attempts). If it still fails, run

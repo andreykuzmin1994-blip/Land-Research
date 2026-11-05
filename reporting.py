@@ -24,6 +24,7 @@ from typing import Any, Mapping, Sequence
 import prepare
 import research
 import zoning  # protected: renders imported zoning for the memo (reviews/21_zoning)
+import site_fit  # protected: building projections (reviews/22_site_fit)
 from pipeline_common import (
     _REPO_ROOT,
     _SQL_FETCH_SUBMARKET_NAME,
@@ -169,6 +170,10 @@ _SQL_FETCH_SCORED_PARCELS_FOR_MEMO = (
 )
 
 # D5: most recent scoring cycle for the market when caller passes cycle_id=None.
+_SQL_FETCH_ZONING_FOR_MEMO = (
+    "SELECT parcel_id, zoning, zoning_description FROM parcels WHERE parcel_id = ANY(%s)"
+)
+
 _SQL_FETCH_LATEST_SCORING_CYCLE_FOR_MEMO = (
     "SELECT cycle_id, MAX(timestamp) AS last_seen "
     "FROM research_log "
@@ -443,11 +448,125 @@ def _fetch_snapshot_data(conn: Any, parcel_id: str) -> dict[str, Any] | None:
                 "flagged_at": frow[3],
             })
 
+    # reviews/22_site_fit: read-time projection (never stored; no schema
+    # change). site_fit runs its reads in SAVEPOINTs and never raises, so a
+    # failure renders '—' with the reason instead of aborting the snapshot.
+    projection = site_fit.project_parcel(conn, parcel_id)
+
     return {
         "parcel": parcel, "score": score, "market_context": mc,
         "comps": comps, "flags": flags,
         "submarket_name": submarket_name,
+        "projection": projection,
     }
+
+
+# ---------------------------------------------------------------------------
+# reviews/22_site_fit — development potential from the site_fit projection
+# ---------------------------------------------------------------------------
+_PROGRAM_COVERAGE_RATIO = 0.40  # program.md snapshot: "SF footprint at 40% coverage ratio"
+
+
+def _used_for_bts(parcel: Mapping[str, Any]) -> bool:
+    """research.py's S9 gate: the projection feeds BTS only for a verified
+    jurisdiction with a known class."""
+    try:
+        c = zoning.classify_stored(parcel.get("zoning"), parcel.get("zoning_description"),
+                                   parcel.get("parcel_id"))
+    except Exception:
+        return False
+    return c.verified and c.cls in (zoning.BY_RIGHT, zoning.CONDITIONAL, zoning.REZONING)
+
+
+def _fmt_sf(v: Any) -> str:
+    return f"{int(v):,} SF" if isinstance(v, (int, float)) else "—"
+
+
+def _projection_reason(p: Any) -> str:
+    if not isinstance(p, site_fit.Projection):
+        return "projection unavailable"
+    if p.status == site_fit.OK:
+        return "no prototype fits"
+    return {site_fit.EMPTY: "nothing left inside the setbacks"}.get(
+        p.status, _md_cell(p.reason))
+
+
+def _bts_use_text(p: Any, used: bool) -> str:
+    """Whether scoring uses this projection for BTS, and how. A verified
+    jurisdiction with a default setback is used but never passes (finding 6)."""
+    if not used:
+        return f"no ({p.rules_label})"
+    if not p.setback_from_rules:
+        return "yes, rated N/A (default setback is not a verified rule)"
+    return "yes (verified rules)"
+
+
+# One footnote under the memo highlights (review finding 8): what no
+# projection deducts, stated once rather than on every line.
+_PROJECTION_FOOTNOTE = (
+    "_Building projections (operator SiteFit prototypes, reviews/22_site_fit): "
+    + "; ".join((site_fit.RES_BUFFERS, site_fit.FLOOD_WETLANDS, site_fit.DETENTION,
+                 site_fit.CAR_PARKING, site_fit.FIT_RULE))
+    + "; height not checked._"
+)
+
+
+def _projection_summary(p: Any, used: bool) -> str:
+    """One line for the memo highlights."""
+    if not isinstance(p, site_fit.Projection):
+        return "Projected max building: — (projection unavailable)."
+    best = site_fit.best_fit(p)
+    sb = f"setback {p.setback_ft:g} ft all sides; " if p.setback_ft is not None else ""
+    use = "no" if not used else ("yes" if p.setback_from_rules
+                                 else "yes, rated N/A (default setback)")
+    tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "
+           f"{site_fit.FLOOD_WETLANDS}; adjacency buffers not applied")
+    if best is None:
+        return f"Projected max building: — ({_projection_reason(p)}; {tag})."
+    return f"Projected max building: {_fmt_sf(best.building_sf)} {best.label} ({tag})."
+
+
+def _render_development_potential(parcel: Mapping[str, Any], p: Any) -> str:
+    """program.md 'Development Potential' lines from the projection, plus a
+    table per prototype (SF-15). Deterministic; '—' with a reason when the
+    projection could not be computed."""
+    used = _used_for_bts(parcel) and isinstance(p, site_fit.Projection)
+    if not isinstance(p, site_fit.Projection):
+        return "- **Building projection**: — (projection unavailable)"
+    gross = p.gross_sf
+    forty = _fmt_sf(round(gross * _PROGRAM_COVERAGE_RATIO)) if gross else "—"
+    net = _fmt_sf(p.buildable_sf) if p.buildable_sf is not None else "—"
+    best = site_fit.best_fit(p)
+    if best is not None:
+        max_line = (f"{_fmt_sf(best.building_sf)} ({best.label}, {best.length_ft:g} x "
+                    f"{best.width_ft:g} ft, {p.rules_label})")
+    else:
+        max_line = f"— ({_projection_reason(p)})"
+    bts = f"used for BTS: {_bts_use_text(p, used)}"
+    lines = [
+        f"- **Estimated buildable area**: 40% coverage of land per program.md: {forty}; "
+        f"net of setbacks: {net}",
+        f"- **Estimated max building SF**: {max_line}",
+        f"- **Building projection** ({p.rules_label}; {bts}; {site_fit.FLOOD_WETLANDS}):",
+    ]
+    if p.status == site_fit.OK and p.fits:
+        lines += ["", "| Prototype | Building SF | L x W (ft) | Docks | Trailer stalls | "
+                      "Coverage | Fit |",
+                  "|---|---|---|---|---|---|---|"]
+        for f in p.fits:
+            if f.fits:
+                lines.append(
+                    f"| {f.label} | {f.building_sf:,} | {f.length_ft:g} x {f.width_ft:g} | "
+                    f"{f.docks} | {f.trailer_stalls} | {f.coverage_pct:.1f}% | "
+                    f"{_md_table_cell(f.binding)} |")
+            else:
+                lines.append(f"| {f.label} | — | — | — | — | — | "
+                             f"{_md_table_cell(f.binding)} |")
+        lines.append("")
+    else:
+        lines.append(f"  - — ({_projection_reason(p)})")
+    lines.append("- **Constraints applied**: " + "; ".join(_md_cell(c) for c in p.constraints))
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -742,6 +861,7 @@ def _render_snapshot_markdown(
         actionability, score.get("actionability_blockers") or {},
     )
     thesis_md = _render_investment_thesis(parcel, score, mc, comps)
+    dev_md = _render_development_potential(parcel, bundle.get("projection"))
 
     rec, rec_reason = _compute_recommendation(
         composite, actionability, threshold,
@@ -823,6 +943,9 @@ def _render_snapshot_markdown(
 - **Last sale**: {_format_date(parcel.get("last_sale_date"))} for {_format_currency(parcel.get("last_sale_price"))}
 - **Assessed value (total)**: {_format_currency(parcel.get("assessed_value_total"))}
 - **Tax status**: {_md_cell(parcel.get("tax_status"))} ({_md_cell(parcel.get("tax_year"))})
+
+### Development Potential
+{dev_md}
 
 ### Strategy Fit Assessment
 {fit_md}
@@ -925,10 +1048,12 @@ def _render_memo_markdown(
     *,
     params: Mapping[str, Any],
     today: str,
+    projections: Mapping[str, Any] | None = None,
 ) -> str:
     """Render the strategy memo per program.md L757-L807. Always renders,
     even when ``rows`` is empty -- the "no pipeline this cycle" memo is
-    itself useful (D4)."""
+    itself useful (D4). ``projections`` (parcel_id -> site_fit projection,
+    reviews/22_site_fit) adds one projection line per highlight."""
     threshold = float(params["composite_threshold"])
     agg = _aggregate_pipeline_composition(rows, threshold)
     top10 = _select_top_n_actionable(rows)
@@ -1017,10 +1142,16 @@ def _render_memo_markdown(
             addr = _md_cell(r.get("address"))
             owner = _md_cell(r.get("owner_name"))
             acres = _format_acres(r.get("acreage"))
-            top_lines.append(
+            line = (
                 f"- **{r.get('parcel_id')}** — {addr} ({sub}, {acres}). "
                 f"Composite {cs_str}, {ab}, primary={ps_label}. Owner: {owner}."
             )
+            if projections is not None:
+                line += " " + _projection_summary(
+                    projections.get(r.get("parcel_id")), bool(r.get("_bts_projection_used")))
+            top_lines.append(line)
+        if projections is not None:
+            top_lines += ["", _PROJECTION_FOOTNOTE]
         top_md = "\n".join(top_lines)
     else:
         top_md = "_No actionable or qualified parcels in this cycle._"
@@ -1295,9 +1426,21 @@ def generate_strategy_memo(
                     "notes": r[6],
                 })
 
+        # reviews/22_site_fit: projections for the highlighted parcels only.
+        top_ids = [r["parcel_id"] for r in _select_top_n_actionable(rows)]
+        projections = site_fit.project_parcels(conn, top_ids)
+        with conn.cursor() as cur:
+            cur.execute(_SQL_FETCH_ZONING_FOR_MEMO, (top_ids,))
+            zrows = {r[0]: r for r in cur.fetchall()}
+        for r in rows:
+            z = zrows.get(r["parcel_id"])
+            if z is not None:
+                r["_bts_projection_used"] = _used_for_bts(
+                    {"parcel_id": z[0], "zoning": z[1], "zoning_description": z[2]})
+
         markdown = _render_memo_markdown(
             market, cycle_id, rows, flags, log_entries,
-            params=params, today=today,
+            params=params, today=today, projections=projections,
         )
     finally:
         if own_conn and ctx is not None:

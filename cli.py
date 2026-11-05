@@ -23,6 +23,8 @@ Subcommands (run ``python cli.py --help`` for the full list):
     halt / unhalt       Sentinel manipulation
     tail                Live-stream experiment_log.tsv
     mirror-restore      Rebuild a MISSING experiment_log.tsv from the mirror
+    site-fit            Print building projections; optionally write SiteFit
+                        study files (reviews/22_site_fit)
 
 Exit codes:
     0   success
@@ -395,6 +397,99 @@ def cmd_tail(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# site-fit (reviews/22_site_fit): read-only projections + SiteFit export
+# ---------------------------------------------------------------------------
+SITE_FIT_STUDIES_DIR = Path(__file__).resolve().parent / "site_fit_studies"
+
+
+def _site_fit_lines(p: Any) -> list[str]:
+    """Projection text for one parcel. Parcel id, zoning-derived rules and
+    numbers only: never owner names, mailing addresses or site addresses."""
+    import site_fit
+    out = [f"{p.parcel_id}: {p.status} ({p.rules_label})"]
+    if p.gross_sf is not None:
+        net = f"{p.buildable_sf:,}" if p.buildable_sf is not None else "-"
+        out.append(f"  gross {p.gross_sf:,} SF; inside setbacks {net} SF")
+    if p.status != site_fit.OK:
+        out.append(f"  reason: {p.reason}")
+    for f in p.fits:
+        if f.fits:
+            out.append(f"  {f.label:11s} {f.building_sf:>9,} SF  {f.length_ft:g} x {f.width_ft:g}"
+                       f"  docks {f.docks}  trailer stalls {f.trailer_stalls}  coverage "
+                       f"{f.coverage_pct:.1f}%  [{f.binding}]")
+        else:
+            out.append(f"  {f.label:11s} {'-':>12}  [{f.binding}]")
+    out.extend(f"  - {c}" for c in p.constraints)
+    return out
+
+
+def _study_filename(parcel_id: str) -> str:
+    """SR-7: parcel ids carry spaces and may carry '/' or '..'; the file name
+    is the id with every unsafe run replaced, plus a short hash of the exact
+    id (so two ids never collide), then the reporting slug guard."""
+    import hashlib
+    import re
+    import reporting
+    base = re.sub(r"[^A-Za-z0-9_-]+", "_", parcel_id).strip("_")[:60] or "parcel"
+    tag = hashlib.sha256(parcel_id.encode("utf-8")).hexdigest()[:8]
+    return reporting._safe_filename_slug(f"{base}-{tag}") + ".sitefit.json"
+
+
+def cmd_site_fit(args: argparse.Namespace) -> int:
+    import prepare
+    import reporting
+    import site_fit
+    if not prepare.dsn_available():
+        print("site-fit: no DATABASE_URL.")
+        return 2
+    if bool(args.parcel) == bool(args.top):
+        print("site-fit: give --parcel ID (repeatable) or --top N")
+        return 2
+    written: list[str] = []
+    with prepare.get_connection() as conn:
+        try:
+            conn.read_only = True  # never writes the database
+        except Exception:
+            pass
+        ids = list(args.parcel) if args.parcel else site_fit.top_scored_parcel_ids(
+            conn, args.market, args.top)
+        projections = site_fit.project_parcels(conn, ids)
+        docs = []
+        for pid in ids:
+            p = projections[pid]
+            if args.json:
+                continue
+            print("\n".join(_site_fit_lines(p)))
+        if args.export:
+            for pid in ids:
+                p = projections[pid]
+                best = site_fit.best_fit(p)
+                if best is None:
+                    print(f"{pid}: nothing to export ({p.status})")
+                    continue
+                try:
+                    boundary, corners = site_fit.export_geometry(conn, p, best)
+                except Exception as exc:
+                    print(f"{pid}: export failed ({type(exc).__name__})")
+                    continue
+                docs.append((pid, site_fit.study_document(p, best, boundary, corners)))
+        conn.rollback()
+    for pid, doc in docs:
+        target = SITE_FIT_STUDIES_DIR / _study_filename(pid)
+        reporting._atomic_write_text(target, json.dumps(doc, indent=1, sort_keys=True) + "\n")
+        written.append(str(target))
+    if args.json:
+        print(json.dumps({pid: {
+            "status": projections[pid].status, "rules": projections[pid].rules_label,
+            "max_building_sf": site_fit.max_building_sf(projections[pid]),
+            "constraints": list(projections[pid].constraints),
+        } for pid in ids}, indent=2, sort_keys=True))
+    for w in written:
+        print(f"wrote {w} (open it in SiteFit: Studies > Open file…)")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 def _build_parser() -> argparse.ArgumentParser:
@@ -468,6 +563,18 @@ def _build_parser() -> argparse.ArgumentParser:
              "(refuses, exit 2, when a live TSV exists)",
     )
     p.set_defaults(fn=cmd_mirror_restore)
+
+    p = sub.add_parser(
+        "site-fit",
+        help="print building projections (read-only); --export writes SiteFit "
+             "study files to the gitignored site_fit_studies/",
+    )
+    p.add_argument("--parcel", action="append", default=[], help="parcel id (repeatable)")
+    p.add_argument("--top", type=int, default=None, help="the N highest-composite parcels")
+    p.add_argument("--market", default="atlanta")
+    p.add_argument("--export", action="store_true",
+                   help="write <parcel>.sitefit.json studies for SiteFit")
+    p.set_defaults(fn=cmd_site_fit)
 
     return parser
 

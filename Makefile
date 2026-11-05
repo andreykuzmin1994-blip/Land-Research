@@ -322,6 +322,10 @@ costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas + industri
 # ---------------------------------------------------------------------
 # Zoning import (reviews/21_zoning) -- between runs only
 # ---------------------------------------------------------------------
+.PHONY: site-fit
+site-fit:  ## Building projections per parcel (read-only). ARGS='--parcel ID' or '--top 10'; add --export for SiteFit study files.
+	@python cli.py --no-color site-fit $(ARGS)
+
 .PHONY: zoning-import
 zoning-import:  ## Write parcels.zoning from the city/county zoning layers in sources.json. Between runs, before make baseline (refuses after it).
 	@python zoning_import.py $(ARGS)
