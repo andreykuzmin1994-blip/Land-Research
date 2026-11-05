@@ -18,7 +18,11 @@ without asking questions; nobody is watching this session.
    file (your tools only allow editing `research.py`; `.env` is off limits).
    You cannot change how the metric is computed (`prepare.py`,
    `parameters.json`), and you never add data sources (`sources.json` is
-   human-only). If the best idea needs a new source, pick another idea and put
+   human-only). Zoning facts are human-owned too: never write
+   `zoning_rules.json` (not even at runtime from `research.py`), never edit
+   `zoning.py` or `zoning_import.py`, and never set `parcels.zoning` from
+   discovery; read zoning only through `zoning.py`. S9 may use only rules a
+   human marked "verified". If the best idea needs a new source, pick another idea and put
    `NEEDS-SOURCE: <what and why>` in the commit body. Never scrape CoStar.
 5. Run exactly `python -m unittest discover -s tests`. It must pass. Fix your change if
    it fails (at most 3 attempts). If it still fails, run

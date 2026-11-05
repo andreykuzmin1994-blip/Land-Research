@@ -1,0 +1,146 @@
+{
+  "_comment": "Paste ONLY the 'zoning_sources' list below into sources.json, as a new key INSIDE county_parcel_data.fulton_ga (next to field_mapping), never directly under county_parcel_data (that would read as a new county connector). sources.json is human-only: the agent never edits it. Built from screener/fulton.py ZONING_SOURCES (2026-11-05) and matching it exactly on url, kind, fields and jurisdictions: the City of South Fulton layer serves south_fulton only, and Fulton layer 34 alone serves the Fulton Industrial District (fid, unincorporated county land under the county's ordinance). Order = precedence: for a parcel, the first role='zoning' source that covers its jurisdiction and matches it wins. role='flu' entries are future land use: zoning_import never writes them to parcels.zoning. Jurisdiction keys are the stable ids of zoning.py / zoning_rules.json.",
+  "key_path": "county_parcel_data.fulton_ga.zoning_sources",
+  "uncovered_jurisdictions": [
+    "college_park",
+    "hapeville",
+    "palmetto",
+    "chattahoochee_hills"
+  ],
+  "zoning_sources": [
+    {
+      "key": "south_fulton_zoning",
+      "name": "South Fulton zoning",
+      "role": "zoning",
+      "kind": "overlay",
+      "jurisdictions": [
+        "south_fulton"
+      ],
+      "url": "https://services3.arcgis.com/y2BJK2GUfoTwH7py/arcgis/rest/services/Zoning/FeatureServer/0",
+      "zoning_field": "ZClass",
+      "desc_field": "ZClassDesc"
+    },
+    {
+      "key": "fulton_layer34_zoning",
+      "name": "Fulton Industrial District zoning (Fulton layer 34)",
+      "role": "zoning",
+      "kind": "overlay",
+      "jurisdictions": [
+        "south_fulton",
+        "fid"
+      ],
+      "url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/34",
+      "zoning_field": "ZClass",
+      "desc_field": "ZClassDesc"
+    },
+    {
+      "key": "fairburn_zoning",
+      "name": "Fairburn zoning",
+      "role": "zoning",
+      "kind": "join",
+      "jurisdictions": [
+        "fairburn"
+      ],
+      "url": "https://services8.arcgis.com/ZvMgtqecACHwgXJb/arcgis/rest/services/Current_Zoning_FLU/FeatureServer/0",
+      "id_field": "ParcelID",
+      "zoning_field": "ZoningCurr"
+    },
+    {
+      "key": "union_city_zoning",
+      "name": "Union City zoning",
+      "role": "zoning",
+      "kind": "join",
+      "jurisdictions": [
+        "union_city"
+      ],
+      "url": "https://services.arcgis.com/MewUCwyCByL0k7La/arcgis/rest/services/Union_City_Data_WFL1/FeatureServer/14",
+      "id_field": "ParcelID",
+      "zoning_field": "Zoning",
+      "desc_field": "ZonDesc"
+    },
+    {
+      "key": "east_point_zoning",
+      "name": "East Point zoning",
+      "role": "zoning",
+      "kind": "join",
+      "jurisdictions": [
+        "east_point"
+      ],
+      "url": "https://services7.arcgis.com/CPLm4MuWYjfnA2R9/arcgis/rest/services/Current_Zoning/FeatureServer/0",
+      "id_field": "PIN",
+      "id_trim_last": true,
+      "zoning_field": "ZONING"
+    },
+    {
+      "key": "atlanta_zoning",
+      "name": "Atlanta zoning",
+      "role": "zoning",
+      "kind": "overlay",
+      "jurisdictions": [
+        "atlanta"
+      ],
+      "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0",
+      "zoning_field": "ZONECLASS"
+    },
+    {
+      "key": "south_fulton_flu_2045",
+      "name": "South Fulton future land use 2045",
+      "role": "flu",
+      "kind": "join",
+      "jurisdictions": [
+        "south_fulton"
+      ],
+      "url": "https://services3.arcgis.com/y2BJK2GUfoTwH7py/arcgis/rest/services/FLUM_2045_New1/FeatureServer/0",
+      "id_field": "ParcelID",
+      "flu_field": "FLUM_2045"
+    },
+    {
+      "key": "fid_flu",
+      "name": "Fulton Industrial District future land use (Fulton layer 33)",
+      "role": "flu",
+      "kind": "overlay",
+      "jurisdictions": [
+        "south_fulton",
+        "fid"
+      ],
+      "url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/33",
+      "flu_field": "LandUses"
+    },
+    {
+      "key": "fairburn_flu",
+      "name": "Fairburn future land use",
+      "role": "flu",
+      "kind": "join",
+      "jurisdictions": [
+        "fairburn"
+      ],
+      "url": "https://services8.arcgis.com/ZvMgtqecACHwgXJb/arcgis/rest/services/Current_Zoning_FLU/FeatureServer/0",
+      "id_field": "ParcelID",
+      "flu_field": "FLU"
+    },
+    {
+      "key": "east_point_flu",
+      "name": "East Point future land use",
+      "role": "flu",
+      "kind": "join",
+      "jurisdictions": [
+        "east_point"
+      ],
+      "url": "https://services7.arcgis.com/CPLm4MuWYjfnA2R9/arcgis/rest/services/Current_Zoning/FeatureServer/0",
+      "id_field": "PIN",
+      "id_trim_last": true,
+      "flu_field": "Future_Use"
+    },
+    {
+      "key": "atlanta_flu",
+      "name": "Atlanta future land use",
+      "role": "flu",
+      "kind": "overlay",
+      "jurisdictions": [
+        "atlanta"
+      ],
+      "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8",
+      "flu_field": "LANDUSEDES"
+    }
+  ]
+}

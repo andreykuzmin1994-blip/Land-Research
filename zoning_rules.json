@@ -1,0 +1,1488 @@
+{
+  "_comment": "HUMAN-OWNED FACTS FILE. Zoning rules for warehouse/distribution, per jurisdiction and district, with citations. The agent (experiment loop) NEVER edits this file; zoning.py loads it once per process and freezes it by SHA-256, like parameters.json. Edit it only BETWEEN runs; a status flip draft -> verified changes S9 and needs a new run and baseline (reviews/21_zoning/02_risk_review.md, Z-01). Built from reviews/21_zoning/01_zoning_rules_DRAFT.json on 2026-11-05.",
+  "schema_version": 1,
+  "use": "warehouse_distribution",
+  "jurisdictions": {
+    "south_fulton": {
+      "name": "City of South Fulton",
+      "status": "draft",
+      "verified_by": null,
+      "verified_on": null,
+      "as_of": "Mirror shows amendments through Ord. No. 2026-011 (4-28-2026); read 2026-11-05",
+      "ordinance": "City of South Fulton Zoning Ordinance (City Code, Appendix C), Articles 2-6",
+      "ordinance_url": "https://library.municode.com/ga/south_fulton (official, blocked to fetch); text read from https://www.zoneomics.com/code/south-fulton-GA/chapter_2 and chapters 3-6",
+      "source_quality": "third-party mirror (Zoneomics); key values cross-checked against official City staff report Z24-029 (buffers) and against the official Fulton County Zoning Resolution the ordinance was derived from (identical numbers)",
+      "unlisted_districts": "unknown",
+      "districts": {
+        "M-1": {
+          "name": "M-1 Light Industrial (formerly M-1A Industrial Park; Table 2-1 Sec. 203)",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts) rows NAICS 493 'Distribution Center' and 49311 'General Warehousing and Indoor Storage' = A in M-1 and M-2 (A = allowed without qualification, Sec. 207.06(a))",
+            "confidence": "high"
+          },
+          "other_uses": {
+            "cold_storage": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts) row 493120 'Refrigerated Warehousing (Cold Storage)' = A",
+              "confidence": "high"
+            },
+            "truck_terminal": {
+              "status": "not_listed_presumed_prohibited",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts); Sec. 207.04(a): any principal use not shown in Tables 2-2/2-4 is specifically prohibited",
+              "confidence": "low",
+              "note": "No 'truck terminal' / 'freight trucking' row found. Related rows: 'Commercial truck parking lot' (NAICS 812930) = A in M-1 and M-2 subject to Sec. 302.48 (codified as 302.49: min 5 ac, 250 ft from residential, 10 ft opaque fence + 10 ft evergreen buffer, 25 ft from ROW); 'Fleet Storage' = A; 'Truck Stops' = S (special use). A cross-dock truck terminal may be classified by the Director under Sec. 207.05 - needs a written use determination."
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts) 'Manufacturing, Industrial' group: e.g. 334 computer/electronic, 335 electrical equipment, 336 transportation equipment, 337 furniture, 3391 medical, 3399 misc., 311 food = A in M-1 and M-2",
+              "confidence": "high",
+              "note": "There is no single 'light manufacturing' row; status is per NAICS row. Fabricated metal (332) and plastics (326) are M-2 only."
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_3 Sec. 303.13(a)(2)",
+              "confidence": "high",
+              "note": "M-1: rear and side yards only; >=25 ft from any residential property line; screened (Tree Preservation Ord. App. G) from residential uses and from streets."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': 'N/A'",
+              "confidence": "high",
+              "note": "Table shows N/A (no minimum)."
+            },
+            "min_lot_width_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': 'N/A'",
+              "confidence": "high",
+              "note": "No minimum lot width."
+            },
+            "min_lot_frontage_ft": {
+              "value": 35,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high"
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 0,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': side/rear cell reads 'None. [fn 19] See Sec. 405 for landscape strip and buffer requirements.'",
+              "confidence": "high",
+              "note": "No yard minimum, but landscape strips/buffers in Table 4-4 apply; Sec. 403.02(b): multiple-frontage lots need a front yard on each street (corner side yard per district regs)."
+            },
+            "rear_setback_ft": {
+              "value": 0,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2' (same cell as side)",
+              "confidence": "high",
+              "note": "Sec. 403.03(e)(4): no rear yard where a rail siding is used for loading."
+            },
+            "corner_lot_rule": {
+              "value": "Front yard (40 ft) on each street frontage except corner lots; corner side yard 'as specified in the district regulations' (Table 4-1 gives none for M-1/M-2); corner-side landscape strip 10 ft (Table 4-4)",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403.02(b); Table 4-4",
+              "confidence": "medium"
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side": 50,
+                "rear": 100,
+                "plus_improvement_setback": 10
+              },
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'; Sec. 405.01(b)(1) (buffers required adjacent to AG-1, R-*, TR, A, A-L, NUP, CUP, MIX-with-residential and existing single-family uses); Sec. 405.01(c) (10-ft improvement setback interior to all buffers)",
+              "confidence": "high",
+              "note": "Buffers are undisturbed natural vegetation (Sec. 405.01(b)(3)-(5)). Note AG-1 neighbours trigger the buffer. Official cross-check: South Fulton staff report Z24-029 (Jan 2025 PC) cites Sec. 405.01/Table 4-4 and the 100-ft buffer for an M-1 rezoning: https://www.cityofsouthfultonga.gov/DocumentCenter/View/11896/Z24-029-CV24-011-3600-Buffington-Center-Place-Jan-PC"
+            },
+            "height_based_extra_setback": {
+              "value": "at least 12 additional feet for each foot of building height in excess of 50 feet when adjacent to a residential district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2' footnote 19",
+              "confidence": "medium",
+              "note": "Verbatim on the mirror AND identical in the official Fulton County Zoning Resolution Sec. 10.2.3.A / 10.3.3.A (from which this was inherited), so it is not a mirror typo; but it is extreme (a 60-ft building would need +120 ft). Human should confirm against Municode and ask staff how it is applied."
+            },
+            "max_height_ft": {
+              "value": "100 ft or 8 stories, whichever is higher",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high"
+            },
+            "max_lot_coverage_pct": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': 'N/A'",
+              "confidence": "high",
+              "note": "No coverage cap in Table 4-1."
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high",
+              "note": "No FAR in Table 4-1."
+            },
+            "landscape_strip_front_ft": {
+              "value": 10,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'",
+              "confidence": "high"
+            },
+            "landscape_strip_side_corner_ft": {
+              "value": 10,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'",
+              "confidence": "high"
+            },
+            "landscape_strip_interior_side_ft": {
+              "value": "0, or 5 where the lot line adjoins a less intense non-residential (except AG-1) district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2' and footnote **",
+              "confidence": "high"
+            },
+            "landscape_strip_rear_ft": {
+              "value": "0, or 5 where the lot line adjoins a less intense non-residential (except AG-1) district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2' and footnote **",
+              "confidence": "high"
+            },
+            "parking_warehouse": {
+              "value": "1 space per 2,000 sq ft (warehousing and storage / distribution centers); manufacturing 1 per 1,000 sq ft",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_6 Sec. 602.02 / Table 6-1 'Minimum Off-Street Parking Spaces Required by Principal Use' (Ord. No. 2024-034, 9-24-2024)",
+              "confidence": "high"
+            },
+            "parking_location_industrial": {
+              "value": "No off-street parking within 25 ft of any property line adjoining a residential use or district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_6 Sec. 606.07(b)",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "Manufacturing/warehousing/wholesaling: 1 (<15,000 sf), 2 (15,000-39,999), 3 (40,000-65,000), +1 per each additional 80,000 sf; berth 12x35 ft, 14 ft clear; 1 in 3 must be 12x55 ft when 3+ required; loading areas across from/adjacent to a non-industrial district need a 50-ft landscaped strip",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_6 Sec. 608.01, 608.02, 608.03(a)",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": "M-1 only: no wood siding; walls visible from a street >=40% Type A (brick/stone/split-face block/tilt-up or precast concrete fluted or exposed-aggregate/stucco), <=60% Type B (finished metal panel), <=25% plain concrete, <=10% corrugated metal; walls >25 ft high may get special percentages from the Director.",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 404.10",
+              "confidence": "high"
+            }
+          },
+          "notes": [
+            "Source is the Zoneomics mirror of the City of South Fulton Zoning Ordinance (City Code Appendix C); Municode (library.municode.com/ga/south_fulton) returned 403 to automated fetches. Latest amendment shown on the mirror: Ord. No. 2026-011, 4-28-2026.",
+            "Sec. 402.05: only one principal building per lot of record - multi-building campuses need subdivision or a variance/rezoning condition.",
+            "Sec. 405.01(e)(3): City Council may impose larger buffers/setbacks as zoning conditions; conditions of zoning on a parcel override these defaults.",
+            "Overlays may add rules: Fulton Industrial Business District Overlay (Sec. 510), South Fulton Parkway Overlay (Sec. 513), Old National Hwy (511), Cascade (506), Sandtown (512), Cedar Grove (507/508), Cliftondale (509), Red Oak (514).",
+            "Sec. 302.48 data center rules exist (min 20 ac, 100 ft residential buffer); a data-center moratorium (RES2025-094) was extended to Sept 9, 2026 - not a warehouse moratorium."
+          ]
+        },
+        "M-2": {
+          "name": "M-2 Heavy Industrial",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts) rows NAICS 493 'Distribution Center' and 49311 'General Warehousing and Indoor Storage' = A in M-1 and M-2 (A = allowed without qualification, Sec. 207.06(a))",
+            "confidence": "high"
+          },
+          "other_uses": {
+            "cold_storage": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts) row 493120 'Refrigerated Warehousing (Cold Storage)' = A",
+              "confidence": "high"
+            },
+            "truck_terminal": {
+              "status": "not_listed_presumed_prohibited",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts); Sec. 207.04(a): any principal use not shown in Tables 2-2/2-4 is specifically prohibited",
+              "confidence": "low",
+              "note": "No 'truck terminal' / 'freight trucking' row found. Related rows: 'Commercial truck parking lot' (NAICS 812930) = A in M-1 and M-2 subject to Sec. 302.48 (codified as 302.49: min 5 ac, 250 ft from residential, 10 ft opaque fence + 10 ft evergreen buffer, 25 ft from ROW); 'Fleet Storage' = A; 'Truck Stops' = S (special use). A cross-dock truck terminal may be classified by the Director under Sec. 207.05 - needs a written use determination."
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts) 'Manufacturing, Industrial' group: e.g. 334 computer/electronic, 335 electrical equipment, 336 transportation equipment, 337 furniture, 3391 medical, 3399 misc., 311 food = A in M-1 and M-2; M-2 additionally allows 321 wood products, 325 chemicals, 326 plastics, 327 non-metallic mineral, 332 fabricated metal = A in M-2 only",
+              "confidence": "high",
+              "note": "There is no single 'light manufacturing' row; status is per NAICS row. Fabricated metal (332) and plastics (326) are M-2 only."
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_3 Sec. 303.13(a)(2)",
+              "confidence": "high",
+              "note": "M-2: allowed in all yards; >=25 ft from any residential property line; screened from neighboring residential uses."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': 'N/A'",
+              "confidence": "high",
+              "note": "Table shows N/A (no minimum)."
+            },
+            "min_lot_width_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': 'N/A'",
+              "confidence": "high",
+              "note": "No minimum lot width."
+            },
+            "min_lot_frontage_ft": {
+              "value": 35,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high"
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 0,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': side/rear cell reads 'None. [fn 19] See Sec. 405 for landscape strip and buffer requirements.'",
+              "confidence": "high",
+              "note": "No yard minimum, but landscape strips/buffers in Table 4-4 apply; Sec. 403.02(b): multiple-frontage lots need a front yard on each street (corner side yard per district regs)."
+            },
+            "rear_setback_ft": {
+              "value": 0,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2' (same cell as side)",
+              "confidence": "high",
+              "note": "Sec. 403.03(e)(4): no rear yard where a rail siding is used for loading."
+            },
+            "corner_lot_rule": {
+              "value": "Front yard (40 ft) on each street frontage except corner lots; corner side yard 'as specified in the district regulations' (Table 4-1 gives none for M-1/M-2); corner-side landscape strip 10 ft (Table 4-4)",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403.02(b); Table 4-4",
+              "confidence": "medium"
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side": 50,
+                "rear": 100,
+                "plus_improvement_setback": 10
+              },
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'; Sec. 405.01(b)(1) (buffers required adjacent to AG-1, R-*, TR, A, A-L, NUP, CUP, MIX-with-residential and existing single-family uses); Sec. 405.01(c) (10-ft improvement setback interior to all buffers)",
+              "confidence": "high",
+              "note": "Buffers are undisturbed natural vegetation (Sec. 405.01(b)(3)-(5)). Note AG-1 neighbours trigger the buffer. Official cross-check: South Fulton staff report Z24-029 (Jan 2025 PC) cites Sec. 405.01/Table 4-4 and the 100-ft buffer for an M-1 rezoning: https://www.cityofsouthfultonga.gov/DocumentCenter/View/11896/Z24-029-CV24-011-3600-Buffington-Center-Place-Jan-PC"
+            },
+            "height_based_extra_setback": {
+              "value": "at least 12 additional feet for each foot of building height in excess of 50 feet when adjacent to a residential district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2' footnote 19",
+              "confidence": "medium",
+              "note": "Verbatim on the mirror AND identical in the official Fulton County Zoning Resolution Sec. 10.2.3.A / 10.3.3.A (from which this was inherited), so it is not a mirror typo; but it is extreme (a 60-ft building would need +120 ft). Human should confirm against Municode and ask staff how it is applied."
+            },
+            "max_height_ft": {
+              "value": "100 ft or 8 stories, whichever is higher",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high"
+            },
+            "max_lot_coverage_pct": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2': 'N/A'",
+              "confidence": "high",
+              "note": "No coverage cap in Table 4-1."
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2'",
+              "confidence": "high",
+              "note": "No FAR in Table 4-1."
+            },
+            "landscape_strip_front_ft": {
+              "value": 10,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'",
+              "confidence": "high"
+            },
+            "landscape_strip_side_corner_ft": {
+              "value": 10,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'",
+              "confidence": "high"
+            },
+            "landscape_strip_interior_side_ft": {
+              "value": "0, or 5 where the lot line adjoins a less intense non-residential (except AG-1) district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2' and footnote **",
+              "confidence": "high"
+            },
+            "landscape_strip_rear_ft": {
+              "value": "0, or 5 where the lot line adjoins a less intense non-residential (except AG-1) district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2' and footnote **",
+              "confidence": "high"
+            },
+            "parking_warehouse": {
+              "value": "1 space per 2,000 sq ft (warehousing and storage / distribution centers); manufacturing 1 per 1,000 sq ft",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_6 Sec. 602.02 / Table 6-1 'Minimum Off-Street Parking Spaces Required by Principal Use' (Ord. No. 2024-034, 9-24-2024)",
+              "confidence": "high"
+            },
+            "parking_location_industrial": {
+              "value": "No off-street parking within 25 ft of any property line adjoining a residential use or district",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_6 Sec. 606.07(b)",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "Manufacturing/warehousing/wholesaling: 1 (<15,000 sf), 2 (15,000-39,999), 3 (40,000-65,000), +1 per each additional 80,000 sf; berth 12x35 ft, 14 ft clear; 1 in 3 must be 12x55 ft when 3+ required; loading areas across from/adjacent to a non-industrial district need a 50-ft landscaped strip",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_6 Sec. 608.01, 608.02, 608.03(a)",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": "No M-2-specific material standard found in Art. 4 (Sec. 404.10 is M-1 only); FIB overlay (Sec. 510) applies inside its boundary.",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 404 (no M-2 subsection)",
+              "confidence": "medium"
+            }
+          },
+          "notes": [
+            "Source is the Zoneomics mirror of the City of South Fulton Zoning Ordinance (City Code Appendix C); Municode (library.municode.com/ga/south_fulton) returned 403 to automated fetches. Latest amendment shown on the mirror: Ord. No. 2026-011, 4-28-2026.",
+            "Sec. 402.05: only one principal building per lot of record - multi-building campuses need subdivision or a variance/rezoning condition.",
+            "Sec. 405.01(e)(3): City Council may impose larger buffers/setbacks as zoning conditions; conditions of zoning on a parcel override these defaults.",
+            "Overlays may add rules: Fulton Industrial Business District Overlay (Sec. 510), South Fulton Parkway Overlay (Sec. 513), Old National Hwy (511), Cascade (506), Sandtown (512), Cedar Grove (507/508), Cliftondale (509), Red Oak (514).",
+            "Sec. 302.48 data center rules exist (min 20 ac, 100 ft residential buffer); a data-center moratorium (RES2025-094) was extended to Sept 9, 2026 - not a warehouse moratorium.",
+            "M-2 Table 2-4 rows: 'Wholesale Trade, no Showrooms' A; 'Wholesaler with Retail Outlet' M-1 only."
+          ]
+        },
+        "AG-1": {
+          "name": "Agricultural District (only use status checked)",
+          "warehouse_distribution": {
+            "status": "not_permitted",
+            "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts): AG-1 column blank for rows 493 Distribution Center, 49311 General Warehousing; blank = prohibited (Sec. 207.06(c), 207.04(a))",
+            "confidence": "high",
+            "note": "Rezoning to M-1 or M-2 required. Recent AG-1 -> industrial requests have been contested/denied (e.g. Z24-026 KMT 188 ac denied 4-2 per AJC Apr 2026; Bridge Logistics Z26-001 PC recommended denial July 2026)."
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "not_permitted",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts)",
+              "confidence": "high"
+            },
+            "manufacturing_light": {
+              "status": "not_permitted",
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts): AG-1 column blank for Manufacturing, Industrial rows",
+              "confidence": "high"
+            }
+          },
+          "dimensions": {
+            "front_setback_ft": {
+              "value": 60,
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings), row 'M-1 M-2' row AG-1",
+              "confidence": "high",
+              "note": "For reference only."
+            },
+            "industrial_buffer_owed_to_AG1_neighbour": {
+              "value": {
+                "side": 50,
+                "rear": 100
+              },
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 405.01 / Table 4-4 (Minimum Landscape Strip and Buffer Requirements), row 'M-1, M-2'",
+              "confidence": "high",
+              "note": "Industrial sites next to AG-1 must give the M-1/M-2 buffer."
+            }
+          },
+          "notes": [
+            "AG-1 land is a rezoning play, not a by-right warehouse site."
+          ]
+        }
+      }
+    },
+    "fairburn": {
+      "name": "City of Fairburn",
+      "status": "draft",
+      "verified_by": null,
+      "verified_on": null,
+      "as_of": "Mirror read 2026-11-05; latest amendment seen Ord. No. 2025-03 (2-24-2025)",
+      "ordinance": "Fairburn Code of Ordinances Ch. 80 Zoning (Art. II districts, Art. IX parking, Art. X buffers)",
+      "ordinance_url": "https://library.municode.com/ga/fairburn (official, not fetched); read from https://www.zoneomics.com/code/fairburn-GA/chapter_2",
+      "source_quality": "third-party mirror (Zoneomics), not cross-checked",
+      "unlisted_districts": "unknown",
+      "districts": {
+        "M-1": {
+          "name": "M-1 Light Industrial",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(c) items (48) 'Warehousing and storage' and (50) 'Wholesale trade and distribution establishments and warehousing facilities'",
+            "confidence": "high",
+            "note": "Storage associated with permitted uses must be inside an enclosed building; outside storage enclosed by opaque fence (Sec. 80-85(c) preamble)."
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "use_permit",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(e) Use Permit item 'Truck terminals/truck stops. See section 80-239. Allowable districts: M-1 and M-2' ; BUT also listed as permitted use (c)(47)",
+              "confidence": "low",
+              "note": "M-1 text is internally inconsistent (permitted list and use-permit table both list it); assume use permit until staff confirms."
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(c) items (27) 'Light assembly and fabrication' and (30) Manufacturing...where...emissions...do not create adverse effects beyond the property",
+              "confidence": "high"
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(c) preamble and (h)(2)",
+              "confidence": "high",
+              "note": "Must be enclosed by opaque fence and completely screened from public view from adjacent properties and streets."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": 43560,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)",
+              "confidence": "high",
+              "note": "1 acre"
+            },
+            "min_lot_frontage_ft": {
+              "value": 100,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f) 'Minimum width of lot frontage or width at building line'",
+              "confidence": "high"
+            },
+            "front_setback_ft": {
+              "value": 35,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 20,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)",
+              "confidence": "high"
+            },
+            "rear_setback_ft": {
+              "value": 30,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)",
+              "confidence": "high"
+            },
+            "corner_lot_rule": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85",
+              "confidence": "high",
+              "note": "Not found."
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side_rear_yard_abutting_residential": 50,
+                "buffer_abutting_other_districts": 50,
+                "buffer_along_all_public_ROW": 25
+              },
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f) Note; https://www.zoneomics.com/code/fairburn-GA/chapter_10 Sec. 80-372 and 80-367",
+              "confidence": "medium",
+              "note": "Sec. 80-372: 'When C-1, C-2, M-1, or M-2 zoned properties abut all other zoning districts; a 50 feet buffer shall be required' - wording ambiguous (may include other industrial). Sec. 80-369: buffers may be counted within required yards. Buffers must give complete visual obstruction to 12 ft (80-371)."
+            },
+            "height_based_extra_setback": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85",
+              "confidence": "high",
+              "note": "None found."
+            },
+            "max_height_ft": {
+              "value": 48,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(g) 'Maximum height (unless approved by the fire marshal) 48 feet'",
+              "confidence": "high",
+              "note": "48 ft is tight for modern 36-40 ft clear-height bulk warehouses; fire marshal can approve more."
+            },
+            "max_lot_coverage_pct": {
+              "value": 60,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(g) 'including accessory structures'",
+              "confidence": "high"
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": 25,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_10 Sec. 80-367 '25 feet buffer along all public right-of-way'",
+              "confidence": "high",
+              "note": "Labelled a buffer, functions as a street landscape strip. Chapter 74 Landscaping not reviewed."
+            },
+            "parking_warehouse": {
+              "value": "1 standard space per 2,500 sq ft of warehouse/storage floor area for first 150,000 sf + 1 per 7,500 sf above; plus 1 oversized (truck) space per 5,000 sf of gross warehouse space; office >10% of floor area at office rate",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_9 Sec. 80-337 item (22)",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "Industrial: 1 for first 25,000 sf; 2 (25,000-99,000); 3 (100,000-159,999); 4 (160,000-239,000); '3' (240,000-349,999 - apparent typo); +1 per 100,000 sf above 350,000; space 15x60 ft (reducible to 12x45)",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_9 Sec. 80-339(a), 80-331",
+              "confidence": "medium"
+            },
+            "site_design": {
+              "value": "Must be on a collector street or in an industrial park served by a collector; on-site truck queuing; no backing onto street",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(h)",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85",
+              "confidence": "medium",
+              "note": "No district material standard found; Hwy 29 and Hwy 74 overlays (Sec. 80-89, 80-90) not reviewed."
+            }
+          },
+          "notes": [
+            "Source: Zoneomics mirror of Fairburn Code Ch. 80 (Zoning); not cross-checked against an official copy. Latest amendments seen: M-1 Ord. No. 2022-230 (3-28-2022); M-2 Ord. No. 2025-03 (2-24-2025)."
+          ]
+        },
+        "M-2": {
+          "name": "M-2 Heavy Industrial",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(c) (1) 'Any use permitted in the M-1 light industrial district'",
+            "confidence": "high",
+            "note": "Storage associated with permitted uses must be inside an enclosed building; outside storage enclosed by opaque fence (Sec. 80-86(c) preamble)."
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "use_permit",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(e) Use Permit item 'Truck terminals/truck stops. See section 80-239. Allowable districts: M-1 and M-2'; (c)(22) 'Truck terminals/truck stops, subject to a use permit' (min 5 ac, 5,000 ft from similar use, 24/7 security, no long-term trailer storage, no overnight facilities)",
+              "confidence": "high"
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(c)(1) + heavy uses (2)-(21)",
+              "confidence": "high"
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(c) preamble and (h)(2)",
+              "confidence": "high",
+              "note": "Must be enclosed by opaque fence and completely screened from public view from adjacent properties and streets."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": 87120,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)",
+              "confidence": "high",
+              "note": "2 acres"
+            },
+            "min_lot_frontage_ft": {
+              "value": 30,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f) 'Minimum width of lot frontage or width at building line'",
+              "confidence": "low",
+              "note": "M-2 shows 30 ft vs 100 ft in M-1 - possibly a typo in the code/mirror; verify."
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 20,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)",
+              "confidence": "high"
+            },
+            "rear_setback_ft": {
+              "value": 30,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)",
+              "confidence": "high"
+            },
+            "corner_lot_rule": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86",
+              "confidence": "high",
+              "note": "Not found."
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side_rear_yard_abutting_residential": 50,
+                "buffer_abutting_other_districts": 50,
+                "buffer_along_all_public_ROW": 25
+              },
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f) Note; https://www.zoneomics.com/code/fairburn-GA/chapter_10 Sec. 80-372 and 80-367",
+              "confidence": "medium",
+              "note": "Sec. 80-372: 'When C-1, C-2, M-1, or M-2 zoned properties abut all other zoning districts; a 50 feet buffer shall be required' - wording ambiguous (may include other industrial). Sec. 80-369: buffers may be counted within required yards. Buffers must give complete visual obstruction to 12 ft (80-371)."
+            },
+            "height_based_extra_setback": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86",
+              "confidence": "high",
+              "note": "None found."
+            },
+            "max_height_ft": {
+              "value": 48,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(g) 'Maximum height (unless approved by the fire marshal) 48 feet'",
+              "confidence": "high",
+              "note": "48 ft is tight for modern 36-40 ft clear-height bulk warehouses; fire marshal can approve more."
+            },
+            "max_lot_coverage_pct": {
+              "value": 60,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(g) 'including accessory structures'",
+              "confidence": "high"
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": 25,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_10 Sec. 80-367 '25 feet buffer along all public right-of-way'",
+              "confidence": "high",
+              "note": "Labelled a buffer, functions as a street landscape strip. Chapter 74 Landscaping not reviewed."
+            },
+            "parking_warehouse": {
+              "value": "1 standard space per 2,500 sq ft of warehouse/storage floor area for first 150,000 sf + 1 per 7,500 sf above; plus 1 oversized (truck) space per 5,000 sf of gross warehouse space; office >10% of floor area at office rate",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_9 Sec. 80-337 item (22)",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "Industrial: 1 for first 25,000 sf; 2 (25,000-99,000); 3 (100,000-159,999); 4 (160,000-239,000); '3' (240,000-349,999 - apparent typo); +1 per 100,000 sf above 350,000; space 15x60 ft (reducible to 12x45)",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_9 Sec. 80-339(a), 80-331",
+              "confidence": "medium"
+            },
+            "site_design": {
+              "value": "Must be on a collector street or in an industrial park served by a collector; on-site truck queuing; no backing onto street; loading docks to rear unless completely screened from street",
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(h)",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86",
+              "confidence": "medium",
+              "note": "No district material standard found; Hwy 29 and Hwy 74 overlays (Sec. 80-89, 80-90) not reviewed."
+            }
+          },
+          "notes": [
+            "Source: Zoneomics mirror of Fairburn Code Ch. 80 (Zoning); not cross-checked against an official copy. Latest amendments seen: M-1 Ord. No. 2022-230 (3-28-2022); M-2 Ord. No. 2025-03 (2-24-2025)."
+          ]
+        },
+        "PD": {
+          "name": "PD Planned Development (Fairburn)",
+          "warehouse_distribution": {
+            "status": "not_permitted",
+            "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-87(c): permitted uses are those of R-1..R-4, R-CT, RM-12, RM-36, O&I, P&O, C-1, C-2 only",
+            "confidence": "medium",
+            "note": "Industrial is listed in the PD intent (80-87(a)) but M-1/M-2 uses are not in the permitted-use list, so a warehouse in Fairburn PD would need a rezoning; Fairburn PDs are mixed-residential, not industrial."
+          },
+          "other_uses": {},
+          "dimensions": {
+            "max_height_ft": {
+              "value": 48,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-87(h)",
+              "confidence": "high"
+            },
+            "min_pd_size_ac": {
+              "value": 5,
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-87(f)",
+              "confidence": "high"
+            }
+          },
+          "notes": [
+            "Ord. No. 2023-12 (7-24-2023) latest amendment seen."
+          ]
+        }
+      }
+    },
+    "atlanta": {
+      "name": "City of Atlanta",
+      "status": "draft",
+      "verified_by": null,
+      "verified_on": null,
+      "as_of": "Mirror read 2026-11-05; latest amendments seen 2023",
+      "ordinance": "Atlanta Zoning Ordinance, Code of Ordinances Part 16 (Ch. 16 I-1, Ch. 17 I-2)",
+      "ordinance_url": "https://library.municode.com/ga/atlanta (official, blocked to fetch); read from https://www.zoneomics.com/code/atlanta-GA/chapter_22 and https://www.zoneomics.com/code/atlanta-GA/chapter_24",
+      "source_quality": "third-party mirror (Zoneomics), not cross-checked against an official copy",
+      "unlisted_districts": "unknown",
+      "districts": {
+        "I-1": {
+          "name": "I-1 Light Industrial",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.003(20) 'Warehousing, self-storage facilities ..., distribution centers'",
+            "confidence": "high",
+            "note": "Except where any part of the property is within 500 ft of the Beltline corridor (Sec. 16-36.007). A separate ordinance to ban warehousing in the Beltline overlay was referred in Feb 2026 (status unknown) - irrelevant to south/west Fulton parcels unless near the Beltline."
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "special_use_permit",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.005(1)(e) 'Terminals, freight, rail, bus or truck, when erected or operated by other than a governmental agency'",
+              "confidence": "high"
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.003(8)",
+              "confidence": "high",
+              "note": "I-1: only where operations/emissions/by-products do not create adverse effects beyond the property; excludes commercial food preparation."
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.003(21) 'Yards for storage of contractor's equipment; sand and gravel; lumber...'",
+              "confidence": "medium",
+              "note": "Principal-use storage yards allowed; general accessory outdoor-storage rules (Ch. 28) not reviewed."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(2) 'No fixed minimum lot widths or areas'",
+              "confidence": "high"
+            },
+            "min_lot_width_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(2)",
+              "confidence": "high"
+            },
+            "min_lot_frontage_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(2)",
+              "confidence": "high",
+              "note": "Not stated."
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(3)(a)",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 5,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(3)(b)",
+              "confidence": "high",
+              "note": "Zero if built to the lot line; otherwise at least 5 ft."
+            },
+            "rear_setback_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(3)",
+              "confidence": "high",
+              "note": "No general rear yard stated; 20-ft rear transitional yard when adjacent to an R district (Sec. 16-16.006(3)(b))."
+            },
+            "corner_lot_rule": {
+              "value": "Side yard adjacent to a street = half the required front yard (20 ft)",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(3)(b)",
+              "confidence": "high"
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side": 20,
+                "rear": 20,
+                "screen": "6-ft opaque fence/screen"
+              },
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.006(3)(a)-(c)",
+              "confidence": "high",
+              "note": "Transitional yards adjacent to an R district (no intervening street), not to be paved or used for parking/servicing."
+            },
+            "height_based_extra_setback": {
+              "value": "45-degree transitional height plane starting 35 ft above the required setback/transitional yard line where contiguous to a protected district (R-1..R-5, RG, MR, and similar PD/SPI/historic); if within 150 ft but not contiguous, plane starts 15 ft above the protected district lot line",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.006(2)",
+              "confidence": "high"
+            },
+            "max_height_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.008 'None, except as required in section 16-16.006' (I-2 text self-references 16-16.008 - apparent codification error)",
+              "confidence": "high",
+              "note": "No district height limit beyond the transitional height plane; airport (FAA/Brown Field, Hartsfield) height limits may apply separately."
+            },
+            "max_lot_coverage_pct": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007",
+              "confidence": "high"
+            },
+            "max_far": {
+              "value": 2.0,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007(1) 'Floor area shall not exceed ... 2.0 times net land area'",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.010",
+              "confidence": "high",
+              "note": "Not in district text; Sec. 16-16.010 requires public sidewalk with >=5-ft amenity zone + 6-10 ft walk zone and street trees. Parking-lot landscaping (Sec. 16-28.014) and Tree Protection Ordinance not reviewed."
+            },
+            "parking_warehouse": {
+              "value": "1 space per 600 sq ft or per 2 employees on peak shift, whichever is greater (manufacturing, warehousing, distribution centers)",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.009(5)",
+              "confidence": "high",
+              "note": "Labelled 'minimum'. Loading per Sec. 16-28.015 not reviewed. Verify no later citywide parking-minimum reform overrides this."
+            },
+            "architectural_standards": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22",
+              "confidence": "medium",
+              "note": "None found in district chapter."
+            }
+          },
+          "notes": [
+            "Source: Zoneomics mirror of Atlanta Zoning Ordinance Part 16; Municode blocked. Latest amendment seen in Ch. 16: Ord. No. 2023-01(22-O-1209).",
+            "Atlanta 'Zoning 2.0' rewrite: Draft V2 comment period closed Apr 8, 2026; not adopted as of last check. If adopted, I-1/I-2 will be converted to new districts - re-check before relying.",
+            "Suffix '-C' (e.g. I-1-C): Sec. 16-02.003(2) - district 'zoned conditional under previous ordinance amendments by the council'; conditions remain in effect and are obtained from the Clerk of Council. Treat every -C parcel as having site-specific conditions that may override these defaults (https://www.zoneomics.com/code/atlanta-GA/chapter_2)."
+          ],
+          "location_conditions": [
+            {
+              "condition": "any part of the property within 500 ft of the Atlanta BeltLine corridor",
+              "effect": "ignored",
+              "allowed_effects": [
+                "ignored",
+                "downgrade_to_conditional"
+              ],
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.003(20) 'Warehousing, self-storage facilities ..., distribution centers'",
+              "note": "No BeltLine geometry is wired, so the exception cannot be tested per parcel. 'ignored' keeps the district by_right; 'downgrade_to_conditional' makes every parcel of this district conditional. The verifying human chooses."
+            }
+          ]
+        },
+        "I-2": {
+          "name": "I-2 Heavy Industrial",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.003(21) 'Warehousing, self-storage facilities ..., distribution centers'",
+            "confidence": "high",
+            "note": "Except where any part of the property is within 500 ft of the Beltline corridor (Sec. 16-36.007). A separate ordinance to ban warehousing in the Beltline overlay was referred in Feb 2026 (status unknown) - irrelevant to south/west Fulton parcels unless near the Beltline."
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "special_use_permit",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.005(1)(p) 'Terminals, freight, rail, bus or truck, when erected or operated by other than a governmental agency'",
+              "confidence": "high"
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.003(9)",
+              "confidence": "high",
+              "note": "I-2: adverse effects limited at district (not property) boundary."
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_by_right",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.003(22) 'Yards for storage of contractor's equipment; sand and gravel; lumber...'",
+              "confidence": "medium",
+              "note": "Principal-use storage yards allowed; general accessory outdoor-storage rules (Ch. 28) not reviewed."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(2) 'No fixed minimum lot widths or areas'",
+              "confidence": "high"
+            },
+            "min_lot_width_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(2)",
+              "confidence": "high"
+            },
+            "min_lot_frontage_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(2)",
+              "confidence": "high",
+              "note": "Not stated."
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(3)(a)",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 10,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(3)(b)-(c)",
+              "confidence": "high",
+              "note": "Zero if built to the lot line; otherwise at least 10 ft."
+            },
+            "rear_setback_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(3)",
+              "confidence": "high",
+              "note": "No general rear yard stated; 20-ft rear transitional yard when adjacent to an R district (Sec. 16-17.006(3)(b))."
+            },
+            "corner_lot_rule": {
+              "value": "Side yard adjacent to a street = half the required front yard (20 ft)",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(3)(b)",
+              "confidence": "high"
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side": 20,
+                "rear": 20,
+                "screen": "6-ft opaque fence/screen"
+              },
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.006(3)(a)-(c)",
+              "confidence": "high",
+              "note": "Transitional yards adjacent to an R district (no intervening street), not to be paved or used for parking/servicing."
+            },
+            "height_based_extra_setback": {
+              "value": "45-degree transitional height plane starting 35 ft above the required setback/transitional yard line where contiguous to a protected district (R-1..R-5, RG, MR, and similar PD/SPI/historic); if within 150 ft but not contiguous, plane starts 15 ft above the protected district lot line",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.006(2)",
+              "confidence": "high"
+            },
+            "max_height_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.008 'None, except as required in section 16-17.006' (I-2 text self-references 16-17.008 - apparent codification error)",
+              "confidence": "high",
+              "note": "No district height limit beyond the transitional height plane; airport (FAA/Brown Field, Hartsfield) height limits may apply separately."
+            },
+            "max_lot_coverage_pct": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007",
+              "confidence": "high"
+            },
+            "max_far": {
+              "value": 2.0,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007(1) 'Floor area shall not exceed ... 2.0 times net land area'",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.010",
+              "confidence": "high",
+              "note": "Not in district text; Sec. 16-17.010 requires public sidewalk with >=5-ft amenity zone + 6-10 ft walk zone and street trees. Parking-lot landscaping (Sec. 16-28.014) and Tree Protection Ordinance not reviewed."
+            },
+            "parking_warehouse": {
+              "value": "1 space per 600 sq ft or per 2 employees on peak shift, whichever is greater (manufacturing, warehousing, distribution centers)",
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.009(5)",
+              "confidence": "high",
+              "note": "Labelled 'minimum'. Loading per Sec. 16-28.015 not reviewed. Verify no later citywide parking-minimum reform overrides this."
+            },
+            "architectural_standards": {
+              "value": null,
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24",
+              "confidence": "medium",
+              "note": "None found in district chapter."
+            }
+          },
+          "notes": [
+            "Source: Zoneomics mirror of Atlanta Zoning Ordinance Part 16; Municode blocked. Latest amendment seen in Ch. 16: Ord. No. 2023-01(22-O-1209).",
+            "Atlanta 'Zoning 2.0' rewrite: Draft V2 comment period closed Apr 8, 2026; not adopted as of last check. If adopted, I-1/I-2 will be converted to new districts - re-check before relying.",
+            "Suffix '-C' (e.g. I-1-C): Sec. 16-02.003(2) - district 'zoned conditional under previous ordinance amendments by the council'; conditions remain in effect and are obtained from the Clerk of Council. Treat every -C parcel as having site-specific conditions that may override these defaults (https://www.zoneomics.com/code/atlanta-GA/chapter_2)."
+          ],
+          "location_conditions": [
+            {
+              "condition": "any part of the property within 500 ft of the Atlanta BeltLine corridor",
+              "effect": "ignored",
+              "allowed_effects": [
+                "ignored",
+                "downgrade_to_conditional"
+              ],
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.003(21) 'Warehousing, self-storage facilities ..., distribution centers'",
+              "note": "No BeltLine geometry is wired, so the exception cannot be tested per parcel. 'ignored' keeps the district by_right; 'downgrade_to_conditional' makes every parcel of this district conditional. The verifying human chooses."
+            }
+          ]
+        }
+      }
+    },
+    "union_city": {
+      "name": "City of Union City",
+      "status": "draft",
+      "verified_by": null,
+      "verified_on": null,
+      "as_of": "February 18, 2025 Rev. (cover states it is an unofficial reference copy; confirm with Community Development)",
+      "ordinance": "Union City, Georgia Zoning Ordinance (city-maintained reference copy, Feb 18, 2025 Rev.)",
+      "ordinance_url": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf",
+      "source_quality": "official city website PDF (self-described unofficial reference copy)",
+      "unlisted_districts": "unknown",
+      "districts": {
+        "M-1": {
+          "name": "M-1 Light Industrial",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.B items 36 'Warehousing & storage', 37 'Wholesale trade', 11 'Electronic shopping & mail order houses' (p. 101-102)",
+            "confidence": "high"
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "permitted_by_right",
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.B item 34 'Truck transportation'; Sec. 10-8.A.1 loading for 'Bus and Truck Terminals'",
+              "confidence": "medium",
+              "note": "'Truck transportation' read as covering truck terminals - confirm with staff."
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.B item 17 'Light manufacturing' (a-r)",
+              "confidence": "high"
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 5-17, 5-18",
+              "confidence": "high",
+              "note": "Outside storage/service areas must be 100% screened before CO (wood, brick, stone, concrete/block, or chain-link with inserts in M-1/M-2)."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": 30000,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.1",
+              "confidence": "high"
+            },
+            "min_lot_width_ft": {
+              "value": 150,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.2 'Lot width and frontage: 150 feet for initial zoning request'",
+              "confidence": "high"
+            },
+            "min_lot_frontage_ft": {
+              "value": 150,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.2",
+              "confidence": "high"
+            },
+            "front_setback_ft": {
+              "value": 50,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.3 (measured from the right-of-way)",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 20,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.5",
+              "confidence": "high"
+            },
+            "rear_setback_ft": {
+              "value": 20,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.4",
+              "confidence": "high"
+            },
+            "corner_lot_rule": {
+              "value": null,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf",
+              "confidence": "high",
+              "note": "Not found in Sec. 6-13; Sec. 10-5 corner visibility clearance applies."
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "buffer": 75,
+                "plus_setback_measured_from_buffer": 20
+              },
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.6",
+              "confidence": "high",
+              "note": "75-ft buffer where rear or side yard abuts a Residential OR Agricultural district, in addition to the setback; setback measured from the buffer (so effectively 95 ft)."
+            },
+            "height_based_extra_setback": {
+              "value": null,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13",
+              "confidence": "high",
+              "note": "None in M-1."
+            },
+            "max_height_ft": {
+              "value": 75,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.7",
+              "confidence": "high"
+            },
+            "max_lot_coverage_pct": {
+              "value": 80,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.D.8 'including structure and parking area'",
+              "confidence": "high",
+              "note": "Impervious-style cap (buildings + parking)."
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": 10,
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 10-6.C.1.a (landscape strip at least 10 ft along street ROW where off-street parking is required)",
+              "confidence": "medium"
+            },
+            "parking_warehouse": {
+              "value": "1 space per employee + 1 per company vehicle operating from the premises",
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 10-7.Y",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "1 per 50,000 sq ft GFA (or fraction); berth 12x35 ft, 14 ft clear; truck terminals: enough for max trucks stored/loaded at once",
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 10-8, 10-8.A.1, 10-8.A.3",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": "Sec. 5-41 requires 80% brick/stone on street-facing facade of 'commercial buildings' - unclear whether it applies to industrial buildings",
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 5-41 (Ord. 07-22)",
+              "confidence": "low"
+            }
+          },
+          "notes": [
+            "Overlays not reviewed: Urban Design Overlay (Sec. 7-5) and Roosevelt Highway Corridor Overlay (Sec. 7-6).",
+            "Data Centers added as permitted M-1 use by Ord. No. 2023-05 (8/22/23)."
+          ]
+        }
+      }
+    },
+    "east_point": {
+      "name": "City of East Point",
+      "status": "draft",
+      "verified_by": null,
+      "verified_on": null,
+      "as_of": "not researched",
+      "ordinance": null,
+      "ordinance_url": null,
+      "source_quality": "not researched",
+      "unlisted_districts": "unknown",
+      "districts": {}
+    },
+    "fid": {
+      "name": "Fulton Industrial District (FID) - which code applies",
+      "status": "draft",
+      "verified_by": null,
+      "verified_on": null,
+      "as_of": "read 2026-11-05",
+      "ordinance": "For annexed FID parcels: City of South Fulton Zoning Ordinance (see City of South Fulton entry) incl. Sec. 510 Fulton Industrial Business District Overlay. For any parcel still unincorporated: Fulton County Zoning Resolution Art. X/IV/XVIII.",
+      "ordinance_url": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf",
+      "source_quality": null,
+      "unlisted_districts": "unknown",
+      "governing_jurisdiction": "south_fulton",
+      "governing_note": "TaxDist 70 parcels are classified against the City of South Fulton rules: most of FID was annexed by HB 445 (2021). Parcels still unincorporated (e.g. north of I-20 near Brown Field) go in unincorporated_parcel_ids and use this entry's own districts (Fulton County Zoning Resolution). Set governing_jurisdiction to 'self' to use the county districts for every FID parcel.",
+      "district_conversions": {
+        "M-1A": "M-1"
+      },
+      "district_conversions_cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 203 / Table 2-1 (district conversion: county M-1A -> M-1)",
+      "unincorporated_parcel_ids": [],
+      "jurisdiction_finding": {
+        "finding": "Most of the Fulton Industrial Boulevard area was annexed into the City of South Fulton by HB 445 (2021), signed by Gov. Kemp May 10, 2021. HB 445 amends the South Fulton charter (Sec. 1.11(b)) to add the territory; it contains no zoning-transition clause (only Sec. 1 boundaries and Sec. 2 repealer). Parcels inside the annexed area are governed by the City of South Fulton Zoning Ordinance, whose Sec. 510 'Fulton Industrial Business District Overlay' now carries the FIB standards, and whose district conversion table (Table 2-1) maps the old county M-1A to M-1. The area north of I-20 around Fulton County Executive Airport/Brown Field was NOT in HB 445 (AJC May 2021: plan was for it to go to Atlanta; airport land reportedly to remain unincorporated). If any of our parcels fall there and are still unincorporated, the Fulton County Zoning Resolution applies.",
+        "cites": [
+          "https://www.legis.ga.gov/api/legislation/document/20212022/197554 (HB 445, LC 47 0808, Sections 1-2)",
+          "https://www.ajc.com/news/atlanta-news/south-fulton-gets-fulton-industrial-spells-end-for-unincorporated-land/B7QHR2JLZZAJXF67VIOVS762OQ",
+          "https://www.fultonneighbor.com/news/new-state-law-allows-south-fulton-to-annex-part-of-fulton-industrial-area/article_b298d2f1-1072-509c-8129-d84ef024e1b4.html",
+          "https://www.zoneomics.com/code/south-fulton-GA/chapter_5 Sec. 510"
+        ],
+        "confidence": "medium",
+        "note": "Could not confirm whether the north-of-I-20 remnant was later annexed (by Atlanta or South Fulton) after 2021. Decide per parcel from the city-limits GIS layer, not the FID name. The enrolled/final HB 445 text was not read (LC version only)."
+      },
+      "fib_overlay_south_fulton": {
+        "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_5 Sec. 510.03-510.07",
+        "rules": [
+          "Applies to all non-single-family property in the overlay; COE/architectural review before LDP or building permit (Sec. 510.04, 10 working-day community review).",
+          "All properties: refuse areas >=50 ft from residential, enclosed in masonry-type walls; all utilities underground; facade variation on ROW-facing walls; office portion of industrial buildings at the front, facing the ROW, with >=40% windows (Sec. 510.05).",
+          "Industrial parcels fronting Fulton Industrial Blvd: 15-ft landscape strip on FIB frontage; outside storage screened from FIB (wall/fence >=50% opacity or 10-ft landscape strip); walls visible from FIB must meet Type A >=40% / Type B <=60% / Type C <=25% / Type D <=10% material mix; no wood siding or reflective glass; no wood fencing (Sec. 510.06).",
+          "Parcels designated 'industrial marketplace' on the future development map: industrially zoned building walls visible from ROW must be stucco, stone, brick or approved alternative (Sec. 510.07(b)(1)) - potentially a significant cost item."
+        ]
+      },
+      "county_ordinance": "Fulton County Zoning Resolution",
+      "county_ordinance_url": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf",
+      "county_as_of": "Art. X adopted 3-7-1990 with amendments",
+      "districts": {
+        "M-1": {
+          "name": "M-1 Light Industrial (Fulton County)",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.2 ('Any industrial use not specifically designated as prohibited or allowed with approval of a Use Permit shall be permitted'; warehousing/distributing named) (Amended 04/04/07)",
+            "confidence": "high"
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "not_permitted",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.2.A item 19 'Truck Terminal' is a Prohibited Use",
+              "confidence": "high",
+              "note": "Truck Stop also prohibited (item 18, added 05/05/10)."
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.2",
+              "confidence": "high",
+              "note": "Listed heavy manufacturing types are prohibited."
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Sec. 4.2 (Outside Storage Associated with Industrial Uses or Districts)",
+              "confidence": "medium",
+              "note": "Rear and side yards only in M-1A; all yards in M-2 (M-1 not named in the yard sentence - ambiguous); >=25 ft from any residential property line; screened from residential in all industrial districts and from streets in M-1A and M-1."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.E 'Minimum Lot Area - None'",
+              "confidence": "high"
+            },
+            "min_lot_frontage_ft": {
+              "value": 35,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.G (Amended 11/03/93)",
+              "confidence": "high"
+            },
+            "min_lot_width_ft": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3",
+              "confidence": "high",
+              "note": "Not stated."
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.B",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 0,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.C 'None. See Section 4.23'",
+              "confidence": "high"
+            },
+            "rear_setback_ft": {
+              "value": 0,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.D 'None. See Section 4.23'",
+              "confidence": "high"
+            },
+            "corner_lot_rule": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3",
+              "confidence": "high",
+              "note": "Not addressed in Art. X; corner-side landscape strip 10 ft (Table 4.23.1). Art. IV general lot rules not fully read."
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side": 50,
+                "rear": 100,
+                "plus_improvement_setback": 10
+              },
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Sec. 4.23.1.B and E, Table 4.23.1 row M-1",
+              "confidence": "high",
+              "note": "Buffers adjacent to AG-1, R-*, TR, A, A-L, NUP, CUP, MIX-with-residential and all single-family uses."
+            },
+            "height_based_extra_setback": {
+              "value": "12 additional feet for each foot of height in excess of 50 feet when adjoining a Dwelling District",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.A",
+              "confidence": "high"
+            },
+            "max_height_ft": {
+              "value": "higher of 8 stories or 100 ft",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3.A",
+              "confidence": "high"
+            },
+            "max_lot_coverage_pct": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3",
+              "confidence": "high",
+              "note": "None stated for M-1 (M-1A has 70%, Sec. 10.1.3.H)."
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": 10,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1",
+              "confidence": "high"
+            },
+            "landscape_strip_side_corner_ft": {
+              "value": 10,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1",
+              "confidence": "high"
+            },
+            "landscape_strip_interior_side_ft": {
+              "value": "0/5 (5 where adjoining a less intense non-residential district except AG-1)",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1 fn **",
+              "confidence": "high"
+            },
+            "landscape_strip_rear_ft": {
+              "value": "0/5",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1 fn **",
+              "confidence": "high"
+            },
+            "parking_warehouse": {
+              "value": "1 per 2,000 sq ft (warehousing & storage, distribution centers); industrial/manufacturing 1 per 1,000 sq ft",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art18.pdf Art. XVIII parking table",
+              "confidence": "high"
+            },
+            "parking_location_industrial": {
+              "value": "No off-street parking within 25 ft of a property line adjoining a residential use or district",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art18.pdf Sec. 18.3.1.G",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "1 (<15,000 sf), 2 (15,000-39,999), 3 (40,000-65,000), +1 each additional 80,000 sf",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art18.pdf Sec. 18.6.1",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2",
+              "confidence": "medium",
+              "note": "No exterior-material standard for M-1 in Art. X (the Type A/B/C/D wall-material table, Sec. 10.1.4, applies to M-1A only). Fulton Industrial Business District overlay (Res. 12-0271, 4-4-12) may apply."
+            }
+          },
+          "notes": [
+            "Official PDF (Fulton County). Article X adopted 3-7-1990 with amendments noted in text (latest seen 05/05/10). Article IV adopted 10-5-1988 w/ amendments; Article XVIII adopted 4-5-1989 w/ amendments.",
+            "cm.fultoncountyga.gov host returned 503 / TLS error; same file served at www.fultoncountyga.gov."
+          ]
+        },
+        "M-2": {
+          "name": "M-2 Heavy Industrial (Fulton County)",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.2 ('Any industrial use not specifically designated as prohibited or allowed with approval of a Use Permit shall be permitted'; warehousing/distributing named) (Amended 04/04/07)",
+            "confidence": "high"
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "permitted_by_right",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.2 - M-2 intent (10.3.1) names 'terminal'; not on the M-2 prohibited list",
+              "confidence": "high",
+              "note": "Truck stop is prohibited in M-2 (10.3.2.A.11, added 05/05/10). Article XIX use permits not reviewed."
+            },
+            "manufacturing_light": {
+              "status": "permitted_by_right",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.2",
+              "confidence": "high",
+              "note": "Listed heavy manufacturing types are prohibited unless approved by the BOC in a rezoning resolution."
+            },
+            "outdoor_storage_accessory": {
+              "status": "permitted_with_standards",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Sec. 4.2 (Outside Storage Associated with Industrial Uses or Districts)",
+              "confidence": "high",
+              "note": "Rear and side yards only in M-1A; all yards in M-2 (M-1 not named in the yard sentence - ambiguous); >=25 ft from any residential property line; screened from residential in all industrial districts and from streets in M-1A and M-1."
+            }
+          },
+          "dimensions": {
+            "min_lot_area_sqft": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.E 'Minimum Lot Area - None'",
+              "confidence": "high"
+            },
+            "min_lot_frontage_ft": {
+              "value": 35,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.G (Amended 11/03/93)",
+              "confidence": "high"
+            },
+            "min_lot_width_ft": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3",
+              "confidence": "high",
+              "note": "Not stated."
+            },
+            "front_setback_ft": {
+              "value": 40,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.B",
+              "confidence": "high"
+            },
+            "side_setback_ft": {
+              "value": 0,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.C 'None. See Section 4.23'",
+              "confidence": "high"
+            },
+            "rear_setback_ft": {
+              "value": 0,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.D 'None. See Section 4.23'",
+              "confidence": "high"
+            },
+            "corner_lot_rule": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3",
+              "confidence": "high",
+              "note": "Not addressed in Art. X; corner-side landscape strip 10 ft (Table 4.23.1). Art. IV general lot rules not fully read."
+            },
+            "residential_adjacency_buffer_ft": {
+              "value": {
+                "side": 50,
+                "rear": 100,
+                "plus_improvement_setback": 10
+              },
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Sec. 4.23.1.B and E, Table 4.23.1 row M-2",
+              "confidence": "high",
+              "note": "Buffers adjacent to AG-1, R-*, TR, A, A-L, NUP, CUP, MIX-with-residential and all single-family uses."
+            },
+            "height_based_extra_setback": {
+              "value": "Any part shall be set back 12 feet from the required yard lines for each foot of height in excess of 50 feet (adjoining a Dwelling District)",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.A",
+              "confidence": "high"
+            },
+            "max_height_ft": {
+              "value": "higher of 8 stories or 100 ft",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3.A",
+              "confidence": "high"
+            },
+            "max_lot_coverage_pct": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3",
+              "confidence": "high",
+              "note": "None stated for M-2 (M-1A has 70%, Sec. 10.1.3.H)."
+            },
+            "max_far": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3",
+              "confidence": "high"
+            },
+            "landscape_strip_front_ft": {
+              "value": 10,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1",
+              "confidence": "high"
+            },
+            "landscape_strip_side_corner_ft": {
+              "value": 10,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1",
+              "confidence": "high"
+            },
+            "landscape_strip_interior_side_ft": {
+              "value": "0/5 (5 where adjoining a less intense non-residential district except AG-1)",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1 fn **",
+              "confidence": "high"
+            },
+            "landscape_strip_rear_ft": {
+              "value": "0/5",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art4.pdf Table 4.23.1 fn **",
+              "confidence": "high"
+            },
+            "parking_warehouse": {
+              "value": "1 per 2,000 sq ft (warehousing & storage, distribution centers); industrial/manufacturing 1 per 1,000 sq ft",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art18.pdf Art. XVIII parking table",
+              "confidence": "high"
+            },
+            "parking_location_industrial": {
+              "value": "No off-street parking within 25 ft of a property line adjoining a residential use or district",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art18.pdf Sec. 18.3.1.G",
+              "confidence": "high"
+            },
+            "loading_warehouse": {
+              "value": "1 (<15,000 sf), 2 (15,000-39,999), 3 (40,000-65,000), +1 each additional 80,000 sf",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art18.pdf Sec. 18.6.1",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": null,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3",
+              "confidence": "medium",
+              "note": "No exterior-material standard for M-2 in Art. X (the Type A/B/C/D wall-material table, Sec. 10.1.4, applies to M-1A only). Fulton Industrial Business District overlay (Res. 12-0271, 4-4-12) may apply."
+            }
+          },
+          "notes": [
+            "Official PDF (Fulton County). Article X adopted 3-7-1990 with amendments noted in text (latest seen 05/05/10). Article IV adopted 10-5-1988 w/ amendments; Article XVIII adopted 4-5-1989 w/ amendments.",
+            "cm.fultoncountyga.gov host returned 503 / TLS error; same file served at www.fultoncountyga.gov."
+          ]
+        },
+        "M-1A": {
+          "name": "M-1A Industrial Park (Fulton County; converted to South Fulton M-1)",
+          "warehouse_distribution": {
+            "status": "permitted_by_right",
+            "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.2",
+            "confidence": "high"
+          },
+          "other_uses": {
+            "truck_terminal": {
+              "status": "not_permitted",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.2.A item 14",
+              "confidence": "high"
+            }
+          },
+          "dimensions": {
+            "front_setback_ft": {
+              "value": 30,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3.B",
+              "confidence": "high"
+            },
+            "max_height_ft": {
+              "value": "higher of 4 stories or 60 ft",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3.A (Amended 5/6/92)",
+              "confidence": "high"
+            },
+            "max_lot_coverage_pct": {
+              "value": 70,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3.H",
+              "confidence": "high"
+            },
+            "min_lot_frontage_ft": {
+              "value": 35,
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3.G",
+              "confidence": "high"
+            },
+            "architectural_standards": {
+              "value": "Type A >=40% etc. (same table as South Fulton Sec. 404.10)",
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.4",
+              "confidence": "high"
+            }
+          },
+          "notes": [
+            "Only relevant if the GIS layer still shows M-1A on unincorporated parcels."
+          ]
+        }
+      }
+    }
+  },
+  "building_code": {
+    "state_codes": {
+      "value": "2024 IBC with Georgia Amendments, 2024 IFC as adopted by the Safety Fire Commissioner (plus 2024 IRC/IMC/IPC/IFGC/ISPSC, 2023 NEC with 2026 GA amendments), effective January 1, 2026",
+      "cite": "https://dca.georgia.gov/document/document/new-codes-and-amendments-effective-january-1-2026-memo/download (DCA memo, Dec 1, 2025; O.C.G.A. § 8-2-23)",
+      "confidence": "high"
+    },
+    "ibc_507_unlimited_area": {
+      "cite": "IBC 2024 Sec. 507 (codes.iccsafe.org returned 403; values from general knowledge of IBC 2018-2024 text and secondary sources - VERIFY)",
+      "confidence": "medium",
+      "rules": [
+        "507.4: one-story Group B, F, M or S buildings of any construction type, sprinklered throughout (NFPA 13), are unlimited in area when surrounded and adjoined by public ways or yards >= 60 ft wide.",
+        "507.3: nonsprinklered one-story F-2 / S-2 (low-hazard) buildings also unlimited with 60-ft yards.",
+        "507.5: two-story B, F, M, S sprinklered buildings unlimited with 60-ft yards.",
+        "507.2.1 (reduced open space): 60 ft may drop to >= 40 ft along <= 75% of the perimeter if that exterior wall has a 3-hour fire-resistance rating and its openings have 3-hour opening protectives.",
+        "The 60-ft yard may be on the same lot or permanently secured (e.g. easement/public way); it acts like a 60-ft building setback from lot lines/other buildings for large boxes."
+      ]
+    },
+    "ifc_503_fire_access": {
+      "cite": "IFC Sec. 503 as modified by Ga. Comp. R. & Regs. 120-3-3 - text read from https://oci.georgia.gov/document/document/120-3-3pdf/download (this copy still cites the 2018 IFC; the 2026 re-adoption on the 2024 IFC should be checked for changes)",
+      "confidence": "medium",
+      "rules": [
+        "GA 503.1.1 (replaces IFC text): access roads must comply with Sec. 503 AND Appendix D (so Appendix D is effectively mandatory in Georgia), and extend to within 150 ft of all portions of the exterior wall of the first story, measured by an approved route around the building.",
+        "Exception: local Fire Chief/Fire Code Official may increase the 150 ft where the building is fully sprinklered (903.3.1.1/.2/.3), where terrain prevents roads and alternative protection is provided, etc. No fixed sprinklered distance (the often-quoted 450 ft is not in this text).",
+        "IFC 503.2.1: min 20 ft unobstructed width, 13 ft 6 in vertical clearance (IFC model text - verify 2024).",
+        "IFC 503.2.5: dead-end access roads > 150 ft need an approved turnaround.",
+        "IFC Appendix D105 (aerial access; model text - verify 2024): buildings with eave/parapet/roof height > 30 ft need an aerial fire apparatus access road, 26 ft min unobstructed width, located 15-30 ft from the building along at least one entire long side, no overhead utility lines over it.",
+        "IFC Appendix D104 (model text - verify): commercial buildings > 3 stories or 30 ft high, or > 62,000 sq ft (124,000 sq ft if sprinklered), need two separate access roads; GA D107.2 adds the remoteness rule (>= 1/2 the max diagonal) where two are required.",
+        "GA 504.1.1: one exterior access door per 100 linear ft of wall facing access roads, or per 200 ft for walls with continuous dock doors; 3 ft x 6 ft 8 in; rolling doors OK if sprinklered.",
+        "GA 507.5.1: on-site hydrants where any part of the building is > 500 ft from a hydrant on an access road (600 ft if sprinklered)."
+      ]
+    }
+  }
+}

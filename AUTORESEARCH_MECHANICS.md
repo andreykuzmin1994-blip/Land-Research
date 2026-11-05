@@ -80,6 +80,10 @@ This is the equivalent of Karpathy's `train.py`. The agent modifies this file fr
 - `reporting.py` — snapshot and strategy memo rendering.
 - `pipeline_common.py` — shared paths, the `flagged_items` helper, shared SQL.
 - `costar_import.py` (added 2026-10-29, `reviews/19_costar_import/`) — operator tool that converts a CoStar Excel export into the contract's `submarket_stats` CSV and writes `submarkets.bbox` areas from where each submarket's sale comps sit. Run between runs only, before a new run's baseline: importing mid-run would change every later experiment's inputs. `research.py` resolves a parcel's submarket from those areas at read time and never stores it, so a discarded experiment leaves no submarket state behind.
+- `zoning.py` (added 2026-11-05, `reviews/21_zoning/`) — loads the human-owned `zoning_rules.json` once per process, freezes it by SHA-256 (`verify_rules_unchanged()` runs at discovery and scoring cycle entry, next to `prepare.verify_parameters_unchanged()`), and classifies a stored (jurisdiction, district) as by_right / conditional / rezoning / unknown, plus whether the jurisdiction's rules are `verified`. Imports neither `research` nor `runner`.
+- `zoning_import.py` (added 2026-11-05, `reviews/21_zoning/`) — operator tool (`make zoning-import`) that writes `parcels.zoning` / `zoning_description` from the city/county zoning layers listed in `sources.json` (`county_parcel_data.fulton_ga.zoning_sources`). Run between runs only, before a new run's baseline; it refuses (exit 3) once the TSV or the database's experiment mirror shows the run's baseline.
+
+**Human-owned data file `zoning_rules.json`** (added 2026-11-05): per jurisdiction a `status` (`draft` | `verified`), `as_of`, `verified_by`/`verified_on` and `unlisted_districts`; per district the warehouse/distribution use status and dimensional values with citations. Same status as `parameters.json`: the agent never edits it, and a human edits it only between runs. S9 uses zoning ONLY for parcels whose jurisdiction is `verified`; while every jurisdiction is `draft` (as shipped) the metric is byte-identical to the pre-zoning code. Flipping a jurisdiction to `verified` changes S9 and so the metric: start a new run and baseline afterwards, and re-run `make zoning-import` at every new run.
 
 **The critical separation**: `research.py` produces parcel records and sub-scores. `prepare.py` evaluates those records to produce the metric, and `runner.py` runs the loop that records the outcome. The agent can change how it produces the inputs, but it cannot change how they are evaluated or how the ratchet is recorded.
 
@@ -533,8 +537,8 @@ When implementing this pattern in code, every item below must be true. If any is
 - [ ] Every commit on the experiment branch corresponds to a `keep` row in the TSV
 - [ ] The TSV is in `.gitignore`
 - [ ] The branch naming convention is `autoresearch/<tag>` and `main` is never written to during a run
-- [ ] The agent does NOT have the ability to modify `prepare.py`, `parameters.json`, or `sources.json` from within `research.py` (file permissions or runtime check)
-- [ ] `runner.py`, `costar_ingest.py`, `reporting.py`, and `pipeline_common.py` are treated as immutable during a run — the agent never edits the loop that evaluates its own experiments
+- [ ] The agent does NOT have the ability to modify `prepare.py`, `parameters.json`, `sources.json`, or `zoning_rules.json` from within `research.py` (file permissions or runtime check)
+- [ ] `runner.py`, `costar_ingest.py`, `costar_import.py`, `reporting.py`, `pipeline_common.py`, `zoning.py`, and `zoning_import.py` are treated as immutable during a run — the agent never edits the loop that evaluates its own experiments or the facts it is scored on
 - [ ] Every `parcel_scores` row carries `run_tag` + `experiment_id`; the metric counts only the active run's rows; a `discard`/`crash`/`timeout` decision purges that experiment's rows (the data half of the git ratchet)
 - [ ] The simplicity criterion is mentioned in `program.md` and the agent's prompt
 - [ ] The NEVER STOP rule is mentioned in `program.md` and the agent's prompt

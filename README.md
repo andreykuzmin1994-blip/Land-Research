@@ -100,6 +100,90 @@ Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) d
 
 `make help` shows every available target with descriptions.
 
+## Zoning import (operator, between runs)
+
+`make zoning-import` (`zoning_import.py`, `reviews/21_zoning/`) writes each
+Fulton parcel's zoning district into `parcels.zoning` /
+`parcels.zoning_description`. S9 (entitlement) and the H3 zoning flag read
+it. Run it **between runs only**, after a new run's branch is cut and
+before its baseline: it refuses (exit 3) once the TSV or the database's
+experiment mirror shows the run's baseline. Re-run it at every new run so
+rezonings are picked up.
+
+One-time setup (sources.json is human-only):
+
+1. Open `reviews/21_zoning/sources_json_snippet.json`.
+2. Copy its `"zoning_sources": [...]` list into `sources.json` as a new
+   key **inside** `county_parcel_data.fulton_ga` (next to
+   `field_mapping`), not directly under `county_parcel_data`. The order of
+   the list is the precedence order (for South Fulton parcels, the city
+   layer before Fulton layer 34; Fulton Industrial District parcels are
+   served by layer 34 only, exactly as in `screener/fulton.py`). Commit it
+   like any `sources.json` change.
+
+Then:
+
+```bash
+make zoning-import          # off a run branch, add ARGS=--no-open-run-check only if
+                            # the newest run in the database is truly over
+```
+
+What it does: finds each parcel's city from its TaxDist on the Fulton
+parcel layer, fetches each zoning source's features around the parcels
+(1 request/second per host, no cache), and assigns a district by parcel id
+(join) or largest polygon overlap in PostGIS (overlay). It updates only
+those two columns, in one transaction; a parcel without a match keeps its
+value; a source that fails or comes back truncated is skipped whole.
+Future-land-use layers are never written as zoning. The console shows
+counts only (per city, per source, per entitlement class, changed /
+unchanged / unmatched).
+
+Exit codes: 0 imported, 1 refused (sources.json key missing or malformed,
+Fulton parcel layer down), 2 no database / database error, 3 a run has its
+baseline, 4 imported **but at least one zoning source failed** (named on
+the last line; that source's parcels kept their previous zoning, the other
+sources' rows were written). Treat 4 as "re-run when the source is back",
+not as success.
+
+The overlay counts each district once even where a city layer has
+overlapping polygons of the same district. Parcels the import could not
+match (and parcels never imported) carry the H3 text "zoning not imported
+or not matched by any zoning source". The first discovery after this
+change opens one new H3 `data_gap` flag per parcel (the text changed);
+the old "H3 zoning unjoined" flags stay open until resolved by hand. They
+do not feed the metric.
+
+**Zoning rules.** `zoning_rules.json` holds, per jurisdiction, a `status`
+(`draft` or `verified`) and, per district, the warehouse/distribution use
+status with citations (built from `reviews/21_zoning/01_zoning_rules_DRAFT.md`).
+Everything ships as `draft`, and S9 ignores draft rules (it stays at its
+old stub value), so importing zoning does not change the metric. To use a
+jurisdiction's rules: check them against the official ordinance, set
+`status` to `verified` with `verified_by` / `verified_on`, choose its
+`unlisted_districts` (`not_permitted` or `unknown`), update the
+all-draft expectation in `tests/test_zoning.py`, and commit **between
+runs**; then start a new run and baseline (the change moves S9 and the
+metric). The runner refuses to run an experiment while
+`zoning_rules.json` differs from the committed version (git HEAD), so an
+uncommitted edit fails loud instead of becoming a silent baseline.
+
+Verification checklist, per jurisdiction, before flipping it to
+`verified`:
+
+- every district's warehouse/distribution status and citation against
+  the current official ordinance;
+- `unlisted_districts`;
+- Atlanta I-1/I-2: the BeltLine 500 ft exception (Sec. 16-36.007) ships
+  as `location_conditions` effect `ignored`, which the draft never stated;
+  choose `ignored` or `downgrade_to_conditional`;
+- Atlanta `-C` parcels (conditions of zoning, e.g. `I-1-C`) score as their
+  base district (by right = S9 10 once verified); the draft says their
+  site conditions may override the defaults; check those parcels by hand
+  or accept the default knowingly;
+- South Fulton: the county `M-1A` -> `M-1` conversion exists only on the
+  `fid` entry; a South Fulton parcel carrying `M-1A` from Fulton layer 34
+  reads `unknown` (S9 stub). None in today's data.
+
 ## Repository Structure
 
 ```
@@ -117,6 +201,7 @@ land-site-selector/
 ├── BUILD_PHASES.md                    — Implementation roadmap
 ├── parameters.json                    — Scoring weights and filter thresholds (IMMUTABLE during run)
 ├── sources.json                       — Registry of data source URLs (LOCKED — agent never writes)
+├── zoning_rules.json                  — Human-owned zoning facts per jurisdiction/district (agent never writes)
 ├── connector_registry.json            — Harness-only config overlay (test bboxes, expected extents)
 ├── prepare.py                         — IMMUTABLE: metric calculation, DDL, frozen parameters
 ├── research.py                        — Agent sandbox — the ONLY file the agent modifies in a run
@@ -124,6 +209,9 @@ land-site-selector/
 ├── costar_ingest.py                   — IMMUTABLE during run: CoStar export ETL
 ├── reporting.py                       — Snapshot + strategy memo rendering
 ├── pipeline_common.py                 — Shared paths/helpers/SQL for the pipeline modules
+├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import (operator, between runs)
+├── zoning.py                          — IMMUTABLE during run: loads + freezes zoning_rules.json, classifies districts
+├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)

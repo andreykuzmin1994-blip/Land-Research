@@ -51,3 +51,18 @@ import research  # noqa: E402 — after the kill switch, before any test runs
 _SOURCES_TMP = tempfile.mkdtemp(prefix="land-research-test-sources-")
 atexit.register(shutil.rmtree, _SOURCES_TMP, ignore_errors=True)
 research._SOURCES_DIR = Path(_SOURCES_TMP)
+
+# Third guard — committed-rules check (reviews/21_zoning, finding 3).
+# ``runner.evaluate`` refuses to run while zoning_rules.json differs from git
+# HEAD. Inside the suite that check is replaced by a no-op so the runner tests
+# do not depend on the working tree's git state (a human verifying the rules
+# runs the suite BEFORE committing). The real function stays reachable as
+# ``REAL_VERIFY_RULES_COMMITTED``; tests/test_zoning.py calls it directly,
+# including on the repo's own file, so an uncommitted rules edit still fails
+# the suite, once and by name (test_the_repo_file_is_committed).
+import zoning  # noqa: E402
+
+if not hasattr(zoning, "_SUITE_REAL_VERIFY_RULES_COMMITTED"):
+    zoning._SUITE_REAL_VERIFY_RULES_COMMITTED = zoning.verify_rules_committed
+    zoning.verify_rules_committed = lambda path=None: None
+REAL_VERIFY_RULES_COMMITTED = zoning._SUITE_REAL_VERIFY_RULES_COMMITTED

@@ -25,6 +25,10 @@ on:
       - 'tests/live_txn_check.py'
       - 'tests/live_submarket_check.py'
       - 'costar_import.py'
+      - 'zoning.py'
+      - 'zoning_import.py'
+      - 'zoning_rules.json'
+      - 'tests/live_zoning_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -42,6 +46,10 @@ on:
       - 'tests/live_txn_check.py'
       - 'tests/live_submarket_check.py'
       - 'costar_import.py'
+      - 'zoning.py'
+      - 'zoning_import.py'
+      - 'zoning_rules.json'
+      - 'tests/live_zoning_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -123,3 +131,9 @@ jobs:
       # CoStar area writer against real PostGIS. Own market, cleans up.
       - name: Run live submarket resolution check
         run: python tests/live_submarket_check.py
+
+      # reviews/21_zoning: the S9 precedent SQL (metres, self-match, index)
+      # and zoning_import's PostGIS overlay + UPDATE against real PostGIS.
+      # No network. Own database, created and dropped by the check.
+      - name: Run live zoning check
+        run: python tests/live_zoning_check.py

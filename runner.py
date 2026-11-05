@@ -49,6 +49,7 @@ import prepare
 import costar_ingest
 import reporting
 import research
+import zoning
 from pipeline_common import _COSTAR_BASE_DIR, _REPO_ROOT
 
 log = logging.getLogger("research")
@@ -1181,7 +1182,8 @@ def evaluate(
 
     R-701: metric read goes through ``prepare.calculate_actionable_pipeline_count``
     and ``prepare.calculate_confidence_weighted_pipeline``.  No reimplementation.
-    R-702: ``prepare.verify_parameters_unchanged`` runs at the start.
+    R-702: ``prepare.verify_parameters_unchanged`` runs at the start, then
+    ``zoning.verify_rules_committed`` (zoning_rules.json == git HEAD).
 
     prepare-mutation (2026-07-07): ``run_tag`` (None -> derived from the
     current git branch) scopes both the scoring cycle and the metric read
@@ -1197,6 +1199,11 @@ def evaluate(
     ``commit`` and ``description``.
     """
     prepare.verify_parameters_unchanged()
+    # reviews/21_zoning finding 3: the rules file must be the COMMITTED one.
+    # research.py's in-process sentinel only compares with its own import
+    # time, so a new process would freeze an uncommitted edit as its
+    # baseline; this check lives here, outside the agent's sandbox.
+    zoning.verify_rules_committed()
 
     if run_tag is None:
         run_tag = prepare.current_run_tag()
