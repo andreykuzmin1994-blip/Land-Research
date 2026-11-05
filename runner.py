@@ -189,6 +189,64 @@ class _ExperimentBudgetInterrupt(BaseException):
 
 
 # ---------------------------------------------------------------------------
+# Human-owned source registry for rules_scrape.py (reviews/23_rules_scraper)
+# ---------------------------------------------------------------------------
+# rules_sources.json is NOT a scoring input: no pipeline module reads it and
+# the metric never depends on it. It is protected like the other human-owned
+# files so that a loop agent cannot edit it unnoticed (RS-07), and the check
+# lives HERE, as a git blob comparison, so runner never imports the network
+# scraper and zoning.py stays byte-identical. A dirty file is an
+# infrastructure problem, not an experiment result (RS-08): verify_setup
+# reports it as a failed sub-check (the loop's setup-failure path: no
+# experiment, no crash row) and evaluate refuses before any sub-cycle.
+_RULES_SOURCES_PATH = _REPO_ROOT / "rules_sources.json"
+
+
+class RulesSourcesChanged(RuntimeError):
+    """rules_sources.json differs from git HEAD (an uncommitted edit)."""
+
+
+def _git_out(args: list[str]) -> str | None:
+    try:
+        out = subprocess.run(["git", "-C", str(_REPO_ROOT), *args], capture_output=True,
+                             text=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
+def verify_rules_sources_committed(path: Path | None = None) -> None:
+    """Raise RulesSourcesChanged unless rules_sources.json on disk is the
+    committed one (same blob id as HEAD). Missing on disk AND absent from
+    HEAD passes; anything git cannot confirm fails loud."""
+    p = (path or _RULES_SOURCES_PATH).resolve()
+    top = _git_out(["rev-parse", "--show-toplevel"])
+    if top is None:
+        raise RulesSourcesChanged(
+            "cannot confirm rules_sources.json against git HEAD (git unavailable or not a "
+            "repository)")
+    rel = p.relative_to(Path(top).resolve()).as_posix()
+    committed = _git_out(["rev-parse", "--verify", "--quiet", f"HEAD:{rel}"])
+    on_disk = _git_out(["hash-object", "--", str(p)]) if p.exists() else None
+    if committed is None and on_disk is None:
+        return
+    if committed != on_disk:
+        raise RulesSourcesChanged(
+            "rules_sources.json differs from the committed version (git HEAD). It is a "
+            "human-owned file edited between runs only: commit the edit, or restore it "
+            "(git checkout -- rules_sources.json).")
+
+
+def _check_rules_sources() -> dict[str, Any]:
+    """verify_setup sub-check: 'fail' while rules_sources.json is uncommitted."""
+    try:
+        verify_rules_sources_committed()
+    except RulesSourcesChanged as exc:
+        return {"status": "fail", "note": str(exc)}
+    return {"status": "ok", "note": "rules_sources.json matches git HEAD"}
+
+
+# ---------------------------------------------------------------------------
 # Git plumbing (R-704)
 # ---------------------------------------------------------------------------
 def _git_current_branch() -> str:
@@ -1126,8 +1184,10 @@ def verify_setup(market: str) -> dict[str, Any]:
         "status": "skipped", "note": "DB unreachable; bbox check skipped",
     }
     costar = _check_costar_freshness()
+    rules_sources = _check_rules_sources()
 
-    statuses = [db["status"], harness["status"], bbox["status"], costar["status"]]
+    statuses = [db["status"], harness["status"], bbox["status"], costar["status"],
+                rules_sources["status"]]
     if not is_autoresearch:
         statuses.append("fail")
     if any(s == "fail" for s in statuses):
@@ -1147,6 +1207,7 @@ def verify_setup(market: str) -> dict[str, Any]:
             "harness": harness,
             "corridor_bbox": bbox,
             "costar_freshness": costar,
+            "rules_sources": rules_sources,
         },
     }
 
@@ -1185,7 +1246,8 @@ def evaluate(
     and ``prepare.calculate_confidence_weighted_pipeline``.  No reimplementation.
     R-702: ``prepare.verify_parameters_unchanged`` runs at the start, then
     ``zoning.verify_rules_committed`` (zoning_rules.json == git HEAD), then
-    ``site_fit.verify_prototypes_committed`` (building_prototypes.json).
+    ``site_fit.verify_prototypes_committed`` (building_prototypes.json), then
+    ``verify_rules_sources_committed`` (rules_sources.json, reviews/23).
 
     prepare-mutation (2026-07-07): ``run_tag`` (None -> derived from the
     current git branch) scopes both the scoring cycle and the metric read
@@ -1209,6 +1271,10 @@ def evaluate(
     # reviews/22_site_fit (SF-04): the same committed check for the
     # human-owned building prototypes, before any sub-cycle.
     site_fit.verify_prototypes_committed()
+    # reviews/23_rules_scraper (RS-07/RS-08): the scraper's source registry.
+    # Not a scoring input; checked so an uncommitted edit is caught before
+    # anything runs (the loop normally stops at verify_setup first).
+    verify_rules_sources_committed()
 
     if run_tag is None:
         run_tag = prepare.current_run_tag()
