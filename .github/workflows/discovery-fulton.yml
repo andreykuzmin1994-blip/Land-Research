@@ -29,6 +29,9 @@ on:
       - 'zoning_import.py'
       - 'zoning_rules.json'
       - 'tests/live_zoning_check.py'
+      - 'site_fit.py'
+      - 'building_prototypes.json'
+      - 'tests/live_site_fit_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -50,6 +53,9 @@ on:
       - 'zoning_import.py'
       - 'zoning_rules.json'
       - 'tests/live_zoning_check.py'
+      - 'site_fit.py'
+      - 'building_prototypes.json'
+      - 'tests/live_site_fit_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -137,3 +143,9 @@ jobs:
       # No network. Own database, created and dropped by the check.
       - name: Run live zoning check
         run: python tests/live_zoning_check.py
+
+      # reviews/22_site_fit: site_fit's inward buffer (SRID 2240 feet),
+      # degenerate geometry, savepoint recovery, ST_Covers of every placement
+      # and the SiteFit export. No network. Own database, created and dropped.
+      - name: Run live site-fit check
+        run: python tests/live_site_fit_check.py
