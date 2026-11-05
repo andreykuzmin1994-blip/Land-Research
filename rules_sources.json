@@ -1,0 +1,564 @@
+{
+  "_comment": "HUMAN-OWNED SOURCE REGISTRY for rules_scrape.py (reviews/23_rules_scraper). Per jurisdiction: the zoning-code sources to read (url, format, source_class official|mirror, parser, sections cut by explicit start/end markers) and the GIS change-signal layers. The agent (experiment loop) NEVER edits this file; rules_scrape.py validates it strictly and freezes it by SHA-256, runner.verify_setup and runner.evaluate check it against git HEAD. Edit it only between runs and commit the edit. Municode and its content store are refused by the tool whatever this file says. Hosts with terms_reviewed_by null are fetched only with --allow-unreviewed-terms. Initial content from the 2026-11-05 read-only source survey.",
+  "schema_version": 1,
+  "hosts": {
+    "www.zoneomics.com": {
+      "terms_url": "https://www.zoneomics.com/terms",
+      "terms_reviewed_by": null,
+      "terms_reviewed_on": null,
+      "note": "Third-party mirror, not authoritative, no currency date, silently drops some tables. robots.txt allows /code/ and disallows /*/codes/. Its terms page renders client-side; no human has reviewed it yet."
+    },
+    "www.fultoncountyga.gov": {
+      "terms_url": null,
+      "terms_reviewed_by": null,
+      "terms_reviewed_on": null,
+      "note": "Official Fulton County site (Zoning Resolution PDFs with a text layer). robots.txt allows the PDF paths."
+    },
+    "www.unioncityga.gov": {
+      "terms_url": null,
+      "terms_reviewed_by": null,
+      "terms_reviewed_on": null,
+      "note": "Official Union City site. Akamai returned 403 (also for robots.txt) from the survey egress on 2026-11-05: unreachable there; may work from the operator's machine."
+    },
+    "services3.arcgis.com": {
+      "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
+      "note": "City of South Fulton ArcGIS Online layers (also used by zoning_import)."
+    },
+    "services7.arcgis.com": {
+      "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
+      "note": "East Point ArcGIS Online layers."
+    },
+    "services8.arcgis.com": {
+      "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
+      "note": "Fairburn ArcGIS Online layers."
+    },
+    "services.arcgis.com": {
+      "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
+      "note": "Union City ArcGIS Online layers."
+    },
+    "gis.atlantaga.gov": {
+      "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
+      "note": "City of Atlanta GIS (LandUsePlanning MapServer: zoning, rezoning cases, special use permits). www.atlantaga.gov itself returned 403 to the survey."
+    },
+    "gismaps.fultoncountyga.gov": {
+      "terms_url": null, "terms_reviewed_by": null, "terms_reviewed_on": null,
+      "note": "Fulton County GIS (PropertyMapViewer layer 34 zoning, used by zoning_import)."
+    }
+  },
+  "jurisdictions": {
+    "south_fulton": {
+      "name": "City of South Fulton",
+      "priority": 1,
+      "conditions_suffix_regex": null,
+      "conditions_note": "Conditions of zoning are not suffixed on the district code; the ZoningCases layer publishes case ids only (no status). Case hits are listed as 'other cases' for a human pull.",
+      "note": "Official code is on Municode (Cloudflare challenge, robots disallows AI agents): never fetched. Mirror only.",
+      "sources": [
+        {
+          "key": "sf_ch4_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "district_grid",
+          "note": "Article 4, Sec. 403 / Table 4-1. M-1 and M-2 share one row. Side/rear cell carries footnote 19 and a Sec. 405 cross-reference.",
+          "sections": [
+            {
+              "id": "table_4_1",
+              "label": "Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "start": "Table 4-1 Area Regulations for Lots and Principal Buildings",
+              "end": "Sec. 404.01. - R-5 single-family district.",
+              "pick": "last",
+              "districts": ["M-1", "M-2", "AG-1"],
+              "config": {
+                "header_rows": 3,
+                "district_header": "Zoning District",
+                "columns": [
+                  {"header": "Lot Area (minimum acres or square feet)", "field": "min_lot_area_sqft", "unit": "sqft"},
+                  {"header": "Setbacks (minimum feet) / Front / To lot line", "field": "front_setback_ft", "unit": "ft"},
+                  {"header": "Setbacks (minimum feet) / Side", "field": "side_setback_ft", "unit": "ft"},
+                  {"header": "Setbacks (minimum feet) / Rear", "field": "rear_setback_ft", "unit": "ft"},
+                  {"header": "Lot Width (minimum feet)", "field": "min_lot_width_ft", "unit": "ft"},
+                  {"header": "Lot Frontage (minimum feet)", "field": "min_lot_frontage_ft", "unit": "ft"},
+                  {"header": "Height (maximum feet)", "field": "max_height_ft", "unit": "ft"},
+                  {"header": "Lot Coverage (maximum percent)", "field": "max_lot_coverage_pct", "unit": "pct"}
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "sf_ch2_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "use_table",
+          "note": "Sec. 207.06 / Table 2-4 Principal Use Table: Non-Residential Districts (A = allowed, S = special use, blank = prohibited per Sec. 207.04).",
+          "sections": [
+            {
+              "id": "table_2_4",
+              "label": "Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts)",
+              "start": "Table 2-4 Principal Use Table: Non-Residential Districts",
+              "end": "Table 2-5 Accessory and Temporary Use Table: Non-Residential Districts",
+              "pick": "last",
+              "districts": ["M-1", "M-2", "AG-1"],
+              "config": {
+                "use_header": "Principal Uses",
+                "row_patterns": ["Distribution Center", "General Warehousing and Indoor Storage"],
+                "legend": {"A": "permitted_by_right", "S": "special_use_permit", "": "not_permitted"}
+              }
+            }
+          ]
+        }
+      ],
+      "change_signals": [
+        {
+          "key": "sf_zoning_cases",
+          "enabled": true,
+          "url": "https://services3.arcgis.com/y2BJK2GUfoTwH7py/arcgis/rest/services/ZoningCases/FeatureServer/0",
+          "kind": "cases",
+          "case_id_field": "Case_",
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "Case ids only; no status field, so hits are 'other cases', never counted as conditions on file."
+        },
+        {
+          "key": "sf_zoning_layer",
+          "enabled": true,
+          "url": "https://services3.arcgis.com/y2BJK2GUfoTwH7py/arcgis/rest/services/Zoning/FeatureServer/0",
+          "kind": "zoning",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "The zoning layer zoning_import overlays."
+        }
+      ]
+    },
+    "fairburn": {
+      "name": "City of Fairburn",
+      "priority": 1,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No conditions suffix convention known; no case layer registered.",
+      "note": "Official code is on Municode (never fetched). Mirror only.",
+      "sources": [
+        {
+          "key": "fairburn_ch2_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/fairburn-GA/chapter_2",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "label_value",
+          "note": "Sec. 80-85 (f)/(g) and Sec. 80-86 (f)/(g): two-column label/value tables.",
+          "sections": [
+            {
+              "id": "m1_standards",
+              "label": "Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "start": ["Sec. 80-85. - M-1—Light Industrial Zoning District.", "M-1—Development standards."],
+              "end": "M-1—Design standards.",
+              "district": "M-1",
+              "config": {"labels": [
+                {"label": "Minimum front yard setback", "field": "front_setback_ft"},
+                {"label": "Minimum side yard setback", "field": "side_setback_ft"},
+                {"label": "Minimum rear yard setback", "field": "rear_setback_ft"},
+                {"label": "Minimum lot area", "field": "min_lot_area_sqft"},
+                {"label": "Minimum width of lot frontage or width at building line", "field": "min_lot_frontage_ft"},
+                {"label": "Maximum height", "field": "max_height_ft"},
+                {"label": "Maximum lot coverage", "field": "max_lot_coverage_pct"}
+              ]}
+            },
+            {
+              "id": "m2_standards",
+              "label": "Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "start": ["Sec. 80-86. - M-2—Heavy Industrial Zoning District.", "M-2—Development standards."],
+              "end": "M-2—Design standards.",
+              "district": "M-2",
+              "config": {"labels": [
+                {"label": "Minimum front yard setback", "field": "front_setback_ft"},
+                {"label": "Minimum side yard setback", "field": "side_setback_ft"},
+                {"label": "Minimum rear yard setback", "field": "rear_setback_ft"},
+                {"label": "Minimum lot area", "field": "min_lot_area_sqft"},
+                {"label": "Minimum width of lot frontage or width at building line", "field": "min_lot_frontage_ft"},
+                {"label": "Maximum height", "field": "max_height_ft"},
+                {"label": "Maximum lot coverage", "field": "max_lot_coverage_pct"}
+              ]}
+            }
+          ]
+        }
+      ],
+      "change_signals": [
+        {
+          "key": "fairburn_zoning_layer",
+          "enabled": true,
+          "url": "https://services8.arcgis.com/ZvMgtqecACHwgXJb/arcgis/rest/services/Current_Zoning_FLU/FeatureServer/0",
+          "kind": "zoning",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "The zoning layer zoning_import joins."
+        }
+      ]
+    },
+    "atlanta": {
+      "name": "City of Atlanta",
+      "priority": 1,
+      "conditions_suffix_regex": "-C$",
+      "conditions_note": "A trailing -C on the district (e.g. I-1-C) means site-specific conditions of zoning (zoning.normalize). The conditions are in scanned PDFs: pull by hand.",
+      "note": "Official code is on Municode (never fetched); www.atlantaga.gov returned 403. Chapter 16-16 (I-1) and 16-17 (I-2) are prose: assisted or --llm extraction.",
+      "sources": [
+        {
+          "key": "atl_i1_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/atlanta-GA/chapter_22",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "llm_prose",
+          "note": "Part 16, Chapter 16 I-1 Light Industrial District.",
+          "sections": [
+            {
+              "id": "i1_dev_controls",
+              "label": "Sec. 16-16.007 (Development controls)",
+              "start": "Sec. 16-16.007. - Development controls.",
+              "end": "Sec. 16-16.008. - Maximum height limitations.",
+              "district": "I-1",
+              "config": {"fields": ["front_setback_ft", "side_setback_ft", "rear_setback_ft", "min_lot_area_sqft", "min_lot_width_ft", "min_lot_frontage_ft", "max_far"]}
+            },
+            {
+              "id": "i1_height",
+              "label": "Sec. 16-16.008 (Maximum height limitations)",
+              "start": "Sec. 16-16.008. - Maximum height limitations.",
+              "end": "Sec. 16-16.009. - Off-street parking minimum requirements.",
+              "district": "I-1",
+              "config": {"fields": ["max_height_ft"]}
+            }
+          ]
+        },
+        {
+          "key": "atl_i2_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/atlanta-GA/chapter_24",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "llm_prose",
+          "note": "Part 16, Chapter 17 I-2 Heavy Industrial District.",
+          "sections": [
+            {
+              "id": "i2_dev_controls",
+              "label": "Sec. 16-17.007 (Development controls)",
+              "start": "Sec. 16-17.007. - Development controls.",
+              "end": "Sec. 16-17.008. - Maximum height limitations.",
+              "district": "I-2",
+              "config": {"fields": ["front_setback_ft", "side_setback_ft", "rear_setback_ft", "min_lot_area_sqft", "min_lot_width_ft", "min_lot_frontage_ft", "max_far"]}
+            },
+            {
+              "id": "i2_height",
+              "label": "Sec. 16-17.008 (Maximum height limitations)",
+              "start": "Sec. 16-17.008. - Maximum height limitations.",
+              "end": "Sec. 16-17.009.",
+              "district": "I-2",
+              "config": {"fields": ["max_height_ft"]}
+            }
+          ]
+        }
+      ],
+      "change_signals": [
+        {
+          "key": "atl_rezoning_cases",
+          "enabled": true,
+          "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10",
+          "kind": "cases",
+          "case_id_field": "DOCKET_NO",
+          "status_field": "STATUSTYPE",
+          "approved_statuses": ["Complete"],
+          "note": "STATUSTYPE domain: Complete, Correction, Denied, Filed, Pending, Reserved. Only Complete counts as conditions on file; the rest are 'other cases'."
+        },
+        {
+          "key": "atl_special_use_permits",
+          "enabled": true,
+          "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11",
+          "kind": "overlay",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "Special Use Permits layer: watched for edits only (field names not yet confirmed for case flags)."
+        },
+        {
+          "key": "atl_zoning_layer",
+          "enabled": true,
+          "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0",
+          "kind": "zoning",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "The zoning layer zoning_import overlays."
+        }
+      ]
+    },
+    "union_city": {
+      "name": "City of Union City",
+      "priority": 1,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No conditions suffix convention known.",
+      "note": "The Zoneomics page for Union City is a stub (no ordinance text): not registered. The official PDF is the only source; Akamai blocked it from the survey egress.",
+      "sources": [
+        {
+          "key": "uc_zoning_ordinance_pdf",
+          "enabled": true,
+          "url": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf",
+          "format": "pdf",
+          "source_class": "official",
+          "parser": "llm_prose",
+          "note": "February 18, 2025 revision (unofficial reference copy per its cover). Section markers unverified: the file was unreachable when this entry was written.",
+          "sections": [
+            {
+              "id": "m1_district",
+              "label": "M-1 Light Industrial District (dimensional requirements)",
+              "start": "M-1",
+              "end": "M-2",
+              "district": "M-1",
+              "config": {"fields": ["front_setback_ft", "side_setback_ft", "rear_setback_ft", "min_lot_area_sqft", "min_lot_width_ft", "min_lot_frontage_ft", "max_height_ft", "max_lot_coverage_pct"]}
+            }
+          ]
+        }
+      ],
+      "change_signals": [
+        {
+          "key": "uc_zoning_layer",
+          "enabled": true,
+          "url": "https://services.arcgis.com/MewUCwyCByL0k7La/arcgis/rest/services/Union_City_Data_WFL1/FeatureServer/14",
+          "kind": "zoning",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "The zoning layer zoning_import joins."
+        }
+      ]
+    },
+    "fid": {
+      "name": "Fulton Industrial District (Fulton County Zoning Resolution remnant)",
+      "priority": 1,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No conditions suffix convention known for layer 34.",
+      "note": "Official Fulton County Zoning Resolution, Article X (Sec. 10.1-10.3). Buffers (Sec. 4.23 / Table 4.23.1, art4.pdf) are outside the scraper's field set.",
+      "sources": [
+        {
+          "key": "fc_art10_pdf",
+          "enabled": true,
+          "url": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf",
+          "format": "pdf",
+          "source_class": "official",
+          "parser": "label_value",
+          "note": "Development standards lists 'B. Minimum Front Yard - 40 feet' etc.",
+          "sections": [
+            {
+              "id": "m1a_dev_standards",
+              "label": "Sec. 10.1.3 (M-1A development standards)",
+              "start": "10.1.3. DEVELOPMENT STANDARDS.",
+              "end": "10.1.4. EXTERIOR BUILDING WALLS.",
+              "district": "M-1A",
+              "config": {"labels": [
+                {"label": "Minimum Front Yard", "field": "front_setback_ft"},
+                {"label": "Minimum Side Yard", "field": "side_setback_ft"},
+                {"label": "Minimum Rear Yard", "field": "rear_setback_ft"},
+                {"label": "Minimum Lot Frontage", "field": "min_lot_frontage_ft"}
+              ]}
+            },
+            {
+              "id": "m1_dev_standards",
+              "label": "Sec. 10.2.3 (M-1 development standards)",
+              "start": "10.2.3. DEVELOPMENT STANDARDS.",
+              "end": "10.2.4. OTHER REGULATIONS.",
+              "district": "M-1",
+              "config": {"labels": [
+                {"label": "Minimum Front Yard", "field": "front_setback_ft"},
+                {"label": "Minimum Side Yard", "field": "side_setback_ft"},
+                {"label": "Minimum Rear Yard", "field": "rear_setback_ft"},
+                {"label": "Minimum Lot Area", "field": "min_lot_area_sqft"},
+                {"label": "Minimum Lot Frontage", "field": "min_lot_frontage_ft"}
+              ]}
+            },
+            {
+              "id": "m2_dev_standards",
+              "label": "Sec. 10.3.3 (M-2 development standards)",
+              "start": "10.3.3. DEVELOPMENT STANDARDS.",
+              "end": "10.3.4. OTHER REGULATIONS.",
+              "district": "M-2",
+              "config": {"labels": [
+                {"label": "Minimum Front Yard", "field": "front_setback_ft"},
+                {"label": "Minimum Side Yard", "field": "side_setback_ft"},
+                {"label": "Minimum Rear Yard", "field": "rear_setback_ft"},
+                {"label": "Minimum Lot Area", "field": "min_lot_area_sqft"},
+                {"label": "Minimum Lot Frontage", "field": "min_lot_frontage_ft"}
+              ]}
+            }
+          ]
+        }
+      ],
+      "change_signals": [
+        {
+          "key": "fc_layer34_zoning",
+          "enabled": true,
+          "url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/34",
+          "kind": "zoning",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "Fulton County zoning layer 34 (South Fulton and FID)."
+        }
+      ]
+    },
+    "east_point": {
+      "name": "City of East Point",
+      "priority": 2,
+      "conditions_suffix_regex": null,
+      "conditions_note": "Case ids only are published; no suffix convention known.",
+      "note": "0 corridor parcels today. Mirror only (official code on Municode).",
+      "sources": [
+        {
+          "key": "ep_ch3_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/east-point-GA/chapter_3",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "label_value",
+          "note": "Sec. 10-2079(e) / 10-2080(e): 'Minimum front yard setback—40 feet.' lists.",
+          "sections": [
+            {
+              "id": "i1_dev_standards",
+              "label": "Sec. 10-2079(e) (I-1 development standards)",
+              "start": ["Sec. 10-2079. - I-1 Light Industrial District.", "Development standards."],
+              "end": "Stormwater Pollution Prevention Plan.",
+              "pick": "last",
+              "district": "I-1",
+              "config": {"labels": [
+                {"label": "Height regulations", "field": "max_height_ft"},
+                {"label": "Minimum front yard setback", "field": "front_setback_ft"},
+                {"label": "Minimum side yard setback", "field": "side_setback_ft"},
+                {"label": "Minimum rear yard setback", "field": "rear_setback_ft"},
+                {"label": "Minimum lot area", "field": "min_lot_area_sqft"},
+                {"label": "Minimum width of lot frontage or width at building line", "field": "min_lot_frontage_ft"}
+              ]}
+            },
+            {
+              "id": "i2_dev_standards",
+              "label": "Sec. 10-2080(e) (I-2 development standards)",
+              "start": ["Sec. 10-2080. - I-2 Heavy Industrial District.", "Development standards."],
+              "end": "Stormwater Pollution Prevention Plan.",
+              "pick": "last",
+              "district": "I-2",
+              "config": {"labels": [
+                {"label": "Height regulations", "field": "max_height_ft"},
+                {"label": "Minimum front yard setback", "field": "front_setback_ft"},
+                {"label": "Minimum side yard setback", "field": "side_setback_ft"},
+                {"label": "Minimum rear yard setback", "field": "rear_setback_ft"},
+                {"label": "Minimum lot area", "field": "min_lot_area_sqft"},
+                {"label": "Minimum width of lot frontage or width at building line", "field": "min_lot_frontage_ft"}
+              ]}
+            }
+          ]
+        }
+      ],
+      "change_signals": [
+        {
+          "key": "ep_zoning_layer",
+          "enabled": true,
+          "url": "https://services7.arcgis.com/CPLm4MuWYjfnA2R9/arcgis/rest/services/Current_Zoning/FeatureServer/0",
+          "kind": "zoning",
+          "case_id_field": null,
+          "status_field": null,
+          "approved_statuses": [],
+          "note": "The zoning layer zoning_import joins."
+        }
+      ]
+    },
+    "hapeville": {
+      "name": "City of Hapeville",
+      "priority": 2,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No suffix convention known.",
+      "note": "0 corridor parcels today. Sec. 93-22.1-1 is a true dimensional chart with footnote letters a-m.",
+      "sources": [
+        {
+          "key": "hap_chart_mirror",
+          "enabled": true,
+          "url": "https://www.zoneomics.com/code/hapeville-GA/chapter_39",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "district_grid",
+          "note": "Two front-yard columns (minor collector / major arterial); only the minor-collector column is mapped.",
+          "sections": [
+            {
+              "id": "chart_93_22_1_1",
+              "label": "Sec. 93-22.1-1 (Chart of dimensional requirements)",
+              "start": "Sec. 93-22.1-1.- Chart of dimensional requirements.",
+              "end": "(Code 1981, § 8-5-171",
+              "pick": "last",
+              "districts": ["I-1", "I-2"],
+              "config": {
+                "header_rows": 2,
+                "district_header": "Zoning District",
+                "columns": [
+                  {"header": "Min. Lot Area Sq. Ft.", "field": "min_lot_area_sqft", "unit": "sqft"},
+                  {"header": "Lot Frontage (Feet)", "field": "min_lot_frontage_ft", "unit": "ft"},
+                  {"header": "Max Lot Coverage", "field": "max_lot_coverage_pct", "unit": "pct"},
+                  {"header": "Minimum Front Yard / Minor Col.", "field": "front_setback_ft", "unit": "ft"},
+                  {"header": "Minimum / Side", "field": "side_setback_ft", "unit": "ft"},
+                  {"header": "Minimum / Rear", "field": "rear_setback_ft", "unit": "ft"},
+                  {"header": "Maximum / Feet", "field": "max_height_ft", "unit": "ft"}
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "change_signals": []
+    },
+    "college_park": {
+      "name": "City of College Park",
+      "priority": 2,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No suffix convention known.",
+      "note": "0 corridor parcels today. Art. 3 Div. 13/14 (M1/M2) on the mirror is a layout grid (labels and values on alternating rows): needs --llm or an assisted file; disabled until markers are checked.",
+      "sources": [
+        {
+          "key": "cp_ch3_mirror",
+          "enabled": false,
+          "url": "https://www.zoneomics.com/code/college-park-GA/chapter_3",
+          "format": "html",
+          "source_class": "mirror",
+          "parser": "llm_prose",
+          "note": "Markers unverified.",
+          "sections": [
+            {
+              "id": "m1_division",
+              "label": "Art. 3 Div. 13 (M1 Light Industrial District)",
+              "start": "DIVISION 13. - M1 LIGHT INDUSTRIAL DISTRICT",
+              "end": "DIVISION 14. - M2 HEAVY INDUSTRIAL DISTRICT",
+              "pick": "last",
+              "district": "M1",
+              "config": {"fields": ["front_setback_ft", "side_setback_ft", "rear_setback_ft", "min_lot_area_sqft", "max_height_ft", "max_lot_coverage_pct"]}
+            }
+          ]
+        }
+      ],
+      "change_signals": []
+    },
+    "palmetto": {
+      "name": "City of Palmetto",
+      "priority": 2,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No suffix convention known.",
+      "note": "0 corridor parcels today. The mirror silently drops the 9-3 and 5-3 tables, so a mirror read would report 'not found in source'; no reachable official text found. No source registered.",
+      "sources": [],
+      "change_signals": []
+    },
+    "chattahoochee_hills": {
+      "name": "City of Chattahoochee Hills",
+      "priority": 2,
+      "conditions_suffix_regex": null,
+      "conditions_note": "No suffix convention known.",
+      "note": "0 corridor parcels today. Form-based code with no industrial district: nothing to extract.",
+      "sources": [],
+      "change_signals": []
+    }
+  }
+}
