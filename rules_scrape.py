@@ -2084,6 +2084,7 @@ class SourceOutcome:
     final_url: str = ""
     sections: list[Section] = field(default_factory=list)
     raw_changed: bool | None = None
+    latest_ord: tuple[date, str] | None = None     # newest 'Ord. No.' date on the whole page
 
 
 @dataclass
@@ -2161,6 +2162,7 @@ def scrape(reg: Registry, *, fetcher: PoliteFetcher | None, cache: Cache, offlin
         out.fetched_at = f.fetched_at
         out.final_url = f.final_url
         doc = _document_for(src, f, res.pdftotext)
+        out.latest_ord = latest_ord(doc.text) if doc is not None else None
         for sd in src.sections:
             if doc is None:
                 sec = Section(src, sd, "pdf text unavailable", source_sha256=out.sha256)
@@ -2642,8 +2644,7 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
         p = prev.get(o.source.key, {}) if isinstance(prev, Mapping) else {}
         reachable = o.status in ("fetched", "replayed")
         st = {"raw_sha256": o.sha256 if reachable else None, "sections": {}, "ord": None}
-        text_all = " ".join(s.norm for s in o.sections if s.status == "found")
-        lo = latest_ord(text_all) if reachable else None
+        lo = o.latest_ord if reachable else None
         if lo:
             st["ord"] = [lo[0].isoformat(), lo[1]]
         cut = {s.defn.id: s for s in o.sections}
