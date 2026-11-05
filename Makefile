@@ -331,6 +331,18 @@ zoning-import:  ## Write parcels.zoning from the city/county zoning layers in so
 	@python zoning_import.py $(ARGS)
 
 # ---------------------------------------------------------------------
+# Zoning-code scraper (reviews/23_rules_scraper) -- between runs only.
+# Writes a CANDIDATE + diff under rules_out/; never zoning_rules.json.
+# ---------------------------------------------------------------------
+.PHONY: rules-scrape
+rules-scrape:  ## Read the sources in rules_sources.json and draft rules_out/zoning_rules.CANDIDATE.json + a diff against zoning_rules.json. ARGS='--offline' / '--llm' / '--assisted FILE' / '--flags'.
+	@python rules_scrape.py $(ARGS)
+
+.PHONY: rules-watch
+rules-watch:  ## Re-fetch the registered sources, report what changed (sections, Ord. No. dates, GIS edits). Never applies anything.
+	@python rules_scrape.py --watch $(ARGS)
+
+# ---------------------------------------------------------------------
 # Higher-level recipes
 # ---------------------------------------------------------------------
 .PHONY: resume

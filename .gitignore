@@ -72,3 +72,8 @@ playwright/.local-browsers/
 site_fit_studies/
 SiteFit.html
 sitefit/
+# Rules scraper (reviews/23_rules_scraper): raw fetched pages with their
+# metadata, cached extractor replies, and the candidate/diff/flags outputs.
+# Never committed; review artifacts go to reviews/23_rules_scraper/ by hand.
+rules_cache/
+rules_out/
