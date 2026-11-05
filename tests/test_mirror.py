@@ -41,6 +41,8 @@ _PIPELINE_MODULES = (
     "research.py",
     "costar_ingest.py",
     "costar_import.py",
+    "zoning.py",
+    "zoning_import.py",
     "reporting.py",
     "pipeline_common.py",
     "connector_harness.py",
@@ -342,6 +344,11 @@ class TestMirrorStaticGuards(unittest.TestCase):
                 )
             elif name == "prepare.py":
                 continue  # DDL mentions the table; CREATE only, no FROM
+            elif name == "zoning_import.py":
+                # reviews/21_zoning (Z-05): the operator tool's run-state
+                # REFUSAL reads the mirror (baseline for the tag; newest
+                # run not halted). Read-only, never a metric input.
+                self.assertEqual(len(reads), 3, "zoning_import.py mirror reads")
             else:
                 self.assertEqual(
                     len(reads), 0, f"{name} reads the mirror (SR-15 fence)"

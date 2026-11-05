@@ -1,0 +1,4262 @@
+{
+ "cycle": {
+  "executed": [
+   [
+    "SELECT COUNT(*) FROM research_log WHERE cycle_id = %s AND action_type = 'scoring'",
+    [
+     "score-atlanta-golden-cycle"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id FROM parcels p WHERE p.market = %s AND (  NOT EXISTS (    SELECT 1 FROM parcel_scores ps     WHERE ps.parcel_id = p.parcel_id AND ps.run_tag = %s  )  OR (    SELECT ps.actionability FROM parcel_scores ps     WHERE ps.parcel_id = p.parcel_id AND ps.run_tag = %s     ORDER BY ps.scored_at DESC, ps.score_id DESC LIMIT 1  ) = 'PENDING') ORDER BY p.parcel_id",
+    [
+     "atlanta",
+     "golden",
+     "golden"
+    ]
+   ],
+   [
+    "SELECT DISTINCT sm FROM (SELECT COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS sm FROM parcels p WHERE p.parcel_id = ANY(%s) OFFSET 0) q WHERE sm IS NOT NULL",
+    [
+     [
+      "fulton-Z01",
+      "fulton-Z02",
+      "fulton-Z03",
+      "fulton-Z04",
+      "fulton-Z05",
+      "fulton-Z06",
+      "fulton-Z07",
+      "fulton-Z08",
+      "fulton-Z09",
+      "fulton-Z10",
+      "fulton-Z11",
+      "fulton-Z12"
+     ]
+    ]
+   ],
+   [
+    "SELECT DISTINCT ON (submarket_id) submarket_id, vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = ANY(%s) ORDER BY submarket_id, (CASE WHEN source = 'costar' THEN 0 ELSE 1 END), as_of_date DESC",
+    [
+     [
+      "atlanta__fb",
+      "atlanta__sf",
+      "atlanta__uc",
+      "atlanta__wa"
+     ]
+    ]
+   ],
+   [
+    "SELECT   submarket_id,   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = ANY(%s)   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months') GROUP BY submarket_id",
+    [
+     [
+      "atlanta__fb",
+      "atlanta__sf",
+      "atlanta__uc",
+      "atlanta__wa"
+     ]
+    ]
+   ],
+   [
+    "SELECT DISTINCT ON (parcel_id) parcel_id, description FROM flagged_items WHERE parcel_id = ANY(%s)   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY parcel_id, flagged_at DESC, flag_id DESC",
+    [
+     [
+      "fulton-Z01",
+      "fulton-Z02",
+      "fulton-Z03",
+      "fulton-Z04",
+      "fulton-Z05",
+      "fulton-Z06",
+      "fulton-Z07",
+      "fulton-Z08",
+      "fulton-Z09",
+      "fulton-Z10",
+      "fulton-Z11",
+      "fulton-Z12"
+     ]
+    ]
+   ],
+   [
+    "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+    [
+     [
+      "fulton-Z01",
+      "fulton-Z02",
+      "fulton-Z03",
+      "fulton-Z04",
+      "fulton-Z05",
+      "fulton-Z06",
+      "fulton-Z07",
+      "fulton-Z08",
+      "fulton-Z09",
+      "fulton-Z10",
+      "fulton-Z11",
+      "fulton-Z12"
+     ]
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z01"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z01"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z01",
+     61.4,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 7, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"MODERATE\", \"ground_lease\": \"WEAK\", \"flip\": \"MODERATE\"}",
+     "bts",
+     "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z01",
+     61.4,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"MODERATE\", \"ground_lease\": \"WEAK\", \"flip\": \"MODERATE\"}",
+     "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z01",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z01"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z01",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z01"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z01",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z01"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z01",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z01"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z01",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z01"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z01",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z02"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z02"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z02",
+     65.09,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+     "land_bank",
+     "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z02",
+     65.09,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+     "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z02",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z02"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z02",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z02"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z02",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z02"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z02",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z02"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z02",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z02"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z02",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z03"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z03"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z03",
+     52.81,
+     0.5833333333333334,
+     "FAIL:deal_killer",
+     "{\"deal_killer\": \"actionability_block: deal killer: pipeline easement\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z03",
+     52.81,
+     "FAIL:deal_killer",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z03",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z03"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z03",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z03"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z03",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z03"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z03",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z03"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z03",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z03"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z03",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z04"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z04",
+     29.0,
+     0.5,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z04",
+     29.0,
+     "FAIL:strategy",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+     "wire CoStar Land / assessor comps for parcel_id=fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z04"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z04",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8 land-basis median has only 2 comps in submarket=atlanta__wa (< 3 required)",
+     "wait for additional CoStar land sales comps in submarket"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z05"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z05"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z05",
+     61.58,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z05",
+     61.58,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z05",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z05"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z05",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z05"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z05",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z05"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z05",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z05"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z05",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z05"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z05",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z06"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z06",
+     70.2,
+     0.5,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z06",
+     70.2,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+     "wire CoStar Land / assessor comps for parcel_id=fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z06"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z06",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z07"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z07",
+     34.09,
+     0.25,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z07",
+     34.09,
+     "FAIL:strategy",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S4_submarket_vacancy (submarket vacancy) unjoined: pending later-phase data wiring (CoStar)",
+     "wire CoStar for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S5_submarket_absorption (submarket net absorption (T12)) unjoined: pending later-phase data wiring (CoStar)",
+     "wire CoStar for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6_competing_pipeline (competing pipeline) unjoined: pending later-phase data wiring (CoStar / Dodge Data)",
+     "wire CoStar / Dodge Data for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+     "wire CoStar Land / assessor comps for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z07",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z07"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z08"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z08",
+     34.09,
+     0.25,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z08",
+     34.09,
+     "FAIL:strategy",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S4_submarket_vacancy (submarket vacancy) unjoined: pending later-phase data wiring (CoStar)",
+     "wire CoStar for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S5_submarket_absorption (submarket net absorption (T12)) unjoined: pending later-phase data wiring (CoStar)",
+     "wire CoStar for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6_competing_pipeline (competing pipeline) unjoined: pending later-phase data wiring (CoStar / Dodge Data)",
+     "wire CoStar / Dodge Data for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+     "wire CoStar Land / assessor comps for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z08",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z08"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z09"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z09",
+     29.0,
+     0.5,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z09",
+     29.0,
+     "FAIL:strategy",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+     "wire CoStar Land / assessor comps for parcel_id=fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z09"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z09",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8 land-basis median has only 2 comps in submarket=atlanta__wa (< 3 required)",
+     "wait for additional CoStar land sales comps in submarket"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z10"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z10",
+     47.4,
+     0.5,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 6, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 4, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z10",
+     47.4,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+     "wire CoStar Land / assessor comps for parcel_id=fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z10"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z10",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S8 land-basis median has only 0 comps in submarket=atlanta__uc (< 3 required)",
+     "wait for additional CoStar land sales comps in submarket"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z11"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z11"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z11",
+     73.86,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+     "land_bank",
+     "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z11",
+     73.86,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+     "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z11",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z11"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z11",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z11"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z11",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z11"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z11",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z11"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z11",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z11"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z11",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ],
+   [
+    "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+    [
+     "fulton-Z12"
+    ]
+   ],
+   [
+    "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+    [
+     "fulton-Z12"
+    ]
+   ],
+   [
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+    [
+     "fulton-Z12",
+     61.58,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   [
+    "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+    [
+     "score-atlanta-golden-cycle",
+     "scoring",
+     "atlanta",
+     "fulton-Z12",
+     61.58,
+     "PASS",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z12",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+     "wire Google Maps API / GIS for parcel_id=fulton-Z12"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z12",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+     "wire USGS 3DEP LiDAR for parcel_id=fulton-Z12"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z12",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+     "wire Census LODES / OnTheMap for parcel_id=fulton-Z12"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z12",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+     "wire Class I railroad maps for parcel_id=fulton-Z12"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z12",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+     "wire GIS / facility locations for parcel_id=fulton-Z12"
+    ]
+   ],
+   [
+    "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+    [
+     "data_gap",
+     "fulton-Z12",
+     "atlanta",
+     "cycle=score-atlanta-golden-cycle; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+     "Phase 11+: implement radius-search facility for S6"
+    ]
+   ]
+  ],
+  "parcel_score_inserts": [
+   [
+    "fulton-Z01",
+    61.4,
+    0.5833333333333334,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 7, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"MODERATE\", \"ground_lease\": \"WEAK\", \"flip\": \"MODERATE\"}",
+    "bts",
+    "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z02",
+    65.09,
+    0.5833333333333334,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+    "land_bank",
+    "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z03",
+    52.81,
+    0.5833333333333334,
+    "FAIL:deal_killer",
+    "{\"deal_killer\": \"actionability_block: deal killer: pipeline easement\"}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    "bts",
+    "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z04",
+    29.0,
+    0.5,
+    "FAIL:strategy",
+    "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    null,
+    "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z05",
+    61.58,
+    0.5833333333333334,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    "bts",
+    "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z06",
+    70.2,
+    0.5,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    "bts",
+    "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z07",
+    34.09,
+    0.25,
+    "FAIL:strategy",
+    "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    null,
+    "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z08",
+    34.09,
+    0.25,
+    "FAIL:strategy",
+    "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    null,
+    "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z09",
+    29.0,
+    0.5,
+    "FAIL:strategy",
+    "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    null,
+    "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z10",
+    47.4,
+    0.5,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 6, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 4, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    "bts",
+    "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z11",
+    73.86,
+    0.5833333333333334,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+    "land_bank",
+    "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ],
+   [
+    "fulton-Z12",
+    61.58,
+    0.5833333333333334,
+    "PASS",
+    "{}",
+    "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+    "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+    "bts",
+    "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+    "golden",
+    "exp-golden"
+   ]
+  ],
+  "research_log_notes": [
+   "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4",
+   "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4",
+   "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4",
+   "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+   "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+   "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4",
+   "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+   "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+   "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+   "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0",
+   "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4",
+   "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+  ],
+  "summary": {
+   "abort_reason": null,
+   "aborted": false,
+   "counts": {
+    "error": 0,
+    "missing": 0,
+    "scored": 12
+   },
+   "cycle_id": "score-atlanta-golden-cycle",
+   "market": "atlanta",
+   "parcels": [
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 61.4,
+     "confidence_score": 0.5833333333333334,
+     "parcel_id": "fulton-Z01",
+     "primary_strategy": "bts",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "MODERATE",
+      "ground_lease": "WEAK",
+      "land_bank": "MODERATE",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 8,
+      "S5_submarket_absorption": 7,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": 7,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 65.09,
+     "confidence_score": 0.5833333333333334,
+     "parcel_id": "fulton-Z02",
+     "primary_strategy": "land_bank",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "STRONG",
+      "ground_lease": "WEAK",
+      "land_bank": "STRONG",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 8,
+      "S5_submarket_absorption": 7,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": 10,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "FAIL:deal_killer",
+     "actionability_blockers": {
+      "deal_killer": "actionability_block: deal killer: pipeline easement"
+     },
+     "composite_score": 52.81,
+     "confidence_score": 0.5833333333333334,
+     "parcel_id": "fulton-Z03",
+     "primary_strategy": "bts",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 8,
+      "S5_submarket_absorption": 7,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": 0,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "FAIL:strategy",
+     "actionability_blockers": {
+      "strategy": "no strategy rated STRONG or MODERATE"
+     },
+     "composite_score": 29.0,
+     "confidence_score": 0.5,
+     "parcel_id": "fulton-Z04",
+     "primary_strategy": null,
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "WEAK",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "WEAK"
+     },
+     "sub_scores": {
+      "S10_incentives": 0,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 3,
+      "S5_submarket_absorption": 4,
+      "S6_competing_pipeline": 0,
+      "S7_labor_pool": null,
+      "S8_land_basis": null,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 61.58,
+     "confidence_score": 0.5833333333333334,
+     "parcel_id": "fulton-Z05",
+     "primary_strategy": "bts",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 10,
+      "S5_submarket_absorption": 10,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": 0,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 70.2,
+     "confidence_score": 0.5,
+     "parcel_id": "fulton-Z06",
+     "primary_strategy": "bts",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 10,
+      "S5_submarket_absorption": 10,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": null,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "FAIL:strategy",
+     "actionability_blockers": {
+      "strategy": "no strategy rated STRONG or MODERATE"
+     },
+     "composite_score": 34.09,
+     "confidence_score": 0.25,
+     "parcel_id": "fulton-Z07",
+     "primary_strategy": null,
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "WEAK",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "WEAK"
+     },
+     "sub_scores": {
+      "S10_incentives": 0,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": null,
+      "S5_submarket_absorption": null,
+      "S6_competing_pipeline": null,
+      "S7_labor_pool": null,
+      "S8_land_basis": null,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "FAIL:strategy",
+     "actionability_blockers": {
+      "strategy": "no strategy rated STRONG or MODERATE"
+     },
+     "composite_score": 34.09,
+     "confidence_score": 0.25,
+     "parcel_id": "fulton-Z08",
+     "primary_strategy": null,
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "WEAK",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "WEAK"
+     },
+     "sub_scores": {
+      "S10_incentives": 0,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": null,
+      "S5_submarket_absorption": null,
+      "S6_competing_pipeline": null,
+      "S7_labor_pool": null,
+      "S8_land_basis": null,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "FAIL:strategy",
+     "actionability_blockers": {
+      "strategy": "no strategy rated STRONG or MODERATE"
+     },
+     "composite_score": 29.0,
+     "confidence_score": 0.5,
+     "parcel_id": "fulton-Z09",
+     "primary_strategy": null,
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "WEAK",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "WEAK"
+     },
+     "sub_scores": {
+      "S10_incentives": 0,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 3,
+      "S5_submarket_absorption": 4,
+      "S6_competing_pipeline": 0,
+      "S7_labor_pool": null,
+      "S8_land_basis": null,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 47.4,
+     "confidence_score": 0.5,
+     "parcel_id": "fulton-Z10",
+     "primary_strategy": "bts",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 0,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 6,
+      "S5_submarket_absorption": 7,
+      "S6_competing_pipeline": 4,
+      "S7_labor_pool": null,
+      "S8_land_basis": null,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 73.86,
+     "confidence_score": 0.5833333333333334,
+     "parcel_id": "fulton-Z11",
+     "primary_strategy": "land_bank",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "STRONG",
+      "ground_lease": "WEAK",
+      "land_bank": "STRONG",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 10,
+      "S5_submarket_absorption": 10,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": 10,
+      "S9_entitlement_complexity": 5
+     }
+    },
+    {
+     "actionability": "PASS",
+     "actionability_blockers": {},
+     "composite_score": 61.58,
+     "confidence_score": 0.5833333333333334,
+     "parcel_id": "fulton-Z12",
+     "primary_strategy": "bts",
+     "status": "scored",
+     "strategy_fit": {
+      "bts": "MODERATE",
+      "flip": "N/A",
+      "ground_lease": "WEAK",
+      "land_bank": "N/A",
+      "spec": "MODERATE"
+     },
+     "sub_scores": {
+      "S10_incentives": 4,
+      "S11_rail_adjacency": null,
+      "S12_demand_generators": null,
+      "S1_interstate_proximity": null,
+      "S2_parcel_geometry": 4,
+      "S3_topography": null,
+      "S4_submarket_vacancy": 10,
+      "S5_submarket_absorption": 10,
+      "S6_competing_pipeline": 7,
+      "S7_labor_pool": null,
+      "S8_land_basis": 0,
+      "S9_entitlement_complexity": 5
+     }
+    }
+   ]
+  }
+ },
+ "per_parcel": {
+  "fulton-Z01": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z01"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z01"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__sf"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__sf"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z01"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z01"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z01",
+      61.4,
+      0.5833333333333334,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 7, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"MODERATE\", \"ground_lease\": \"WEAK\", \"flip\": \"MODERATE\"}",
+      "bts",
+      "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z01",
+      61.4,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"MODERATE\", \"ground_lease\": \"WEAK\", \"flip\": \"MODERATE\"}",
+      "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z01",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z01"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z01",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z01"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z01",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z01"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z01",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z01"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z01",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z01"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z01",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z01",
+     61.4,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 7, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"MODERATE\", \"ground_lease\": \"WEAK\", \"flip\": \"MODERATE\"}",
+     "bts",
+     "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=61.4 actionability=PASS primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=7 S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 61.4,
+    "confidence_score": 0.5833333333333334,
+    "parcel_id": "fulton-Z01",
+    "primary_strategy": "bts",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "MODERATE",
+     "ground_lease": "WEAK",
+     "land_bank": "MODERATE",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 8,
+     "S5_submarket_absorption": 7,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": 7,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z02": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z02"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z02"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__sf"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__sf"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z02"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z02"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z02",
+      65.09,
+      0.5833333333333334,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+      "land_bank",
+      "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z02",
+      65.09,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+      "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z02",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z02"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z02",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z02"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z02",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z02"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z02",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z02"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z02",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z02"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z02",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z02",
+     65.09,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+     "land_bank",
+     "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=65.09 actionability=PASS primary_strategy=land_bank S2=4 S4=8 S5=7 S6=7 S8=10 S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 65.09,
+    "confidence_score": 0.5833333333333334,
+    "parcel_id": "fulton-Z02",
+    "primary_strategy": "land_bank",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "STRONG",
+     "ground_lease": "WEAK",
+     "land_bank": "STRONG",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 8,
+     "S5_submarket_absorption": 7,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": 10,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z03": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z03"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z03"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__sf"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__sf"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z03"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z03"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z03",
+      52.81,
+      0.5833333333333334,
+      "FAIL:deal_killer",
+      "{\"deal_killer\": \"actionability_block: deal killer: pipeline easement\"}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "bts",
+      "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z03",
+      52.81,
+      "FAIL:deal_killer",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z03",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z03"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z03",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z03"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z03",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z03"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z03",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z03"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z03",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z03"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z03",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z03",
+     52.81,
+     0.5833333333333334,
+     "FAIL:deal_killer",
+     "{\"deal_killer\": \"actionability_block: deal killer: pipeline easement\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 8, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=52.81 actionability=FAIL:deal_killer primary_strategy=bts S2=4 S4=8 S5=7 S6=7 S8=0 S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "FAIL:deal_killer",
+    "actionability_blockers": {
+     "deal_killer": "actionability_block: deal killer: pipeline easement"
+    },
+    "composite_score": 52.81,
+    "confidence_score": 0.5833333333333334,
+    "parcel_id": "fulton-Z03",
+    "primary_strategy": "bts",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 8,
+     "S5_submarket_absorption": 7,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": 0,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z04": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z04"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z04"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__wa"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__wa"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z04"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z04"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z04",
+      29.0,
+      0.5,
+      "FAIL:strategy",
+      "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      null,
+      "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z04",
+      29.0,
+      "FAIL:strategy",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z04"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z04"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z04"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+      "wire CoStar Land / assessor comps for parcel_id=fulton-Z04"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z04"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z04"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z04",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8 land-basis median has only 2 comps in submarket=atlanta__wa (< 3 required)",
+      "wait for additional CoStar land sales comps in submarket"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z04",
+     29.0,
+     0.5,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0"
+   ],
+   "result": {
+    "actionability": "FAIL:strategy",
+    "actionability_blockers": {
+     "strategy": "no strategy rated STRONG or MODERATE"
+    },
+    "composite_score": 29.0,
+    "confidence_score": 0.5,
+    "parcel_id": "fulton-Z04",
+    "primary_strategy": null,
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "WEAK",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "WEAK"
+    },
+    "sub_scores": {
+     "S10_incentives": 0,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 3,
+     "S5_submarket_absorption": 4,
+     "S6_competing_pipeline": 0,
+     "S7_labor_pool": null,
+     "S8_land_basis": null,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z05": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z05"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z05"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z05"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z05"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z05",
+      61.58,
+      0.5833333333333334,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "bts",
+      "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z05",
+      61.58,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z05",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z05"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z05",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z05"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z05",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z05"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z05",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z05"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z05",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z05"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z05",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z05",
+     61.58,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 61.58,
+    "confidence_score": 0.5833333333333334,
+    "parcel_id": "fulton-Z05",
+    "primary_strategy": "bts",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 10,
+     "S5_submarket_absorption": 10,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": 0,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z06": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z06"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z06"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z06"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z06"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z06",
+      70.2,
+      0.5,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "bts",
+      "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z06",
+      70.2,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z06"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z06"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z06"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+      "wire CoStar Land / assessor comps for parcel_id=fulton-Z06"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z06"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z06"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z06",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z06",
+     70.2,
+     0.5,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=70.2 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=None S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 70.2,
+    "confidence_score": 0.5,
+    "parcel_id": "fulton-Z06",
+    "primary_strategy": "bts",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 10,
+     "S5_submarket_absorption": 10,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": null,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z07": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z07"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z07"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z07"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z07"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z07",
+      34.09,
+      0.25,
+      "FAIL:strategy",
+      "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      null,
+      "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z07",
+      34.09,
+      "FAIL:strategy",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S4_submarket_vacancy (submarket vacancy) unjoined: pending later-phase data wiring (CoStar)",
+      "wire CoStar for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S5_submarket_absorption (submarket net absorption (T12)) unjoined: pending later-phase data wiring (CoStar)",
+      "wire CoStar for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6_competing_pipeline (competing pipeline) unjoined: pending later-phase data wiring (CoStar / Dodge Data)",
+      "wire CoStar / Dodge Data for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+      "wire CoStar Land / assessor comps for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z07"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z07",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z07"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z07",
+     34.09,
+     0.25,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0"
+   ],
+   "result": {
+    "actionability": "FAIL:strategy",
+    "actionability_blockers": {
+     "strategy": "no strategy rated STRONG or MODERATE"
+    },
+    "composite_score": 34.09,
+    "confidence_score": 0.25,
+    "parcel_id": "fulton-Z07",
+    "primary_strategy": null,
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "WEAK",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "WEAK"
+    },
+    "sub_scores": {
+     "S10_incentives": 0,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": null,
+     "S5_submarket_absorption": null,
+     "S6_competing_pipeline": null,
+     "S7_labor_pool": null,
+     "S8_land_basis": null,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z08": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z08"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z08"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z08"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z08"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z08",
+      34.09,
+      0.25,
+      "FAIL:strategy",
+      "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      null,
+      "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z08",
+      34.09,
+      "FAIL:strategy",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S4_submarket_vacancy (submarket vacancy) unjoined: pending later-phase data wiring (CoStar)",
+      "wire CoStar for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S5_submarket_absorption (submarket net absorption (T12)) unjoined: pending later-phase data wiring (CoStar)",
+      "wire CoStar for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6_competing_pipeline (competing pipeline) unjoined: pending later-phase data wiring (CoStar / Dodge Data)",
+      "wire CoStar / Dodge Data for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+      "wire CoStar Land / assessor comps for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z08"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z08",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z08"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z08",
+     34.09,
+     0.25,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": null, \"S5_submarket_absorption\": null, \"S6_competing_pipeline\": null, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=34.09 actionability=FAIL:strategy primary_strategy=None S2=4 S4=None S5=None S6=None S8=None S9=5 S10=0"
+   ],
+   "result": {
+    "actionability": "FAIL:strategy",
+    "actionability_blockers": {
+     "strategy": "no strategy rated STRONG or MODERATE"
+    },
+    "composite_score": 34.09,
+    "confidence_score": 0.25,
+    "parcel_id": "fulton-Z08",
+    "primary_strategy": null,
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "WEAK",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "WEAK"
+    },
+    "sub_scores": {
+     "S10_incentives": 0,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": null,
+     "S5_submarket_absorption": null,
+     "S6_competing_pipeline": null,
+     "S7_labor_pool": null,
+     "S8_land_basis": null,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z09": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z09"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z09"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__wa"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__wa"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z09"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z09"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z09",
+      29.0,
+      0.5,
+      "FAIL:strategy",
+      "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      null,
+      "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z09",
+      29.0,
+      "FAIL:strategy",
+      "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z09"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z09"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z09"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+      "wire CoStar Land / assessor comps for parcel_id=fulton-Z09"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z09"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z09"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z09",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8 land-basis median has only 2 comps in submarket=atlanta__wa (< 3 required)",
+      "wait for additional CoStar land sales comps in submarket"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z09",
+     29.0,
+     0.5,
+     "FAIL:strategy",
+     "{\"strategy\": \"no strategy rated STRONG or MODERATE\"}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 3, \"S5_submarket_absorption\": 4, \"S6_competing_pipeline\": 0, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"WEAK\", \"spec\": \"WEAK\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     null,
+     "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=29.0 actionability=FAIL:strategy primary_strategy=None S2=4 S4=3 S5=4 S6=0 S8=None S9=5 S10=0"
+   ],
+   "result": {
+    "actionability": "FAIL:strategy",
+    "actionability_blockers": {
+     "strategy": "no strategy rated STRONG or MODERATE"
+    },
+    "composite_score": 29.0,
+    "confidence_score": 0.5,
+    "parcel_id": "fulton-Z09",
+    "primary_strategy": null,
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "WEAK",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "WEAK"
+    },
+    "sub_scores": {
+     "S10_incentives": 0,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 3,
+     "S5_submarket_absorption": 4,
+     "S6_competing_pipeline": 0,
+     "S7_labor_pool": null,
+     "S8_land_basis": null,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z10": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z10"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z10"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__uc"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__uc"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z10"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z10"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z10",
+      47.4,
+      0.5,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 6, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 4, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "bts",
+      "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z10",
+      47.4,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z10"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z10"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z10"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8_land_basis (land basis ($/acre)) unjoined: pending later-phase data wiring (CoStar Land / assessor comps)",
+      "wire CoStar Land / assessor comps for parcel_id=fulton-Z10"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z10"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z10"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z10",
+      "atlanta",
+      "cycle=score-atlanta-golden; S8 land-basis median has only 0 comps in submarket=atlanta__uc (< 3 required)",
+      "wait for additional CoStar land sales comps in submarket"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z10",
+     47.4,
+     0.5,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 6, \"S5_submarket_absorption\": 7, \"S6_competing_pipeline\": 4, \"S7_labor_pool\": null, \"S8_land_basis\": null, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 0, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=47.4 actionability=PASS primary_strategy=bts S2=4 S4=6 S5=7 S6=4 S8=None S9=5 S10=0"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 47.4,
+    "confidence_score": 0.5,
+    "parcel_id": "fulton-Z10",
+    "primary_strategy": "bts",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 0,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 6,
+     "S5_submarket_absorption": 7,
+     "S6_competing_pipeline": 4,
+     "S7_labor_pool": null,
+     "S8_land_basis": null,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z11": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z11"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z11"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z11"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z11"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z11",
+      73.86,
+      0.5833333333333334,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+      "land_bank",
+      "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z11",
+      73.86,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+      "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z11",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z11"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z11",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z11"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z11",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z11"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z11",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z11"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z11",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z11"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z11",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z11",
+     73.86,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 10, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"STRONG\", \"ground_lease\": \"WEAK\", \"flip\": \"STRONG\"}",
+     "land_bank",
+     "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=73.86 actionability=PASS primary_strategy=land_bank S2=4 S4=10 S5=10 S6=7 S8=10 S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 73.86,
+    "confidence_score": 0.5833333333333334,
+    "parcel_id": "fulton-Z11",
+    "primary_strategy": "land_bank",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "STRONG",
+     "ground_lease": "WEAK",
+     "land_bank": "STRONG",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 10,
+     "S5_submarket_absorption": 10,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": 10,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  },
+  "fulton-Z12": {
+   "executed": [
+    [
+     "SELECT p.parcel_id, p.market, COALESCE((SELECT s.submarket_id FROM submarkets s WHERE s.market_id = p.market AND s.bbox IS NOT NULL AND p.centroid IS NOT NULL AND s.bbox && ST_Expand(p.centroid, 0.05) AND ST_DWithin(s.bbox::geography, p.centroid::geography, 3000) ORDER BY ST_Distance(s.bbox::geography, p.centroid::geography), ST_Area(s.bbox::geography), s.submarket_id LIMIT 1), p.submarket) AS submarket, p.state, p.acreage, p.last_sale_date, p.last_sale_price, p.assessed_value_total, ST_X(p.centroid)::float AS centroid_lng, ST_Y(p.centroid)::float AS centroid_lat FROM parcels p WHERE p.parcel_id = %s",
+     [
+      "fulton-Z12"
+     ]
+    ],
+    [
+     "WITH g AS (  SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS geom,          ST_Envelope(geometry) AS bbox   FROM parcels WHERE parcel_id = %s) SELECT   ST_Area(geom::geography) AS area_m2,   ST_Area(bbox::geography) AS bbox_area_m2,   GREATEST(ST_XMax(bbox)-ST_XMin(bbox), ST_YMax(bbox)-ST_YMin(bbox))   / NULLIF(LEAST(ST_XMax(bbox)-ST_XMin(bbox),                  ST_YMax(bbox)-ST_YMin(bbox)), 0) AS aspect_ratio FROM g WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom)",
+     [
+      "fulton-Z12"
+     ]
+    ],
+    [
+     "SELECT vacancy_rate_pct, net_absorption_t12_sf, under_construction_sf, proposed_sf, asking_rent_nnn_psf, as_of_date, source FROM market_context WHERE submarket_id = %s ORDER BY (CASE WHEN source = 'costar' THEN 0 ELSE 1 END),          as_of_date DESC LIMIT 1",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT   COUNT(*) AS n,   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price_per_acre)     AS median_price_per_acre FROM sales_comps WHERE submarket_id = %s   AND comp_type = 'land'   AND price_per_acre IS NOT NULL   AND sale_date >= (CURRENT_DATE - INTERVAL '36 months')",
+     [
+      "atlanta__fb"
+     ]
+    ],
+    [
+     "SELECT description FROM flagged_items WHERE parcel_id = %s   AND flag_type = 'actionability_block'   AND status = 'open' ORDER BY flagged_at DESC LIMIT 1",
+     [
+      "fulton-Z12"
+     ]
+    ],
+    [
+     "SELECT DISTINCT parcel_id, CASE WHEN strpos(description, '; ') > 0 THEN substr(description, strpos(description, '; ') + 2) ELSE description END FROM flagged_items WHERE flag_type = 'data_gap' AND status = 'open'   AND parcel_id = ANY(%s)",
+     [
+      [
+       "fulton-Z12"
+      ]
+     ]
+    ],
+    [
+     "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, actionability_blockers, sub_scores, strategy_fit, primary_strategy, notes, run_tag, experiment_id) VALUES (%s, %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s, %s, %s, %s) RETURNING score_id",
+     [
+      "fulton-Z12",
+      61.58,
+      0.5833333333333334,
+      "PASS",
+      "{}",
+      "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "bts",
+      "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+      "golden",
+      "exp-golden"
+     ]
+    ],
+    [
+     "INSERT INTO research_log (cycle_id, action_type, market, parcel_id, composite_score, actionability, strategy_fit, notes) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+     [
+      "score-atlanta-golden",
+      "scoring",
+      "atlanta",
+      "fulton-Z12",
+      61.58,
+      "PASS",
+      "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+      "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z12",
+      "atlanta",
+      "cycle=score-atlanta-golden; S1_interstate_proximity (interstate proximity) unjoined: pending later-phase data wiring (Google Maps API / GIS)",
+      "wire Google Maps API / GIS for parcel_id=fulton-Z12"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z12",
+      "atlanta",
+      "cycle=score-atlanta-golden; S3_topography (topography / grading cost) unjoined: pending later-phase data wiring (USGS 3DEP LiDAR)",
+      "wire USGS 3DEP LiDAR for parcel_id=fulton-Z12"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z12",
+      "atlanta",
+      "cycle=score-atlanta-golden; S7_labor_pool (labor pool density) unjoined: pending later-phase data wiring (Census LODES / OnTheMap)",
+      "wire Census LODES / OnTheMap for parcel_id=fulton-Z12"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z12",
+      "atlanta",
+      "cycle=score-atlanta-golden; S11_rail_adjacency (rail adjacency) unjoined: pending later-phase data wiring (Class I railroad maps)",
+      "wire Class I railroad maps for parcel_id=fulton-Z12"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z12",
+      "atlanta",
+      "cycle=score-atlanta-golden; S12_demand_generators (proximity to demand generators) unjoined: pending later-phase data wiring (GIS / facility locations)",
+      "wire GIS / facility locations for parcel_id=fulton-Z12"
+     ]
+    ],
+    [
+     "INSERT INTO flagged_items (flag_type, parcel_id, market, description, suggested_resolution) VALUES (%s, %s, %s, %s, %s)",
+     [
+      "data_gap",
+      "fulton-Z12",
+      "atlanta",
+      "cycle=score-atlanta-golden; S6 approximated at submarket grain; program.md spec is 5-mi radius",
+      "Phase 11+: implement radius-search facility for S6"
+     ]
+    ]
+   ],
+   "parcel_score_inserts": [
+    [
+     "fulton-Z12",
+     61.58,
+     0.5833333333333334,
+     "PASS",
+     "{}",
+     "{\"S1_interstate_proximity\": null, \"S2_parcel_geometry\": 4, \"S3_topography\": null, \"S4_submarket_vacancy\": 10, \"S5_submarket_absorption\": 10, \"S6_competing_pipeline\": 7, \"S7_labor_pool\": null, \"S8_land_basis\": 0, \"S9_entitlement_complexity\": 5, \"S10_incentives\": 4, \"S11_rail_adjacency\": null, \"S12_demand_generators\": null}",
+     "{\"bts\": \"MODERATE\", \"spec\": \"MODERATE\", \"land_bank\": \"N/A\", \"ground_lease\": \"WEAK\", \"flip\": \"N/A\"}",
+     "bts",
+     "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4",
+     "golden",
+     "exp-golden"
+    ]
+   ],
+   "research_log_notes": [
+    "phase78: composite=61.58 actionability=PASS primary_strategy=bts S2=4 S4=10 S5=10 S6=7 S8=0 S9=5 S10=4"
+   ],
+   "result": {
+    "actionability": "PASS",
+    "actionability_blockers": {},
+    "composite_score": 61.58,
+    "confidence_score": 0.5833333333333334,
+    "parcel_id": "fulton-Z12",
+    "primary_strategy": "bts",
+    "status": "scored",
+    "strategy_fit": {
+     "bts": "MODERATE",
+     "flip": "N/A",
+     "ground_lease": "WEAK",
+     "land_bank": "N/A",
+     "spec": "MODERATE"
+    },
+    "sub_scores": {
+     "S10_incentives": 4,
+     "S11_rail_adjacency": null,
+     "S12_demand_generators": null,
+     "S1_interstate_proximity": null,
+     "S2_parcel_geometry": 4,
+     "S3_topography": null,
+     "S4_submarket_vacancy": 10,
+     "S5_submarket_absorption": 10,
+     "S6_competing_pipeline": 7,
+     "S7_labor_pool": null,
+     "S8_land_basis": 0,
+     "S9_entitlement_complexity": 5
+    }
+   }
+  }
+ }
+}

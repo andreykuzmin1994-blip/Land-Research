@@ -10,7 +10,10 @@ Python file the agent edits while the experiment loop is active. The agent:
     - never re-parses ``parameters.json`` directly,
     - never re-defines symbols imported from :mod:`prepare`,
     - never modifies :mod:`prepare`, :mod:`runner`, :mod:`costar_ingest`,
-      :mod:`reporting`, :mod:`pipeline_common`, or any spec ``.md`` file.
+      :mod:`reporting`, :mod:`pipeline_common`, :mod:`zoning`,
+      ``zoning_import.py``, or any spec ``.md`` file,
+    - never writes the human-owned ``zoning_rules.json`` and reads zoning
+      facts only through :mod:`zoning` (reviews/21_zoning).
 
 ============================================================================
 WHAT LIVES HERE (post-split experiment surface)
@@ -118,6 +121,7 @@ import requests
 # safe to run in CI / smoke tests with no DATABASE_URL set.
 import prepare  # noqa: F401 — re-exported intentionally for the agent.
 import connector_harness
+import zoning  # protected: rules facts + classifier (reviews/21_zoning)
 from pipeline_common import (
     _COSTAR_BASE_DIR,  # noqa: F401 — re-exported for backwards compatibility.
     _REPO_ROOT,
@@ -669,11 +673,19 @@ def _h2_filter(
 def _h3_flag(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H3 zoning is unjoined — emit data_gap flag, parcel passes (R-22). Replace body in Phase 5+; preserve signature."""
-    return _FilterResult(
-        "flag", "H3",
-        "H3 zoning unjoined: pending Layer 34 cross-query (Phase 5+)",
-    )
+    """H3 zoning: flag only, never a reject (reviews/21_zoning, Z-15).
+
+    The text comes from the protected zoning.h3_description on the parcel's
+    STORED, imported zoning (``_stored_zoning``, read once per discovery
+    cycle): the ArcGIS row itself never carries zoning. It is written as an
+    idempotent data_gap flag, so it never touches actionability.
+    """
+    stored = parcel.get("_stored_zoning") or (None, None)
+    try:
+        text = zoning.h3_description(stored[0], stored[1], parcel.get("parcel_id"))
+    except Exception:  # never let H3 break discovery
+        text = "H3 zoning not imported: run make zoning-import between runs"
+    return _FilterResult("flag", "H3", text)
 
 
 def _h4_flag(
@@ -1085,8 +1097,8 @@ _SQL_UPSERT_PARCEL = (
     "owner_type_inferred = EXCLUDED.owner_type_inferred, "
     "acreage = EXCLUDED.acreage, "
     "land_sf = EXCLUDED.land_sf, "
-    "zoning = EXCLUDED.zoning, "
-    "zoning_description = EXCLUDED.zoning_description, "
+    "zoning = COALESCE(EXCLUDED.zoning, parcels.zoning), "
+    "zoning_description = COALESCE(EXCLUDED.zoning_description, parcels.zoning_description), "
     "land_use_code = EXCLUDED.land_use_code, "
     "land_use_description = EXCLUDED.land_use_description, "
     "assessed_value_land = EXCLUDED.assessed_value_land, "
@@ -1107,6 +1119,43 @@ _SQL_UPSERT_PARCEL = (
     "discovery_date = COALESCE(parcels.discovery_date, EXCLUDED.discovery_date), "
     "last_updated = NOW(), "
     "raw_response_path = EXCLUDED.raw_response_path"
+)
+
+# Zoning (reviews/21_zoning). zoning/zoning_description are written ONLY by
+# the between-runs operator tool zoning_import.py; discovery's upsert keeps
+# them (COALESCE above, and the mapped row carries None). Read-only here.
+# Discovery: one read per cycle of the market's imported zoning, for H3.
+_SQL_STORED_ZONING_FOR_MARKET = (
+    "SELECT parcel_id, zoning, zoning_description FROM parcels "
+    "WHERE market = %s AND zoning_description IS NOT NULL"
+)
+# Scoring, only while at least one jurisdiction's rules are verified: the
+# parcel's stored zoning (per parcel, or batched per cycle).
+_SQL_STORED_ZONING = (
+    "SELECT zoning, zoning_description FROM parcels WHERE parcel_id = %s"
+)
+_SQL_STORED_ZONING_BATCH = (
+    "SELECT parcel_id, zoning, zoning_description FROM parcels "
+    "WHERE parcel_id = ANY(%s)"
+)
+# S9 industrial precedent: other parcels within a radius in METRES
+# (geography), with a degree bbox pre-filter so the GIST index on
+# parcels.geometry is used. Params: (pad_deg, radius_m, parcel_id[s]).
+_SQL_ZONING_PRECEDENT = (
+    "SELECT p2.parcel_id, p2.zoning, p2.zoning_description "
+    "FROM parcels p1 JOIN parcels p2 "
+    "ON p2.parcel_id <> p1.parcel_id AND p2.zoning IS NOT NULL "
+    "AND p2.geometry && ST_Expand(p1.geometry, %s) "
+    "AND ST_DWithin(p1.geometry::geography, p2.geometry::geography, %s) "
+    "WHERE p1.parcel_id = %s"
+)
+_SQL_ZONING_PRECEDENT_BATCH = (
+    "SELECT p1.parcel_id, p2.parcel_id, p2.zoning, p2.zoning_description "
+    "FROM parcels p1 JOIN parcels p2 "
+    "ON p2.parcel_id <> p1.parcel_id AND p2.zoning IS NOT NULL "
+    "AND p2.geometry && ST_Expand(p1.geometry, %s) "
+    "AND ST_DWithin(p1.geometry::geography, p2.geometry::geography, %s) "
+    "WHERE p1.parcel_id = ANY(%s)"
 )
 
 
@@ -1131,6 +1180,19 @@ def _log_research(
 # the cycle ends. A cycle that is not registered here (a direct call to
 # _process_parcel) writes every flag, as before.
 _OPEN_DATA_GAPS_BY_CYCLE: dict[str, set[tuple[str, str]]] = {}
+
+# Imported zoning per running discovery cycle: parcel_id -> (zoning,
+# zoning_description), read once at cycle start for H3. Zoning changes only
+# between runs (zoning_import.py), so a cycle-start read is exact.
+_STORED_ZONING_BY_CYCLE: dict[str, dict[str, tuple[Any, Any]]] = {}
+
+
+def _load_stored_zoning(conn: Any, market: str) -> dict[str, tuple[Any, Any]]:
+    with conn.cursor() as cur:
+        cur.execute(_SQL_STORED_ZONING_FOR_MARKET, (market,))
+        rows = cur.fetchall()
+    return {str(r[0]): (r[1], r[2]) for r in rows
+            if isinstance(r, (tuple, list)) and len(r) >= 3 and r[0] is not None}
 
 
 def _load_open_data_gaps(
@@ -1400,7 +1462,8 @@ def _map_feature_to_parcel(
         "owner_type_inferred": _infer_owner_type(owner_name, classification),
         "acreage": acreage,
         "land_sf": land_sf,
-        "zoning": _str_or_none(attrs.get(mapping.get("zoning", ""))),
+        # Zoning comes ONLY from the protected zoning_import.py (Z-06).
+        "zoning": None,
         "zoning_description": None,
         "land_use_code": _str_or_none(attrs.get(mapping.get("land_use_code", "LUCode"))),
         "land_use_description": None,
@@ -1493,6 +1556,7 @@ def _process_parcel(
         return "skip_unmappable"
 
     parcel_id = row["parcel_id"]
+    row["_stored_zoning"] = _STORED_ZONING_BY_CYCLE.get(cycle_id, {}).get(parcel_id)
     # Run hard filters once (R-24). Cache the results so the post-UPSERT flag
     # emission loop reuses them instead of re-running every filter — re-running
     # would double the DB cost and create a window where a state-dependent
@@ -1675,6 +1739,7 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
 
     # R-03: SHA-256 sentinel — fail-loud on mid-run parameters mutation.
     prepare.verify_parameters_unchanged()
+    zoning.verify_rules_unchanged()  # Z-01: same sentinel for zoning_rules.json
     params = prepare.get_parameters()  # R-02: read once, pass through.
     sources = _load_sources_json()
 
@@ -1702,6 +1767,8 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
 
             # Idempotent data_gap flags: one read of the market's open gaps.
             _OPEN_DATA_GAPS_BY_CYCLE[cycle_id] = _load_open_data_gaps(conn, market=market)
+            # H3: one read of the market's imported zoning.
+            _STORED_ZONING_BY_CYCLE[cycle_id] = _load_stored_zoning(conn, market)
 
             try:
                 summary["per_county"] = _run_for_counties(
@@ -1735,6 +1802,7 @@ def run_discovery_cycle(market: str) -> dict[str, Any]:
             conn.commit()
     finally:
         _OPEN_DATA_GAPS_BY_CYCLE.pop(cycle_id, None)
+        _STORED_ZONING_BY_CYCLE.pop(cycle_id, None)
         session.close()
 
     return summary
@@ -2006,9 +2074,91 @@ def _compute_s2(conn: Any, parcel_id: str) -> int | None:
     return _score_geometry(area_m2, bbox_area_m2, aspect_ratio)
 
 
-def _compute_s9() -> int:
-    """S9 — entitlement complexity. Phase 5 stub returns moderate default."""
-    return _S9_MODERATE_DEFAULT
+# S9 values from the program.md S9 table, used ONLY for parcels whose
+# jurisdiction's rules are "verified" in zoning_rules.json (reviews/21_zoning).
+_S9_BY_RIGHT: int = 10
+_S9_CONDITIONAL: int = 7
+_S9_REZONING_WITH_PRECEDENT: int = 4
+_S9_REZONING: int = 1
+# Precedent: an industrially zoned (by_right, verified) parcel within 1 mile.
+_S9_PRECEDENT_RADIUS_M: float = 1609.344
+# Degree pad for the index pre-filter; 1 mile is <= 0.0175 deg of longitude
+# at Atlanta's latitude, so 0.03 is a safe superset.
+_S9_PRECEDENT_BBOX_PAD_DEG: float = 0.03
+
+
+def _is_industrial_precedent(row: Sequence[Any]) -> bool:
+    """A neighbour (parcel_id, zoning, zoning_description) counts only when
+    its OWN jurisdiction is verified and its class is by_right."""
+    c = zoning.classify_stored(row[1], row[2], row[0])
+    return c.verified and c.cls == zoning.BY_RIGHT
+
+
+def _compute_s9(
+    stored: Sequence[Any] | None = None,
+    *,
+    parcel_id: str | None = None,
+    has_precedent: Any = None,
+) -> int:
+    """S9 — entitlement complexity from the parcel's imported zoning.
+
+    ``stored`` is (zoning, zoning_description). While a parcel's
+    jurisdiction is draft, unknown, or its zoning has no import provenance,
+    S9 is the unchanged stub (int 5): a single guarded early return, so the
+    metric does not move until a human verifies the rules (Z-03, Z-21).
+    ``has_precedent`` is a zero-arg callable, asked only for a verified
+    rezoning parcel.
+    """
+    if stored is None:
+        return _S9_MODERATE_DEFAULT
+    try:
+        c = zoning.classify_stored(stored[0], stored[1], parcel_id)
+    except Exception:
+        return _S9_MODERATE_DEFAULT
+    if not c.verified or c.cls not in (zoning.BY_RIGHT, zoning.CONDITIONAL, zoning.REZONING):
+        return _S9_MODERATE_DEFAULT
+    if c.cls == zoning.BY_RIGHT:
+        return _S9_BY_RIGHT
+    if c.cls == zoning.CONDITIONAL:
+        return _S9_CONDITIONAL
+    if has_precedent is not None and has_precedent():
+        return _S9_REZONING_WITH_PRECEDENT
+    return _S9_REZONING
+
+
+def _needs_precedent(stored: Sequence[Any] | None, parcel_id: str | None) -> bool:
+    if stored is None:
+        return False
+    c = zoning.classify_stored(stored[0], stored[1], parcel_id)
+    return c.verified and c.cls == zoning.REZONING
+
+
+def _fetch_stored_zoning(
+    conn: Any, parcel_id: str, *, cache: "_CycleCache | None" = None,
+) -> tuple[Any, Any] | None:
+    """(zoning, zoning_description), read ONLY while some rules are verified."""
+    if not zoning.any_verified():
+        return None
+    if cache is not None and cache.stored_zoning is not None:
+        return cache.stored_zoning.get(parcel_id)
+    with conn.cursor() as cur:
+        cur.execute(_SQL_STORED_ZONING, (parcel_id,))
+        row = cur.fetchone()
+    return (row[0], row[1]) if row and len(row) >= 2 else None
+
+
+def _has_precedent(
+    conn: Any, parcel_id: str, *, cache: "_CycleCache | None" = None,
+) -> bool:
+    if cache is not None and cache.precedent is not None:
+        return bool(cache.precedent.get(parcel_id, False))
+    with conn.cursor() as cur:
+        cur.execute(
+            _SQL_ZONING_PRECEDENT,
+            (_S9_PRECEDENT_BBOX_PAD_DEG, _S9_PRECEDENT_RADIUS_M, parcel_id),
+        )
+        rows = cur.fetchall()
+    return any(_is_industrial_precedent(r) for r in rows if len(r) >= 3)
 
 
 def _compute_s10(centroid_lng: float | None, centroid_lat: float | None) -> int | None:
@@ -2209,6 +2359,10 @@ class _CycleCache:
     market_context: dict[str, tuple]
     land_median: dict[str, tuple]
     actionability_block: dict[str, str]
+    # reviews/21_zoning: prefetched ONLY while some rules are verified;
+    # None = not prefetched (the per-parcel query runs if needed).
+    stored_zoning: dict[str, tuple] | None = None
+    precedent: dict[str, bool] | None = None
 
 
 def _prefetch_cycle_cache(
@@ -2267,7 +2421,29 @@ def _prefetch_cycle_cache(
             if row[1] is not None:
                 actionability_block[row[0]] = str(row[1])
 
-    return _CycleCache(market_context, land_median, actionability_block)
+    # reviews/21_zoning: zoning reads happen ONLY while at least one
+    # jurisdiction's rules are verified; with all rules draft this cycle
+    # issues exactly the queries it issued before zoning existed (Z-03).
+    if not zoning.any_verified():
+        return _CycleCache(market_context, land_median, actionability_block)
+    stored_zoning: dict[str, tuple] = {}
+    with conn.cursor() as cur:
+        cur.execute(_SQL_STORED_ZONING_BATCH, (pid_list,))
+        for row in cur.fetchall():
+            stored_zoning[row[0]] = (row[1], row[2])
+    precedent: dict[str, bool] = {}
+    need = [p for p in pid_list if _needs_precedent(stored_zoning.get(p), p)]
+    if need:
+        with conn.cursor() as cur:
+            cur.execute(
+                _SQL_ZONING_PRECEDENT_BATCH,
+                (_S9_PRECEDENT_BBOX_PAD_DEG, _S9_PRECEDENT_RADIUS_M, need),
+            )
+            for row in cur.fetchall():
+                if _is_industrial_precedent(row[1:4]):
+                    precedent[row[0]] = True
+    return _CycleCache(market_context, land_median, actionability_block,
+                       stored_zoning=stored_zoning, precedent=precedent)
 
 
 # ---------------------------------------------------------------------------
@@ -2802,6 +2978,7 @@ def score_parcel(
         conn = ctx.__enter__()
     if params is None:
         prepare.verify_parameters_unchanged()
+        zoning.verify_rules_unchanged()
         params = prepare.get_parameters()
     if cycle_id is None:
         cycle_id = _make_scoring_cycle_id("adhoc")
@@ -2838,7 +3015,11 @@ def score_parcel(
 
         sub_scores: dict[str, int | None] = {n: None for n in _SUB_SCORE_NAMES}
         sub_scores["S2_parcel_geometry"] = _compute_s2(conn, parcel_id)
-        sub_scores["S9_entitlement_complexity"] = _compute_s9()
+        stored_zoning = _fetch_stored_zoning(conn, parcel_id, cache=cache)
+        sub_scores["S9_entitlement_complexity"] = _compute_s9(
+            stored_zoning, parcel_id=parcel_id,
+            has_precedent=lambda: _has_precedent(conn, parcel_id, cache=cache),
+        )
         sub_scores["S10_incentives"] = _compute_s10(
             parcel.get("centroid_lng"), parcel.get("centroid_lat"),
         )
@@ -3048,6 +3229,7 @@ def run_scoring_cycle(
         )
 
     prepare.verify_parameters_unchanged()
+    zoning.verify_rules_unchanged()  # Z-01: a mid-run rules edit fails loud
     params = prepare.get_parameters()
     cycle_id = _make_scoring_cycle_id(market)
     if run_tag is None:
@@ -3070,6 +3252,17 @@ def run_scoring_cycle(
             summary["aborted"] = True
             summary["abort_reason"] = "cycle_id_collision"
             return summary
+
+        # reviews/21_zoning (Z-03): a missing/invalid zoning_rules.json never
+        # raises here; S9 stays the stub and the cycle records one event.
+        rules_problem = zoning.rules_problem()
+        if rules_problem:
+            with conn.transaction():
+                _flag(
+                    conn, cycle_id, None, market, "data_gap",
+                    f"zoning rules unavailable ({rules_problem}): S9 uses the stub",
+                    "fix the zoning rules file between runs (reviews/21_zoning)",
+                )
 
         with conn.cursor() as cur:
             if run_tag is None:

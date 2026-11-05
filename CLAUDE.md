@@ -29,9 +29,14 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
   vector.
 - **NEVER edit `program.md`** — human-only strategic direction, at any
   tier, in any session type.
+- **NEVER edit `zoning_rules.json`** — human-owned zoning facts (per
+  jurisdiction `draft`/`verified`, per district use status with
+  citations). `zoning.py` freezes it by SHA-256 at load, like
+  `parameters.json`: edits (above all draft → verified) are between runs
+  only and need a new run + baseline (`reviews/21_zoning/`).
 - **Immutable during a run**: `runner.py`, `costar_ingest.py`,
-  `costar_import.py`, `reporting.py`, `pipeline_common.py`. Between runs,
-  changes there are
+  `costar_import.py`, `reporting.py`, `pipeline_common.py`, `zoning.py`,
+  `zoning_import.py`. Between runs, changes there are
   Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **`research.py` is the agent sandbox** — the ONLY file the agent edits
   during an experiment run. One focused change per experiment, committed

@@ -100,6 +100,58 @@ Per `AUTORESEARCH_MECHANICS.md` "The Experiment Loop", the agent (Claude Code) d
 
 `make help` shows every available target with descriptions.
 
+## Zoning import (operator, between runs)
+
+`make zoning-import` (`zoning_import.py`, `reviews/21_zoning/`) writes each
+Fulton parcel's zoning district into `parcels.zoning` /
+`parcels.zoning_description`. S9 (entitlement) and the H3 zoning flag read
+it. Run it **between runs only**, after a new run's branch is cut and
+before its baseline: it refuses (exit 3) once the TSV or the database's
+experiment mirror shows the run's baseline. Re-run it at every new run so
+rezonings are picked up.
+
+One-time setup (sources.json is human-only):
+
+1. Open `reviews/21_zoning/sources_json_snippet.json`.
+2. Copy its `"zoning_sources": [...]` list into `sources.json` as a new
+   key **inside** `county_parcel_data.fulton_ga` (next to
+   `field_mapping`), not directly under `county_parcel_data`. The order of
+   the list is the precedence order (South Fulton's city layer before
+   Fulton layer 34). Commit it like any `sources.json` change.
+
+Then:
+
+```bash
+make zoning-import          # off a run branch, add ARGS=--no-open-run-check only if
+                            # the newest run in the database is truly over
+```
+
+What it does: finds each parcel's city from its TaxDist on the Fulton
+parcel layer, fetches each zoning source's features around the parcels
+(1 request/second per host, no cache), and assigns a district by parcel id
+(join) or largest polygon overlap in PostGIS (overlay). It updates only
+those two columns, in one transaction; a parcel without a match keeps its
+value; a source that fails or comes back truncated is skipped whole.
+Future-land-use layers are never written as zoning. The console shows
+counts only (per city, per source, per entitlement class, changed /
+unchanged / unmatched).
+
+Exit codes: 0 imported, 1 refused (sources.json key missing or malformed,
+Fulton parcel layer down), 2 no database / database error, 3 a run has its
+baseline.
+
+**Zoning rules.** `zoning_rules.json` holds, per jurisdiction, a `status`
+(`draft` or `verified`) and, per district, the warehouse/distribution use
+status with citations (built from `reviews/21_zoning/01_zoning_rules_DRAFT.md`).
+Everything ships as `draft`, and S9 ignores draft rules (it stays at its
+old stub value), so importing zoning does not change the metric. To use a
+jurisdiction's rules: check them against the official ordinance, set
+`status` to `verified` with `verified_by` / `verified_on`, choose its
+`unlisted_districts` (`not_permitted` or `unknown`), update the
+all-draft expectation in `tests/test_zoning.py`, and commit **between
+runs**; then start a new run and baseline (the change moves S9 and the
+metric).
+
 ## Repository Structure
 
 ```
@@ -117,6 +169,7 @@ land-site-selector/
 ├── BUILD_PHASES.md                    — Implementation roadmap
 ├── parameters.json                    — Scoring weights and filter thresholds (IMMUTABLE during run)
 ├── sources.json                       — Registry of data source URLs (LOCKED — agent never writes)
+├── zoning_rules.json                  — Human-owned zoning facts per jurisdiction/district (agent never writes)
 ├── connector_registry.json            — Harness-only config overlay (test bboxes, expected extents)
 ├── prepare.py                         — IMMUTABLE: metric calculation, DDL, frozen parameters
 ├── research.py                        — Agent sandbox — the ONLY file the agent modifies in a run
@@ -124,6 +177,9 @@ land-site-selector/
 ├── costar_ingest.py                   — IMMUTABLE during run: CoStar export ETL
 ├── reporting.py                       — Snapshot + strategy memo rendering
 ├── pipeline_common.py                 — Shared paths/helpers/SQL for the pipeline modules
+├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import (operator, between runs)
+├── zoning.py                          — IMMUTABLE during run: loads + freezes zoning_rules.json, classifies districts
+├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)
