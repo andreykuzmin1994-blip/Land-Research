@@ -67,3 +67,8 @@ playwright/.local-browsers/
 # Phase 10 runtime sentinels — local to a checkout, never committed.
 .halt
 .experiment_loop.lock
+# Site-fit operator exports (reviews/22_site_fit): SiteFit study files of
+# real parcels, and the operator's own SiteFit tool file. Never committed.
+site_fit_studies/
+SiteFit.html
+sitefit/

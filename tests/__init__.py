@@ -66,3 +66,13 @@ if not hasattr(zoning, "_SUITE_REAL_VERIFY_RULES_COMMITTED"):
     zoning._SUITE_REAL_VERIFY_RULES_COMMITTED = zoning.verify_rules_committed
     zoning.verify_rules_committed = lambda path=None: None
 REAL_VERIFY_RULES_COMMITTED = zoning._SUITE_REAL_VERIFY_RULES_COMMITTED
+
+# Fourth guard — committed-prototypes check (reviews/22_site_fit, SF-04),
+# the same pattern for building_prototypes.json. tests/test_site_fit.py calls
+# the real function on the repo's own file (test_the_repo_file_is_committed).
+import site_fit  # noqa: E402
+
+if not hasattr(site_fit, "_SUITE_REAL_VERIFY_PROTOTYPES_COMMITTED"):
+    site_fit._SUITE_REAL_VERIFY_PROTOTYPES_COMMITTED = site_fit.verify_prototypes_committed
+    site_fit.verify_prototypes_committed = lambda path=None: None
+REAL_VERIFY_PROTOTYPES_COMMITTED = site_fit._SUITE_REAL_VERIFY_PROTOTYPES_COMMITTED
