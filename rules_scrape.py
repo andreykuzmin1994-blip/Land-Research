@@ -67,8 +67,10 @@ counts on the console, parcel ids only in a gitignored report.
 Exit codes: 0 done; 1 refused (registry invalid or changed mid-run, output
 path protected, candidate invalid); 2 no database / database error
 (--flags); 3 a run has its baseline or the loop is open (--flags); 4 done,
-but at least one enabled source was unreachable or failed; 5 the request
-budget was exhausted (nothing written).
+but at least one enabled source was unreachable or failed, or an enabled
+section was not found in a reachable source (the watch also names
+sections lost since its previous run); 5 the request budget was exhausted
+(nothing written).
 
 Imports prepare, zoning and zoning_import (its run-state guard and geometry
 helpers) -- never research (the agent's sandbox) or runner.
@@ -89,12 +91,13 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
-from urllib.parse import urlencode, urljoin, urlparse
+from urllib.parse import unquote, urlencode, urljoin, urlparse
 
 import requests
 
@@ -111,6 +114,11 @@ OUT_DIR = REPO_ROOT / "rules_out"
 DEFAULT_CANDIDATE = OUT_DIR / "zoning_rules.CANDIDATE.json"
 DEFAULT_REPORT = OUT_DIR / "rules_diff_report.md"
 LOOP_LOCK_PATH = REPO_ROOT / ".experiment_loop.lock"
+REVIEW_DIR = REPO_ROOT / "reviews" / "23_rules_scraper"
+# The only repository folders this tool writes into (F19); parcel ids only
+# into the gitignored ones (F11).
+REPO_OUTPUT_DIRS = (OUT_DIR, CACHE_DIR, REVIEW_DIR)
+PRIVATE_REPO_DIRS = (OUT_DIR, CACHE_DIR)
 EXPERIMENT_LOG = REPO_ROOT / "experiment_log.tsv"
 
 # Files this tool must never write, whatever path the operator passes
@@ -148,9 +156,19 @@ _DENY_HOSTS = frozenset({"mcclibrary.blob.core.usgovcloudapi.net"})
 # Challenge / WAF markers (RS-03). The title phrases are checked in the
 # <title>, the script markers anywhere in the first 64 kB.
 _CHALLENGE_TITLES = ("just a moment", "attention required", "access denied",
-                     "request rejected", "pardon our interruption")
+                     "request rejected", "pardon our interruption", "checking your browser",
+                     "request unsuccessful", "incapsula incident", "ddos-guard",
+                     "sucuri website firewall", "human verification", "are you a robot")
 _CHALLENGE_BODY = ("challenge-platform", "_cf_chl", "cf_chl_opt", "cf-browser-verification",
-                   "errors.edgesuite.net")
+                   "errors.edgesuite.net", "_incapsula_resource", "incapsula incident",
+                   "ddos-guard", "awswafcookiedomainlist", "aws-waf-token", "awswafintegration",
+                   "sucuri website firewall", "sucuri_cloudproxy", "perimeterx", "_px3",
+                   "captcha-delivery.com")
+
+# Hosts known to be unofficial code mirrors: a registry source on one of them
+# must be declared source_class "mirror" (F6), and cites on them are mirror
+# cites in the diff.
+MIRROR_HOSTS = frozenset({"www.zoneomics.com", "zoneomics.com"})
 
 EXIT_OK, EXIT_REFUSED, EXIT_DB, EXIT_RUN_OPEN, EXIT_PARTIAL, EXIT_BUDGET = 0, 1, 2, 3, 4, 5
 
@@ -192,8 +210,13 @@ def norm_ws(s: str) -> str:
 
 
 def sanitize(s: str) -> str:
-    """Drop ANSI escapes and control characters (tabs/newlines kept)."""
-    return _CTRL_RE.sub("", s)
+    """Drop ANSI escapes, control characters (tabs/newlines kept) and
+    invisible format characters (Unicode category Cf: soft hyphen, zero-width
+    space/joiners, BOM, bidi marks), so '4&shy;0' reads as 40, never as 4."""
+    s = _CTRL_RE.sub("", s)
+    if not s.isascii():
+        s = "".join(ch for ch in s if ch < "\x80" or unicodedata.category(ch) != "Cf")
+    return s
 
 
 def sha256_bytes(b: bytes) -> str:
@@ -239,6 +262,14 @@ def guard_output_path(path: Path | str) -> Path:
     target = parent / p.name
     if ".git" in target.parts:
         raise Refused("output path is inside .git")
+    # Inside the repository only the tool's own folders are writable (F19):
+    # never experiment_log.tsv, .env, screener/ files, tests, golden records
+    # or any other tracked file, whatever path the operator passes.
+    root = REPO_ROOT.resolve()
+    if _is_under(target, root) and not any(_is_under(target, d.resolve())
+                                           for d in REPO_OUTPUT_DIRS):
+        raise Refused("output inside the repository must be under rules_out/, rules_cache/ "
+                      "or reviews/23_rules_scraper/")
     for name in HUMAN_OWNED + PROTECTED_MODULES:
         q = REPO_ROOT / name
         if target == q.resolve():
@@ -249,6 +280,26 @@ def guard_output_path(path: Path | str) -> Path:
                     raise Refused(f"output path is a link to the protected file {name}")
             except OSError:
                 raise Refused("output path cannot be checked") from None
+    return target
+
+
+def _is_under(p: Path, d: Path) -> bool:
+    try:
+        p.relative_to(d)
+    except ValueError:
+        return False
+    return True
+
+
+def guard_private_path(path: Path | str) -> Path:
+    """guard_output_path, and a file holding parcel ids (conditions flags)
+    may sit inside the repository only under the gitignored rules_out/ or
+    rules_cache/, never in a tracked folder such as reviews/ (F11)."""
+    target = guard_output_path(path)
+    if _is_under(target, REPO_ROOT.resolve()) and not any(
+            _is_under(target, d.resolve()) for d in PRIVATE_REPO_DIRS):
+        raise Refused("--flags writes parcel ids: put --report outside the repository or "
+                      "under rules_out/")
     return target
 
 
@@ -435,6 +486,9 @@ def validate_registry(data: Any) -> Registry:
             if s.get("format") not in FORMATS or s.get("source_class") not in SOURCE_CLASSES \
                     or s.get("parser") not in PARSERS or not isinstance(s.get("enabled"), bool):
                 raise Refused(f"{sw}: format/source_class/parser/enabled invalid")
+            if (urlparse(s["url"]).hostname or "").lower() in MIRROR_HOSTS \
+                    and s["source_class"] != "mirror":
+                raise Refused(f"{sw}: a known mirror host must have source_class 'mirror'")
             secs = s.get("sections")
             if not isinstance(secs, list) or not secs:
                 raise Refused(f"{sw}: sections must be a non-empty list")
@@ -514,6 +568,25 @@ def load_registry(path: Path = REGISTRY_PATH) -> Registry:
     return Registry(sha256_bytes(raw), reg.hosts, reg.jurisdictions, reg.sources, reg.signals)
 
 
+def registry_matches_head(path: Path = REGISTRY_PATH) -> bool | None:
+    """True/False: the registry's bytes equal / differ from the git HEAD blob;
+    None when git cannot tell (no git, not a checkout, file untracked). A
+    local re-implementation of runner.verify_rules_sources_committed: this
+    tool must not import runner (F6)."""
+    try:
+        rel = path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+        now = subprocess.run(["git", "hash-object", "--", str(path)], cwd=REPO_ROOT,
+                             capture_output=True, text=True, timeout=30, check=False)
+        head = subprocess.run(["git", "rev-parse", "--verify", "-q", f"HEAD:{rel}"],
+                              cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+                              check=False)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    if now.returncode != 0 or head.returncode != 0:
+        return None
+    return now.stdout.strip() == head.stdout.strip()
+
+
 def verify_registry_unchanged(reg: Registry, path: Path = REGISTRY_PATH) -> None:
     """Refused when the registry's bytes changed since load (mid-run edit)."""
     try:
@@ -535,7 +608,28 @@ class _Group:
     signals: dict[str, str] = field(default_factory=dict)
 
 
+_UNRESERVED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+_PCT_RE = re.compile(r"%([0-9A-Fa-f]{2})")
+
+
+def pct_normalise(s: str) -> str:
+    """RFC 9309 s2.2.2 / RFC 3986 s6.2.2: decode %XX of unreserved characters,
+    upper-case every other escape, so '/a~b', '/a%7Eb' and '/a%7eb' compare
+    equal in robots matching (F9)."""
+    def one(m: re.Match[str]) -> str:
+        ch = chr(int(m.group(1), 16))
+        return ch if ch in _UNRESERVED else "%" + m.group(1).upper()
+    return _PCT_RE.sub(one, s)
+
+
+def _agent_token(v: str) -> str:
+    """The product token of a User-agent line ('ClaudeBot/1.0' -> 'claudebot')."""
+    v = v.strip().lower()
+    return v if v == "*" else v.split("/", 1)[0].strip()
+
+
 def _robots_pattern(pat: str) -> re.Pattern[str]:
+    pat = pct_normalise(pat)
     anchored = pat.endswith("$")
     body = pat[:-1] if anchored else pat
     rx = "".join(".*" if ch == "*" else re.escape(ch) for ch in body)
@@ -550,12 +644,14 @@ class Robots:
                  reason: str = "") -> None:
         self.allow_all, self.deny_all, self.reason = allow_all, deny_all, reason
         self.groups: list[_Group] = []
+        self.global_signals: dict[str, str] = {}    # Content-Signal outside any group
         if text:
             self._parse(text)
 
     def _parse(self, text: str) -> None:
         cur: _Group | None = None
         last_was_agent = False
+        text = text.lstrip("\ufeff")       # a UTF-8 BOM must not hide the first group (F7)
         for raw in text.splitlines():
             line = raw.split("#", 1)[0].strip()
             if ":" not in line:
@@ -566,11 +662,13 @@ class Robots:
                 if cur is None or not last_was_agent:
                     cur = _Group()
                     self.groups.append(cur)
-                cur.agents.append(v.lower())
+                cur.agents.append(_agent_token(v))
                 last_was_agent = True
                 continue
             last_was_agent = False
             if cur is None:
+                if k == "content-signal":      # before any group: applies to all (F20)
+                    self._signals(v, self.global_signals)
                 continue
             if k in ("allow", "disallow"):
                 if v:
@@ -581,10 +679,14 @@ class Robots:
                 except ValueError:
                     pass
             elif k == "content-signal":
-                for part in v.split(","):
-                    if "=" in part:
-                        a, b = part.split("=", 1)
-                        cur.signals[a.strip().lower()] = b.strip().lower()
+                self._signals(v, cur.signals)
+
+    @staticmethod
+    def _signals(v: str, into: dict[str, str]) -> None:
+        for part in v.split(","):
+            if "=" in part:
+                a, b = part.split("=", 1)
+                into[a.strip().lower()] = b.strip().lower()
 
     def _groups_for(self, token: str) -> list[_Group]:
         t = token.lower()
@@ -596,6 +698,7 @@ class Robots:
             return False
         if self.allow_all or path == "/robots.txt":
             return True
+        path = pct_normalise(path)
         best: tuple[int, bool] | None = None
         for g in self._groups_for(token):
             for allow, pat in g.rules:
@@ -612,6 +715,8 @@ class Robots:
         for tok in (UA_TOKEN,) + AI_AGENT_TOKENS:
             if not self.allowed(path, tok):
                 return f"robots.txt disallows this path for {tok}"
+        if self.global_signals.get("ai-input") == "no":
+            return "robots.txt Content-Signal ai-input=no"
         for tok in (UA_TOKEN,) + AI_AGENT_TOKENS:
             for g in self._groups_for(tok):
                 if g.signals.get("ai-input") == "no":
@@ -637,7 +742,11 @@ def classify_block(status: int, headers: Mapping[str, str], body: bytes) -> str 
         return f"HTTP {status}"
     if "cf-mitigated" in h or any(k.startswith("cf-chl") for k in h):
         return "Cloudflare challenge"
+    if "x-amzn-waf-action" in h or "x-sucuri-block" in h:
+        return "WAF challenge"
     head = body[:65536].decode("utf-8", "replace").lower()
+    if status == 202 and ("<html" in head or "<!doctype" in head or "<script" in head):
+        return "HTTP 202 with an HTML body (WAF challenge)"
     m = re.search(r"<title[^>]*>(.*?)</title>", head, re.S)
     title = norm_ws(m.group(1)) if m else ""
     if any(t in title for t in _CHALLENGE_TITLES):
@@ -735,8 +844,13 @@ class PoliteFetcher:
                     self.sleep(ra)
                     continue
                 if 500 <= status < 600:
+                    # Retry-After is honoured on every 5xx as on 429 (F8):
+                    # over the cap -> unreachable, no retry.
+                    ra = _retry_after(resp)
+                    if ra is not None and ra > RETRY_AFTER_CAP_S:
+                        raise Unreachable(f"HTTP {status} with Retry-After above the cap", status)
                     if attempt < MAX_RETRIES:
-                        self.sleep(delay)
+                        self.sleep(max(delay, ra) if ra is not None else delay)
                         continue
                     raise Unreachable(f"HTTP {status}", status)
                 return resp, body
@@ -771,7 +885,7 @@ class PoliteFetcher:
                 if st in (404, 410):
                     rb = Robots(allow_all=True, reason=f"HTTP {st}")
                 elif 200 <= st < 300 and (ctype.startswith("text/plain") or not ctype):
-                    rb = Robots(body.decode("utf-8", "replace"))
+                    rb = Robots(body.decode("utf-8-sig", "replace"))
                 elif 200 <= st < 300:
                     rb = Robots(deny_all=True, reason="robots.txt is not text")
                 else:
@@ -1205,17 +1319,37 @@ def _marker_re(marker: str) -> re.Pattern[str]:
     return re.compile(r"\s+".join(re.escape(w) for w in marker.split()))
 
 
+# A section heading at the start of a line ('Sec. 10-2081. - I-3 ...').
+_HEADING_RE = re.compile(r"(?m)^[ \t]*(?:Sec(?:tion)?\.?|§)[ \t]*\d")
+
+
+def _chain_gap_ok(text: str, a: int, b: int, own_end: re.Pattern[str],
+                  others: Sequence[re.Pattern[str]]) -> bool:
+    """May the marker chain step over text[a:b]? Not when the gap holds
+    another section heading, this section's own end marker or the first
+    start marker of another registered section of the same page: the next
+    marker would then belong to a different block (F1)."""
+    if _HEADING_RE.search(text, a, b) or own_end.search(text, a, b):
+        return False
+    return not any(o.search(text, a, b) for o in others)
+
+
 def cut_section(doc: Document, src: SourceDef, sec: SectionDef, source_sha: str) -> Section:
     """The longest start..end span (start inclusive, end exclusive). Both
-    markers are required; a missing one is 'not found in source' (RS-13)."""
+    markers are required; a missing one is 'not found in source' (RS-13).
+    A later start marker counts only when nothing between it and the
+    previous marker opens another block (_chain_gap_ok); otherwise the
+    chain is broken and the section is 'not found in source' (F1)."""
     text = doc.text
     best: tuple[int, int] | None = None
     end_re = _marker_re(sec.end)
+    others = [_marker_re(o.start[0]) for o in src.sections
+              if o.id != sec.id and o.start[0] != sec.start[0]]
     for m in _marker_re(sec.start[0]).finditer(text):
         a, pos = m.start(), m.end()
         for later in sec.start[1:]:
             n = _marker_re(later).search(text, pos)
-            if n is None:
+            if n is None or not _chain_gap_ok(text, pos, n.start(), end_re, others):
                 a = -1
                 break
             a, pos = n.start(), n.end()
@@ -1314,6 +1448,14 @@ QUALIFIERS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
         ("conditional", r"\b(?:if|when|where)\s"),
         ("note", r"\bnote\s*:"),
         ("amended", r"\(Amended\b"),
+        # Limiting wording (F5): the value applies only in some cases.
+        ("limited_scope", r"\bfor\s+(?:the\s+)?(?:initial|new|existing|corner|interior|through)\b"),
+        ("adjustable", r"\bmay\s+be\s+(?:reduced|increased|waived|modified|varied|adjusted)\b"),
+        ("variance", r"\bvariances?\b"),
+        ("up_to", r"\bup\s+to\b"),
+        ("range", r"\d[\d,]*\s*(?:'|feet|ft\.?)?\s*(?:to|-|–|—)\s*\d[\d,]*\s*(?:'|feet\b|foot\b|ft\b)"),
+        ("per_unit", r"\bper\s+(?:dwelling|unit|lot|building)\b"),
+        ("per_conditions", r"\bper\s+conditions?\b|\bconditions\s+of\s+zoning\b"),
     ))
 _CONF = ("low", "medium", "high")
 
@@ -1343,7 +1485,15 @@ def qualifiers_in(*texts: str | None) -> list[tuple[str, str]]:
 
 
 def district_re(code: str) -> re.Pattern[str]:
-    return re.compile(r"(?<![A-Za-z0-9-])" + re.escape(code) + r"(?![A-Za-z0-9])")
+    """The code as a whole token: 'M-1' matches 'M-1 M-2' and 'M-1/M-2' but
+    neither 'M-1A' nor the conditional-zoning row 'M-1-C' (F3)."""
+    return re.compile(r"(?<![A-Za-z0-9-])" + re.escape(code) + r"(?![A-Za-z0-9]|-[A-Za-z0-9])")
+
+
+def suffixed_district_re(code: str) -> re.Pattern[str]:
+    """The code with a hyphenated suffix ('M-1-C', 'I-1-ATL'): a variant of
+    the district, never the base district itself (F3)."""
+    return re.compile(r"(?<![A-Za-z0-9-])" + re.escape(code) + r"-[A-Za-z0-9]")
 
 
 # ---------------------------------------------------------------------------
@@ -1456,8 +1606,12 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
         return _rej("quote carries control characters")
     s = section.norm
     q = norm_ws(rec.quote)
-    if q not in s:
-        return _rej("quote not verbatim in the section")
+    at = _bounded_find(s, q)
+    if at is None:
+        # Not there, or only as a fragment cut out of a longer token such
+        # as '5 feet' out of '25 feet' (F13).
+        return _rej("quote not verbatim in the section" if q not in s
+                    else "quote cuts through a word or number of the section")
     for part in rec.header_parts:
         if not norm_ws(part) or norm_ws(part) not in s:
             return _rej("header/label not verbatim in the section")
@@ -1468,13 +1622,20 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
     spec = FIELDS[rec.field]
     tabular = rec.cell is not None and bool(rec.header_parts)
     header = " / ".join(rec.header_parts)
+    prose = not tabular and rec.extractor != "deterministic"
+    review: list[str] = list(rec.review)
+    if prose and not any(q in norm_ws(ln) for ln in section.text.split("\n")):
+        # A quote stitched across lines of the source: a table header and
+        # the row under it, or two layout-grid rows (F2).
+        if " | " in q:
+            return _rej("quote crosses table rows")
+        review.append("quote spans several lines of the source")
     # Field keyword (RS-10 b).
     kw_text = header if rec.header_parts else q
     if rec.field == "warehouse_distribution":
         kw_text = rec.row_label or q
     if not re.search(spec.keyword, kw_text, re.I):
         return _rej("field keyword missing")
-    review: list[str] = list(rec.review)
     # District (RS-10 a).
     dtext = rec.row_label if rec.row_label is not None else q
     if rec.field == "warehouse_distribution":
@@ -1491,6 +1652,11 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
         return _rej("quote names another district")
     if others and named and not set(others) <= set(rec.shared_districts):
         review.append("quote names several districts: " + ", ".join(others))
+    if suffixed_district_re(rec.district).search(dtext):
+        # 'M-1-C' is a conditional-zoning variant, not M-1 (F3).
+        if not named:
+            return _rej("quote names only a suffixed variant of the district")
+        review.append("quote also names a suffixed variant of the district")
     # Value (RS-10 c-g).
     vtext = norm_ws(rec.cell) if rec.cell is not None else q
     notes = list(rec.notes)
@@ -1506,10 +1672,14 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
     elif rec.value is None:
         if not _NULL_RE.search(vtext):
             return _rej("null value but the quote has no N/A or None")
+        if prose and not _null_attached(q, spec):
+            return _rej("null not attached to this field")
     elif isinstance(rec.value, bool) or not isinstance(rec.value, (int, float)):
         return _rej("value is not a number")
     elif rec.value == 0 and rec.field in SETBACK_FIELDS and _NONE_RE.search(vtext) \
             and not any(t[0] == 0 for t in number_tokens(vtext)):
+        if prose and not _null_attached(q, spec):
+            return _rej("null not attached to this field")
         review.append("'None' read as 0")
     else:
         bare_ok = tabular and rec.extractor == "deterministic" and (
@@ -1531,10 +1701,14 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
             notes.append(note)
             if rec.extractor != "deterministic":
                 review.append(note)
-        if not tabular and rec.extractor != "deterministic":
-            nearest = _nearest_field(q, rec.value, spec)
-            if nearest is not None and nearest != rec.field:
+        if prose:
+            att = _attribution(q, rec.value, rec.field, spec)
+            if att == "reject":
                 return _rej("number belongs to another field's wording")
+            if att == "none":
+                return _rej("no wording of this field before or right after the number")
+            if att == "review":
+                review.append("another field's wording sits between the label and the number")
     if tabular and rec.field in DIMENSION_FIELDS and isinstance(rec.value, (int, float)):
         compat = {"sqft": ("sqft", "acres")}.get(spec.unit, (spec.unit,))
         same_unit = {t[0] for t in number_tokens(vtext)
@@ -1543,7 +1717,15 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
         if len(same_unit) > 1 and not (spec.unit == "sqft" and _acre_pair(vtext)):
             review.append("the text holds several values for this field")
     quals = qualifiers_in(vtext, header if rec.header_parts else None) if tabular \
-        else qualifiers_in(q)
+        else qualifiers_in(q, _context_of(section, q, s, at))
+    # 'up to 75 feet' restates a maximum; it limits only a minimum (F5).
+    quals = [x for x in quals if not (x[0] == "up_to" and rec.field.startswith("max_"))]
+    if rec.field != "warehouse_distribution":
+        # Section notes about this field ('Note: ... abutting a residential
+        # district must maintain a side and rear yard of 50 feet') are
+        # surfaced whatever the quote covers (F15).
+        for note in _section_notes(section, spec, rec.district):
+            review.append("section note mentions this field: " + short(note, 120))
     if quals:
         review.extend(f"qualifier: {n}" for n, _ in quals)
     # Confidence (RS-13): mirror never high; qualifiers cost a level.
@@ -1554,6 +1736,160 @@ def verify(rec: Record, section: Section, registry: Registry | None = None) -> V
         level = max(0, level - 1)
     outcome = "needs_review" if review else "accepted"
     return Verdict(outcome, tuple(dict.fromkeys(review + notes)), tuple(quals), _CONF[level])
+
+
+def _bounded_find(s: str, q: str) -> int | None:
+    """Start of the first occurrence of ``q`` in ``s`` that does not cut a
+    word or number in two (F13), or None."""
+    i = s.find(q)
+    while i >= 0:
+        left_ok = i == 0 or not (s[i - 1].isalnum() and q[:1].isalnum())
+        j = i + len(q)
+        right_ok = j >= len(s) or not (s[j].isalnum() and q[-1:].isalnum())
+        if left_ok and right_ok:
+            return i
+        i = s.find(q, i + 1)
+    return None
+
+
+_SENTENCE_END_RE = re.compile(r"[.;]\s+(?=[A-Z(])")
+
+
+def _sentence_around(s: str, a: int, b: int) -> str:
+    """The sentence(s) of ``s`` holding s[a:b] (F15)."""
+    left = 0
+    for m in _SENTENCE_END_RE.finditer(s, 0, min(len(s), a + 1)):
+        if m.end() <= a:
+            left = m.end()
+    m = _SENTENCE_END_RE.search(s, max(a, b - 1))
+    return s[left:m.start() + 1 if m else len(s)]
+
+
+def _context_of(section: Section, q: str, s: str, at: int) -> str:
+    """The sentence around a prose quote, within its source line when the
+    quote sits on one line (paragraph boundaries are kept). A quote found
+    in several places gets every place's sentence: which one the extractor
+    meant is unknown, so all their qualifiers count."""
+    out = []
+    for ln in section.text.split("\n"):
+        n = norm_ws(ln)
+        i = _bounded_find(n, q)
+        while i is not None:
+            out.append(_sentence_around(n, i, i + len(q)))
+            j = _bounded_find(n[i + 1:], q)
+            i = None if j is None else i + 1 + j
+    return " \n ".join(out) if out else _sentence_around(s, at, at + len(q))
+
+
+_NOTE_LINE_RE = re.compile(r"\bnote\s*:", re.I)
+
+
+def _section_notes(section: Section, spec: FieldSpec, district: str) -> list[str]:
+    """'Note:' lines of the section that use this field's wording and do not
+    name only other districts."""
+    out = []
+    for ln in section.text.split("\n"):
+        if not _NOTE_LINE_RE.search(ln) or not re.search(spec.keyword, ln, re.I):
+            continue
+        codes = {d for d in section.defn.districts} | (
+            {section.defn.district} if section.defn.district else set())
+        named = [d for d in codes if district_re(d).search(ln)]
+        if named and district not in named:
+            continue
+        out.append(norm_ws(ln))
+    return out
+
+
+_FIELD_KWS = tuple((n, re.compile(f.keyword, re.I)) for n, f in FIELDS.items()
+                   if n != "warehouse_distribution")
+_LABEL_AFTER_RE = re.compile(r"[^:.;|\d]{0,24}?(?::|—|–|\s-\s)")
+_CLAUSE_END_RE = re.compile(r"[;,.:|()\d]")
+# Words that may sit between a number and a postfix label ('50 feet minimum rear yard').
+_FOLLOW_LEAD_RE = re.compile(r"\s*(?:(?:minimum|maximum|min\.?|max\.?|required|the)\s+)*", re.I)
+
+
+def _value_spans(q: str, value: Any, spec: FieldSpec) -> list[tuple[int, int]]:
+    """(start, end-after-unit) of each place the value is written in ``q``:
+    digits, an acre figure converted to square feet, or a number in words."""
+    out = []
+    for num, a, e in number_tokens(q):
+        if num == value or (spec.unit == "sqft" and abs(num * 43560 - float(value)) < 0.5):
+            m = re.match(r"(?:" + "|".join(_UNIT_RE.values()) + r")", q[e:], re.I)
+            out.append((a, e + (m.end() if m else 0)))
+    for word, n in _WORD_NUMS.items():
+        if n == value:
+            for m in re.finditer(r"\b" + re.escape(word) + r"\b", q, re.I):
+                u = re.match(r"(?:\s*\(\d+\))?(?:" + "|".join(_UNIT_RE.values()) + r")",
+                             q[m.end():], re.I)
+                out.append((m.start(), m.end() + (u.end() if u else 0)))
+    return sorted(set(out))
+
+
+def _attribution(q: str, value: Any, own: str, spec: FieldSpec) -> str:
+    """Which field's wording a prose number belongs to (F2, F13):
+    'ok' | 'review' | 'reject' (another field's) | 'none' (no field wording).
+
+    A field keyword right after the number ('50 feet rear yard') decides.
+    Otherwise a labelled keyword ('Rear:', 'Side yard -') before it decides,
+    and an unlabelled other-field keyword between that label and the number
+    sends the value to review. Without a label, the nearest keyword before
+    the number decides; no keyword at all rejects."""
+    spans = _value_spans(q, value, spec)
+    if not spans:
+        return "ok"          # _value_match already accepted it; nothing to place
+    best = "none"
+    rank = {"none": 0, "reject": 1, "review": 2, "ok": 3}
+    for a, e in spans:
+        tail = q[e:e + 40]
+        cut = _CLAUSE_END_RE.search(tail)
+        tail = tail[:cut.start()] if cut else tail
+        lead = _FOLLOW_LEAD_RE.match(tail)
+        k = lead.end() if lead else 0
+        follow = {n for n, rx in _FIELD_KWS if rx.match(tail, k)}
+        if follow:
+            got = "ok" if own in follow else "reject"
+        else:
+            before = [(m.start(), m.end(), n) for n, rx in _FIELD_KWS for m in rx.finditer(q[:a])]
+            labels = [x for x in before if _LABEL_AFTER_RE.match(q, x[1])]
+            if labels:
+                lab = max(labels, key=lambda x: (x[1], x[2] == own))
+                if lab[2] != own and not any(x[2] == own and x[1] >= lab[1] for x in labels):
+                    got = "reject"
+                elif any(x[2] != own and x[0] >= lab[1] for x in before):
+                    got = "review"
+                else:
+                    got = "ok"
+            elif before:
+                end = max(x[1] for x in before)
+                got = "ok" if any(x[2] == own and x[1] == end for x in before) else "reject"
+            else:
+                got = "none"
+        if rank[got] > rank[best]:
+            best = got
+    return best
+
+
+def _null_attached(q: str, spec: FieldSpec) -> bool:
+    """Is an N/A / None / 'no minimum' phrase in ``q`` tied to this field
+    (F14)? Either it follows this field's wording with no other field's
+    wording and no number of this field's unit in between ('Side: None'),
+    or it opens the clause that names this field ('No fixed minimum lot
+    widths or areas')."""
+    own_rx = re.compile(spec.keyword, re.I)
+    others = [rx for n, rx in _FIELD_KWS if rx.pattern != spec.keyword]
+    unit_rx = _UNIT_RE.get(spec.unit)
+    for m in own_rx.finditer(q):
+        stop = min([o.start() for rx in others for o in rx.finditer(q, m.end())] + [len(q)])
+        window = q[m.end():stop]
+        n = _NULL_RE.search(window)
+        if n and not any(unit_rx and re.match(unit_rx, window[e:], re.I)
+                         for _v, _a, e in number_tokens(window[:n.start()])):
+            return True
+        for n in _NULL_RE.finditer(q, 0, m.start()):
+            between = q[n.end():m.start()]
+            if not number_tokens(between) and not re.search(r"[.:;]", between):
+                return True
+    return False
 
 
 def _acre_pair(text: str) -> bool:
@@ -1712,6 +2048,10 @@ def parse_district_grid(section: Section) -> ParseResult:
             continue
         label = row[dcol][1].text
         found = [d for d in wanted if district_re(d).search(_strip_fn(label))]
+        for d in wanted:
+            if d not in found and suffixed_district_re(d).search(_strip_fn(label)):
+                res.review.append(f"{d}: a row labelled with a suffixed variant (conditional-"
+                                  f"zoning row?) is not read as {d}")
         if found:
             hits.append((r, row, label, found))
     if not hits:
@@ -1858,9 +2198,12 @@ def parse_pdf_grid(section: Section) -> ParseResult:
         starts.append((i, i + len(col["label"]), col))
     starts.sort(key=lambda t: t[0])
     for d in section.defn.districts:
-        row = next((ln for ln in lines if re.match(r"^\s*" + re.escape(d) + r"(?![A-Za-z0-9])", ln)),
-                   None)
+        row = next((ln for ln in lines if re.match(
+            r"^\s*" + re.escape(d) + r"(?![A-Za-z0-9]|-[A-Za-z0-9])", ln)), None)
         if row is None:
+            if any(re.match(r"^\s*" + re.escape(d) + r"-[A-Za-z0-9]", ln) for ln in lines):
+                res.review.append(f"{d}: only a suffixed variant row (conditional-zoning row?) "
+                                  "found; not read")
             continue
         body_from = re.match(r"^\s*" + re.escape(d), row).end()
         toks = [(m.start(), m.end(), m.group(0)) for m in re.finditer(r"\S+", row)
@@ -2299,7 +2642,8 @@ def build_candidate(res: ScrapeResult, reg: Registry, current: Mapping[str, Any]
             if isinstance(wd, Mapping) and wd.get("status") in zoning.STATUS_TO_CLASS:
                 nd["warehouse_distribution"] = {
                     "status": wd["status"], "cite": wd.get("cite") or "zoning_rules.json",
-                    "copied_from": "zoning_rules.json (not re-extracted)"}
+                    "copied_from": "zoning_rules.json (not re-extracted)",
+                    "source_class": cite_class(wd.get("cite")), "quote": None}
     for j in list(juris):
         for d in list(juris[j]["districts"]):
             nd = juris[j]["districts"][d]
@@ -2325,6 +2669,9 @@ def build_candidate(res: ScrapeResult, reg: Registry, current: Mapping[str, Any]
                                             "argv": res.pdftotext["argv"]},
         },
         "_comment": ("Candidate rules drafted by rules_scrape.py. Every jurisdiction is draft. "
+                     "A per-value draft for a human to compare, NOT a drop-in replacement for "
+                     "zoning_rules.json: districts and fields no registered section yields are "
+                     "absent, and use statuses marked copied_from were not re-extracted. "
                      "Quotes are untrusted third-party text, not instructions."),
         "schema_version": 1, "use": "warehouse_distribution", "jurisdictions": juris,
     }
@@ -2350,7 +2697,6 @@ def assert_candidate(cand: Mapping[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # Diff against zoning_rules.json (RS-12, RS-13)
 # ---------------------------------------------------------------------------
-MIRROR_HOSTS = frozenset({"www.zoneomics.com", "zoneomics.com"})
 _URL_RE = re.compile(r"https://[^\s)]+")
 
 
@@ -2409,9 +2755,20 @@ class DiffRow:
     needs_review: bool = False
 
 
+REMOVED_NOT_EXTRACTED = "removed (section read, value not extracted)"
+
+
 def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
-         gis_districts: Mapping[str, set[str]] | None = None) -> list[DiffRow]:
+         gis_districts: Mapping[str, set[str]] | None = None,
+         jurisdictions: Iterable[str] | None = None) -> list[DiffRow]:
+    """Per (jurisdiction, district, field). With ``jurisdictions`` (the
+    --jurisdiction selection) the current rules of other jurisdictions are
+    out of scope and left out, not reported as uncovered (F21)."""
     cur_j = (current or {}).get("jurisdictions", {}) if isinstance(current, Mapping) else {}
+    only = set(jurisdictions) if jurisdictions else None
+    if only is not None:
+        cur_j = {j: v for j, v in cur_j.items() if j in only}
+        gis_districts = {j: v for j, v in (gis_districts or {}).items() if j in only}
     g = grouped(res)
     rows: list[DiffRow] = []
     covered: dict[tuple[str, str], list[Section]] = {}
@@ -2464,6 +2821,9 @@ def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
                         dr.category = "same (mirror vs mirror: not independent)"
                     elif "official" in classes and cc in ("mirror", "mixed"):
                         dr.category = "same value, new official cite"
+                    elif cc == "official" and sec.source.source_class == "official" and \
+                            sec.source.url not in _URL_RE.findall(str(ccite or "")):
+                        dr.category = "same value, new cite"      # another official document (F23)
                     else:
                         dr.category = "same"
             if classes == {"mirror"} and dr.category not in (
@@ -2490,7 +2850,7 @@ def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
             elif any((s.source.key, s.defn.id) in res.needs_extraction for s in relevant):
                 cat = "needs extraction"
             else:
-                cat = "not extracted"
+                cat = REMOVED_NOT_EXTRACTED
         rows.append(DiffRow(j, d, f, cat, cv, None, short(str(ccite or ""), 200)))
     for j, codes in sorted((gis_districts or {}).items()):
         listed = {zoning.normalize(k)[0] for k in ((cur_j.get(j) or {}).get("districts") or {})}
@@ -2631,34 +2991,63 @@ def gis_signal(fetcher: PoliteFetcher, sig: SignalDef) -> dict[str, Any]:
     return out
 
 
+SECTION_MISSING = "missing"     # watch state: reachable page, section markers not found
+
+
 def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
                   gis: Mapping[str, Mapping[str, Any]], reg: Registry, today: date,
                   current: Mapping[str, Any] | None = None
                   ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """(new state, report rows). Unknown is never summarised as unchanged."""
-    prev = (prev_state or {}).get("sources", {}) if isinstance(prev_state, Mapping) else {}
-    prev_g = (prev_state or {}).get("gis", {}) if isinstance(prev_state, Mapping) else {}
-    state: dict[str, Any] = {"sources": {}, "gis": {}}
+    """(new state, report rows). Unknown is never summarised as unchanged.
+
+    The new state starts from the previous one: a source or layer that was
+    out of scope (--jurisdiction), not queried (offline, loop lock) or
+    unreachable keeps its previous baseline, so a change made in the gap is
+    still reported as changed at the next good observation (F16). A section
+    that was found before and is now missing from a reachable page is
+    'changed' with the detail 'section lost' (F17)."""
+    prev_ok = isinstance(prev_state, Mapping)
+    prev = (prev_state or {}).get("sources", {}) if prev_ok else {}
+    prev_g = (prev_state or {}).get("gis", {}) if prev_ok else {}
+    prev = prev if isinstance(prev, Mapping) else {}
+    prev_g = prev_g if isinstance(prev_g, Mapping) else {}
+    state: dict[str, Any] = {"sources": json.loads(json.dumps(prev)),
+                             "gis": json.loads(json.dumps(prev_g))}
     rows: list[dict[str, Any]] = []
     for o in res.outcomes:
-        p = prev.get(o.source.key, {}) if isinstance(prev, Mapping) else {}
+        p = prev.get(o.source.key, {})
+        p = p if isinstance(p, Mapping) else {}
+        p_secs = p.get("sections") if isinstance(p.get("sections"), Mapping) else {}
         reachable = o.status in ("fetched", "replayed")
-        st = {"raw_sha256": o.sha256 if reachable else None, "sections": {}, "ord": None}
         lo = o.latest_ord if reachable else None
-        if lo:
-            st["ord"] = [lo[0].isoformat(), lo[1]]
-        cut = {s.defn.id: s for s in o.sections}
+        st = {"raw_sha256": o.sha256 if reachable else p.get("raw_sha256"),
+              "sections": dict(p_secs),
+              "ord": [lo[0].isoformat(), lo[1]] if lo else p.get("ord")}
+        cut = {sec.defn.id: sec for sec in o.sections}
         for sd in o.source.sections:
-            s = cut.get(sd.id) or Section(o.source, sd, o.status)
-            now_sha = s.sha256 if (reachable and s.status == "found") else None
-            st["sections"][s.defn.id] = now_sha
-            before = (p.get("sections") or {}).get(s.defn.id) if isinstance(p, Mapping) else None
-            rows.append({"kind": "section", "key": f"{o.source.key}/{s.defn.id}",
-                         "result": compare_signal(before, now_sha),
-                         "detail": o.reason or s.status})
+            sec = cut.get(sd.id) or Section(o.source, sd, o.status)
+            before = p_secs.get(sd.id)
+            if reachable and sec.status == "found":
+                now = sec.sha256
+            elif reachable and sec.status == "not found in source":
+                now = SECTION_MISSING
+            else:
+                now = None                  # not observed: keep the previous baseline
+            if now is not None:
+                st["sections"][sd.id] = now
+            result = compare_signal(before, now)
+            detail = o.reason or sec.status
+            if result == "changed" and now == SECTION_MISSING:
+                detail = "section lost: was found at the previous watch, now not found in source"
+            elif result == "changed" and before == SECTION_MISSING:
+                detail = "section found again"
+            elif result == "unchanged" and now == SECTION_MISSING:
+                detail = "still not found in source"
+            rows.append({"kind": "section", "key": f"{o.source.key}/{sd.id}", "result": result,
+                         "detail": detail})
         rows.append({"kind": "raw bytes (low weight)", "key": o.source.key,
-                     "result": compare_signal(p.get("raw_sha256") if isinstance(p, Mapping)
-                                              else None, st["raw_sha256"]),
+                     "result": compare_signal(p.get("raw_sha256"),
+                                              o.sha256 if reachable else None),
                      "detail": o.reason})
         age = (today - lo[0]).days if lo else None
         cur_asof = (((current or {}).get("jurisdictions") or {}).get(o.source.jurisdiction)
@@ -2667,19 +3056,21 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
                      "detail": short(str(cur_asof or "not in zoning_rules.json"), 120)})
         rows.append({"kind": "latest Ord. No.", "key": o.source.key,
                      "result": "unknown" if lo is None else compare_signal(
-                         (p.get("ord") if isinstance(p, Mapping) else None), st["ord"]),
+                         p.get("ord"), [lo[0].isoformat(), lo[1]]),
                      "detail": (f"{lo[1]} of {lo[0].isoformat()}, {age} days old"
                                 + (" (STALE)" if age is not None and age > ORD_STALE_DAYS else "")
-                                if lo else "no Ord. No. date found")})
+                                if lo else (o.reason or "no Ord. No. date found"))})
         state["sources"][o.source.key] = st
     for key, g in sorted(gis.items()):
-        pg = prev_g.get(key) if isinstance(prev_g, Mapping) else None
-        now = None if g.get("reason") else [g.get("last_edit"), g.get("count"), g.get("max_oid")]
-        state["gis"][key] = now
-        res_le = compare_signal((pg or [None])[0] if pg else None,
-                                g.get("last_edit") if not g.get("reason") else None)
+        pg = prev_g.get(key)
+        pg = pg if isinstance(pg, list) and len(pg) == 3 else None
+        ok = not g.get("reason")
+        now = [g.get("last_edit"), g.get("count"), g.get("max_oid")] if ok else None
+        if now is not None:
+            state["gis"][key] = now
+        res_le = compare_signal(pg[0] if pg else None, g.get("last_edit") if ok else None)
         res_ct = compare_signal(pg[1:] if pg else None,
-                                [g.get("count"), g.get("max_oid")] if not g.get("reason") else None)
+                                [g.get("count"), g.get("max_oid")] if ok else None)
         rows.append({"kind": "gis lastEditDate", "key": key, "result": res_le,
                      "detail": g.get("reason") or ("no editingInfo" if g.get("last_edit") is None
                                                    else "")})
@@ -2697,11 +3088,25 @@ _SQL_FLAG_PARCELS = (
     "ST_XMax(geometry), ST_YMax(geometry) FROM parcels WHERE county = 'fulton' "
     "ORDER BY parcel_id"
 )
+# Per parcel the share of the overlap in the parcel's and in the case
+# polygon's area (planar in 4326: a ratio of areas is unaffected by the
+# local degree scaling). A bare ST_Intersects flagged neighbours that only
+# touch a case polygon because the two layers do not line up (F18).
 _SQL_CASE_HITS = (
-    "SELECT parcel_id FROM parcels WHERE parcel_id = ANY(%s) AND geometry IS NOT NULL "
-    "AND ST_Intersects(geometry, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326))"
+    "WITH c AS (SELECT ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326)) AS g) "
+    "SELECT p.parcel_id, "
+    "COALESCE(ST_Area(ST_Intersection(ST_MakeValid(p.geometry), c.g)) "
+    "/ NULLIF(ST_Area(p.geometry), 0), 0), "
+    "COALESCE(ST_Area(ST_Intersection(ST_MakeValid(p.geometry), c.g)) "
+    "/ NULLIF(ST_Area(c.g), 0), 0) "
+    "FROM parcels p, c WHERE p.parcel_id = ANY(%s) AND p.geometry IS NOT NULL "
+    "AND ST_Intersects(p.geometry, c.g)"
 )
 CASE_PAGE = 100
+# A case counts for a parcel when the overlap is at least this share of the
+# parcel or of the case polygon; smaller overlaps are 'adjacent case (low
+# overlap)' and listed separately (F18).
+MIN_CASE_OVERLAP = 0.05
 
 
 def set_read_only(conn: Any) -> None:
@@ -2717,10 +3122,13 @@ def set_read_only(conn: Any) -> None:
 
 
 def conditions_suffix(reg: Registry, jurisdiction: str, district: str | None) -> bool:
+    """The registry's suffix regex for the jurisdiction, or zoning.normalize's
+    own conditions reading ('-C', or 'C' right after a digit) for any
+    jurisdiction that registers a regex (F23)."""
     rx = (reg.jurisdictions.get(jurisdiction) or {}).get("conditions_suffix_regex")
     if not rx or not district:
         return False
-    return re.search(rx, district.strip().upper()) is not None
+    return re.search(rx, district.strip().upper()) is not None or zoning.normalize(district)[1]
 
 
 def case_features(fetcher: PoliteFetcher, sig: SignalDef,
@@ -2777,12 +3185,13 @@ def _geojson_bbox(gj: str) -> tuple[float, float, float, float] | None:
 class FlagResult:
     conditions_on_file: list[dict[str, str]] = field(default_factory=list)
     other_cases: list[dict[str, str]] = field(default_factory=list)
+    low_overlap: list[dict[str, str]] = field(default_factory=list)
     gis_districts: dict[str, set[str]] = field(default_factory=dict)
     layer_failures: list[str] = field(default_factory=list)
 
 
 def compute_flags(conn: Any, reg: Registry, fetcher: PoliteFetcher | None,
-                  loop_running: bool) -> FlagResult:
+                  loop_running: bool, jurisdictions: Iterable[str] | None = None) -> FlagResult:
     """Read-only: SELECT of parcel ids, zoning provenance and extents only.
     The caller has already made the transaction read-only (set_read_only)."""
     with conn.cursor() as cur:
@@ -2791,9 +3200,10 @@ def compute_flags(conn: Any, reg: Registry, fetcher: PoliteFetcher | None,
     fr = FlagResult()
     by_j: dict[str, list[tuple[str, tuple[float, ...]]]] = {}
     flagged: set[str] = set()
+    only = set(jurisdictions) if jurisdictions else None
     for pid, z, desc, *bb in rows:
         st = zoning.parse_stored(z, desc)
-        if st is None:
+        if st is None or (only is not None and st.jurisdiction not in only):
             continue
         if st.district:
             base, _c = zoning.normalize(st.district)
@@ -2806,7 +3216,8 @@ def compute_flags(conn: Any, reg: Registry, fetcher: PoliteFetcher | None,
         if all(v is not None for v in bb):
             by_j.setdefault(st.jurisdiction, []).append((str(pid), tuple(float(v) for v in bb)))
     for sig in reg.signals:
-        if sig.kind != "cases" or not sig.enabled or sig.jurisdiction not in by_j:
+        if sig.kind != "cases" or not sig.enabled or sig.jurisdiction not in by_j \
+                or (only is not None and sig.jurisdiction not in only):
             continue
         if loop_running or fetcher is None:
             fr.layer_failures.append(f"{sig.key}: not queried (experiment loop lock present)"
@@ -2831,17 +3242,22 @@ def compute_flags(conn: Any, reg: Registry, fetcher: PoliteFetcher | None,
             if not near:
                 continue
             with conn.cursor() as cur:
-                cur.execute(_SQL_CASE_HITS, (near, gj))
-                hits = sorted(str(r[0]) for r in cur.fetchall())
+                cur.execute(_SQL_CASE_HITS, (gj, near))
+                hits = sorted((str(r[0]), float(r[1] or 0), float(r[2] or 0))
+                              for r in cur.fetchall())
             ok = bool(sig.status_field) and f["status"].casefold() in approved
-            for pid in hits:
+            for pid, of_parcel, of_case in hits:
                 item = {"parcel_id": pid, "jurisdiction": sig.jurisdiction,
                         "case_id": f["case_id"], "case_status": f["status"] or "unknown",
-                        "layer": sig.key}
-                (fr.conditions_on_file if ok else fr.other_cases).append(item)
+                        "layer": sig.key, "overlap_pct_of_parcel": round(100 * of_parcel, 1)}
+                if max(of_parcel, of_case) < MIN_CASE_OVERLAP:
+                    fr.low_overlap.append(item)
+                else:
+                    (fr.conditions_on_file if ok else fr.other_cases).append(item)
     conn.rollback()
     fr.conditions_on_file.sort(key=lambda x: (x["jurisdiction"], x["parcel_id"], x.get("case_id", "")))
     fr.other_cases.sort(key=lambda x: (x["jurisdiction"], x["parcel_id"], x.get("case_id", "")))
+    fr.low_overlap.sort(key=lambda x: (x["jurisdiction"], x["parcel_id"], x.get("case_id", "")))
     return fr
 
 
@@ -2923,14 +3339,27 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
     except Refused as exc:
         print(f"REFUSED: {exc}")
         return EXIT_REFUSED
-    # Output paths are checked BEFORE any network or database work (RS-06).
+    if registry_path == REGISTRY_PATH and registry_matches_head(registry_path) is False:
+        print("warning: rules_sources.json differs from git HEAD (an uncommitted registry edit "
+              "is in use)")
+    # Every output path, the derived ones included, is checked BEFORE any
+    # network or database work (RS-06, F19).
     try:
         out_path = Path(args.out) if args.out else DEFAULT_CANDIDATE
         report_path = Path(args.report) if args.report else DEFAULT_REPORT
-        if out_path == DEFAULT_CANDIDATE or report_path == DEFAULT_REPORT:
+        state_path = OUT_DIR / "watch_state.json" if not args.out else out_path.with_name(
+            "watch_state.json")
+        flags_path = report_path.with_name("conditions_flags.json")
+        if any(x.parent.resolve() == OUT_DIR.resolve()
+               for x in (out_path, report_path, state_path)):
             ensure_dir(OUT_DIR)
         guard_output_path(out_path)
         guard_output_path(report_path)
+        guard_output_path(report_path.with_suffix(".json"))
+        if args.watch:
+            guard_output_path(state_path)
+        if args.flags:
+            guard_private_path(flags_path)
     except Refused as exc:
         print(f"REFUSED: {exc}")
         return EXIT_REFUSED
@@ -2995,7 +3424,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
                         print(f"REFUSED: {why}. --flags reads the database only between runs.")
                         return EXIT_RUN_OPEN
                     flags = compute_flags(conn, reg, None if args.offline else fetcher,
-                                          loop_on)
+                                          loop_on, args.jurisdiction or None)
             except BudgetExceeded:
                 raise
             except Exception as exc:  # psycopg errors: the class name only
@@ -3010,13 +3439,13 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         current = {}
     try:
         cand = build_candidate(res, reg, current)
-        rows = diff(res, current, reg, flags.gis_districts if flags else None)
+        rows = diff(res, current, reg, flags.gis_districts if flags else None,
+                    args.jurisdiction or None)
         verify_registry_unchanged(reg, registry_path)
         safe_write(out_path, canonical_json(cand).encode("utf-8"))
         report = render_report(res, rows, cand)
+        lost: list[str] = []
         if args.watch:
-            state_path = OUT_DIR / "watch_state.json" if not args.out else out_path.with_name(
-                "watch_state.json")
             prev = None
             try:
                 prev = json.loads(guard_output_path(state_path).read_text(encoding="utf-8"))
@@ -3027,6 +3456,8 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
             report += "\n".join(f"| {w['kind']} | {w['key']} | {w['result']} | {_md(w['detail'])} |"
                                 for w in wrows) + "\n"
             safe_write(state_path, canonical_json(state).encode("utf-8"))
+            lost = [w["key"] for w in wrows if w["kind"] == "section"
+                    and w["detail"].startswith("section lost")]
             wc: dict[str, int] = {}
             for w in wrows:
                 wc[w["result"]] = wc.get(w["result"], 0) + 1
@@ -3036,10 +3467,13 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         safe_write(report_path.with_suffix(".json"), canonical_json(
             {"counts": diff_counts(rows), "rows": jrows}).encode("utf-8"))
         if flags is not None:
-            safe_write(report_path.with_name("conditions_flags.json"), canonical_json({
+            guard_private_path(flags_path)
+            safe_write(flags_path, canonical_json({
                 "_comment": "parcel ids and public case ids only; pull conditions by hand",
                 "conditions_on_file": flags.conditions_on_file,
                 "other_cases": flags.other_cases,
+                "adjacent_case_low_overlap": flags.low_overlap,
+                "min_case_overlap": MIN_CASE_OVERLAP,
                 "layer_failures": flags.layer_failures}).encode("utf-8"))
     except Refused as exc:
         print(f"REFUSED: {exc}")
@@ -3048,17 +3482,29 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
     if flags is not None:
         cof = {x["parcel_id"] for x in flags.conditions_on_file}
         oth = {x["parcel_id"] for x in flags.other_cases}
+        low = {x["parcel_id"] for x in flags.low_overlap}
         print(f"flags: {len(cof)} parcel(s) with conditions on file ({len(flags.conditions_on_file)} "
               f"hit(s); pull by hand), {len(oth)} parcel(s) with other cases "
-              f"({len(flags.other_cases)} hit(s)), {len(flags.layer_failures)} case layer(s) not "
-              "checked")
+              f"({len(flags.other_cases)} hit(s)), {len(low)} parcel(s) only touching a case "
+              f"polygon ({len(flags.low_overlap)} hit(s) under {MIN_CASE_OVERLAP:.0%} overlap), "
+              f"{len(flags.layer_failures)} case layer(s) not checked")
     if fetcher is not None and not args.offline:
         print("requests: " + ", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items())))
     print(f"wrote candidate and report under {out_path.parent.name}/ (never zoning_rules.json)")
     failed = [o for o in res.outcomes if o.status == "unreachable"]
+    missing = [f"{o.source.key}/{sec.defn.id}" for o in res.outcomes
+               if o.status in ("fetched", "replayed") for sec in o.sections
+               if sec.status == "not found in source"]
+    if lost:
+        print(f"{len(lost)} section(s) lost since the previous watch (markers no longer found): "
+              f"{', '.join(lost)}.")
     if failed:
         print(f"{len(failed)} enabled source(s) unreachable: "
               f"{', '.join(o.source.key for o in failed)}. Exit 4.")
+        return EXIT_PARTIAL
+    if missing:
+        print(f"{len(missing)} enabled section(s) not found in a reachable source: "
+              f"{', '.join(missing)}. Exit 4.")
         return EXIT_PARTIAL
     return EXIT_OK
 

@@ -1348,7 +1348,7 @@ class FakeConn:
         if sql == rs._SQL_FLAG_PARCELS:
             return self.parcels
         if sql == rs._SQL_CASE_HITS:
-            return [(p,) for p in params[0]]
+            return [(p, 1.0, 1.0) for p in params[1]]
         if sql == zoning_import._SQL_MIRROR_EXISTS:
             return [(self.mirror is not None,)]
         if sql == zoning_import._SQL_MIRROR_BASELINE_FOR_TAG:
@@ -1725,6 +1725,394 @@ class ProtectionTests(unittest.TestCase):
         # The real check on the repo's own file (the suite no-ops it for runner tests).
         tests.REAL_VERIFY_RULES_SOURCES_COMMITTED()
 
+
+
+# ---------------------------------------------------------------------------
+# Adversarial post-change review, round 1 (reviews/23_rules_scraper/03, F1-F23)
+# ---------------------------------------------------------------------------
+EP_HTML = textwrap.dedent("""\
+    <html><body>
+    <h3>Sec. 10-2079. - I-1 Light Industrial District.</h3>
+    <p>(a) Purpose. Light industry.</p>
+    <p>Development standards.</p>
+    <p>Minimum rear yard setback—40 feet.</p>
+    <p>Stormwater Pollution Prevention Plan.</p>
+    <h3>Sec. 10-2080. - I-2 Heavy Industrial District.</h3>
+    <p>(a) Purpose. Heavy industry.</p>
+    <p>Stormwater Pollution Prevention Plan.</p>
+    <h3>Sec. 10-2081. - I-3 Special Industrial District.</h3>
+    <p>Development standards.</p>
+    <p>Minimum rear yard setback—150 feet.</p>
+    <p>Stormwater Pollution Prevention Plan.</p>
+    </body></html>""")
+
+
+def ep_registry():
+    d = base_registry()
+    secs = []
+    for code, sec_no, name in (("I-1", "10-2079", "Light"), ("I-2", "10-2080", "Heavy")):
+        secs.append({"id": code.lower().replace("-", ""), "label": f"Sec. {sec_no}",
+                     "start": [f"Sec. {sec_no}. - {code} {name} Industrial District.",
+                               "Development standards."],
+                     "end": "Stormwater Pollution Prevention Plan.", "district": code,
+                     "config": {"labels": [{"label": "Minimum rear yard setback",
+                                            "field": "rear_setback_ft"}]}})
+    d["jurisdictions"]["east_point"] = {
+        "name": "EP", "priority": 2, "conditions_suffix_regex": None, "change_signals": [],
+        "sources": [{"key": "ep", "enabled": True, "url": f"https://{MIRROR}/code/ep/ch3",
+                     "format": "html", "source_class": "mirror", "parser": "label_value",
+                     "sections": secs}]}
+    return registry_obj(d)
+
+
+class ReviewRoundOneTests(TmpDirTest):
+    def setUp(self):
+        super().setUp()
+        self.reg = registry_obj()
+        self.dev = section(self.reg, "atl", "dev", PROSE_HTML)
+
+    def v(self, r, sec=None):
+        return rs.verify(r, sec or self.dev, self.reg)
+
+    def dev_with(self, html_fragment):
+        html = PROSE_HTML.replace("<p>FAR is 50%.</p>", html_fragment)
+        return section(self.reg, "atl", "dev", html)
+
+    # F1: a marker chain never steps into another district's block.
+    def test_chain_does_not_jump_to_the_next_block(self):
+        reg = ep_registry()
+        doc = rs.html_document(EP_HTML.encode())
+        src = reg.source("ep")
+        i1 = rs.cut_section(doc, src, src.sections[0], "x")
+        i2 = rs.cut_section(doc, src, src.sections[1], "x")
+        self.assertEqual(i1.status, "found")
+        self.assertIn("40 feet", i1.text)
+        self.assertEqual(i2.status, "not found in source")
+        pr = rs.parse_label_value(i1)
+        self.assertEqual([(r.district, r.value) for r in pr.records], [("I-1", 40)])
+
+    def test_chain_stops_at_its_own_end_marker(self):
+        reg = ep_registry()
+        html = EP_HTML.replace("<h3>Sec. 10-2081. - I-3 Special Industrial District.</h3>",
+                               "<p>(b) Reserved.</p>")
+        doc = rs.html_document(html.encode())
+        src = reg.source("ep")
+        self.assertEqual(rs.cut_section(doc, src, src.sections[1], "x").status,
+                         "not found in source")
+
+    # F2: stitched table lines and postfix labels.
+    def test_quote_across_table_rows_rejected(self):
+        sec = self.dev_with("<table><tr><td>District</td><td>Front yard</td><td>Side yard</td>"
+                            "<td>Rear yard</td></tr><tr><td>I-1</td><td>60 feet</td>"
+                            "<td>25 feet</td><td>40 feet</td></tr></table>")
+        out = self.v(rec(sec, "I-1", "rear_setback_ft", 60, "Rear yard I-1 | 60 feet"), sec)
+        self.assertEqual(out.outcome, "rejected")
+        self.assertEqual(out.reasons, ("quote crosses table rows",))
+
+    def test_quote_across_plain_lines_needs_review(self):
+        sec = self.dev_with("<div>Front yard Side yard Rear yard</div><div>60 feet 25 feet 40 feet</div>")
+        out = self.v(rec(sec, "I-1", "rear_setback_ft", 60, "Rear yard 60 feet"), sec)
+        self.assertNotEqual(out.outcome, "accepted")
+
+    def test_postfix_label_decides(self):
+        sec = self.dev_with("<p>I-1 district: 20 feet side yard; 50 feet rear yard.</p>")
+        q = "I-1 district: 20 feet side yard; 50 feet rear yard"
+        self.assertEqual(self.v(rec(sec, "I-1", "side_setback_ft", 50, q), sec).outcome, "rejected")
+        self.assertEqual(self.v(rec(sec, "I-1", "side_setback_ft", 20, q), sec).outcome, "accepted")
+        self.assertEqual(self.v(rec(sec, "I-1", "rear_setback_ft", 50, q), sec).outcome, "accepted")
+        self.assertEqual(self.v(rec(sec, "I-1", "rear_setback_ft", 20, q), sec).outcome, "rejected")
+
+    # F3: conditional-zoning rows are not the base district.
+    def test_district_re_excludes_conditional_suffix(self):
+        rx = rs.district_re("M-1")
+        for t, want in (("M-1", True), ("M-1 M-2", True), ("M-1/M-2", True), ("M-1-C", False),
+                        ("M-1A", False), ("M-1, M-2", True), ("(M-1)", True)):
+            self.assertEqual(bool(rx.search(t)), want, t)
+
+    def test_grid_row_with_suffix_is_review_not_a_value(self):
+        html = GRID_HTML.replace("<td>M-1 M-2</td>", "<td>M-1-C</td>")
+        g = section(self.reg, "grid", "t41", html)
+        pr = rs.parse_district_grid(g)
+        self.assertFalse([r for r in pr.records if r.district == "M-1"])
+        self.assertTrue(any("suffixed variant" in m for m in pr.review))
+
+    def test_assisted_quote_naming_only_the_suffixed_district_rejected(self):
+        sec = self.dev_with("<p>I-1-C rear yard 90 feet.</p>")
+        out = self.v(rec(sec, "I-1", "rear_setback_ft", 90, "I-1-C rear yard 90 feet"), sec)
+        self.assertEqual(out.outcome, "rejected")
+
+    # F4: invisible format characters never split a number.
+    def test_soft_hyphen_and_zero_width_are_dropped(self):
+        self.assertEqual(rs.sanitize("4\u00ad0' 5\u200b0 \ufeffx"), "40' 50 x")
+        g = section(self.reg, "grid", "t41", GRID_HTML.replace("<td>40'</td></tr>", "<td>4&shy;0'</td></tr>"))
+        pr = rs.parse_district_grid(g)
+        h = next(r for r in pr.records if r.district == "AG-1" and r.field == "max_height_ft")
+        self.assertEqual(h.value, 40)
+        sec = section(self.reg, "atl", "dev", PROSE_HTML.replace("Rear: 50 feet", "Rear: 5&#8203;0 feet"))
+        self.assertEqual(self.v(rec(sec, "I-1", "rear_setback_ft", 0, "(b) Rear: 50 feet."), sec).outcome,
+                         "rejected")
+        self.assertEqual(self.v(rec(sec, "I-1", "rear_setback_ft", 50, "(b) Rear: 50 feet."), sec).outcome,
+                         "accepted")
+        self.assertEqual(self.v(rec(sec, "I-1", "rear_setback_ft", 50, "(b) Rear: 5\u200b0 feet."),
+                                sec).outcome, "rejected")
+
+    # F5: limiting wording is a qualifier.
+    def test_limiting_wording_qualifies(self):
+        for t, kind in (("2. Lot width and frontage: 150 feet for initial zoning request;", "limited_scope"),
+                        ("M-1 front yard 100 feet, which may be reduced to 25 feet", "adjustable"),
+                        ("side yard 20 to 40 feet", "range"),
+                        ("unless a variance is granted", "variance"),
+                        ("minimum lot area up to 1 acre", "up_to")):
+            self.assertIn(kind, [k for k, _ in rs.qualifiers_in(t)], t)
+        sec = self.dev_with("<p>Height: up to 75 feet.</p>")
+        out = self.v(rec(sec, "I-1", "max_height_ft", 75, "Height: up to 75 feet."), sec)
+        self.assertNotIn("up_to", [k for k, _ in out.qualifiers])
+
+    # F6: a known mirror host can never be declared official.
+    def test_mirror_host_must_be_mirror(self):
+        d = base_registry()
+        d["hosts"]["www.zoneomics.com"] = {"terms_url": None, "terms_reviewed_by": None,
+                                           "terms_reviewed_on": None, "note": "x"}
+        src = d["jurisdictions"]["atlanta"]["sources"][0]
+        src["url"] = "https://www.zoneomics.com/code/atlanta-GA/chapter_22"
+        src["source_class"] = "official"
+        with self.assertRaises(rs.Refused):
+            rs.validate_registry(copy.deepcopy(d))
+        src["source_class"] = "mirror"
+        rs.validate_registry(d)
+        live = json.loads(rs.REGISTRY_PATH.read_text())
+        for j in live["jurisdictions"].values():
+            for s in j.get("sources") or []:
+                if "zoneomics" in s["url"]:
+                    s["source_class"] = "official"
+        with self.assertRaises(rs.Refused):
+            rs.validate_registry(live)
+
+    def test_registry_head_check(self):
+        self.assertIn(rs.registry_matches_head(), (True, None))
+        self.assertIsNone(rs.registry_matches_head(self.write_registry()))
+
+    # F7, F9, F20: robots parsing.
+    def test_robots_bom_does_not_hide_the_first_group(self):
+        self.assertIsNotNone(rs.Robots("\ufeffUser-agent: *\nDisallow: /\n").verdict("/x"))
+        f, _, _ = fetcher({f"https://{MIRROR}/robots.txt": FakeResp(
+            200, b"\xef\xbb\xbfUser-agent: *\nDisallow: /\n", {"Content-Type": "text/plain"}),
+            f"https://{MIRROR}/x": FakeResp(200, "page")})
+        with self.assertRaises(rs.Unreachable):
+            f.fetch(f"https://{MIRROR}/x")
+
+    def test_robots_percent_encoding_normalised(self):
+        for rule, path in (("/a~b", "/a%7Eb"), ("/a%7Eb", "/a~b"), ("/a%7eb", "/a%7Eb"),
+                           ("/a%2fb", "/a%2Fb")):
+            self.assertIsNotNone(rs.Robots(f"User-agent: *\nDisallow: {rule}\n").verdict(path),
+                                 (rule, path))
+        self.assertIsNone(rs.Robots("User-agent: *\nDisallow: /a%2Fb\n").verdict("/a/b"))
+
+    def test_robots_versioned_agent_and_global_content_signal(self):
+        self.assertIsNotNone(rs.Robots("User-agent: ClaudeBot/1.0\nDisallow: /\n").verdict("/x"))
+        self.assertIsNotNone(rs.Robots("Content-Signal: ai-input=no\nUser-agent: *\nAllow: /\n")
+                             .verdict("/x"))
+
+    # F8: Retry-After on 5xx.
+    def test_503_retry_after_honoured_or_unreachable(self):
+        f, http, clock = fetcher({f"https://{MIRROR}/robots.txt": robots(),
+                                  f"https://{MIRROR}/x": [FakeResp(503, "", {"Retry-After": "120"}),
+                                                          FakeResp(200, "ok")]})
+        with self.assertRaises(rs.Unreachable):
+            f.fetch(f"https://{MIRROR}/x")
+        self.assertEqual(http.calls.count(f"https://{MIRROR}/x"), 1)
+        f, http, clock = fetcher({f"https://{MIRROR}/robots.txt": robots(),
+                                  f"https://{MIRROR}/x": [FakeResp(503, "", {"Retry-After": "7"}),
+                                                          FakeResp(200, "ok")]})
+        self.assertEqual(f.fetch(f"https://{MIRROR}/x").body, b"ok")
+        self.assertIn(7.0, clock.sleeps)
+
+    # F10: other WAF interstitials.
+    def test_more_challenge_pages_unreachable(self):
+        for st, body in ((200, b"<title>Request unsuccessful. Incapsula incident ID: 1</title>"),
+                         (200, b"<title>DDoS-Guard</title>"),
+                         (202, b"<html><script>window.awsWafCookieDomainList=[]</script></html>"),
+                         (200, b"<title>Sucuri WebSite Firewall - Access Denied</title>"),
+                         (202, b"<!doctype html><p>wait</p>")):
+            self.assertIsNotNone(rs.classify_block(st, {}, body), body)
+        self.assertIsNone(rs.classify_block(200, {}, b"<title>Chapter 4</title>"))
+
+    # F11, F19: output paths.
+    def test_repo_writes_only_into_the_tools_folders(self):
+        for p in (REPO_ROOT / "experiment_log.tsv", REPO_ROOT / ".env", REPO_ROOT / "screener" / "rank.py",
+                  REPO_ROOT / "tests" / "zoning_golden_check.py", REPO_ROOT / "README.md",
+                  REPO_ROOT / "reviews" / "21_zoning" / "x.json"):
+            with self.assertRaises(rs.Refused, msg=str(p)):
+                rs.guard_output_path(p)
+        for p in (rs.OUT_DIR / "x.json", rs.REVIEW_DIR / "x.md", self.tmp / "x.json"):
+            if p.parent.exists():
+                rs.guard_output_path(p)
+        if rs.REVIEW_DIR.exists():
+            with self.assertRaises(rs.Refused):
+                rs.guard_private_path(rs.REVIEW_DIR / "conditions_flags.json")
+
+    def test_flags_report_in_a_tracked_folder_refused_before_any_work(self):
+        p = self.write_registry()
+        f, http, _ = fetcher(routes_for(ALL_PAGES))
+        a = rs.build_parser().parse_args(["--flags", "--out", str(self.tmp / "c.json"),
+                                          "--report", str(rs.REVIEW_DIR / "x.md")])
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = rs.run(a, fetcher=f, cache=self.cache, registry_path=p,
+                          connect=lambda: self.fail("connected"), log_path=self.tmp / "n.tsv")
+        self.assertEqual(code, rs.EXIT_REFUSED)
+        self.assertEqual(http.calls, [])
+
+    # F13: fragments and keyword placement.
+    def test_fragment_of_a_number_rejected(self):
+        sec = self.dev_with("<p>Minimum front yard: 25 feet; side yard as required by the building code.</p>")
+        self.assertEqual(self.v(rec(sec, "I-1", "side_setback_ft", 5, "5 feet; side yard"), sec).outcome,
+                         "rejected")
+        sec = self.dev_with("<p>Rear: 50 feet maximum. Height regulations apply.</p>")
+        self.assertEqual(self.v(rec(sec, "I-1", "max_height_ft", 50, "50 feet maximum. Height"),
+                                sec).outcome, "rejected")
+        self.assertEqual(self.v(rec(sec, "I-1", "max_height_ft", 50, "Rear: 50 feet maximum. Height"),
+                                sec).outcome, "rejected")
+
+    # F14: a null must belong to the field.
+    def test_null_must_be_attached_to_the_field(self):
+        sec = self.dev_with("<p>I-1 Rear: 20 feet. Side: None. Front yard: 40 feet. Lot coverage: N/A.</p>")
+        for f, q in (("rear_setback_ft", "Rear: 20 feet. Side: None."),
+                     ("front_setback_ft", "Front yard: 40 feet. Lot coverage: N/A.")):
+            self.assertEqual(self.v(rec(sec, "I-1", f, None, q), sec).outcome, "rejected", f)
+            self.assertEqual(self.v(rec(sec, "I-1", f, 0, q), sec).outcome, "rejected", f)
+        self.assertEqual(self.v(rec(sec, "I-1", "max_lot_coverage_pct", None, "Lot coverage: N/A."),
+                                sec).outcome, "accepted")
+        self.assertEqual(self.v(rec(sec, "I-1", "side_setback_ft", 0, "Side: None."), sec).outcome,
+                         "needs_review")
+        sec = self.dev_with("<p>No fixed minimum lot widths or areas are established for these districts.</p>")
+        q = "No fixed minimum lot widths or areas are established for these districts"
+        for f in ("min_lot_width_ft", "min_lot_area_sqft"):
+            self.assertNotEqual(self.v(rec(sec, "I-1", f, None, q), sec).outcome, "rejected", f)
+
+    # F15: qualifiers next to the quote.
+    def test_sentence_and_note_qualifiers_surface(self):
+        sec = self.dev_with("<p>Front: 40 feet, except where adjacent to residential districts it "
+                            "shall be 100 feet.</p>")
+        out = self.v(rec(sec, "I-1", "front_setback_ft", 40, "Front: 40 feet"), sec)
+        self.assertEqual(out.outcome, "needs_review")
+        html = LABEL_HTML.replace("<p>M-1—Design standards.",
+                                  "<p>Note: All M-1 uses abutting a residential district must maintain "
+                                  "a side and rear yard of 50 feet.</p><p>M-1—Design standards.")
+        d = base_registry()
+        d["jurisdictions"]["fairburn"] = {
+            "name": "F", "priority": 1, "conditions_suffix_regex": None, "change_signals": [],
+            "sources": [{"key": "fb", "enabled": True, "url": f"https://{MIRROR}/code/fb",
+                         "format": "html", "source_class": "mirror", "parser": "label_value",
+                         "sections": [{"id": "m1", "label": "Sec. 80-85",
+                                       "start": ["Sec. 80-85. - M-1—Light Industrial Zoning District.",
+                                                 "M-1—Development standards."],
+                                       "end": "M-1—Design standards.", "district": "M-1",
+                                       "config": {"labels": [
+                                           {"label": "Minimum front yard setback", "field": "front_setback_ft"},
+                                           {"label": "Minimum side yard setback", "field": "side_setback_ft"}]}}]}]}
+        reg = registry_obj(d)
+        fb = section(reg, "fb", "m1", html)
+        got = {r.field: rs.verify(r, fb, reg) for r in rs.parse_label_value(fb).records}
+        self.assertEqual(got["side_setback_ft"].outcome, "needs_review")
+        self.assertTrue(any("section note" in x for x in got["side_setback_ft"].reasons))
+        self.assertFalse(any("section note" in x for x in got["front_setback_ft"].reasons))
+
+    # F16, F17: the watch keeps baselines and reports a lost section.
+    def test_watch_keeps_unobserved_baselines(self):
+        reg = registry_obj()
+        f, _, _ = fetcher(routes_for(ALL_PAGES))
+        res1 = rs.scrape(reg, fetcher=f, cache=self.cache, offline=False)
+        gis = {"sf_cases": {"last_edit": 1, "count": 5, "max_oid": 9, "reason": ""}}
+        state, _ = rs.watch_compare(None, res1, gis, reg, date(2026, 11, 5))
+        res2 = rs.scrape(reg, fetcher=None, cache=self.cache, offline=True,
+                         jurisdictions=["south_fulton"])
+        state2, _ = rs.watch_compare(state, res2, {"sf_cases": {"reason": "not queried: offline"}},
+                                     reg, date(2026, 11, 5))
+        self.assertEqual(state2["gis"]["sf_cases"], [1, 5, 9])
+        self.assertEqual(state2["sources"]["atl"], state["sources"]["atl"])
+        routes = routes_for(ALL_PAGES)
+        routes[f"https://{MIRROR}/code/sf/ch4"] = FakeResp(403, "no")
+        f3, _, _ = fetcher(routes)
+        res3 = rs.scrape(reg, fetcher=f3, cache=self.cache, offline=False)
+        state3, _ = rs.watch_compare(state2, res3, gis, reg, date(2026, 11, 5))
+        self.assertEqual(state3["sources"]["grid"], state["sources"]["grid"])
+        pages = dict(ALL_PAGES)
+        pages[f"https://{MIRROR}/code/sf/ch4"] = GRID_HTML.replace("<td>35'</td><td>100'",
+                                                                   "<td>36'</td><td>100'")
+        f4, _, _ = fetcher(routes_for(pages))
+        res4 = rs.scrape(reg, fetcher=f4, cache=self.cache, offline=False)
+        _s, rows = rs.watch_compare(state3, res4, gis, reg, date(2026, 11, 5))
+        got = {(r["kind"], r["key"]): r["result"] for r in rows}
+        self.assertEqual(got[("section", "grid/t41")], "changed")
+
+    def test_lost_section_is_changed_and_exit_4(self):
+        p = self.write_registry()
+        f, _, _ = fetcher(routes_for(ALL_PAGES))
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(rs.run(self.args("--watch"), fetcher=f, cache=self.cache,
+                                    registry_path=p, loop_lock=self.tmp / "n"), rs.EXIT_OK)
+        pages = dict(ALL_PAGES)
+        pages[f"https://{MIRROR}/code/sf/ch4"] = GRID_HTML.replace("Table 4-1 Area Regulations",
+                                                                   "Table 4-1 Area Rules")
+        f2, _, _ = fetcher(routes_for(pages))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = rs.run(self.args("--watch"), fetcher=f2, cache=self.cache, registry_path=p,
+                          loop_lock=self.tmp / "n")
+        self.assertEqual(code, rs.EXIT_PARTIAL)
+        self.assertIn("1 section(s) lost since the previous watch", out.getvalue())
+        report = (self.tmp / "report.md").read_text()
+        self.assertIn("| section | grid/t41 | changed | section lost", report)
+
+    # F18: sliver overlaps are not conditions on file.
+    def test_low_overlap_case_listed_separately(self):
+        reg = registry_obj()
+        base, routes, feats = FlagTests._case_routes(self, "Approved")
+
+        class H(FakeHttp):
+            def get(s, url, **kw):
+                s.calls.append(url)
+                if url.endswith("robots.txt"):
+                    return robots()
+                if "returnIdsOnly=true" in url:
+                    return FakeResp(200, json.dumps({"objectIds": [4]}))
+                if "objectIds=4" in url:
+                    return FakeResp(200, json.dumps(feats))
+                return FakeResp(404, "")
+
+        class Sliver(FakeConn):
+            def answer(s, sql, params):
+                if sql == rs._SQL_CASE_HITS:
+                    return [(params[1][0], 0.004, 0.01), (params[1][1], 0.30, 0.02)]
+                return super().answer(sql, params)
+
+        c = FakeClock()
+        f = rs.PoliteFetcher(H({}), clock=c.clock, sleep=c.sleep)
+        conn = Sliver([stored_row("fulton-1", "south_fulton", "M-1"),
+                       stored_row("fulton-2", "south_fulton", "M-2")])
+        fr = rs.compute_flags(conn, reg, f, loop_running=False)
+        self.assertEqual([x["parcel_id"] for x in fr.low_overlap], ["fulton-1"])
+        self.assertEqual([x["parcel_id"] for x in fr.conditions_on_file], ["fulton-2"])
+        fr2 = rs.compute_flags(conn, reg, f, loop_running=False, jurisdictions=["atlanta"])
+        self.assertEqual((fr2.conditions_on_file, fr2.low_overlap, fr2.gis_districts), ([], [], {}))
+
+    # F21, F23: diff scope, categories, conditions suffix.
+    def test_diff_scope_and_categories(self):
+        reg = registry_obj()
+        f, _, _ = fetcher(routes_for(ALL_PAGES))
+        res = rs.scrape(reg, fetcher=f, cache=self.cache, offline=False, jurisdictions=["atlanta"],
+                        assisted=[rs.Record("atlanta", "I-1", "front_setback_ft", 40,
+                                            "(a) Front: 40 feet.", "atl", "dev", "assisted")])
+        cur = {"jurisdictions": {
+            "south_fulton": {"districts": {"M-1": {"dimensions": {"front_setback_ft": {"value": 40,
+                                                                                        "cite": "x"}}}}},
+            "atlanta": {"districts": {"I-1": {"dimensions": {"rear_setback_ft": {"value": 50,
+                                                                                  "cite": "x"}}}}}}}
+        rows = rs.diff(res, cur, reg, jurisdictions=["atlanta"])
+        self.assertEqual({r.jurisdiction for r in rows}, {"atlanta"})
+        self.assertIn(rs.REMOVED_NOT_EXTRACTED, {r.category for r in rows})
+        self.assertTrue(rs.conditions_suffix(reg, "atlanta", "I-1C"))
+        self.assertFalse(rs.conditions_suffix(reg, "atlanta", "I-1"))
 
 if __name__ == "__main__":
     unittest.main()

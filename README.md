@@ -247,18 +247,26 @@ the zoning-code pages listed in `rules_sources.json` and drafts a
 **candidate** rules file. It never writes `zoning_rules.json` and it is no
 scoring input. What a human does with it:
 
-1. Run it between runs: `make rules-scrape ARGS=--allow-unreviewed-terms`
-   (the flag is needed until someone has read the terms of each host and
-   filled `terms_reviewed_by` / `terms_reviewed_on` in
-   `rules_sources.json`). It writes, under the gitignored `rules_out/`,
+1. First, once per host: a human reads the host's terms of use in a
+   browser and fills `terms_reviewed_by` / `terms_reviewed_on` in
+   `rules_sources.json` (commit the edit). Then run it between runs:
+   `make rules-scrape`. Until a host's terms are reviewed it is skipped as
+   unreachable; `--allow-unreviewed-terms` overrides that and is an
+   exception for a one-off run, never a default. It writes, under the
+   gitignored `rules_out/`,
    `zoning_rules.CANDIDATE.json` (every jurisdiction `draft`, every value
    with a cite, a short verbatim quote, `source_class` official or mirror
    and the source page's SHA-256) and `rules_diff_report.md` / `.json`
    (per jurisdiction, district and field: same, same but mirror vs mirror
-   (not independent), changed, added, not found in source, source
-   unreachable, needs extraction, ...). The console shows counts only.
+   (not independent), same value with a new cite, changed, added, removed
+   (section read, value not extracted), not found in source, source
+   unreachable, needs extraction, ...). The candidate is a per-value draft
+   to compare, not a drop-in replacement for `zoning_rules.json`. The
+   console shows counts only.
 2. Read the diff. Values marked needs_review carry a footnote,
-   cross-reference, "whichever is greater", adjacency wording or a unit
+   cross-reference, "whichever is greater", adjacency or limiting wording
+   ("for initial ...", "may be reduced", a range), a section note about
+   the field, a quote spanning several source lines or a unit
    conversion: read the cited section yourself. Agreement with a mirror is
    not verification.
 3. Edit `zoning_rules.json` **by hand**, per value, between runs, and
@@ -277,16 +285,24 @@ directory; needs `ANTHROPIC_API_KEY`, as it runs with `--bare`), otherwise
 prose sections are reported "needs extraction"; `--flags` (read-only
 database, refuses after a run's baseline like `make zoning-import`) lists
 parcels with conditions of zoning on file (an Atlanta `-C` district or an
-approved case polygon), counts on the console and parcel ids only in
-`rules_out/conditions_flags.json`. Pull those conditions by hand.
+approved case polygon covering at least 5% of the parcel or of the case;
+smaller overlaps are listed apart as adjacent cases), counts on the
+console and parcel ids only in `rules_out/conditions_flags.json` (with
+`--flags`, `--report` must point outside the repository or under
+`rules_out/`). Pull those conditions by hand. Inside the repository the
+tool writes only under `rules_out/`, `rules_cache/` and
+`reviews/23_rules_scraper/`.
 
 The fetcher never contacts Municode (hard-coded denylist, also for
 redirects), honours robots.txt for its own token and for AI-agent tokens,
 sends one fixed User-Agent, waits 1 s between requests to a host (longer
 when Crawl-delay asks) and treats any challenge or WAF page as
-unreachable without retrying. Exit codes: 0 done, 1 refused, 2 database
-error (`--flags`), 3 run has its baseline (`--flags`), 4 done but a source
-was unreachable, 5 request budget spent.
+unreachable without retrying (a 429 or 5xx with a Retry-After above 30 s
+too). The watch keeps the previous baseline for anything it could not
+observe and reports a section whose markers vanished as "changed (section
+lost)". Exit codes: 0 done, 1 refused, 2 database error (`--flags`), 3 run
+has its baseline (`--flags`), 4 done but a source was unreachable or an
+enabled section was not found, 5 request budget spent.
 
 **Prerequisite**: PDF sources need `pdftotext` (poppler-utils, e.g.
 `sudo apt-get install -y poppler-utils`); without it PDF sections are
