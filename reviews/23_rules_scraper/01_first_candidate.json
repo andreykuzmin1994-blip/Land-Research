@@ -1,0 +1,2025 @@
+{
+  "_candidate": {
+    "current_rules_sha256": "9039c4548df1b46fd76c7d4dbd13f384e4231449ba220f71ddfc1c6587714575",
+    "marker": "CANDIDATE - NOT zoning_rules.json. Values scraped from the sources in rules_sources.json and checked by rules_scrape.verify. Apply by hand, per value, between runs; draft -> verified is a human act with a new run + baseline (reviews/23_rules_scraper).",
+    "pdftotext": {
+      "argv": [
+        "pdftotext",
+        "-layout",
+        "-enc",
+        "UTF-8",
+        "<file>",
+        "-"
+      ],
+      "version": "pdftotext version 24.02.0"
+    },
+    "registry_sha256": "e1fe19831fe7013237b1edfcc0569fdf8f89ffe0cf55df8f94c9bc76317bc638",
+    "sources": {
+      "atl_i1_mirror": {
+        "fetched_at": "2026-11-05T23:15:15+00:00",
+        "final_url": "https://www.zoneomics.com/code/atlanta-GA/chapter_22",
+        "jurisdiction": "atlanta",
+        "reason": "",
+        "sections": {
+          "i1_dev_controls": {
+            "section_sha256": "c84343e22adf99822708943407b155deecfbc4a00ef264cb364970b02b53138c",
+            "status": "found"
+          },
+          "i1_height": {
+            "section_sha256": "2ba430232ba7147ad411d05e37954ba3167e3411ea7f2656692b3107cc0273d0",
+            "status": "found"
+          }
+        },
+        "sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/atlanta-GA/chapter_22"
+      },
+      "atl_i2_mirror": {
+        "fetched_at": "2026-11-05T23:15:15+00:00",
+        "final_url": "https://www.zoneomics.com/code/atlanta-GA/chapter_24",
+        "jurisdiction": "atlanta",
+        "reason": "",
+        "sections": {
+          "i2_dev_controls": {
+            "section_sha256": "d915ceebc389c40ee5964a7a975c7c90591c43508f49a24161fb7d39b1ecc4bd",
+            "status": "found"
+          },
+          "i2_height": {
+            "section_sha256": "a1fbe17490760fcd28941d5f0ce7a941e4b07f9a7f22cf2b6197733e1c770b05",
+            "status": "found"
+          }
+        },
+        "sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/atlanta-GA/chapter_24"
+      },
+      "cp_ch3_mirror": {
+        "fetched_at": "",
+        "final_url": "",
+        "jurisdiction": "college_park",
+        "reason": "disabled in rules_sources.json",
+        "sections": {},
+        "sha256": "",
+        "source_class": "mirror",
+        "status": "disabled",
+        "url": "https://www.zoneomics.com/code/college-park-GA/chapter_3"
+      },
+      "ep_ch3_mirror": {
+        "fetched_at": "2026-11-05T23:15:19+00:00",
+        "final_url": "https://www.zoneomics.com/code/east-point-GA/chapter_3",
+        "jurisdiction": "east_point",
+        "reason": "",
+        "sections": {
+          "i1_dev_standards": {
+            "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+            "status": "found"
+          },
+          "i2_dev_standards": {
+            "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+            "status": "found"
+          }
+        },
+        "sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/east-point-GA/chapter_3"
+      },
+      "fairburn_ch2_mirror": {
+        "fetched_at": "2026-11-05T23:15:13+00:00",
+        "final_url": "https://www.zoneomics.com/code/fairburn-GA/chapter_2",
+        "jurisdiction": "fairburn",
+        "reason": "",
+        "sections": {
+          "m1_standards": {
+            "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+            "status": "found"
+          },
+          "m2_standards": {
+            "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+            "status": "found"
+          }
+        },
+        "sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/fairburn-GA/chapter_2"
+      },
+      "fc_art10_pdf": {
+        "fetched_at": "2026-11-05T23:15:18+00:00",
+        "final_url": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf",
+        "jurisdiction": "fid",
+        "reason": "",
+        "sections": {
+          "m1_dev_standards": {
+            "section_sha256": "43308038890d3d3d0ce07d4b65dc3f3cd78d4d19a5ca99b4a34fd6d9417ca86d",
+            "status": "found"
+          },
+          "m1a_dev_standards": {
+            "section_sha256": "67c1b0e4efd525f5a072d34e4eb95f6c1fc6b71304ed0d1c24f770aa1068006b",
+            "status": "found"
+          },
+          "m2_dev_standards": {
+            "section_sha256": "d7dcf4aefacc6ef6d5a1a6fe035dd282ed7478d0b7bb84166d0989224d0492db",
+            "status": "found"
+          }
+        },
+        "sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+        "source_class": "official",
+        "status": "fetched",
+        "url": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf"
+      },
+      "hap_chart_mirror": {
+        "fetched_at": "2026-11-05T23:15:20+00:00",
+        "final_url": "https://www.zoneomics.com/code/hapeville-GA/chapter_39",
+        "jurisdiction": "hapeville",
+        "reason": "",
+        "sections": {
+          "chart_93_22_1_1": {
+            "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+            "status": "found"
+          }
+        },
+        "sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/hapeville-GA/chapter_39"
+      },
+      "sf_ch2_mirror": {
+        "fetched_at": "2026-11-05T23:15:11+00:00",
+        "final_url": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2",
+        "jurisdiction": "south_fulton",
+        "reason": "",
+        "sections": {
+          "table_2_4": {
+            "section_sha256": "c65f81d7c44025a699870e6003b6853773db547aa58637ad14854fa84277bbae",
+            "status": "found"
+          }
+        },
+        "sha256": "29fc3b8fba951160b3de7bb737d251b6c9c48c8d76b6b03764f533d899f9c46e",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2"
+      },
+      "sf_ch4_mirror": {
+        "fetched_at": "2026-11-05T23:15:09+00:00",
+        "final_url": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4",
+        "jurisdiction": "south_fulton",
+        "reason": "",
+        "sections": {
+          "table_4_1": {
+            "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+            "status": "found"
+          }
+        },
+        "sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+        "source_class": "mirror",
+        "status": "fetched",
+        "url": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4"
+      },
+      "uc_zoning_ordinance_pdf": {
+        "fetched_at": "2026-11-05T23:15:16+00:00",
+        "final_url": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf",
+        "jurisdiction": "union_city",
+        "reason": "",
+        "sections": {
+          "m1_dimensional": {
+            "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+            "status": "found"
+          }
+        },
+        "sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+        "source_class": "official",
+        "status": "fetched",
+        "url": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf"
+      }
+    },
+    "tool_version": "rules_scrape 1",
+    "unplaced_values": [
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "front_setback_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-1 | Light industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 20
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "low",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "max_height_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "needs_review": [
+          "qualifier: footnote"
+        ],
+        "qualifiers": [
+          {
+            "kind": "footnote",
+            "text": "40 b."
+          }
+        ],
+        "quote": "I-1 | Light industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 40
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "max_lot_coverage_pct",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-1 | Light industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 80
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "rear_setback_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-1 | Light industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 20
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "side_setback_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-1 | Light industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 10
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "front_setback_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-2 | Heavy industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 20
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "low",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "max_height_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "needs_review": [
+          "qualifier: footnote"
+        ],
+        "qualifiers": [
+          {
+            "kind": "footnote",
+            "text": "40 b."
+          }
+        ],
+        "quote": "I-2 | Heavy industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 40
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "max_lot_coverage_pct",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-2 | Heavy industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 80
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "rear_setback_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-2 | Heavy industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 20
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/hapeville-GA/chapter_39 Sec. 93-22.1-1 (Chart of dimensional requirements)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "side_setback_ft",
+        "jurisdiction": "hapeville",
+        "mirror_only": true,
+        "quote": "I-2 | Heavy industrial |  |  |  |  | 80 | 20 | 20 | 10 | 20 |  | 40 b. | c., d., e., f. | ",
+        "section_id": "chart_93_22_1_1",
+        "section_sha256": "811731171a2559a391b22878c5fc4170a4df9ece8147b354f9b77e50c5a01fc5",
+        "source_class": "mirror",
+        "source_key": "hap_chart_mirror",
+        "source_sha256": "1354e1ed0f77a62dcf89feaeded0e4f80a172d16dbb000acf7c8b33c6528435b",
+        "value": 10
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2079(e) (I-1 development standards)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "front_setback_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Minimum front yard setback—40 feet.",
+        "section_id": "i1_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 40
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2079(e) (I-1 development standards)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "max_height_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Height regulations—40 feet.",
+        "section_id": "i1_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 40
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2079(e) (I-1 development standards)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "min_lot_frontage_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Minimum width of lot frontage or width at building line—30 feet.",
+        "section_id": "i1_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 30
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2079(e) (I-1 development standards)",
+        "confidence": "medium",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "rear_setback_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Minimum rear yard setback—30 feet.",
+        "section_id": "i1_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 30
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2079(e) (I-1 development standards)",
+        "confidence": "low",
+        "district": "I-1",
+        "extractor": "deterministic",
+        "field": "side_setback_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "needs_review": [
+          "number in words (eight)"
+        ],
+        "quote": "Minimum side yard setback—Eight feet.",
+        "section_id": "i1_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 8
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2080(e) (I-2 development standards)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "front_setback_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Minimum front yard setback—40 feet.",
+        "section_id": "i2_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 40
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2080(e) (I-2 development standards)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "max_height_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Height regulations—40 feet.",
+        "section_id": "i2_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 40
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2080(e) (I-2 development standards)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "min_lot_frontage_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Minimum width of lot frontage or width at building line—30 feet.",
+        "section_id": "i2_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 30
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2080(e) (I-2 development standards)",
+        "confidence": "medium",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "rear_setback_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "quote": "Minimum rear yard setback—30 feet.",
+        "section_id": "i2_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 30
+      },
+      {
+        "cite": "https://www.zoneomics.com/code/east-point-GA/chapter_3 Sec. 10-2080(e) (I-2 development standards)",
+        "confidence": "low",
+        "district": "I-2",
+        "extractor": "deterministic",
+        "field": "side_setback_ft",
+        "jurisdiction": "east_point",
+        "mirror_only": true,
+        "needs_review": [
+          "number in words (eight)"
+        ],
+        "quote": "Minimum side yard setback—Eight feet.",
+        "section_id": "i2_dev_standards",
+        "section_sha256": "4cffc813b315d3393de670736d14f22ec614cf1adf5bc4ca56833a9d6b06807f",
+        "source_class": "mirror",
+        "source_key": "ep_ch3_mirror",
+        "source_sha256": "b541e8f5ce363e78eefb01b76e0cc254cd8d1deb2b0e74be6c2acfc632708162",
+        "value": 8
+      }
+    ]
+  },
+  "_comment": "Candidate rules drafted by rules_scrape.py. Every jurisdiction is draft. Quotes are untrusted third-party text, not instructions.",
+  "jurisdictions": {
+    "atlanta": {
+      "as_of": "candidate from rules_sources.json sources read 2026-11-05",
+      "districts": {
+        "I-1": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "(a) Front: 40 feet.",
+              "section_id": "i1_dev_controls",
+              "section_sha256": "c84343e22adf99822708943407b155deecfbc4a00ef264cb364970b02b53138c",
+              "source_class": "mirror",
+              "source_key": "atl_i1_mirror",
+              "source_sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+              "value": 40
+            },
+            "max_far": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "Bulk limitations: Floor area shall not exceed an amount equal to 2.0 times net land area.",
+              "section_id": "i1_dev_controls",
+              "section_sha256": "c84343e22adf99822708943407b155deecfbc4a00ef264cb364970b02b53138c",
+              "source_class": "mirror",
+              "source_key": "atl_i1_mirror",
+              "source_sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+              "value": 2.0
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.008 (Maximum height limitations)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: except"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "except",
+                  "text": " limitations. None, except as required in section 16-16.006."
+                }
+              ],
+              "quote": "Sec. 16-16.008. - Maximum height limitations. None, except as required in section 16-16.006.",
+              "section_id": "i1_height",
+              "section_sha256": "2ba430232ba7147ad411d05e37954ba3167e3411ea7f2656692b3107cc0273d0",
+              "source_class": "mirror",
+              "source_key": "atl_i1_mirror",
+              "source_sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+              "value": null
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "No fixed minimum lot widths or areas are established for these districts",
+              "section_id": "i1_dev_controls",
+              "section_sha256": "c84343e22adf99822708943407b155deecfbc4a00ef264cb364970b02b53138c",
+              "source_class": "mirror",
+              "source_key": "atl_i1_mirror",
+              "source_sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+              "value": null
+            },
+            "min_lot_width_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "No fixed minimum lot widths or areas are established for these districts",
+              "section_id": "i1_dev_controls",
+              "section_sha256": "c84343e22adf99822708943407b155deecfbc4a00ef264cb364970b02b53138c",
+              "source_class": "mirror",
+              "source_key": "atl_i1_mirror",
+              "source_sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+              "value": null
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "needs_review": [
+                "number in words (five)",
+                "qualifier: adjacency",
+                "qualifier: conditional"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "adjacency",
+                  "text": "Side: Adjacent to a street, half the required front ya"
+                },
+                {
+                  "kind": "conditional",
+                  "text": "generally provided. If a building is not built to the lot line,"
+                }
+              ],
+              "quote": "Side: Adjacent to a street, half the required front yard, as generally provided. If a building is not built to the lot line, it shall be set back from the lot line at least five feet.",
+              "section_id": "i1_dev_controls",
+              "section_sha256": "c84343e22adf99822708943407b155deecfbc4a00ef264cb364970b02b53138c",
+              "source_class": "mirror",
+              "source_key": "atl_i1_mirror",
+              "source_sha256": "62b3b74f8244cfa048948e92bb0f6d99630982a6dd94241505f9e460c3df69e0",
+              "value": 5
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_22 Sec. 16-16.003(20) 'Warehousing, self-storage facilities ..., distribution centers'",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        },
+        "I-2": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "(a) Front: 40 feet.",
+              "section_id": "i2_dev_controls",
+              "section_sha256": "d915ceebc389c40ee5964a7a975c7c90591c43508f49a24161fb7d39b1ecc4bd",
+              "source_class": "mirror",
+              "source_key": "atl_i2_mirror",
+              "source_sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+              "value": 40
+            },
+            "max_far": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "Bulk limitations: Floor area shall not exceed an amount equal to 2.0 times net land area.",
+              "section_id": "i2_dev_controls",
+              "section_sha256": "d915ceebc389c40ee5964a7a975c7c90591c43508f49a24161fb7d39b1ecc4bd",
+              "source_class": "mirror",
+              "source_key": "atl_i2_mirror",
+              "source_sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+              "value": 2.0
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.008 (Maximum height limitations)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: except"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "except",
+                  "text": " limitations. None, except as required in section 16-17.008."
+                }
+              ],
+              "quote": "Sec. 16-17.008. - Maximum height limitations. None, except as required in section 16-17.008.",
+              "section_id": "i2_height",
+              "section_sha256": "a1fbe17490760fcd28941d5f0ce7a941e4b07f9a7f22cf2b6197733e1c770b05",
+              "source_class": "mirror",
+              "source_key": "atl_i2_mirror",
+              "source_sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+              "value": null
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "No fixed minimum lot widths or areas are established for these districts",
+              "section_id": "i2_dev_controls",
+              "section_sha256": "d915ceebc389c40ee5964a7a975c7c90591c43508f49a24161fb7d39b1ecc4bd",
+              "source_class": "mirror",
+              "source_key": "atl_i2_mirror",
+              "source_sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+              "value": null
+            },
+            "min_lot_width_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "quote": "No fixed minimum lot widths or areas are established for these districts",
+              "section_id": "i2_dev_controls",
+              "section_sha256": "d915ceebc389c40ee5964a7a975c7c90591c43508f49a24161fb7d39b1ecc4bd",
+              "source_class": "mirror",
+              "source_key": "atl_i2_mirror",
+              "source_sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+              "value": null
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.007 (Development controls)",
+              "confidence": "low",
+              "extractor": "assisted",
+              "extractor_note": "assisted: hand-written record, verified by rules_scrape.verify",
+              "mirror_only": true,
+              "needs_review": [
+                "number in words (ten)",
+                "qualifier: adjacency",
+                "qualifier: conditional"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "adjacency",
+                  "text": "(b) Side: Adjacent to a street, half the required front ya"
+                },
+                {
+                  "kind": "conditional",
+                  "text": "rally provided. (c) If a building is not built to the lot line,"
+                }
+              ],
+              "quote": "(b) Side: Adjacent to a street, half the required front yard, as generally provided. (c) If a building is not built to the lot line, it shall be set back from the lot line at least ten feet.",
+              "section_id": "i2_dev_controls",
+              "section_sha256": "d915ceebc389c40ee5964a7a975c7c90591c43508f49a24161fb7d39b1ecc4bd",
+              "source_class": "mirror",
+              "source_key": "atl_i2_mirror",
+              "source_sha256": "5af5ba02162127fba5f88aab49d0663a6e00da15552ccf311a5b0986000a3692",
+              "value": 10
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/atlanta-GA/chapter_24 Sec. 16-17.003(21) 'Warehousing, self-storage facilities ..., distribution centers'",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        }
+      },
+      "name": "City of Atlanta",
+      "status": "draft",
+      "unlisted_districts": "unknown",
+      "verified_by": null,
+      "verified_on": null
+    },
+    "east_point": {
+      "as_of": "candidate from rules_sources.json sources read 2026-11-05",
+      "districts": {},
+      "name": "City of East Point",
+      "status": "draft",
+      "unlisted_districts": "unknown",
+      "verified_by": null,
+      "verified_on": null
+    },
+    "fairburn": {
+      "as_of": "candidate from rules_sources.json sources read 2026-11-05",
+      "districts": {
+        "M-1": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum front yard setback | 35 feet",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 35
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: unless"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "unless",
+                  "text": "Maximum height (unless approved by the fire marshal)"
+                }
+              ],
+              "quote": "Maximum height (unless approved by the fire marshal) | 48 feet",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 48
+            },
+            "max_lot_coverage_pct": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Maximum lot coverage en;a. Including accessory structures. | 60 percent",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 60
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum lot area | 1 acre (43,560 square feet)",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 43560
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum width of lot frontage or width at building line | 100 feet",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 100
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum rear yard setback | 30 feet",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 30
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum side yard setback | 20 feet",
+              "section_id": "m1_standards",
+              "section_sha256": "ff003cd690c926cf3d7c81fa0d84eec88538577e2b5f8797231b07533cc295d3",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 20
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-85(c) items (48) 'Warehousing and storage' and (50) 'Wholesale trade and distribution establishments and warehousing facilities'",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        },
+        "M-2": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum front yard setback | 40 feet",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 40
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: unless"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "unless",
+                  "text": "Maximum height (unless approved by the fire marshal)"
+                }
+              ],
+              "quote": "Maximum height (unless approved by the fire marshal) | 48 feet",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 48
+            },
+            "max_lot_coverage_pct": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Maximum lot coverage a. Including accessory structures. | 60 percent",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 60
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum lot area | 2 acres (87,120 square feet)",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 87120
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum width of lot frontage or width at building line | 30 feet",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 30
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum rear yard setback | 30 feet",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 30
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "Minimum side yard setback | 20 feet",
+              "section_id": "m2_standards",
+              "section_sha256": "8bb649a3799cb36cbdc96a38f55ad3e8dc56627a7d8b9e41df4a62198d23bc09",
+              "source_class": "mirror",
+              "source_key": "fairburn_ch2_mirror",
+              "source_sha256": "d7a12a4aba2c282ee1d3f1804d36f50ce3c743f9d7ef82ab0bfdbb192b612664",
+              "value": 20
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/fairburn-GA/chapter_2 Sec. 80-86(c) (1) 'Any use permitted in the M-1 light industrial district'",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        }
+      },
+      "name": "City of Fairburn",
+      "status": "draft",
+      "unlisted_districts": "unknown",
+      "verified_by": null,
+      "verified_on": null
+    },
+    "fid": {
+      "as_of": "candidate from rules_sources.json sources read 2026-11-05",
+      "district_conversions": {
+        "M-1A": "M-1"
+      },
+      "districts": {
+        "M-1": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3 (M-1 development standards)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "B. Minimum Front Yard - 40 feet",
+              "section_id": "m1_dev_standards",
+              "section_sha256": "43308038890d3d3d0ce07d4b65dc3f3cd78d4d19a5ca99b4a34fd6d9417ca86d",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 40
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3 (M-1 development standards)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "E. Minimum Lot Area - None",
+              "section_id": "m1_dev_standards",
+              "section_sha256": "43308038890d3d3d0ce07d4b65dc3f3cd78d4d19a5ca99b4a34fd6d9417ca86d",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": null
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3 (M-1 development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "qualifier: adjacency",
+                "qualifier: amended"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "adjacency",
+                  "text": "35 feet adjoining a street (Amended 11/03/93)"
+                },
+                {
+                  "kind": "amended",
+                  "text": " adjoining a street (Amended 11/03/93)"
+                }
+              ],
+              "quote": "G. Minimum Lot Frontage - 35 feet adjoining a street (Amended 11/03/93)",
+              "section_id": "m1_dev_standards",
+              "section_sha256": "43308038890d3d3d0ce07d4b65dc3f3cd78d4d19a5ca99b4a34fd6d9417ca86d",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 35
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3 (M-1 development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: cross_reference"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "cross_reference",
+                  "text": "None. See Section 4.23 for buffer and landscape"
+                }
+              ],
+              "quote": "D. Minimum Rear Yard - None. See Section 4.23 for buffer and landscape",
+              "section_id": "m1_dev_standards",
+              "section_sha256": "43308038890d3d3d0ce07d4b65dc3f3cd78d4d19a5ca99b4a34fd6d9417ca86d",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 0
+            },
+            "side_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.3 (M-1 development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: cross_reference"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "cross_reference",
+                  "text": "None. See Section 4.23 for buffer and landscape"
+                }
+              ],
+              "quote": "C. Minimum Side Yard - None. See Section 4.23 for buffer and landscape",
+              "section_id": "m1_dev_standards",
+              "section_sha256": "43308038890d3d3d0ce07d4b65dc3f3cd78d4d19a5ca99b4a34fd6d9417ca86d",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 0
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.2.2 ('Any industrial use not specifically designated as prohibited or allowed with approval of a Use Permit shall be permitted'; warehousing/distributing named) (Amended 04/04/07)",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        },
+        "M-1A": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3 (M-1A development standards)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "B. Minimum Front Yard - 30 feet",
+              "section_id": "m1a_dev_standards",
+              "section_sha256": "67c1b0e4efd525f5a072d34e4eb95f6c1fc6b71304ed0d1c24f770aa1068006b",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 30
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3 (M-1A development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "qualifier: adjacency",
+                "qualifier: amended"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "adjacency",
+                  "text": "35 feet adjoining a street (Amended 11/30/93)"
+                },
+                {
+                  "kind": "amended",
+                  "text": " adjoining a street (Amended 11/30/93)"
+                }
+              ],
+              "quote": "G. Minimum Lot Frontage - 35 feet adjoining a street (Amended 11/30/93)",
+              "section_id": "m1a_dev_standards",
+              "section_sha256": "67c1b0e4efd525f5a072d34e4eb95f6c1fc6b71304ed0d1c24f770aa1068006b",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 35
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3 (M-1A development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: cross_reference"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "cross_reference",
+                  "text": "None. See Section 4.23 for buffer and landscape"
+                }
+              ],
+              "quote": "D. Minimum Rear Yard - None. See Section 4.23 for buffer and landscape",
+              "section_id": "m1a_dev_standards",
+              "section_sha256": "67c1b0e4efd525f5a072d34e4eb95f6c1fc6b71304ed0d1c24f770aa1068006b",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 0
+            },
+            "side_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.3 (M-1A development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: cross_reference"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "cross_reference",
+                  "text": "None. See Section 4.23 for buffer and landscape"
+                }
+              ],
+              "quote": "C. Minimum Side Yard - None. See Section 4.23 for buffer and landscape",
+              "section_id": "m1a_dev_standards",
+              "section_sha256": "67c1b0e4efd525f5a072d34e4eb95f6c1fc6b71304ed0d1c24f770aa1068006b",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 0
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.1.2",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        },
+        "M-2": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3 (M-2 development standards)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "B. Minimum Front Yard - 40 feet",
+              "section_id": "m2_dev_standards",
+              "section_sha256": "d7dcf4aefacc6ef6d5a1a6fe035dd282ed7478d0b7bb84166d0989224d0492db",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 40
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3 (M-2 development standards)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "E. Minimum Lot Area - None",
+              "section_id": "m2_dev_standards",
+              "section_sha256": "d7dcf4aefacc6ef6d5a1a6fe035dd282ed7478d0b7bb84166d0989224d0492db",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": null
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3 (M-2 development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "qualifier: adjacency",
+                "qualifier: amended"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "adjacency",
+                  "text": "35 feet adjoining a street (Amended 11/03/93)"
+                },
+                {
+                  "kind": "amended",
+                  "text": " adjoining a street (Amended 11/03/93)"
+                }
+              ],
+              "quote": "G. Minimum Lot Frontage - 35 feet adjoining a street (Amended 11/03/93)",
+              "section_id": "m2_dev_standards",
+              "section_sha256": "d7dcf4aefacc6ef6d5a1a6fe035dd282ed7478d0b7bb84166d0989224d0492db",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 35
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3 (M-2 development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: cross_reference",
+                "qualifier: adjacency"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "cross_reference",
+                  "text": "None. See Section 4.23 for buffer req. adjoining resident"
+                },
+                {
+                  "kind": "adjacency",
+                  "text": ".23 for buffer req. adjoining residential."
+                }
+              ],
+              "quote": "D. Minimum Rear Yard - None. See Section 4.23 for buffer req. adjoining residential.",
+              "section_id": "m2_dev_standards",
+              "section_sha256": "d7dcf4aefacc6ef6d5a1a6fe035dd282ed7478d0b7bb84166d0989224d0492db",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 0
+            },
+            "side_setback_ft": {
+              "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.3 (M-2 development standards)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: cross_reference",
+                "qualifier: adjacency"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "cross_reference",
+                  "text": "None. See Section 4.23 for buffer req. adjoining resident"
+                },
+                {
+                  "kind": "adjacency",
+                  "text": ".23 for buffer req. adjoining residential."
+                }
+              ],
+              "quote": "C. Minimum Side Yard - None. See Section 4.23 for buffer req. adjoining residential.",
+              "section_id": "m2_dev_standards",
+              "section_sha256": "d7dcf4aefacc6ef6d5a1a6fe035dd282ed7478d0b7bb84166d0989224d0492db",
+              "source_class": "official",
+              "source_key": "fc_art10_pdf",
+              "source_sha256": "9b28e035e76474a48578967574422c5ff2dd318f83cd728374dd1d6d72ad3ec4",
+              "value": 0
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.fultoncountyga.gov/-/media/Departments/Public-Works/Planning-Zoning-and-Permits/Zoning-Resolution/art10.pdf Sec. 10.3.2 ('Any industrial use not specifically designated as prohibited or allowed with approval of a Use Permit shall be permitted'; warehousing/distributing named) (Amended 04/04/07)",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        }
+      },
+      "governing_jurisdiction": "south_fulton",
+      "name": "Fulton Industrial District (FID) - which code applies",
+      "status": "draft",
+      "unincorporated_parcel_ids": [],
+      "unlisted_districts": "unknown",
+      "verified_by": null,
+      "verified_on": null
+    },
+    "south_fulton": {
+      "as_of": "candidate from rules_sources.json sources read 2026-11-05",
+      "districts": {
+        "AG-1": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: footnote"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "nimum feet) / Front [^1] / To lot line"
+                }
+              ],
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 60
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 40
+            },
+            "max_lot_coverage_pct": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "the text holds several values for this field",
+                "converted 1 acre(s) to 43,560 sq ft"
+              ],
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 43560
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 35
+            },
+            "min_lot_width_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 100
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 50
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "the text holds several values for this field"
+              ],
+              "quote": "AG-1 | 1 acre with frontage on paved road 3 acres with frontage on unpaved road | 60' | N/A | 25' to interior lot line 40' to street | 50' | 100' | 35' | N/A | 40' | < 2 story; 1.800 sq.ft. on g.f. ≥ 2 story; 2.000 sq,ft. with 1.200 sq.ft. on g.f. | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 25
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts)",
+            "confidence": "low",
+            "extractor": "deterministic",
+            "mirror_only": true,
+            "needs_review": [
+              "blank cell read as not_permitted"
+            ],
+            "quote": "493 | Distribution Center |  |  |  |  |  | A | A | ",
+            "section_id": "table_2_4",
+            "section_sha256": "c65f81d7c44025a699870e6003b6853773db547aa58637ad14854fa84277bbae",
+            "source_class": "mirror",
+            "source_key": "sf_ch2_mirror",
+            "source_sha256": "29fc3b8fba951160b3de7bb737d251b6c9c48c8d76b6b03764f533d899f9c46e",
+            "status": "not_permitted"
+          }
+        },
+        "M-1": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: footnote"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "nimum feet) / Front [^1] / To lot line"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 40
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: whichever"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "whichever",
+                  "text": "100' or 8 stories, whichever is higher"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 100
+            },
+            "max_lot_coverage_pct": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 35
+            },
+            "min_lot_width_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: footnote",
+                "qualifier: cross_reference",
+                "cell spans 2 columns"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and bu"
+                },
+                {
+                  "kind": "cross_reference",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and buffer requ"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 0
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: footnote",
+                "qualifier: cross_reference",
+                "cell spans 2 columns"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and bu"
+                },
+                {
+                  "kind": "cross_reference",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and buffer requ"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 0
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts)",
+            "confidence": "medium",
+            "extractor": "deterministic",
+            "mirror_only": true,
+            "quote": "493 | Distribution Center |  |  |  |  |  | A | A | ",
+            "section_id": "table_2_4",
+            "section_sha256": "c65f81d7c44025a699870e6003b6853773db547aa58637ad14854fa84277bbae",
+            "source_class": "mirror",
+            "source_key": "sf_ch2_mirror",
+            "source_sha256": "29fc3b8fba951160b3de7bb737d251b6c9c48c8d76b6b03764f533d899f9c46e",
+            "status": "permitted_by_right"
+          }
+        },
+        "M-2": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: footnote"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "nimum feet) / Front [^1] / To lot line"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 40
+            },
+            "max_height_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "qualifier: whichever"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "whichever",
+                  "text": "100' or 8 stories, whichever is higher"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 100
+            },
+            "max_lot_coverage_pct": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 35
+            },
+            "min_lot_width_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "medium",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": null
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: footnote",
+                "qualifier: cross_reference",
+                "cell spans 2 columns"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and bu"
+                },
+                {
+                  "kind": "cross_reference",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and buffer requ"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 0
+            },
+            "side_setback_ft": {
+              "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_4 Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+              "confidence": "low",
+              "extractor": "deterministic",
+              "mirror_only": true,
+              "needs_review": [
+                "'None' read as 0",
+                "qualifier: footnote",
+                "qualifier: cross_reference",
+                "cell spans 2 columns"
+              ],
+              "qualifiers": [
+                {
+                  "kind": "footnote",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and bu"
+                },
+                {
+                  "kind": "cross_reference",
+                  "text": "None. [^19] See Sec. 405 for landscape strip and buffer requ"
+                }
+              ],
+              "quote": "M-1 M-2 | N/A | 40' |  | None. [^19] See Sec. 405 for landscape strip and buffer requirements. | N/A | 35' | N/A | 100' or 8 stories, whichever is higher | N/A | N/A | N/A",
+              "section_id": "table_4_1",
+              "section_sha256": "93bf394c4877de1c6432a6170058ea920b7be9b95355600fc7f7a733613fe8c6",
+              "shared_row": [
+                "M-1",
+                "M-2"
+              ],
+              "source_class": "mirror",
+              "source_key": "sf_ch4_mirror",
+              "source_sha256": "662f7f0fad59f9a62af38f783bb9df80162957344ca7befeb459a2c1b9ac9309",
+              "value": 0
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.zoneomics.com/code/south-fulton-GA/chapter_2 Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts)",
+            "confidence": "medium",
+            "extractor": "deterministic",
+            "mirror_only": true,
+            "quote": "493 | Distribution Center |  |  |  |  |  | A | A | ",
+            "section_id": "table_2_4",
+            "section_sha256": "c65f81d7c44025a699870e6003b6853773db547aa58637ad14854fa84277bbae",
+            "source_class": "mirror",
+            "source_key": "sf_ch2_mirror",
+            "source_sha256": "29fc3b8fba951160b3de7bb737d251b6c9c48c8d76b6b03764f533d899f9c46e",
+            "status": "permitted_by_right"
+          }
+        }
+      },
+      "name": "City of South Fulton",
+      "status": "draft",
+      "unlisted_districts": "unknown",
+      "verified_by": null,
+      "verified_on": null
+    },
+    "union_city": {
+      "as_of": "candidate from rules_sources.json sources read 2026-11-05",
+      "districts": {
+        "M-1": {
+          "dimensions": {
+            "front_setback_ft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "3. Front yard setback, as measured from the right-of-way: 50 feet;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 50
+            },
+            "max_height_ft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "7. Height: up to 75 feet;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 75
+            },
+            "max_lot_coverage_pct": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "8. Lot coverage, including structure and parking area: up to 80% of total lot area; and",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 80
+            },
+            "min_lot_area_sqft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "1. Lot area: 30,000 square feet;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 30000
+            },
+            "min_lot_frontage_ft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "2. Lot width and frontage: 150 feet for initial zoning request;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 150
+            },
+            "min_lot_width_ft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "2. Lot width and frontage: 150 feet for initial zoning request;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 150
+            },
+            "rear_setback_ft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "4. Rear yard setback: 20 feet;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 20
+            },
+            "side_setback_ft": {
+              "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13 D (M-1 Light Industrial, Dimensional Requirements)",
+              "confidence": "high",
+              "extractor": "deterministic",
+              "quote": "5. Side yard setback: 20 feet;",
+              "section_id": "m1_dimensional",
+              "section_sha256": "3a5da2277f1a767d7b8a49025cf857d38c6d2ae37835e42fd36e70471011e921",
+              "source_class": "official",
+              "source_key": "uc_zoning_ordinance_pdf",
+              "source_sha256": "7e10eeefa111086a6e4ca38c5d6cc61c48d56fd58b0fcf6a6e28224283398a90",
+              "value": 20
+            }
+          },
+          "warehouse_distribution": {
+            "cite": "https://www.unioncityga.gov/files/assets/city/v/1/community-development/documents/documents-amp-applications/zoningordinance022025.pdf Sec. 6-13.B items 36 'Warehousing & storage', 37 'Wholesale trade', 11 'Electronic shopping & mail order houses' (p. 101-102)",
+            "copied_from": "zoning_rules.json (not re-extracted)",
+            "status": "permitted_by_right"
+          }
+        }
+      },
+      "name": "City of Union City",
+      "status": "draft",
+      "unlisted_districts": "unknown",
+      "verified_by": null,
+      "verified_on": null
+    }
+  },
+  "schema_version": 1,
+  "use": "warehouse_distribution"
+}
