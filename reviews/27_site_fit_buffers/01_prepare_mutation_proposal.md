@@ -136,7 +136,9 @@ cited by the human:
 "neighbour_classes": {
   "residential": ["R-*", "TR", "A", "A-L", "NUP"],
   "agricultural": ["AG-1"],
-  "non_residential": ["M-1", "M-2", "C-1", "C-2"],
+  "industrial": ["M-1", "M-2"],
+  "non_residential": ["C-1", "C-2"],
+  "readings": {"side_rear": "max", "other_district": "literal"},
   "cite": "Sec. 405.01(b)(1); district list Sec. 203 Table 2-1"
 }
 ```
@@ -144,24 +146,45 @@ cited by the human:
 The example values above are ILLUSTRATIVE ONLY, copied from the prose, and not
 checked against the ordinances. Rules the code applies:
 
-- Keys: `residential`, `agricultural`, `non_residential` (lists of district
-  codes as the zoning layers spell them) and `cite` (required, non-empty). A
+- Keys: `residential`, `agricultural`, `non_residential` and, optionally,
+  `industrial` (lists of district codes as the zoning layers spell them;
+  `industrial` is a non-residential class used only by the
+  `"non_industrial"` reading below) and `cite` (required, non-empty). A
   malformed object reads as absent, with the reason in the projection.
+- `readings` (optional): the human's choice where the rule text is
+  ambiguous. Nothing is defaulted in code: unset (or any other value), the
+  buffer it governs is not applied and the projection says "reading not
+  decided in the rules".
+  - `"side_rear"`: `"max"` (the rear value on every abutting side, frontage
+    being unknown) or `"side"` (the side value). Needed only where a
+    district's side and rear values differ (South Fulton, FID).
+  - `"other_district"`: `"literal"` (Fairburn Sec. 80-372 "abut all other
+    zoning districts" = any other district, other industrial districts
+    included) or `"non_industrial"` (other districts the table classifies
+    and does not list under `industrial`). Needed only for Fairburn; it
+    means Fairburn's other-district buffer needs a Fairburn
+    `neighbour_classes` object (lists may be empty) carrying the reading.
+  The reading of the parcel's own rules table is used.
 - Codes are compared after `zoning.normalize` with hyphens ignored (`M-1` =
-  `M1`). An entry ending in `*` is a literal prefix (`R-*` matches `R-3`,
-  never `RM`).
+  `M1`). An entry ending in `*` is a prefix, hyphens ignored too; a prefix
+  ending in a hyphen ends the letters (`R-*` matches `R-3` and `R3`, never
+  `RM` or `RG-3`). Codes that are not districts (`UNKNOWN`, `TBD`, `N/A`)
+  are never classified: the side reads "adjacency unknown".
 - A code in none of the lists is "not classified": no buffer, named. Codes
   that are residential only conditionally (PD, CUP, MIX) are applied only if
   the human lists them.
 - The table of the rules table the neighbour resolves to is used (an FID
-  neighbour resolves to South Fulton's table, through `governing_jurisdiction`).
+  neighbour resolves to South Fulton's table, through
+  `governing_jurisdiction`); for a parcel listed in FID's
+  `unincorporated_parcel_ids`, a county-layer neighbour is also tried under
+  FID's own table (the strictest class wins).
 - Which buffer applies to which class is the allow-list in `adjacency.py`
   (`BUFFER_KEYS`), each entry citing the rule text it reads: South Fulton and
   FID side/rear/improvement setback apply to residential and agricultural
   (Sec. 405.01(b)(1) lists AG-1); Union City's buffer to residential and
   agricultural ("Residential OR Agricultural"); Atlanta's transitional yards to
   residential only ("an R district"); Fairburn's 50 ft to residential and,
-  separately, to any other district.
+  separately, to other districts as `readings.other_district` says.
 - Like every rules edit, between runs only, and `verify_rules_committed`
   refuses an experiment while the file differs from git HEAD.
 
