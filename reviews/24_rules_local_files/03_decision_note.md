@@ -114,4 +114,6 @@ encoding so fixtures can carry em dashes.
   markers, labels and headers are not validated against official text.
 - No OCR for scanned PDFs (SR-10).
 - A label whose value wraps to the next line is not read
-  deterministically (it exits 4 and names the label).
+  deterministically. It is reported as "label found, no separator or value
+  after it on its line"; the run exits 4 only if no value at all is read
+  from that section, otherwise it exits 0, so read the report.

@@ -224,7 +224,7 @@
         "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
         "obtained_on": "<OPERATOR: YYYY-MM-DD>",
         "sha256": "record on first use",
-        "note": "Sec. 80-85 (f)-(g) and Sec. 80-86 (f)-(g). Starting point: the mirror's markers and labels. Official text may punctuate headings differently ('Sec. 80-85. - ...' in a Municode export); re-derive start/end and labels from the file before enabling. A PDF or text copy works with label_value when each label and its value sit on one line, separated by ':', a dash, a dot leader, or a run of two or more spaces or a tab (how pdftotext prints a two-column table). A value that wraps onto the next line is not read: the run reports 'label found, no separator or value after it on its line' and exits 4; use llm_prose or --assisted for that section.",
+        "note": "Sec. 80-85 (f)-(g) and Sec. 80-86 (f)-(g). Starting point: the mirror's markers and labels. Official text may punctuate headings differently ('Sec. 80-85. - ...' in a Municode export); re-derive start/end and labels from the file before enabling. A PDF or text copy works with label_value when each label and its value sit on one line, separated by ':', a dash, a dot leader, or a run of two or more spaces or a tab (how pdftotext prints a two-column table). A value that wraps onto the next line is not read: the run reports 'label found, no separator or value after it on its line' (exit 4 only if no value at all is read from the section, otherwise exit 0); use llm_prose or --assisted for that section.",
         "sections": [
           {
             "id": "m1_standards",
