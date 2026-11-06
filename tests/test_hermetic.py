@@ -68,6 +68,9 @@ _NEVER_COMMIT = (
     # Rules scraper cache and outputs (reviews/23_rules_scraper, RS-17).
     "rules_cache/0123abcd.body",
     "rules_out/zoning_rules.CANDIDATE.json",
+    # Official ordinance files the operator drops in (reviews/24_rules_local_files, LF-09).
+    "rules_inbox/south_fulton_udo.pdf",
+    "rules_inbox/sub/fairburn_ch80.html",
 )
 
 
