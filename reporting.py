@@ -26,6 +26,7 @@ import research
 import zoning  # protected: renders imported zoning for the memo (reviews/21_zoning)
 import site_fit  # protected: building projections (reviews/22_site_fit)
 import hazards  # protected: flood/wetland lines (reviews/26_flood_wetlands)
+import adjacency  # protected: adjacency-buffer footnote (reviews/27_site_fit_buffers)
 from pipeline_common import (
     _REPO_ROOT,
     _SQL_FETCH_SUBMARKET_NAME,
@@ -527,6 +528,18 @@ _PROJECTION_FOOTNOTE_HAZARDS = (
 )
 
 
+
+
+def _projection_footnote() -> str:
+    """The memo footnote: exactly the old text while the adjacency table is
+    not enabled; once it is, the adjacency clause replaces RES_BUFFERS
+    (reviews/27_site_fit_buffers, BUF-24)."""
+    text = _PROJECTION_FOOTNOTE if not hazards.enabled() else _PROJECTION_FOOTNOTE_HAZARDS
+    if adjacency.enabled():
+        text = text.replace(site_fit.RES_BUFFERS, adjacency.FOOTNOTE, 1)
+    return text
+
+
 def _flood_lines(bundle: Mapping[str, Any]) -> tuple[str, str]:
     """program.md's 'Flood zone' and 'Wetlands' snapshot lines. Exactly the
     old text while the hazard table is not enabled (FW-18)."""
@@ -549,7 +562,7 @@ def _projection_summary(p: Any, used: bool) -> str:
     use = "no" if not used else ("yes" if p.setback_from_rules
                                  else "yes, rated N/A (default setback)")
     tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "
-           f"{site_fit.flood_wetlands_text(p)}; adjacency buffers not applied")
+           f"{site_fit.flood_wetlands_text(p)}; {site_fit.adjacency_text(p)}")
     if best is None:
         return f"Projected max building: — ({_projection_reason(p)}; {tag})."
     return f"Projected max building: {_fmt_sf(best.building_sf)} {best.label} ({tag})."
@@ -1181,8 +1194,8 @@ def _render_memo_markdown(
                     projections.get(r.get("parcel_id")), bool(r.get("_bts_projection_used")))
             top_lines.append(line)
         if projections is not None:
-            top_lines += ["", _PROJECTION_FOOTNOTE] if not hazards.enabled() else [
-                "", _PROJECTION_FOOTNOTE_HAZARDS]
+            top_lines += ["", _PROJECTION_FOOTNOTE] if not (
+                hazards.enabled() or adjacency.enabled()) else ["", _projection_footnote()]
         top_md = "\n".join(top_lines)
     else:
         top_md = "_No actionable or qualified parcels in this cycle._"

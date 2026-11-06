@@ -35,6 +35,9 @@ on:
       - 'hazards.py'
       - 'hazards_import.py'
       - 'tests/live_hazards_check.py'
+      - 'adjacency.py'
+      - 'adjacency_import.py'
+      - 'tests/live_adjacency_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -62,6 +65,9 @@ on:
       - 'hazards.py'
       - 'hazards_import.py'
       - 'tests/live_hazards_check.py'
+      - 'adjacency.py'
+      - 'adjacency_import.py'
+      - 'tests/live_adjacency_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -162,3 +168,11 @@ jobs:
       # deduction and the scoring read. No network. Created and dropped.
       - name: Run live hazards check
         run: python tests/live_hazards_check.py
+
+      # reviews/27_site_fit_buffers: the proposed parcel_adjacency DDL (own
+      # database only), the import's per-edge outward bands (SRID 2240),
+      # slivers, misalignment, unknown sides, the site-fit buffers (analytic
+      # areas, envelope distances), staleness, idempotency, the 2x2
+      # hazards/adjacency matrix and the runner audit. No network.
+      - name: Run live adjacency check
+        run: python tests/live_adjacency_check.py

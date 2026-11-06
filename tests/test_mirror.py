@@ -47,6 +47,8 @@ _PIPELINE_MODULES = (
     "rules_scrape.py",
     "hazards.py",
     "hazards_import.py",
+    "adjacency.py",
+    "adjacency_import.py",
     "reporting.py",
     "pipeline_common.py",
     "connector_harness.py",

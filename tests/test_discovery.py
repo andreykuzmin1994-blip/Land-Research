@@ -55,11 +55,14 @@ RULES_SCRAPE_PY_SRC = (REPO_ROOT / "rules_scrape.py").read_text(encoding="utf-8"
 # reviews/26_flood_wetlands: the protected flood/wetland modules join them too.
 HAZARDS_PY_SRC = (REPO_ROOT / "hazards.py").read_text(encoding="utf-8")
 HAZARDS_IMPORT_PY_SRC = (REPO_ROOT / "hazards_import.py").read_text(encoding="utf-8")
+# reviews/27_site_fit_buffers: the protected adjacency modules join them too.
+ADJACENCY_PY_SRC = (REPO_ROOT / "adjacency.py").read_text(encoding="utf-8")
+ADJACENCY_IMPORT_PY_SRC = (REPO_ROOT / "adjacency_import.py").read_text(encoding="utf-8")
 ALL_PIPELINE_PY_SRC = "\n".join(
     (RESEARCH_PY_SRC, COSTAR_INGEST_PY_SRC, REPORTING_PY_SRC,
      RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC, COSTAR_IMPORT_PY_SRC,
      ZONING_PY_SRC, ZONING_IMPORT_PY_SRC, SITE_FIT_PY_SRC, RULES_SCRAPE_PY_SRC,
-     HAZARDS_PY_SRC, HAZARDS_IMPORT_PY_SRC)
+     HAZARDS_PY_SRC, HAZARDS_IMPORT_PY_SRC, ADJACENCY_PY_SRC, ADJACENCY_IMPORT_PY_SRC)
 )
 # Merged module AST spanning every pipeline module, for whole-surface
 # static checks (each file is parsed separately, then bodies spliced,
@@ -71,7 +74,7 @@ ALL_PIPELINE_AST = ast.Module(
                        REPORTING_PY_SRC, RUNNER_PY_SRC, PIPELINE_COMMON_PY_SRC,
                        COSTAR_IMPORT_PY_SRC, ZONING_PY_SRC, ZONING_IMPORT_PY_SRC,
                        SITE_FIT_PY_SRC, RULES_SCRAPE_PY_SRC, HAZARDS_PY_SRC,
-                       HAZARDS_IMPORT_PY_SRC)
+                       HAZARDS_IMPORT_PY_SRC, ADJACENCY_PY_SRC, ADJACENCY_IMPORT_PY_SRC)
         for node in ast.parse(source).body
     ],
     type_ignores=[],

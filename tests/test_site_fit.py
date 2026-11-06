@@ -912,11 +912,15 @@ class BoundaryTests(unittest.TestCase):
                 mods.add((node.module or "").split(".")[0])
         # reviews/26_flood_wetlands (FW-26): "hazards" added deliberately,
         # imported once under the alias _hz (the host ban below still holds).
+        # reviews/27_site_fit_buffers (BUF-22): "adjacency" added deliberately,
+        # imported once under the alias _adj; never adjacency_import.
         allowed = {"__future__", "hashlib", "json", "math", "re", "subprocess", "types",
                    "weakref", "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning",
-                   "hazards"}
+                   "hazards", "adjacency"}
         self.assertEqual(mods - allowed, set())
         self.assertIn("import hazards as _hz\n", self.SRC)
+        self.assertIn("import adjacency as _adj\n", self.SRC)
+        self.assertNotIn("adjacency_import", self.SRC)
 
     def test_requirements_unchanged(self):
         self.assertEqual((REPO_ROOT / "requirements.txt").read_text(encoding="utf-8").split(),

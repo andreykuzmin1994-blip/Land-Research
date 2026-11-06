@@ -409,7 +409,8 @@ class ProtectionTests(unittest.TestCase):
     PIPELINE = ("research.py", "runner.py", "costar_ingest.py", "costar_import.py",
                 "reporting.py", "pipeline_common.py", "zoning.py", "zoning_import.py",
                 "connector_harness.py", "cli.py", "prepare.py", "site_fit.py",
-                "rules_scrape.py", "hazards.py", "hazards_import.py")
+                "rules_scrape.py", "hazards.py", "hazards_import.py", "adjacency.py",
+                "adjacency_import.py")
 
     def test_no_pipeline_module_writes_the_prototypes_file(self):
         writers = {"write_text", "write_bytes", "dump", "replace", "rename", "copy",

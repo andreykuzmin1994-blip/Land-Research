@@ -20,9 +20,12 @@ from typing import Iterable
 # reviews/26_flood_wetlands: hazards_import imports hazards (and zoning);
 # site_fit imports hazards too, but site_fit is reached only through its own
 # allowed names (its scan), so it is not listed here.
+# reviews/27_site_fit_buffers (BUF-12, BUF-22): adjacency_import imports
+# adjacency (and zoning, hazards); research.py may not reach either at all
+# (``absent_module_problems``).
 REEXPORTING_MODULES = frozenset({"reporting", "runner", "cli", "zoning_import", "rules_scrape",
-                                 "hazards_import"})
-PROTECTED_NAMES = REEXPORTING_MODULES | {"site_fit", "zoning", "hazards"}
+                                 "hazards_import", "adjacency_import"})
+PROTECTED_NAMES = REEXPORTING_MODULES | {"site_fit", "zoning", "hazards", "adjacency"}
 REFLECTIVE_NAMES = frozenset({"__import__", "eval", "exec", "compile", "globals", "vars",
                               "locals", "importlib", "attrgetter"})
 REFLECTIVE_ATTRS = frozenset({"__dict__", "__globals__", "__builtins__", "__code__",
@@ -149,4 +152,39 @@ def prepare_write_problems(src: str) -> list[str]:
             problems.append(f"line {at}: global prepare")
     if plain != 1:
         problems.append(f"expected exactly one plain 'import prepare', found {plain}")
+    return problems
+
+
+def absent_module_problems(src: str, modules: Iterable[str],
+                           banned_strings: Iterable[str] = ()) -> list[str]:
+    """Every way ``src`` names a module it must not use AT ALL
+    (reviews/27_site_fit_buffers, BUF-12: research.py and ``adjacency`` /
+    ``adjacency_import`` / the ``parcel_adjacency`` table): an import or
+    from-import of it, a name or attribute spelled like it (``site_fit._adj``
+    included), or a string literal holding a banned text. Empty list = clean."""
+    tree = ast.parse(src)
+    modules = set(modules)
+    aliases = {"_adj"} | modules
+    banned_strings = tuple(banned_strings)
+    problems: list[str] = []
+    for node in ast.walk(tree):
+        at = getattr(node, "lineno", "?")
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name.split(".")[0] in modules or a.asname in aliases:
+                    problems.append(f"line {at}: import {a.name}")
+        elif isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[0] in modules:
+                problems.append(f"line {at}: from {node.module} import ...")
+            for a in node.names:
+                if a.name in aliases or a.asname in aliases:
+                    problems.append(f"line {at}: from-import binds {a.name}")
+        elif isinstance(node, ast.Name) and node.id in aliases:
+            problems.append(f"line {at}: name {node.id}")
+        elif isinstance(node, ast.Attribute) and node.attr in aliases:
+            problems.append(f"line {at}: attribute .{node.attr}")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            for b in banned_strings:
+                if b in node.value:
+                    problems.append(f"line {at}: string names {b}")
     return problems

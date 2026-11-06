@@ -52,6 +52,7 @@ import research
 import zoning
 import site_fit  # protected: building prototypes (reviews/22_site_fit)
 import hazards  # protected: the H4/H6 metric-side audit (reviews/26_flood_wetlands)
+import adjacency  # protected: the adjacency-table audit (reviews/27_site_fit_buffers)
 from pipeline_common import _COSTAR_BASE_DIR, _REPO_ROOT
 
 log = logging.getLogger("research")
@@ -1257,6 +1258,13 @@ def evaluate(
     a parcel_hazards change during the experiment makes it a crash (metric
     0, discarded and purged). While the gate is off nothing runs.
 
+    reviews/27_site_fit_buffers (BUF-12): once ``adjacency.enabled()`` (a
+    human applied the parcel_adjacency DDL), ``_adjacency_audit`` compares a
+    fingerprint of parcel_adjacency taken before the sub-cycles with one
+    taken after them; any change (adjacency_import.py runs between runs
+    only) makes the experiment a crash, so it is discarded and purged.
+    While the gate is off nothing runs.
+
     prepare-mutation (2026-07-07): ``run_tag`` (None -> derived from the
     current git branch) scopes both the scoring cycle and the metric read
     to THIS RUN's rows. ``experiment_id`` (None -> generated) is stamped
@@ -1309,6 +1317,9 @@ def evaluate(
         # sandbox, against the parcels the metric counts. While the gate is
         # off nothing runs (no connection, no SQL): byte-identical.
         hazard_fp_before = _hazard_fingerprint() if hazards.enabled() else None
+        # reviews/27_site_fit_buffers (BUF-12): the same before/after
+        # fingerprint for the adjacency table; nothing runs while it is off.
+        adjacency_fp_before = _adjacency_fingerprint() if adjacency.enabled() else None
 
         if not skip_ingestion:
             sub_summaries["ingestion"] = costar_ingest.run_ingestion_cycle()
@@ -1358,6 +1369,10 @@ def evaluate(
             if hazard_fp_before is not None:
                 sub_summaries["hazard_audit"] = _hazard_audit(
                     conn, run_tag, hazard_fp_before,
+                )
+            if adjacency_fp_before is not None:
+                sub_summaries["adjacency_audit"] = _adjacency_audit(
+                    conn, adjacency_fp_before,
                 )
             metric = prepare.calculate_actionable_pipeline_count(
                 conn, run_tag=run_tag,
@@ -1637,6 +1652,52 @@ def _hazard_audit(conn: Any, run_tag: str | None,
         log.warning("hazard audit: %d counted parcel(s) have stale hazard data "
                     "(geometry changed since the import)", stale)
     return {"counted": len(ids), "blocked": 0, "stale": stale, "absent": absent}
+
+
+# reviews/27_site_fit_buffers (BUF-12): parcel_adjacency is written only by
+# adjacency_import.py between runs (it refuses once a run has its baseline),
+# so it must not change during an experiment.
+_SQL_ADJACENCY_FINGERPRINT = (
+    "SELECT COUNT(*), md5(COALESCE(string_agg(md5(a::text), '' ORDER BY a.adjacency_id), '')) "
+    "FROM parcel_adjacency a"
+)
+
+
+class AdjacencyAuditFailed(RuntimeError):
+    """parcel_adjacency changed, or could not be read, during the experiment.
+    evaluate() reports the experiment as a crash (metric 0), so the loop
+    discards and purges it."""
+
+
+def _adjacency_fingerprint(conn: Any = None) -> tuple[int, str]:
+    """(row count, md5 over every row's text) of parcel_adjacency. Raises
+    AdjacencyAuditFailed when the table cannot be read."""
+    try:
+        if conn is None:
+            with prepare.get_connection() as own:
+                return _adjacency_fingerprint(own)
+        with conn.cursor() as cur:
+            cur.execute(_SQL_ADJACENCY_FINGERPRINT)
+            row = cur.fetchone()
+        return (int(row[0]), str(row[1]))
+    except AdjacencyAuditFailed:
+        raise
+    except Exception as exc:  # noqa: BLE001 - fail closed, by type only
+        raise AdjacencyAuditFailed(
+            f"adjacency audit: parcel_adjacency unreadable ({type(exc).__name__})"
+        ) from None
+
+
+def _adjacency_audit(conn: Any, before: tuple[int, str]) -> dict[str, int]:
+    """Raise AdjacencyAuditFailed when parcel_adjacency differs from its
+    fingerprint before the sub-cycles. Counts only (SR-8)."""
+    after = _adjacency_fingerprint(conn)
+    if after != before:
+        raise AdjacencyAuditFailed(
+            "adjacency audit: parcel_adjacency changed during the experiment "
+            "(adjacency_import.py runs between runs only)"
+        )
+    return {"rows": after[0]}
 
 
 _SQL_INSERT_RESEARCH_LOG_PURGE = (
