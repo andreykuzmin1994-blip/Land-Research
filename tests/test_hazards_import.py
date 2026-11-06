@@ -551,6 +551,27 @@ class RunGuardTests(unittest.TestCase):
         self.assertFalse(any(s == hi._SQL_UPSERT_NFHL for s, _ in conn.executed))
 
 
+class AsOfTests(unittest.TestCase):
+    """FW-20: no row is written without as-of values."""
+
+    def test_write_refused_without_as_of(self):
+        conn = FakeConn(answer_factory())
+        data = hi.SourceData("nwi", [hi.Feature("1", {}, "{}", 4326)], as_of="  ",
+                             covered=["fulton-a"])
+        with self.assertRaises(hi.SourceError):
+            hi.write_source(conn, data)
+        self.assertEqual(conn.executed, [])
+
+    def test_returned_row_without_as_of_aborts(self):
+        def answer(sql, p):
+            if sql == hi._SQL_UPSERT_NWI:
+                return [("fulton-a", "")]
+            return []
+        data = hi.SourceData("nwi", [], as_of="dbf 2026-05-01", covered=["fulton-a"])
+        with self.assertRaises(hi.SourceError):
+            hi.write_source(FakeConn(answer), data)
+
+
 class OutputTests(unittest.TestCase):
     """FW-21: counts only on the console, never ids, owners or attributes."""
 
