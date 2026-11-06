@@ -26,6 +26,12 @@ Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop r
 - The metric is **run-scoped** (`prepare-mutation`): `parcel_scores` rows carry `run_tag` + `experiment_id`, the metric counts only the active run's rows, and the runner purges a discarded experiment's rows so the data ratchet mirrors the git ratchet. Pre-mutation metric values are not comparable to post-mutation values; the next run starts fresh.
 - The review process is **tiered** (`STANDING_RISKS.md`): tests+CI for low-risk changes, one independent fresh-context reviewer for ordinary logic, the full three-agent workflow for metric/contract-touching work.
 
+2026-11-06: flood (H4) and wetlands (H6) are built (`hazards.py`,
+`make hazards-import`, `reviews/26_flood_wetlands/`) but **inert**: they
+need a new table that only a human adds to `prepare.py` (the proposal is
+`reviews/26_flood_wetlands/01_prepare_mutation_proposal.md`). Until then H4/H6
+stay data_gap passes and every score is unchanged. See "Flood and wetlands".
+
 For live repo state, run `make status` (setup checks + last TSV rows) — prose snapshots of state in documents go stale; the command does not.
 
 ## Quick Start (Operator)
@@ -240,6 +246,40 @@ setback on every edge and the fitted building, to open in SiteFit
 (Studies > Open file…) and refine by hand. Keep the SiteFit tool file itself out of the repo
 (`SiteFit.html` is gitignored).
 
+## Flood and wetlands (H4/H6, operator, between runs)
+
+`hazards.py` and `hazards_import.py` (`reviews/26_flood_wetlands/`)
+implement program.md's H4 ("not in FEMA Zone A or AE"; Zone AE with an
+intersecting LOMR passes with a review flag; a floodway always blocks;
+LOMA is never checked) and H6 ("no NWI-mapped wetlands covering more than
+20% of the parcel", from `parameters.json`), mirroring the operator's
+SiteFit categories (floodway, SFHA, 0.2% zone). Shares are computed in
+PostGIS (SRID 2240, feet) over the same parcel geometry as site fit. They
+are enforced at scoring, through gate 4: a block or fail makes the parcel
+`FAIL:deal_killer` with blocker text `H4: ...` / `H6: ...`. Review flags
+use `flagged_items.flag_type = 'review'`, which no gate reads. Site fit
+then deducts the SFHA (floodway included) and NWI wetland area from the
+buildable area; the 0.2% zone, fill and stream/state-waters buffers are
+not considered (stated on every projection).
+
+Nothing of this is active until a human:
+
+1. applies `reviews/26_flood_wetlands/01_prepare_mutation_proposal.md` to
+   `prepare.py` between runs (`make db-check`, which runs `python prepare.py`, then creates `parcel_hazards`);
+2. downloads, in a browser, the FEMA NFHL county package for Fulton
+   (13121C, Map Service Center) and the USFWS NWI Georgia shapefile, and
+   unpacks them as `hazards_inbox/nfhl/S_FLD_HAZ_AR.*` (+ `S_LOMR.*`) and
+   `hazards_inbox/nwi/<name>.shp` (+ .dbf, .prj);
+3. runs `make hazards-import` (counts only on the console; exit 4 names a
+   failed source and keeps its previous data), then starts a new run and
+   baseline: the first populated import is a metric change.
+
+`ARGS='--mode rest'` reads the public NFHL/NWI services instead, through
+the scraper's robots.txt policy; on 2026-11-06 both hosts' robots.txt deny
+those queries, so it fails both sources without a data request. The data
+is screening only: not an official flood determination (the effective FIRM
+governs) and not a jurisdictional wetland delineation.
+
 ## Zoning-code scraper (operator, between runs)
 
 `make rules-scrape` (`rules_scrape.py`, `reviews/23_rules_scraper/`) reads
@@ -368,6 +408,9 @@ land-site-selector/
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings
 ├── rules_scrape.py                    — IMMUTABLE during run: zoning-code scraper, writes a CANDIDATE only (operator, between runs)
+├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (inert until the parcel_hazards proposal is applied)
+├── hazards_import.py                  — IMMUTABLE during run: writes parcel_hazards from hazards_inbox/ files (operator, between runs)
+├── hazards_inbox/                     — gitignored: NFHL county package + NWI state shapefile the operator downloads by hand
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)

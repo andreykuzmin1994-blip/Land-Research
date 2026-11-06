@@ -30,7 +30,11 @@ without asking questions; nobody is watching this session.
    is an operator tool: never run or edit `rules_scrape.py`, never write
    `rules_sources.json`, and never read its candidate or cache
    (`rules_out/`, `rules_cache/`, `reviews/23_rules_scraper/`) from
-   `research.py`. If the best idea needs a new source, pick another idea and put
+   `research.py`. Flood and wetlands (H4/H6) are protected too: never edit
+   `hazards.py` or `hazards_import.py`, never run the import, and take
+   H4/H6 only from `hazards.assess_parcels` behind `hazards.enabled()`
+   (no thresholds, zone lists or hazard SQL in `research.py`).
+   If the best idea needs a new source, pick another idea and put
    `NEEDS-SOURCE: <what and why>` in the commit body. Never scrape CoStar.
 5. Run exactly `python -m unittest discover -s tests`. It must pass. Fix your change if
    it fails (at most 3 attempts). If it still fails, run
