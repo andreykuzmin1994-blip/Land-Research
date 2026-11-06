@@ -77,3 +77,7 @@ sitefit/
 # Never committed; review artifacts go to reviews/23_rules_scraper/ by hand.
 rules_cache/
 rules_out/
+# Rules scraper local files (reviews/24_rules_local_files): official
+# ordinance text the operator obtained by hand (city clerk copies, exports
+# the operator downloaded). Never committed, never copied into reviews/.
+rules_inbox/

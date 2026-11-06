@@ -57,6 +57,21 @@ What it does
    the console. Quotes are untrusted third-party text: sanitised, capped,
    written to files, never printed.
 
+Terms block and local files (reviews/24_rules_local_files)
+---------------------------------------------------------
+Hosts whose terms of use prohibit automated access (``TERMS_BLOCKED_DOMAINS``,
+a code constant: zoneomics.com and every subdomain) are never requested --
+not the page, not robots.txt, not a redirect target -- and their cached
+pages are never replayed or parsed. A registry source on such a host loads
+but is skipped ("terms prohibit automated access"); nothing in the registry,
+the CLI or the environment lifts the block. Official ordinance text the
+operator obtained by hand (a city clerk's copy, or an export the operator
+downloaded as a human) is read from the gitignored ``rules_inbox/`` folder
+(registry ``"kind": "local_file"``): no network, a strict path and file
+check, a provenance sniff that refuses mirror copies, an optional sha256
+pin, and then the same sections, parsers and verifier. Cites name the
+document, never a filesystem path.
+
 ``--watch`` re-fetches, compares per-section text hashes and the newest
 "Ord. No." date with the previous watch, checks GIS lastEditDate plus
 feature counts, and reports changed / unchanged / unknown. It never applies
@@ -81,11 +96,13 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import html as html_lib
 import http.cookiejar
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -170,6 +187,34 @@ _CHALLENGE_BODY = ("challenge-platform", "_cf_chl", "cf_chl_opt", "cf-browser-ve
 # cites in the diff.
 MIRROR_HOSTS = frozenset({"www.zoneomics.com", "zoneomics.com"})
 
+# Hosts whose terms of use prohibit automated access, whatever robots.txt
+# says (operator review, reviews/24_rules_local_files: Zoneomics' Terms of
+# Use bind every visitor and prohibit any robot, spider or other automatic
+# means). The host itself and EVERY subdomain. A code constant on purpose:
+# no registry key, CLI flag, environment variable or parameter lifts it, and
+# it is distinct from the robots/Municode denylist (host_denied), which
+# makes a registry fail to load; a source on a blocked host loads and is
+# skipped (LF-06, LF-07).
+TERMS_BLOCKED_DOMAINS = frozenset({"zoneomics.com"})
+TERMS_BLOCKED = "terms prohibit automated access"
+STATUS_BLOCKED = "blocked_terms"
+
+# Local official files (LF-01..LF-23): the operator drops them into this
+# gitignored folder; the registry names them by a relative path inside it.
+INBOX_DIRNAME = "rules_inbox"
+INBOX_DIR = REPO_ROOT / INBOX_DIRNAME
+LOCAL_TOFU = "record on first use"
+MAX_LOCAL_BYTES = MAX_BODY_BYTES
+MAX_LOCAL_LINE_CHARS = 20_000          # one text line of a local document
+MAX_TABLE_CELLS = 20_000               # cells in one table of a local document
+MAX_PDFTEXT_BYTES = 64 * 1024 * 1024   # pdftotext stdout cap
+PDFTEXT_TIMEOUT_S = 120
+MIN_TEXT_LAYER_CHARS = 40              # fewer non-space characters: a scanned PDF
+NO_TEXT_LAYER = "no text layer (scanned PDF): route to --assisted"
+LOCAL_MISSING = "file not in rules_inbox/"
+OFFICIAL_CITE_PREFIX = "official:"
+READ_STATUSES = ("fetched", "replayed", "read")
+
 EXIT_OK, EXIT_REFUSED, EXIT_DB, EXIT_RUN_OPEN, EXIT_PARTIAL, EXIT_BUDGET = 0, 1, 2, 3, 4, 5
 
 QUOTE_MAX = 300
@@ -243,6 +288,71 @@ def registrable_domain(host: str) -> str:
 def host_denied(host: str | None) -> bool:
     h = (host or "").lower().rstrip(".")
     return not h or h in _DENY_HOSTS or bool(_DENY_HOST_RE.search(h))
+
+
+def norm_host(host: str | None) -> str:
+    """Lower case, no userinfo, no port, no trailing dot, IDNA (ASCII) form,
+    so 'ZONEOMICS.COM.', 'www.zoneomics.com:443' and a full-width spelling
+    all compare equal to 'zoneomics.com' / 'www.zoneomics.com' (LF-03)."""
+    h = str(host or "").strip().lower().rsplit("@", 1)[-1]
+    if h.startswith("["):
+        return h
+    h = h.split(":", 1)[0].rstrip(".")
+    try:
+        h = h.encode("idna").decode("ascii").lower()
+    except (UnicodeError, ValueError):
+        pass
+    return h.rstrip(".")
+
+
+def terms_blocked(host: str | None) -> bool:
+    """Is this host, or a parent domain of it, in TERMS_BLOCKED_DOMAINS?"""
+    h = norm_host(host)
+    return bool(h) and any(h == d or h.endswith("." + d) for d in TERMS_BLOCKED_DOMAINS)
+
+
+def url_terms_blocked(url: Any) -> bool:
+    """terms_blocked for a URL's host; also True when a userinfo or backslash
+    trick puts a blocked domain into the authority, or the URL cannot be
+    parsed (fail closed)."""
+    s = str(url or "")
+    try:
+        p = urlparse(s)
+        host, netloc = p.hostname, p.netloc.lower()
+    except ValueError:
+        return True
+    if terms_blocked(host):
+        return True
+    return ("@" in netloc or "\\" in s.split("?", 1)[0]) and any(
+        d in s.lower() for d in TERMS_BLOCKED_DOMAINS)
+
+
+def mirror_host(host: str | None) -> bool:
+    """A known mirror host (MIRROR_HOSTS, any subdomain) or a terms-blocked one."""
+    h = norm_host(host)
+    return bool(h) and (h in MIRROR_HOSTS or any(h.endswith("." + m) for m in MIRROR_HOSTS)
+                        or terms_blocked(h))
+
+
+def _blocked_names() -> tuple[str, ...]:
+    """Domain strings and their first labels ('zoneomics.com', 'zoneomics')
+    that a local file or a provenance text must not mention (LF-02)."""
+    doms = set(TERMS_BLOCKED_DOMAINS) | {m[4:] if m.startswith("www.") else m
+                                         for m in MIRROR_HOSTS}
+    return tuple(sorted(doms | {d.split(".")[0] for d in doms}))
+
+
+def mentions_blocked_host(text: str) -> bool:
+    """Does the text name a terms-blocked or mirror host, also behind HTML
+    entities, percent-encoding or inserted whitespace?"""
+    t = str(text or "")
+    variants = {t.lower()}
+    try:
+        u = unquote(html_lib.unescape(t)).lower()
+    except (ValueError, TypeError):
+        u = t.lower()
+    variants |= {u, _WS_RE.sub("", u), unicodedata.normalize("NFKC", u)}
+    return any(n in v for v in variants for n in _blocked_names())
 
 
 # ---------------------------------------------------------------------------
@@ -323,14 +433,31 @@ def ensure_dir(d: Path) -> Path:
 # ---------------------------------------------------------------------------
 PARSERS = ("district_grid", "label_value", "use_table", "pdf_grid", "llm_prose")
 FORMATS = ("html", "pdf")
+LOCAL_FORMATS = ("html", "pdf", "txt")
+SOURCE_KINDS = ("url", "local_file")
 SOURCE_CLASSES = ("official", "mirror")
+# Which parser can read which document format (LF-12): table parsers need
+# HTML tables, the aligned-grid parser needs pdftotext -layout lines, and a
+# plain-text copy (no table structure) allows label lines and prose only.
+PARSER_FORMATS: Mapping[str, frozenset[str]] = {
+    "district_grid": frozenset({"html"}), "use_table": frozenset({"html"}),
+    "pdf_grid": frozenset({"pdf"}), "label_value": frozenset({"html", "pdf", "txt"}),
+    "llm_prose": frozenset({"html", "pdf", "txt"})}
 SIGNAL_KINDS = ("cases", "zoning", "overlay")
 _KEY_RE = re.compile(r"^[a-z0-9_]{1,48}$")
 _TOP_KEYS = {"_comment", "schema_version", "hosts", "jurisdictions"}
 _HOST_KEYS = {"terms_url", "terms_reviewed_by", "terms_reviewed_on", "note"}
 _JUR_KEYS = {"name", "priority", "conditions_suffix_regex", "conditions_note", "sources",
              "change_signals", "note"}
-_SRC_KEYS = {"key", "enabled", "url", "format", "source_class", "parser", "sections", "note"}
+_SRC_KEYS = {"key", "kind", "enabled", "url", "format", "source_class", "parser", "sections",
+             "note"}
+# A local_file source has its own key set (LF-23): no url, and every
+# provenance field is required.
+_LOCAL_REQUIRED = {"key", "kind", "enabled", "path", "format", "source_class", "parser",
+                   "sections", "title", "obtained_from", "obtained_on", "sha256"}
+_LOCAL_SRC_KEYS = _LOCAL_REQUIRED | {"note"}
+_PATH_PART_RE = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$")
+_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 _SEC_KEYS = {"id", "label", "start", "end", "pick", "district", "districts", "config"}
 _SIG_KEYS = {"key", "enabled", "url", "kind", "case_id_field", "status_field",
              "approved_statuses", "note"}
@@ -359,6 +486,22 @@ class SourceDef:
     source_class: str
     parser: str
     sections: tuple[SectionDef, ...]
+    kind: str = "url"                   # 'url' | 'local_file'
+    path: str | None = None             # local_file: relative POSIX path inside rules_inbox/
+    title: str | None = None            # local_file: the official document's identity
+    obtained_from: str | None = None    # local_file: channel (City Clerk, export by operator)
+    obtained_on: str | None = None      # local_file: ISO date
+    sha256_pin: str | None = None       # local_file: pinned sha256, None = record on first use
+    blocked_reason: str | None = None   # url on a terms-blocked host: skipped, never fetched
+
+    @property
+    def is_local(self) -> bool:
+        return self.kind == "local_file"
+
+    @property
+    def identity(self) -> str:
+        """The URL of a url source; 'local:<key>' for a local file (never a path)."""
+        return f"local:{self.key}" if self.is_local else self.url
 
 
 @dataclass(frozen=True)
@@ -371,6 +514,7 @@ class SignalDef:
     case_id_field: str | None
     status_field: str | None
     approved_statuses: tuple[str, ...]
+    blocked_reason: str | None = None   # terms-blocked host: never queried
 
 
 @dataclass(frozen=True)
@@ -385,6 +529,7 @@ class Registry:
         return next((s for s in self.sources if s.key == key), None)
 
     def terms_reviewed(self, host: str) -> bool:
+        """A human filled both review fields. Never lifts the terms block."""
         h = self.hosts.get(host) or {}
         return bool(h.get("terms_reviewed_by") and h.get("terms_reviewed_on"))
 
@@ -394,6 +539,61 @@ def _https_url(u: Any) -> bool:
         return False
     p = urlparse(u)
     return bool(p.hostname) and not host_denied(p.hostname) and p.username is None
+
+
+def _placeholder(v: Any) -> bool:
+    return isinstance(v, str) and ("<" in v or ">" in v or "todo" in v.lower())
+
+
+def check_local_path(p: Any) -> bool:
+    """A relative POSIX path made only of [A-Za-z0-9._-] parts: no '..', no
+    '.', no hidden part, no leading '/', no backslash, NUL, drive letter or
+    empty part (LF-01). Lexical; the read re-checks every component."""
+    if not isinstance(p, str) or not p or len(p) > 255 or p.startswith("/"):
+        return False
+    if any(c in p for c in ("\\", "\x00", ":")):
+        return False
+    parts = p.split("/")
+    return len(parts) <= 8 and all(x not in ("", ".", "..") and _PATH_PART_RE.match(x)
+                                   for x in parts)
+
+
+def _check_provenance_text(v: Any, what: str, where: str, path: str, *, enabled: bool,
+                           limit: int) -> None:
+    """obtained_from / title: short text naming a channel or document, never
+    a path, an e-mail, a file: URL, a mirror or terms-blocked host, a
+    denylisted URL or the local file's name (LF-02, LF-08, LF-13, LF-15)."""
+    bad = Refused(f"{where}: {what} invalid")
+    if not isinstance(v, str) or not v.strip() or len(v) > limit or v != sanitize(v) \
+            or "\n" in v:
+        raise bad
+    low = v.strip().lower()
+    if low[0] in "/\\~" or "@" in v or "file:" in low or INBOX_DIRNAME in low \
+            or "\\" in v or mentions_blocked_host(v):
+        raise bad
+    for u in re.findall(r"[a-z][a-z0-9+.-]*://[^\s)]+", v, re.I):
+        h = urlparse(u).hostname
+        if host_denied(h) or url_terms_blocked(u) or mirror_host(h):
+            raise bad
+    base = path.rsplit("/", 1)[-1].lower()
+    if base and base in low:
+        raise bad
+    if enabled and _placeholder(v):
+        raise Refused(f"{where}: {what} is a placeholder; fill it before enabling the source")
+
+
+def _check_obtained_on(v: Any, where: str, *, enabled: bool, today: date) -> None:
+    if not enabled and _placeholder(v):
+        return
+    try:
+        d = date.fromisoformat(v) if isinstance(v, str) and len(v) == 10 else None
+    except ValueError:
+        d = None
+    if d is None:
+        raise Refused(f"{where}: obtained_on must be an ISO date (YYYY-MM-DD)"
+                      + (" or, while disabled, a placeholder" if not enabled else ""))
+    if not date(2000, 1, 1) <= d <= today:
+        raise Refused(f"{where}: obtained_on must lie between 2000-01-01 and today")
 
 
 def _check_config(parser: str, cfg: Any, where: str) -> None:
@@ -442,8 +642,15 @@ def _check_config(parser: str, cfg: Any, where: str) -> None:
             raise bad
 
 
-def validate_registry(data: Any) -> Registry:
-    """Strict validation; Refused names the entry index only (RS-28)."""
+def validate_registry(data: Any, *, today: date | None = None) -> Registry:
+    """Strict validation; Refused names the entry index only (RS-28).
+
+    A url source on a terms-blocked host loads with ``blocked_reason`` set
+    and is skipped at run time, so the other sources keep working (LF-06).
+    A known mirror or terms-blocked host declared 'official' still refuses
+    the whole registry: that is a relabelling of a mirror, an integrity
+    problem, not a terms question (F6)."""
+    today = today or date.today()
     if not isinstance(data, dict) or set(data) - _TOP_KEYS or data.get("schema_version") != 1:
         raise Refused("rules_sources.json: top level malformed")
     hosts = data.get("hosts")
@@ -475,20 +682,55 @@ def validate_registry(data: Any) -> Registry:
                 raise Refused(f"{jw}: conditions_suffix_regex invalid") from None
         for i, s in enumerate(j.get("sources") or []):
             sw = f"{jw} sources[{i}]"
-            if not isinstance(s, dict) or set(s) - _SRC_KEYS:
+            kind = s.get("kind", "url") if isinstance(s, dict) else None
+            if kind not in SOURCE_KINDS:
+                raise Refused(f"{sw}: kind must be 'url' or 'local_file'")
+            if not isinstance(s, dict) or set(s) - (_SRC_KEYS if kind == "url"
+                                                    else _LOCAL_SRC_KEYS):
                 raise Refused(f"{sw} has unknown keys")
             if not (isinstance(s.get("key"), str) and _KEY_RE.match(s["key"])) or s["key"] in keys:
                 raise Refused(f"{sw}: key missing, malformed or duplicate")
-            if not _https_url(s.get("url")):
-                raise Refused(f"{sw}: url must be https and not denylisted")
-            if urlparse(s["url"]).hostname not in hosts:
-                raise Refused(f"{sw}: host not listed under hosts")
-            if s.get("format") not in FORMATS or s.get("source_class") not in SOURCE_CLASSES \
+            if s.get("source_class") not in SOURCE_CLASSES \
                     or s.get("parser") not in PARSERS or not isinstance(s.get("enabled"), bool):
                 raise Refused(f"{sw}: format/source_class/parser/enabled invalid")
-            if (urlparse(s["url"]).hostname or "").lower() in MIRROR_HOSTS \
-                    and s["source_class"] != "mirror":
-                raise Refused(f"{sw}: a known mirror host must have source_class 'mirror'")
+            local: dict[str, Any] = {}
+            blocked = None
+            if kind == "url":
+                if not _https_url(s.get("url")):
+                    raise Refused(f"{sw}: url must be https and not denylisted")
+                if urlparse(s["url"]).hostname not in hosts:
+                    raise Refused(f"{sw}: host not listed under hosts")
+                if s.get("format") not in FORMATS:
+                    raise Refused(f"{sw}: format/source_class/parser/enabled invalid")
+                if mirror_host(urlparse(s["url"]).hostname) and s["source_class"] != "mirror":
+                    raise Refused(f"{sw}: a known mirror host must have source_class 'mirror'")
+                if url_terms_blocked(s["url"]):
+                    blocked = TERMS_BLOCKED
+            else:
+                if _LOCAL_REQUIRED - set(s):
+                    raise Refused(f"{sw}: a local_file source needs "
+                                  + ", ".join(sorted(_LOCAL_REQUIRED - set(s))))
+                if s.get("format") not in LOCAL_FORMATS:
+                    raise Refused(f"{sw}: format must be pdf, html or txt")
+                if s["source_class"] != "official":
+                    raise Refused(f"{sw}: a local_file source must be source_class 'official'")
+                if not check_local_path(s.get("path")):
+                    raise Refused(f"{sw}: path must be a plain relative path inside "
+                                  f"{INBOX_DIRNAME}/")
+                _check_provenance_text(s.get("title"), "title", sw, s["path"],
+                                       enabled=s["enabled"], limit=160)
+                _check_provenance_text(s.get("obtained_from"), "obtained_from", sw, s["path"],
+                                       enabled=s["enabled"], limit=120)
+                _check_obtained_on(s.get("obtained_on"), sw, enabled=s["enabled"], today=today)
+                pin = s.get("sha256")
+                if not (isinstance(pin, str) and (pin == LOCAL_TOFU or _SHA_RE.match(pin))):
+                    raise Refused(f"{sw}: sha256 must be 64 lower-case hex digits or "
+                                  f"'{LOCAL_TOFU}'")
+                local = {"kind": "local_file", "path": s["path"], "title": s["title"],
+                         "obtained_from": s["obtained_from"], "obtained_on": s["obtained_on"],
+                         "sha256_pin": None if pin == LOCAL_TOFU else pin}
+            if s["format"] not in PARSER_FORMATS[s["parser"]]:
+                raise Refused(f"{sw}: parser {s['parser']!r} cannot read format {s['format']!r}")
             secs = s.get("sections")
             if not isinstance(secs, list) or not secs:
                 raise Refused(f"{sw}: sections must be a non-empty list")
@@ -526,8 +768,9 @@ def validate_registry(data: Any) -> Registry:
                                            tuple(ds) if ds else ((d,) if d else ()),
                                            zoning._deep_freeze(sec.get("config", {}))))
             keys.add(s["key"])
-            sources.append(SourceDef(jkey, s["key"], s["enabled"], s["url"], s["format"],
-                                     s["source_class"], s["parser"], tuple(out_secs)))
+            sources.append(SourceDef(jkey, s["key"], s["enabled"], s.get("url", ""), s["format"],
+                                     s["source_class"], s["parser"], tuple(out_secs),
+                                     blocked_reason=blocked, **local))
         for i, g in enumerate(j.get("change_signals") or []):
             gw = f"{jw} change_signals[{i}]"
             if not isinstance(g, dict) or set(g) - _SIG_KEYS:
@@ -550,7 +793,8 @@ def validate_registry(data: Any) -> Registry:
             keys.add(g["key"])
             signals.append(SignalDef(jkey, g["key"], g["enabled"], g["url"].rstrip("/"),
                                      g["kind"], g.get("case_id_field"), g.get("status_field"),
-                                     tuple(appr)))
+                                     tuple(appr),
+                                     TERMS_BLOCKED if url_terms_blocked(g["url"]) else None))
     return Registry("", zoning._deep_freeze(hosts), zoning._deep_freeze(jurs),
                     tuple(sources), tuple(signals))
 
@@ -813,6 +1057,8 @@ class PoliteFetcher:
         host = urlparse(url).hostname or "?"
         if host_denied(host):
             raise Unreachable("denylisted host")
+        if url_terms_blocked(url):          # backstop: nothing reaches a blocked host (LF-03)
+            raise Unreachable(TERMS_BLOCKED)
         if self.total() >= self.max_requests:
             raise BudgetExceeded(f"request budget of {self.max_requests} spent")
         self._space(host)
@@ -864,6 +1110,11 @@ class PoliteFetcher:
             return self._robots[scheme_host]
         url = scheme_host + "/robots.txt"
         rb: Robots
+        if url_terms_blocked(url):
+            # Never request robots.txt of a terms-blocked host (LF-03).
+            rb = Robots(deny_all=True, reason=TERMS_BLOCKED)
+            self._robots[scheme_host] = rb
+            return rb
         try:
             hops = 0
             cur = url
@@ -874,6 +1125,9 @@ class PoliteFetcher:
                     nxt = urljoin(cur, resp.headers["Location"])
                     nh = urlparse(nxt).hostname
                     hops += 1
+                    if url_terms_blocked(nxt):
+                        rb = Robots(deny_all=True, reason=TERMS_BLOCKED)
+                        break
                     if hops > MAX_REDIRECTS or not nxt.startswith("https://") or host_denied(nh) \
                             or registrable_domain(nh or "") != registrable_domain(
                                 urlparse(url).hostname or ""):
@@ -910,6 +1164,8 @@ class PoliteFetcher:
             raise Unreachable("not an https URL")
         if host_denied(p.hostname):
             raise Unreachable("denylisted host")
+        if url_terms_blocked(url):          # before robots_for: no robots.txt request (LF-03)
+            raise Unreachable(TERMS_BLOCKED)
         rb = self.robots_for(f"https://{p.netloc}")
         path = (p.path or "/") + (f"?{p.query}" if p.query else "")
         why = rb.verdict(path)
@@ -930,6 +1186,8 @@ class PoliteFetcher:
                     raise Unreachable(f"HTTP {st} without Location", st)
                 nxt = urljoin(cur, loc)
                 nh = urlparse(nxt).hostname
+                if url_terms_blocked(nxt):
+                    raise Unreachable(TERMS_BLOCKED, st)
                 if host_denied(nh):
                     raise Unreachable("redirect to a denylisted host", st)
                 if not nxt.startswith("https://"):
@@ -997,6 +1255,8 @@ class Cache:
         return p
 
     def store(self, f: Fetched, extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        if url_terms_blocked(f.url) or url_terms_blocked(f.final_url):
+            raise Unreachable(TERMS_BLOCKED)
         ensure_dir(self.root)
         body_p, meta_p = self._paths(f.url)
         meta = {"url": f.url, "final_url": f.final_url, "status": f.status,
@@ -1009,12 +1269,23 @@ class Cache:
         return meta
 
     def load(self, url: str) -> tuple[Fetched, dict[str, Any]]:
-        """Replay; Unreachable when missing or tampered (bytes != recorded sha)."""
+        """Replay; Unreachable when missing or tampered (bytes != recorded sha).
+        A page of a terms-blocked host (by its url, or by the recorded url or
+        final url) is never replayed: its bytes are not even read (LF-04).
+        The agent does not delete such entries; the operator does, by hand."""
+        if url_terms_blocked(url):
+            raise Unreachable(TERMS_BLOCKED)
         body_p, meta_p = self._paths(url)
         try:
             meta = json.loads(meta_p.read_text(encoding="utf-8"))
-            body = body_p.read_bytes()
         except (OSError, ValueError):
+            raise Unreachable("not in the cache") from None
+        if isinstance(meta, dict) and (url_terms_blocked(meta.get("url"))
+                                       or url_terms_blocked(meta.get("final_url"))):
+            raise Unreachable(TERMS_BLOCKED)
+        try:
+            body = body_p.read_bytes()
+        except OSError:
             raise Unreachable("not in the cache") from None
         if not isinstance(meta, dict) or meta.get("url") != url \
                 or meta.get("sha256") != sha256_bytes(body):
@@ -1269,24 +1540,84 @@ def pdftotext_info() -> dict[str, Any] | None:
             "argv": ["pdftotext", "-layout", "-enc", "UTF-8", "<file>", "-"]}
 
 
-def pdf_document(body: bytes, info: Mapping[str, Any] | None) -> Document | None:
-    """pdftotext -layout text, or None when pdftotext is not installed."""
+def _run_capped(argv: Sequence[str], timeout: float, cap: int) -> bytes | None:
+    """stdout of argv, or None on failure, timeout or more than ``cap`` bytes
+    (a decompression bomb is killed, never buffered whole: LF-20)."""
+    try:
+        proc = subprocess.Popen(list(argv), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                stdin=subprocess.DEVNULL)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    buf = bytearray()
+    over = threading.Event()
+
+    def pump() -> None:
+        assert proc.stdout is not None
+        while True:
+            chunk = proc.stdout.read(65536)
+            if not chunk:
+                return
+            buf.extend(chunk)
+            if len(buf) > cap:
+                over.set()
+                return
+
+    t = threading.Thread(target=pump, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive() or over.is_set():
+        proc.kill()
+        proc.wait()
+        t.join(5)
+        return None
+    try:
+        rc = proc.wait(timeout=10)
+    except subprocess.SubprocessError:
+        proc.kill()
+        return None
+    return bytes(buf) if rc == 0 else None
+
+
+def pdf_document(body: bytes, info: Mapping[str, Any] | None, *,
+                 with_pdfinfo: bool = False) -> Document | None:
+    """pdftotext -layout text, or None when pdftotext is not installed, fails,
+    times out or answers more than MAX_PDFTEXT_BYTES. With ``with_pdfinfo``
+    the document metadata (pdfinfo, when installed) goes to meta['pdfinfo']
+    for the provenance sniff of local files."""
     if info is None:
         return None
+    pinfo = ""
     with tempfile.TemporaryDirectory(prefix="rules-pdf-") as d:
         src = Path(d) / "in.pdf"
         src.write_bytes(body)
-        try:
-            out = subprocess.run([info["exe"], "-layout", "-enc", "UTF-8", str(src), "-"],
-                                 capture_output=True, timeout=120, check=False)
-        except (OSError, subprocess.SubprocessError):
-            return None
-    if out.returncode != 0:
+        out = _run_capped([info["exe"], "-layout", "-enc", "UTF-8", str(src), "-"],
+                          PDFTEXT_TIMEOUT_S, MAX_PDFTEXT_BYTES)
+        if out is not None and with_pdfinfo:
+            exe = shutil.which("pdfinfo")
+            got = _run_capped([exe, "-enc", "UTF-8", str(src)], 30, 1_000_000) if exe else None
+            pinfo = got.decode("utf-8", "replace") if got else ""
+    if out is None:
         return None
-    raw = sanitize(out.stdout.decode("utf-8", "replace").replace("\f", "\n"))
+    raw = sanitize(out.decode("utf-8", "replace").replace("\f", "\n"))
     raw_lines = [ln.rstrip() for ln in raw.splitlines() if ln.strip()]
-    return Document([_clean_line(ln) for ln in raw_lines], [], raw_lines,
-                    {"pdftotext": {"version": info["version"], "argv": info["argv"]}})
+    meta: dict[str, Any] = {"pdftotext": {"version": info["version"], "argv": info["argv"]}}
+    if with_pdfinfo:
+        meta["pdfinfo"] = pinfo
+    return Document([_clean_line(ln) for ln in raw_lines], [], raw_lines, meta)
+
+
+def text_document(body: bytes) -> Document:
+    """A plain-text copy: one Document line per source line; the original
+    lines are kept in raw_lines and never joined (LF-10)."""
+    raw = sanitize(body.decode("utf-8-sig", "replace").replace("\r\n", "\n")
+                   .replace("\r", "\n").replace("\f", "\n"))
+    raw_lines = [ln.rstrip() for ln in raw.split("\n") if ln.strip()]
+    return Document([_clean_line(ln) for ln in raw_lines], [], raw_lines)
+
+
+def text_layer_empty(doc: Document) -> bool:
+    """pdftotext produced (almost) no text: a scanned PDF (LF-12)."""
+    return sum(len(_WS_RE.sub("", ln)) for ln in doc.lines) < MIN_TEXT_LAYER_CHARS
 
 
 # ---------------------------------------------------------------------------
@@ -1312,7 +1643,16 @@ class Section:
 
     @property
     def cite(self) -> str:
+        if self.source.is_local:
+            return local_cite(self.source, self.defn.label)
         return f"{self.source.url} {self.defn.label}"
+
+
+def local_cite(src: SourceDef, label: str) -> str:
+    """'official: <document>, <section> (obtained from <channel>, <date>)'.
+    The document's identity, never a filesystem path (LF-08, LF-17)."""
+    return (f"{OFFICIAL_CITE_PREFIX} {src.title}, {label} "
+            f"(obtained from {src.obtained_from}, {src.obtained_on})")
 
 
 def _marker_re(marker: str) -> re.Pattern[str]:
@@ -2415,6 +2755,198 @@ def load_assisted(path: Path, reg: Registry) -> tuple[list[Record], int]:
 
 
 # ---------------------------------------------------------------------------
+# Local official files (reviews/24_rules_local_files, LF-01..LF-23)
+# ---------------------------------------------------------------------------
+class LocalRefused(Exception):
+    """A local file this tool refuses to read. ``reason`` is tool text that
+    names a reason class only: never a path, a file name or file bytes."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+@dataclass(frozen=True)
+class LocalInbox:
+    """The drop folder and the checkout it must sit in (gitignored there)."""
+    path: Path
+    root: Path
+
+
+DEFAULT_INBOX = LocalInbox(INBOX_DIR, REPO_ROOT)
+
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_O_DIRECTORY = getattr(os, "O_DIRECTORY", 0)
+_O_NONBLOCK = getattr(os, "O_NONBLOCK", 0)
+_O_NOCTTY = getattr(os, "O_NOCTTY", 0)
+_DIR_FD_OK = os.open in os.supports_dir_fd and os.stat in os.supports_dir_fd
+
+
+def _read_fd(fd: int, cap: int) -> bytes:
+    """At most cap + 1 bytes from one open descriptor (the bytes hashed)."""
+    buf = bytearray()
+    while len(buf) <= cap:
+        chunk = os.read(fd, min(1 << 20, cap + 1 - len(buf)))
+        if not chunk:
+            break
+        buf.extend(chunk)
+    return bytes(buf)
+
+
+def _git_ignored(root: Path, rel: str) -> bool:
+    """git check-ignore says ``rel`` is ignored (and so not tracked) in root."""
+    git = shutil.which("git")
+    if git is None:
+        return False
+    try:
+        out = subprocess.run([git, "-C", str(root), "check-ignore", "-q", "--", rel],
+                             capture_output=True, timeout=30, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return out.returncode == 0
+
+
+def _protected_ids(root: Path) -> set[tuple[int, int]]:
+    ids = set()
+    for name in (".env", *HUMAN_OWNED, *PROTECTED_MODULES):
+        try:
+            st = os.stat(root / name)
+        except OSError:
+            continue
+        ids.add((st.st_dev, st.st_ino))
+    return ids
+
+
+def read_local(src: SourceDef, inbox: LocalInbox = DEFAULT_INBOX) -> bytes:
+    """The bytes of a registered local file, read through one descriptor.
+
+    The inbox must be a real directory (not a symlink) inside the checkout
+    and gitignored there; every path component is opened with O_NOFOLLOW
+    relative to its parent's descriptor; the file must be a regular file
+    with one link, no larger than MAX_LOCAL_BYTES, not a protected file,
+    and the same inode that was checked (no swap between check and read).
+    The bytes read are exactly the bytes hashed (LF-01). LocalRefused or
+    Unreachable(LOCAL_MISSING) otherwise; nothing is read on a refusal."""
+    if not src.is_local or not check_local_path(src.path):
+        raise LocalRefused("path invalid")
+    if not (_O_NOFOLLOW and _O_DIRECTORY and _DIR_FD_OK):
+        raise LocalRefused("local files need a POSIX system (O_NOFOLLOW, dir_fd)")
+    try:
+        root = Path(inbox.root).resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise LocalRefused("repository root unavailable") from None
+    ip = Path(inbox.path)
+    if ip.is_symlink():
+        raise LocalRefused("the inbox folder is a symlink")
+    if not ip.exists():
+        raise Unreachable(LOCAL_MISSING)
+    try:
+        ir = ip.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise LocalRefused("the inbox folder cannot be resolved") from None
+    if ir == root or not _is_under(ir, root) or ".git" in ir.relative_to(root).parts:
+        raise LocalRefused("the inbox folder is not inside the repository")
+    rel = ir.relative_to(root).as_posix()
+    if not _git_ignored(root, rel + "/") or not _git_ignored(root, f"{rel}/{src.path}"):
+        raise LocalRefused("the inbox folder or the file is not gitignored")
+    parts = str(src.path).split("/")
+    try:
+        dfd = os.open(str(ir), os.O_RDONLY | _O_DIRECTORY | _O_NOFOLLOW)
+    except OSError:
+        raise LocalRefused("the inbox folder cannot be opened without following links") from None
+    try:
+        for part in parts[:-1]:
+            try:
+                nfd = os.open(part, os.O_RDONLY | _O_DIRECTORY | _O_NOFOLLOW, dir_fd=dfd)
+            except FileNotFoundError:
+                raise Unreachable(LOCAL_MISSING) from None
+            except OSError:
+                raise LocalRefused("a folder on the path is a symlink or not a folder") from None
+            os.close(dfd)
+            dfd = nfd
+        try:
+            st = os.stat(parts[-1], dir_fd=dfd, follow_symlinks=False)
+        except FileNotFoundError:
+            raise Unreachable(LOCAL_MISSING) from None
+        except OSError:
+            raise LocalRefused("file cannot be checked") from None
+        if stat.S_ISLNK(st.st_mode):
+            raise LocalRefused("file is a symlink")
+        if not stat.S_ISREG(st.st_mode):
+            raise LocalRefused("not a regular file")
+        if st.st_nlink != 1:
+            raise LocalRefused("file has more than one hard link")
+        if st.st_size > MAX_LOCAL_BYTES:
+            raise LocalRefused("file larger than the size cap")
+        try:
+            ffd = os.open(parts[-1], os.O_RDONLY | _O_NOFOLLOW | _O_NONBLOCK | _O_NOCTTY,
+                          dir_fd=dfd)
+        except OSError:
+            raise LocalRefused("file cannot be opened without following links") from None
+        try:
+            fst = os.fstat(ffd)
+            if not stat.S_ISREG(fst.st_mode) or (fst.st_dev, fst.st_ino) != (
+                    st.st_dev, st.st_ino) or fst.st_nlink != 1:
+                raise LocalRefused("file changed between check and read")
+            if fst.st_size > MAX_LOCAL_BYTES:
+                raise LocalRefused("file larger than the size cap")
+            if (fst.st_dev, fst.st_ino) in _protected_ids(root):
+                raise LocalRefused("file is a protected file")
+            buf = _read_fd(ffd, MAX_LOCAL_BYTES)
+        finally:
+            os.close(ffd)
+    finally:
+        os.close(dfd)
+    if len(buf) > MAX_LOCAL_BYTES:
+        raise LocalRefused("file larger than the size cap")
+    return buf
+
+
+def local_format_problem(fmt: str, data: bytes) -> str | None:
+    """Magic-byte check of a local file against its registered format (LF-20)."""
+    if fmt == "pdf":
+        return None if data.startswith(b"%PDF-") else "format mismatch (not a PDF)"
+    if b"\x00" in data:
+        return "format mismatch (NUL bytes in a text file)"
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return "format mismatch (not UTF-8 text)"
+    head = text[:4096].lstrip().lower()
+    if head.startswith("%pdf-"):
+        return "format mismatch (a PDF registered as text)"
+    if fmt == "txt" and (head.startswith("<!doctype html") or head.startswith("<html")):
+        return "format mismatch (HTML registered as txt)"
+    return None
+
+
+def local_provenance_problem(fmt: str, data: bytes, doc: Document | None) -> str | None:
+    """The file must not reference a terms-blocked or mirror host anywhere:
+    canonical link, og:url, 'saved from url' comment, <base href>, any
+    href/src, the visible text, PDF metadata (pdfinfo) or a printed footer
+    URL. A 'Save As' or 'Print to PDF' copy of a mirror page is refused, so
+    a mirror can never pose as an official document (LF-02)."""
+    texts = [data.decode("latin-1")]
+    if fmt in ("html", "txt"):
+        texts.append(data.decode("utf-8-sig", "replace"))
+    if doc is not None:
+        texts.append(doc.text)
+        texts.append(str(doc.meta.get("pdfinfo") or ""))
+    if any(mentions_blocked_host(t) for t in texts):
+        return "provenance check failed: the file references a terms-blocked or mirror host"
+    return None
+
+
+def local_caps_problem(doc: Document) -> str | None:
+    """Parser caps for an untrusted local document (LF-20)."""
+    if any(len(ln) > MAX_LOCAL_LINE_CHARS for ln in doc.lines):
+        return "document above the parser caps (a text line is too long)"
+    if any(sum(len(r) for r in t.rows) > MAX_TABLE_CELLS for t in doc.tables):
+        return "document above the parser caps (a table has too many cells)"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Scrape pipeline
 # ---------------------------------------------------------------------------
 @dataclass
@@ -2428,6 +2960,7 @@ class SourceOutcome:
     sections: list[Section] = field(default_factory=list)
     raw_changed: bool | None = None
     latest_ord: tuple[date, str] | None = None     # newest 'Ord. No.' date on the whole page
+    provenance_check: str = ""                     # local files: 'passed' or why not checked
 
 
 @dataclass
@@ -2454,16 +2987,48 @@ def _document_for(src: SourceDef, f: Fetched, pdf_info: Mapping[str, Any] | None
     if src.format == "pdf":
         if not f.body.startswith(b"%PDF"):
             return Document([], [])
-        return pdf_document(f.body, pdf_info)
+        return pdf_document(f.body, pdf_info, with_pdfinfo=src.is_local)
+    if src.format == "txt":
+        return text_document(f.body)
     return html_document(f.body)
+
+
+def _read_local_source(src: SourceDef, out: SourceOutcome, inbox: LocalInbox
+                       ) -> Fetched | None:
+    """Read and check one local file; None (with out.status/reason set) when
+    it is refused or missing. Never touches the network or the cache."""
+    try:
+        body = read_local(src, inbox)
+    except Unreachable as exc:
+        out.status, out.reason = "unreachable", exc.reason
+        return None
+    except LocalRefused as exc:
+        out.status, out.reason = "refused", exc.reason
+        return None
+    why = local_format_problem(src.format, body)
+    sha = sha256_bytes(body)
+    if why is None and src.sha256_pin is not None and src.sha256_pin != sha:
+        why = ("file sha256 differs from the pinned value (operator replaced file? "
+               "update the pin)")
+    if why:
+        out.status, out.reason = "refused", why
+        return None
+    ident = f"local:{src.key}:{sha}"
+    ctype = {"pdf": "application/pdf", "html": "text/html", "txt": "text/plain"}[src.format]
+    return Fetched(ident, ident, 200, ctype, body, str(src.obtained_on or ""))
 
 
 def scrape(reg: Registry, *, fetcher: PoliteFetcher | None, cache: Cache, offline: bool,
            llm: LlmExtractor | None = None, assisted: Sequence[Record] = (),
            allow_unreviewed_terms: bool = False, jurisdictions: Iterable[str] | None = None,
-           verify_fn: Callable[..., Verdict] | None = None) -> ScrapeResult:
-    """Fetch (or replay), cut, extract, verify. Never writes outside the cache."""
+           verify_fn: Callable[..., Verdict] | None = None,
+           inbox: LocalInbox | None = None) -> ScrapeResult:
+    """Fetch (or replay, or read a local file), cut, extract, verify. Never
+    writes outside the cache. A source on a terms-blocked host is skipped
+    BEFORE either branch: no request, no cache replay, no parse, no
+    extractor call (LF-04)."""
     vfn = verify_fn or verify
+    inbox = inbox or DEFAULT_INBOX
     res = ScrapeResult(pdftotext=pdftotext_info())
     only = set(jurisdictions) if jurisdictions else None
     sections_by_key: dict[tuple[str, str], Section] = {}
@@ -2475,9 +3040,18 @@ def scrape(reg: Registry, *, fetcher: PoliteFetcher | None, cache: Cache, offlin
         if not src.enabled:
             out.reason = "disabled in rules_sources.json"
             continue
-        host = urlparse(src.url).hostname or ""
+        if src.blocked_reason or (not src.is_local and url_terms_blocked(src.url)):
+            out.status, out.reason = STATUS_BLOCKED, TERMS_BLOCKED
+            continue
+        host = "" if src.is_local else (urlparse(src.url).hostname or "")
         try:
-            if offline:
+            if src.is_local:
+                lf = _read_local_source(src, out, inbox)
+                if lf is None:
+                    continue
+                f, meta = lf, {"sha256": sha256_bytes(lf.body)}
+                out.status = "read"
+            elif offline:
                 f, meta = cache.load(src.url)
                 out.status = "replayed"
             else:
@@ -2503,12 +3077,24 @@ def scrape(reg: Registry, *, fetcher: PoliteFetcher | None, cache: Cache, offlin
             continue
         out.sha256 = str(meta.get("sha256") or sha256_bytes(f.body))
         out.fetched_at = f.fetched_at
-        out.final_url = f.final_url
+        out.final_url = "" if src.is_local else f.final_url
         doc = _document_for(src, f, res.pdftotext)
+        if src.is_local:
+            why = local_provenance_problem(src.format, f.body, doc) or (
+                local_caps_problem(doc) if doc is not None else None)
+            if why:
+                out.status, out.reason = "refused", why
+                continue
+            out.provenance_check = "passed" if doc is not None else \
+                "partial (pdftotext unavailable: metadata and raw bytes only)"
+        no_text = doc is not None and src.format == "pdf" and f.body.startswith(b"%PDF") \
+            and text_layer_empty(doc)
         out.latest_ord = latest_ord(doc.text) if doc is not None else None
         for sd in src.sections:
             if doc is None:
                 sec = Section(src, sd, "pdf text unavailable", source_sha256=out.sha256)
+            elif no_text:
+                sec = Section(src, sd, NO_TEXT_LAYER, source_sha256=out.sha256)
             else:
                 sec = cut_section(doc, src, sd, out.sha256)
             out.sections.append(sec)
@@ -2653,13 +3239,22 @@ def build_candidate(res: ScrapeResult, reg: Registry, current: Mapping[str, Any]
                 del juris[j]["districts"][d]
     sources = {}
     for o in res.outcomes:
+        secs = {s.defn.id: {"status": s.status, "section_sha256": s.sha256} for s in o.sections}
+        if o.source.is_local:
+            # Document identity and provenance, never a path or file name (LF-08).
+            src = o.source
+            sources[src.key] = {
+                "jurisdiction": src.jurisdiction, "kind": "local_file", "title": src.title,
+                "source_class": src.source_class, "status": o.status, "reason": o.reason,
+                "sha256": o.sha256, "sha256_pinned": src.sha256_pin is not None,
+                "obtained_from": src.obtained_from, "obtained_on": src.obtained_on,
+                "provenance_check": o.provenance_check, "sections": secs}
+            continue
         sources[o.source.key] = {"jurisdiction": o.source.jurisdiction, "url": o.source.url,
                                  "source_class": o.source.source_class, "status": o.status,
                                  "reason": o.reason, "sha256": o.sha256,
                                  "fetched_at": o.fetched_at, "final_url": o.final_url,
-                                 "sections": {s.defn.id: {"status": s.status,
-                                                          "section_sha256": s.sha256}
-                                              for s in o.sections}}
+                                 "sections": secs}
     cand = {
         "_candidate": {
             "marker": CANDIDATE_MARKER, "tool_version": TOOL_VERSION,
@@ -2701,13 +3296,20 @@ _URL_RE = re.compile(r"https://[^\s)]+")
 
 
 def cite_class(cite: Any) -> str:
-    hosts = {urlparse(u).hostname for u in _URL_RE.findall(str(cite or ""))}
+    """official | mirror | mixed | unknown. A local document cite
+    ('official: <document>, <section> (obtained from ...)', LF-17) is
+    official unless it also names a mirror or terms-blocked host (mixed)."""
+    text = str(cite or "")
+    hosts = {urlparse(u).hostname for u in _URL_RE.findall(text)}
     hosts.discard(None)
+    mirrors = {h for h in hosts if mirror_host(h)}
+    if text.startswith(OFFICIAL_CITE_PREFIX):
+        return "mixed" if mirrors or mentions_blocked_host(text) else "official"
     if not hosts:
         return "unknown"
-    if hosts <= MIRROR_HOSTS:
+    if mirrors == hosts:
         return "mirror"
-    if hosts & MIRROR_HOSTS:
+    if mirrors:
         return "mixed"
     return "official"
 
@@ -2821,8 +3423,11 @@ def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
                         dr.category = "same (mirror vs mirror: not independent)"
                     elif "official" in classes and cc in ("mirror", "mixed"):
                         dr.category = "same value, new official cite"
-                    elif cc == "official" and sec.source.source_class == "official" and \
-                            sec.source.url not in _URL_RE.findall(str(ccite or "")):
+                    elif cc == "official" and sec.source.source_class == "official" and (
+                            (sec.source.is_local and sec.cite.split(" (obtained from ")[0]
+                             not in str(ccite or ""))
+                            or (not sec.source.is_local
+                                and sec.source.url not in _URL_RE.findall(str(ccite or "")))):
                         dr.category = "same value, new cite"      # another official document (F23)
                     else:
                         dr.category = "same"
@@ -2841,8 +3446,14 @@ def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
             o_st = {outcome_of[s.source.key].status for s in relevant}
             if "unreachable" in o_st and len(o_st) == 1:
                 cat = "source unreachable"
+            elif o_st == {"refused"}:
+                cat = "source refused (local file)"
+            elif STATUS_BLOCKED in o_st and o_st <= {STATUS_BLOCKED, "disabled"}:
+                cat = "source blocked (terms)"
             elif o_st == {"disabled"}:
                 cat = "source disabled"
+            elif NO_TEXT_LAYER in sts and len(sts) == 1:
+                cat = "no text layer (scanned PDF)"
             elif "not found in source" in sts and len(sts) == 1:
                 cat = "not found in source"
             elif "pdf text unavailable" in sts:
@@ -2973,6 +3584,9 @@ def compare_signal(prev: Any, now: Any) -> str:
 def gis_signal(fetcher: PoliteFetcher, sig: SignalDef) -> dict[str, Any]:
     """lastEditDate + feature count + max object id of one layer (ids only)."""
     out: dict[str, Any] = {"last_edit": None, "count": None, "max_oid": None, "reason": ""}
+    if sig.blocked_reason or url_terms_blocked(sig.url):
+        out["reason"], out["skipped"] = TERMS_BLOCKED, True
+        return out
     try:
         meta = json.loads(fetcher.fetch(sig.url + "?" + urlencode({"f": "json"})).body)
         ei = meta.get("editingInfo") if isinstance(meta, dict) else None
@@ -3015,10 +3629,19 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
                              "gis": json.loads(json.dumps(prev_g))}
     rows: list[dict[str, Any]] = []
     for o in res.outcomes:
+        if o.status == STATUS_BLOCKED:
+            # Never fetched, never compared, never 'unchanged': skipped, and
+            # the previous baseline (if any) is kept as it was (LF-05).
+            for sd in o.source.sections:
+                rows.append({"kind": "section", "key": f"{o.source.key}/{sd.id}",
+                             "result": "skipped", "detail": TERMS_BLOCKED})
+            rows.append({"kind": "raw bytes (low weight)", "key": o.source.key,
+                         "result": "skipped", "detail": TERMS_BLOCKED})
+            continue
         p = prev.get(o.source.key, {})
         p = p if isinstance(p, Mapping) else {}
         p_secs = p.get("sections") if isinstance(p.get("sections"), Mapping) else {}
-        reachable = o.status in ("fetched", "replayed")
+        reachable = o.status in READ_STATUSES
         lo = o.latest_ord if reachable else None
         st = {"raw_sha256": o.sha256 if reachable else p.get("raw_sha256"),
               "sections": dict(p_secs),
@@ -3045,10 +3668,11 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
                 detail = "still not found in source"
             rows.append({"kind": "section", "key": f"{o.source.key}/{sd.id}", "result": result,
                          "detail": detail})
-        rows.append({"kind": "raw bytes (low weight)", "key": o.source.key,
-                     "result": compare_signal(p.get("raw_sha256"),
-                                              o.sha256 if reachable else None),
-                     "detail": o.reason})
+        raw_res = compare_signal(p.get("raw_sha256"), o.sha256 if reachable else None)
+        rows.append({"kind": "raw bytes (low weight)" if not o.source.is_local
+                     else "local file sha256", "key": o.source.key, "result": raw_res,
+                     "detail": "changed (operator replaced file)"
+                     if o.source.is_local and raw_res == "changed" else o.reason})
         age = (today - lo[0]).days if lo else None
         cur_asof = (((current or {}).get("jurisdictions") or {}).get(o.source.jurisdiction)
                     or {}).get("as_of")
@@ -3062,6 +3686,11 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
                                 if lo else (o.reason or "no Ord. No. date found"))})
         state["sources"][o.source.key] = st
     for key, g in sorted(gis.items()):
+        if g.get("skipped"):
+            for kind in ("gis lastEditDate", "gis count/max id"):
+                rows.append({"kind": kind, "key": key, "result": "skipped",
+                             "detail": g.get("reason") or TERMS_BLOCKED})
+            continue
         pg = prev_g.get(key)
         pg = pg if isinstance(pg, list) and len(pg) == 3 else None
         ok = not g.get("reason")
@@ -3219,6 +3848,9 @@ def compute_flags(conn: Any, reg: Registry, fetcher: PoliteFetcher | None,
         if sig.kind != "cases" or not sig.enabled or sig.jurisdiction not in by_j \
                 or (only is not None and sig.jurisdiction not in only):
             continue
+        if sig.blocked_reason or url_terms_blocked(sig.url):
+            fr.layer_failures.append(f"{sig.key}: skipped ({TERMS_BLOCKED})")
+            continue
         if loop_running or fetcher is None:
             fr.layer_failures.append(f"{sig.key}: not queried (experiment loop lock present)"
                                      if loop_running else f"{sig.key}: no fetcher")
@@ -3332,7 +3964,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         cache: Cache | None = None, llm_runner: Callable[..., Any] | None = None,
         connect: Callable[[], Any] | None = None, today: date | None = None,
         registry_path: Path = REGISTRY_PATH, log_path: Path = EXPERIMENT_LOG,
-        loop_lock: Path | None = None) -> int:
+        loop_lock: Path | None = None, inbox: LocalInbox | None = None) -> int:
     today = today or date.today()
     try:
         reg = load_registry(registry_path)
@@ -3400,14 +4032,16 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         res = scrape(reg, fetcher=None if args.offline else fetcher, cache=cache,
                      offline=args.offline, llm=llm, assisted=assisted,
                      allow_unreviewed_terms=args.allow_unreviewed_terms,
-                     jurisdictions=args.jurisdiction or None)
+                     jurisdictions=args.jurisdiction or None, inbox=inbox)
         res.assisted_rejected = a_rej
         gis: dict[str, dict[str, Any]] = {}
         if args.watch:
             for sig in reg.signals:
                 if not sig.enabled or (args.jurisdiction and sig.jurisdiction not in args.jurisdiction):
                     continue
-                if loop_on:
+                if sig.blocked_reason or url_terms_blocked(sig.url):
+                    gis[sig.key] = {"reason": TERMS_BLOCKED, "skipped": True}
+                elif loop_on:
                     gis[sig.key] = {"reason": "not queried: experiment loop lock present"}
                 elif args.offline or fetcher is None:
                     gis[sig.key] = {"reason": "not queried: offline"}
@@ -3491,20 +4125,32 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
     if fetcher is not None and not args.offline:
         print("requests: " + ", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items())))
     print(f"wrote candidate and report under {out_path.parent.name}/ (never zoning_rules.json)")
-    failed = [o for o in res.outcomes if o.status == "unreachable"]
+    failed = [o for o in res.outcomes if o.status in ("unreachable", "refused")]
     missing = [f"{o.source.key}/{sec.defn.id}" for o in res.outcomes
-               if o.status in ("fetched", "replayed") for sec in o.sections
+               if o.status in READ_STATUSES for sec in o.sections
                if sec.status == "not found in source"]
+    scanned = [f"{o.source.key}/{sec.defn.id}" for o in res.outcomes
+               if o.status in READ_STATUSES for sec in o.sections
+               if sec.status == NO_TEXT_LAYER]
+    blocked = [o.source.key for o in res.outcomes if o.status == STATUS_BLOCKED]
+    if blocked:
+        # One line, never an exit 4: the block is policy, not a failure (LF-05).
+        print(f"{len(blocked)} enabled source(s) skipped ({TERMS_BLOCKED}): "
+              f"{', '.join(blocked)}. Disable them in rules_sources.json.")
     if lost:
         print(f"{len(lost)} section(s) lost since the previous watch (markers no longer found): "
               f"{', '.join(lost)}.")
     if failed:
-        print(f"{len(failed)} enabled source(s) unreachable: "
+        print(f"{len(failed)} enabled source(s) unreachable or refused: "
               f"{', '.join(o.source.key for o in failed)}. Exit 4.")
         return EXIT_PARTIAL
-    if missing:
-        print(f"{len(missing)} enabled section(s) not found in a reachable source: "
-              f"{', '.join(missing)}. Exit 4.")
+    if missing or scanned:
+        if missing:
+            print(f"{len(missing)} enabled section(s) not found in a reachable source: "
+                  f"{', '.join(missing)}. Exit 4.")
+        if scanned:
+            print(f"{len(scanned)} section(s) in a PDF without a text layer ({NO_TEXT_LAYER}): "
+                  f"{', '.join(scanned)}. Exit 4.")
         return EXIT_PARTIAL
     return EXIT_OK
 

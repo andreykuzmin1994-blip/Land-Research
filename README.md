@@ -293,6 +293,28 @@ console and parcel ids only in `rules_out/conditions_flags.json` (with
 tool writes only under `rules_out/`, `rules_cache/` and
 `reviews/23_rules_scraper/`.
 
+**Terms block and local official files** (`reviews/24_rules_local_files/`).
+Zoneomics' terms of use prohibit automated access, so `zoneomics.com` and
+every subdomain are blocked in the code (`TERMS_BLOCKED_DOMAINS`): never
+requested (not even robots.txt or a redirect target), never replayed from
+`rules_cache/`, never parsed. A registry source there is skipped with
+"terms prohibit automated access" (no exit 4); nothing in the registry or
+on the command line lifts the block. Official ordinance text you obtained
+yourself (a city clerk's copy, or a Municode export you downloaded as a
+human) goes into the gitignored `rules_inbox/` folder and is registered as
+`"kind": "local_file"` (relative `path`, `format` pdf/html/txt,
+`source_class` official, `title`, `obtained_from`, `obtained_on`, `sha256`
+pinned or `"record on first use"`). The tool reads it with no network,
+refuses symlinks, hard links, non-regular or oversized files and any file
+that references a mirror host (a "Save As" of a mirror page), and cites the
+document (`official: <title>, <section> (obtained from ..., <date>)`),
+never a file path. A changed file is reported "changed (operator replaced
+file)" by `make rules-watch`; a pinned sha256 that no longer matches is
+refused (exit 4). Scanned PDFs without a text layer are reported "no text
+layer (scanned PDF): route to --assisted". Before `--llm` on an export,
+check the export's terms. The registry edits to make are in
+`reviews/24_rules_local_files/rules_sources_patch.json`.
+
 The fetcher never contacts Municode (hard-coded denylist, also for
 redirects), honours robots.txt for its own token and for AI-agent tokens,
 sends one fixed User-Agent, waits 1 s between requests to a host (longer
@@ -329,6 +351,7 @@ land-site-selector/
 ├── zoning_rules.json                  — Human-owned zoning facts per jurisdiction/district (agent never writes)
 ├── building_prototypes.json           — Human-owned building prototypes from the operator's SiteFit tool (agent never writes)
 ├── rules_sources.json                 — Human-owned source registry of the zoning-code scraper (agent never writes)
+├── rules_inbox/                       — gitignored: official ordinance files the operator obtained by hand (local_file sources)
 ├── connector_registry.json            — Harness-only config overlay (test bboxes, expected extents)
 ├── prepare.py                         — IMMUTABLE: metric calculation, DDL, frozen parameters
 ├── research.py                        — Agent sandbox — the ONLY file the agent modifies in a run
