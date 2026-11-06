@@ -351,6 +351,16 @@ hazards-import:  ## Write parcel_hazards (FEMA NFHL flood zones, USFWS NWI wetla
 	@python hazards_import.py $(ARGS)
 
 # ---------------------------------------------------------------------
+# Adjacency import (reviews/27_site_fit_buffers) -- between runs only.
+# Refuses until a human applies the parcel_adjacency proposal to prepare.py.
+# Exit codes: 0 imported, 1 refused, 2 database, 3 run has its baseline,
+# 4 a zoning source failed (named; its territory reads as adjacency unknown).
+# ---------------------------------------------------------------------
+.PHONY: adjacency-import
+adjacency-import:  ## Write parcel_adjacency (which boundary parts face which neighbour zoning) from the zoning layers in sources.json, robots.txt permitting. Between runs, before make baseline (refuses after it).
+	@python adjacency_import.py $(ARGS)
+
+# ---------------------------------------------------------------------
 # Higher-level recipes
 # ---------------------------------------------------------------------
 .PHONY: resume
