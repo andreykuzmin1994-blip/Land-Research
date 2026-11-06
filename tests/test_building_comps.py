@@ -894,8 +894,11 @@ class HeaderTests(unittest.TestCase):
                 if base_names[f] not in BUILDING_HEADER:
                     continue
                 with self.subTest(alias=alias):
-                    (kept,) = ci.convert_building([[f"  {h.upper()} " for h in header],
-                                                   building_row()], today=TODAY).rows
+                    shouted = [f"  {h.upper()} " for h in header]
+                    cols = ci._columns(ci._folded_header([shouted], [ci._BUILDING_MARKERS])[0],
+                                       ci.BUILDING_COLUMNS)
+                    self.assertEqual(cols[f], header.index(alias))
+                    (kept,) = ci.convert_building([shouted, building_row()], today=TODAY).rows
                     self.assertEqual(kept["price_psf"], 100.0)
 
     def test_bc12_every_lease_alias_is_read(self):
@@ -906,8 +909,11 @@ class HeaderTests(unittest.TestCase):
             for alias in aliases:
                 header = [alias if h == base_names[f] else h for h in LEASE_HEADER]
                 with self.subTest(alias=alias):
-                    res = ci.convert_lease([[h.lower() for h in header], lease_row()],
-                                           today=TODAY)
+                    lower = [h.lower() for h in header]
+                    cols = ci._columns(ci._folded_header([lower], [ci._LEASE_MARKERS])[0],
+                                       ci.LEASE_COLUMNS)
+                    self.assertEqual(cols[f], header.index(alias))
+                    res = ci.convert_lease([lower, lease_row()], today=TODAY)
                     self.assertEqual(len(res.rows), 1, res.dropped)
 
     def test_bc12_no_substring_matching(self):
