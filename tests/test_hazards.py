@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import re
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import tests  # noqa: F401  (suite guards)
@@ -51,6 +52,49 @@ class GateTests(unittest.TestCase):
             self.assertTrue(hazards.enabled())
             self.assertIn("lacks", hazards.schema_problem())
         self.assertFalse(hazards.enabled())
+
+    def test_runtime_assignment_to_prepare_cannot_switch_the_gate_on(self):
+        # Review finding 2: the probe's in-process monkeypatch.
+        ddl = "parcel_" + "hazards " + " ".join(hazards.COLUMNS)
+        with mock.patch.object(prepare, hazards.GATE_CONSTANT, ddl, create=True):
+            self.assertFalse(hazards.enabled())
+            self.assertEqual(hazards.schema_problem(), "no hazard table in prepare.py")
+
+    def test_runtime_assignment_cannot_switch_an_enabled_gate_off(self):
+        with enabled():
+            for v in ("x", None, ""):
+                with mock.patch.object(prepare, hazards.GATE_CONSTANT, v):
+                    self.assertTrue(hazards.enabled(), v)
+                    self.assertIsNone(hazards.schema_problem(), v)
+            with mock.patch.object(prepare, hazards.GATE_CONSTANT, "x"):
+                delattr(prepare, hazards.GATE_CONSTANT)
+                self.assertTrue(hazards.enabled())
+                setattr(prepare, hazards.GATE_CONSTANT, "x")
+
+    def test_gate_reads_prepare_source_text(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "prepare.py"
+            f.write_text("X = 1\n", encoding="utf-8")
+            self.assertIsNone(hazards.ddl_from_prepare_source(f))
+            f.write_text("_DDL_PARCEL_HAZARDS = " + repr(hazards.PROPOSED_DDL) + "\n",
+                         encoding="utf-8")
+            self.assertEqual(hazards.ddl_from_prepare_source(f), hazards.PROPOSED_DDL)
+            half = len(hazards.PROPOSED_DDL) // 2
+            f.write_text("_DDL_PARCEL_HAZARDS = (" + repr(hazards.PROPOSED_DDL[:half]) + " + "
+                         + repr(hazards.PROPOSED_DDL[half:]) + ")\n", encoding="utf-8")
+            self.assertEqual(hazards.ddl_from_prepare_source(f), hazards.PROPOSED_DDL)
+            f.write_text("def f():\n    _DDL_PARCEL_HAZARDS = 'parcel_hazards'\n",
+                         encoding="utf-8")
+            self.assertIsNone(hazards.ddl_from_prepare_source(f))
+            f.write_text("_DDL_PARCEL_HAZARDS = make()\n", encoding="utf-8")
+            self.assertIsNone(hazards.ddl_from_prepare_source(f))
+            f.write_text("def (:\n", encoding="utf-8")
+            self.assertIsNone(hazards.ddl_from_prepare_source(f))
+        self.assertIsNone(hazards.ddl_from_prepare_source(Path("/nonexistent/prepare.py")))
+        # The shipped prepare.py carries no constant.
+        self.assertIsNone(hazards.ddl_from_prepare_source())
+        self.assertIsNone(hazards._SOURCE_DDL)
 
     def test_schema_mismatch_is_a_gap_without_sql(self):
         class Boom:
@@ -143,16 +187,52 @@ class FloodDecisionTests(unittest.TestCase):
 
     def test_floodway_always_blocks_even_with_lomr(self):
         a = self.a(sfha_sf=5000, floodway_sf=2000, lomr_status="intersects",
-                   nfhl_zone_sf=zmap(("AE||T", 3000), ("AE|FLOODWAY|T", 2000)))
+                   nfhl_zone_sf=zmap(("AE||T", 3000), ("AE|FLOODWAY|T", 2000)),
+                   nfhl_zone_lomr_sf=zmap(("AE||T", 3000), ("AE|FLOODWAY|T", 2000)))
         self.assertEqual(a.h4, hazards.BLOCK)
         self.assertIn("regulatory floodway", a.blocker)
         self.assertNotIn("zone AE on parcel (flood", a.blocker)
 
     def test_ae_with_lomr_is_a_review_pass(self):
-        a = self.a(sfha_sf=5000, lomr_status="intersects", nfhl_zone_sf=zmap(("AE||T", 5000)))
+        a = self.a(sfha_sf=5000, lomr_status="intersects", nfhl_zone_sf=zmap(("AE||T", 5000)),
+                   nfhl_zone_lomr_sf=zmap(("AE||T", 5000)))
         self.assertEqual(a.h4, hazards.REVIEW)
         self.assertIsNone(a.blocker)
         self.assertTrue(any("LOMR" in r and "LOMA not checked" in r for r in a.reviews))
+
+    def test_lomr_on_parcel_but_off_the_ae_area_still_blocks(self):
+        # Review findings 3/4: a LOMR in a corner of the lot, away from the
+        # AE strip, says nothing about that AE.
+        for lm in ({}, None, zmap(("X|AREA OF MINIMAL FLOOD HAZARD|F", 10000))):
+            a = self.a(sfha_sf=5000, lomr_status="intersects",
+                       nfhl_zone_sf=zmap(("AE||T", 5000), ("X|AREA OF MINIMAL FLOOD HAZARD|F", 95000)),
+                       nfhl_zone_lomr_sf=lm)
+            self.assertEqual(a.h4, hazards.BLOCK, lm)
+            self.assertTrue(a.blocker.startswith("H4: FEMA SFHA zone AE"), lm)
+
+    def test_lomr_covering_part_of_the_ae_area_blocks_and_says_so(self):
+        a = self.a(sfha_sf=5000, lomr_status="intersects", nfhl_zone_sf=zmap(("AE||T", 5000)),
+                   nfhl_zone_lomr_sf=zmap(("AE||T", 4998.5)))
+        self.assertEqual(a.h4, hazards.BLOCK)
+        self.assertIn("a LOMR covers only part of zone AE", a.blocker)
+        # Under the 1 SF noise floor outside the LOMR: covered.
+        a = self.a(sfha_sf=5000, lomr_status="intersects", nfhl_zone_sf=zmap(("AE||T", 5000)),
+                   nfhl_zone_lomr_sf=zmap(("AE||T", 4999.5)))
+        self.assertEqual(a.h4, hazards.REVIEW)
+
+    def test_lomr_coverage_counts_every_subtype_of_the_zone(self):
+        z = zmap(("AE||T", 3000), ("AE|AREA WITH REDUCED FLOOD RISK DUE TO LEVEE|T", 2000))
+        a = self.a(sfha_sf=5000, lomr_status="intersects", nfhl_zone_sf=z,
+                   nfhl_zone_lomr_sf=zmap(("AE||T", 3000)))
+        self.assertEqual(a.h4, hazards.BLOCK)
+        a = self.a(sfha_sf=5000, lomr_status="intersects", nfhl_zone_sf=z, nfhl_zone_lomr_sf=z)
+        self.assertEqual(a.h4, hazards.REVIEW)
+
+    def test_lomr_map_without_lomr_status_blocks(self):
+        for st in ("none", "not_read", None):
+            a = self.a(sfha_sf=5000, lomr_status=st, nfhl_zone_sf=zmap(("AE||T", 5000)),
+                       nfhl_zone_lomr_sf=zmap(("AE||T", 5000)))
+            self.assertEqual(a.h4, hazards.BLOCK, st)
 
     def test_ae_without_lomr_data_blocks(self):
         for st in ("none", "not_read", None):
@@ -161,10 +241,12 @@ class FloodDecisionTests(unittest.TestCase):
 
     def test_a_is_not_relaxed_by_the_ae_token(self):
         a = self.a(sfha_sf=5000, lomr_status="intersects",
-                   nfhl_zone_sf=zmap(("A||T", 2000), ("AE||T", 3000)))
+                   nfhl_zone_sf=zmap(("A||T", 2000), ("AE||T", 3000)),
+                   nfhl_zone_lomr_sf=zmap(("A||T", 2000), ("AE||T", 3000)))
         self.assertEqual(a.h4, hazards.BLOCK)
         self.assertIn("zone A on parcel", a.blocker)
-        self.assertTrue(any("zone AE on parcel with an intersecting LOMR" in r for r in a.reviews))
+        self.assertTrue(any("zone AE on parcel lies wholly within a LOMR" in r
+                            for r in a.reviews))
 
     def test_other_sfha_zones_are_reviews_not_blocks(self):
         for z in ("AH", "AO", "A99", "AR", "V", "VE"):
@@ -206,7 +288,8 @@ class FloodDecisionTests(unittest.TestCase):
         self.assertEqual(self.a(params(flood_zones_blocked=["A"]), **r).h4, hazards.REVIEW)
         self.assertEqual(self.a(params(flood_zones_blocked=["A", "AE"],
                                        flood_zones_flag_for_review=[]),
-                                lomr_status="intersects", **r).h4, hazards.BLOCK)
+                                lomr_status="intersects",
+                                nfhl_zone_lomr_sf=zmap(("AE||T", 5000)), **r).h4, hazards.BLOCK)
 
     def test_bfe_sentinel_dropped(self):
         self.assertIn("BFE —", self.a(bfe_ft=-9999).flood_line)
@@ -345,8 +428,8 @@ class BoundaryTests(unittest.TestCase):
                 mods |= {a.name.split(".")[0] for a in node.names}
             elif isinstance(node, ast.ImportFrom):
                 mods.add((node.module or "").split(".")[0])
-        self.assertEqual(mods - {"__future__", "json", "dataclasses", "fractions", "typing",
-                                 "prepare"}, set())
+        self.assertEqual(mods - {"__future__", "ast", "json", "dataclasses", "fractions",
+                                 "pathlib", "typing", "prepare"}, set())
 
     def test_no_mercator_no_service_area_fields(self):
         consts = [n.value for n in ast.walk(self.TREE)

@@ -17,6 +17,14 @@ constant and nothing else: it costs no SQL, so while the constant is absent
 every consumer issues exactly the statements it issued before this module
 existed, and H4/H6 keep their stub behaviour (data_gap flag, pass).
 
+The constant is read from prepare.py's SOURCE TEXT on disk, once, when this
+module loads (``_SOURCE_DDL``), never from the in-process ``prepare``
+module object. An assignment or deletion of ``prepare._DDL_PARCEL_HAZARDS``
+at runtime (for example from research.py, the agent sandbox) therefore
+cannot switch the gate on, or off once a human has switched it on
+(review finding 2; ``tests/test_hazards_scoring.StaticResearchTests`` also
+bans any store to ``prepare.<attr>`` in research.py).
+
 Three states per parcel and per source (FW-04)
 ----------------------------------------------
 - ``absent``: no row, or the source never imported for the parcel: pass
@@ -39,10 +47,16 @@ from ``prepare.get_parameters()`` only (SR-3):
 - a regulatory floodway (ZONE_SUBTY containing FLOODWAY) blocks, always,
   and is named separately: it lies inside the SFHA, and no LOMR relaxes it;
 - a ``<ZONE>_with_LOMR`` token relaxes ``<ZONE>`` (outside any floodway) to
-  a review flag when a polygon of the NFHL LOMR layer intersects the parcel
-  by at least the noise floor: this is program.md's "may pass" clause and
-  it RELAXES a block. A LOMA is never detectable from these layers: every
-  text says "LOMA not checked" (FW-09);
+  a review flag only when the LOMR polygons of the NFHL LOMR layer cover
+  that zone's whole area on the parcel: the part of the zone inside the
+  LOMR union is at least the noise floor and the part outside it is below
+  the noise floor (``nfhl_zone_lomr_sf``). A LOMR elsewhere on the lot, or
+  one that covers only part of the zone, relaxes nothing (review findings
+  3 and 4: the effective NFHL already folds LOMRs in, so AE outside a LOMR
+  is plain effective AE). This is program.md's "may pass" clause and it
+  RELAXES a block; the reading is for the human to confirm (00_design.md
+  H4). A LOMA is never detectable from these layers: every text says
+  "LOMA not checked" (FW-09);
 - other SFHA zones (SFHA_TF = 'T' outside the blocked list: AH, AO, A99,
   AR, V, VE), the 1% future-conditions floodplain, levee-reduced areas and
   open water are review flags, never blocks (FW-08);
@@ -69,9 +83,11 @@ Shape_Length and ACRES fields are never requested or read (FW-11).
 
 from __future__ import annotations
 
+import ast
 import json
 from dataclasses import dataclass
 from fractions import Fraction
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 import prepare
@@ -98,6 +114,7 @@ CREATE TABLE IF NOT EXISTS parcel_hazards (
     floodway_pct NUMERIC,
     x500_pct NUMERIC,
     nfhl_zone_sf JSONB,
+    nfhl_zone_lomr_sf JSONB,
     zones TEXT[],
     bfe_ft NUMERIC,
     lomr_status TEXT,
@@ -124,17 +141,55 @@ PROPOSED_INDEXES = (
 COLUMNS = (
     "parcel_id", "nfhl_parcel_geom_md5", "nfhl_parcel_sf", "nfhl_mapped_sf",
     "nfhl_undetermined_sf", "sfha_sf", "floodway_sf", "x500_sf", "sfha_pct", "floodway_pct",
-    "x500_pct", "nfhl_zone_sf", "zones", "bfe_ft", "lomr_status", "nfhl_as_of", "nfhl_source",
+    "x500_pct", "nfhl_zone_sf", "nfhl_zone_lomr_sf", "zones", "bfe_ft", "lomr_status", "nfhl_as_of", "nfhl_source",
     "nfhl_fetched_at", "sfha_geom", "nwi_parcel_geom_md5", "nwi_parcel_sf", "wetland_sf",
     "wetland_pct", "wetland_deep_excavated_sf", "wetland_type_sf", "nwi_as_of", "nwi_source",
     "nwi_fetched_at", "wetland_geom",
 )
 
 
+def _string_value(node: ast.AST) -> str | None:
+    """A string literal, or a ``+`` concatenation of string literals."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        a, b = _string_value(node.left), _string_value(node.right)
+        return a + b if a is not None and b is not None else None
+    return None
+
+
+def ddl_from_prepare_source(path: Any = None) -> str | None:
+    """The module-level string ``_DDL_PARCEL_HAZARDS = "..."`` of prepare.py
+    as written on disk (the last top-level assignment wins), or None. Never
+    raises. Read once at load into ``_SOURCE_DDL``."""
+    try:
+        src = Path(path if path is not None else prepare.__file__).read_text(encoding="utf-8")
+        tree = ast.parse(src)
+    except Exception:  # noqa: BLE001 - load never raises
+        return None
+    found: str | None = None
+    for node in tree.body:
+        targets: list[ast.AST] = []
+        value = None
+        if isinstance(node, ast.Assign):
+            targets, value = list(node.targets), node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets, value = [node.target], node.value
+        if any(isinstance(t, ast.Name) and t.id == GATE_CONSTANT for t in targets):
+            found = _string_value(value) if value is not None else None
+    return found
+
+
+# Frozen at load from prepare.py's source text (review finding 2): runtime
+# assignments to ``prepare._DDL_PARCEL_HAZARDS`` change nothing.
+_SOURCE_DDL: str | None = ddl_from_prepare_source()
+
+
 def enabled() -> bool:
-    """True only once a human has added ``_DDL_PARCEL_HAZARDS`` to prepare.py.
-    No SQL, no file read: the gate costs nothing while it is off (FW-03)."""
-    ddl = getattr(prepare, GATE_CONSTANT, None)
+    """True only once a human has added ``_DDL_PARCEL_HAZARDS`` to prepare.py
+    (its source text, frozen at load). No SQL: the gate costs nothing while
+    it is off (FW-03)."""
+    ddl = _SOURCE_DDL
     return isinstance(ddl, str) and TABLE in ddl
 
 
@@ -142,7 +197,7 @@ def schema_problem() -> str | None:
     """Why prepare.py's DDL cannot be read by this module, or None. A DDL
     that lacks a column this module reads is never queried (every parcel
     is then a data_gap pass, FW-06)."""
-    ddl = getattr(prepare, GATE_CONSTANT, None)
+    ddl = _SOURCE_DDL
     if not isinstance(ddl, str):
         return "no hazard table in prepare.py"
     missing = [c for c in COLUMNS if c not in ddl]
@@ -282,7 +337,8 @@ _SQL_HAZARDS_FOR_PARCELS = (
     "AND status = 'open' AND parcel_id = ANY(%s) AND strpos(description, %s) > 0) "
     "SELECT p.parcel_id, md5(ST_AsBinary(p.geometry)), "
     "h.nfhl_parcel_geom_md5, h.nfhl_parcel_sf, h.nfhl_mapped_sf, h.nfhl_undetermined_sf, "
-    "h.sfha_sf, h.floodway_sf, h.x500_sf, h.nfhl_zone_sf, h.zones, h.bfe_ft, "
+    "h.sfha_sf, h.floodway_sf, h.x500_sf, h.nfhl_zone_sf, h.nfhl_zone_lomr_sf, h.zones, "
+    "h.bfe_ft, "
     "h.lomr_status, h.nfhl_as_of, h.nfhl_fetched_at, "
     "h.nwi_parcel_geom_md5, h.nwi_parcel_sf, h.wetland_sf, h.wetland_deep_excavated_sf, "
     "h.wetland_type_sf, h.nwi_as_of, h.nwi_fetched_at, "
@@ -295,8 +351,8 @@ _SQL_HAZARDS_FOR_PARCELS = (
 )
 ROW_FIELDS = (
     "parcel_id", "geom_md5", "nfhl_md5", "nfhl_parcel_sf", "nfhl_mapped_sf",
-    "nfhl_undetermined_sf", "sfha_sf", "floodway_sf", "x500_sf", "nfhl_zone_sf", "zones",
-    "bfe_ft", "lomr_status", "nfhl_as_of", "nfhl_fetched_at", "nwi_md5", "nwi_parcel_sf",
+    "nfhl_undetermined_sf", "sfha_sf", "floodway_sf", "x500_sf", "nfhl_zone_sf",
+    "nfhl_zone_lomr_sf", "zones", "bfe_ft", "lomr_status", "nfhl_as_of", "nfhl_fetched_at", "nwi_md5", "nwi_parcel_sf",
     "wetland_sf", "wetland_deep_excavated_sf", "wetland_type_sf", "nwi_as_of",
     "nwi_fetched_at", "open_reviews", "multipart",
 )
@@ -399,6 +455,15 @@ def _flood(r: Mapping[str, Any], params: Mapping[str, Any]) -> tuple[str, list, 
     relaxed = _relaxed_zones(hf.get("flood_zones_flag_for_review") or ())
     parcel_sf = r["nfhl_parcel_sf"]
     zmap = _json_map(r["nfhl_zone_sf"])
+    lmap = _json_map(r.get("nfhl_zone_lomr_sf"))
+    zone_all: dict[str, Fraction] = {}
+    zone_in_lomr: dict[str, Fraction] = {}
+    for key, sf in zmap.items():
+        z = norm(str(key).partition("|")[0])
+        zone_all[z] = zone_all.get(z, Fraction(0)) + Fraction(str(sf or 0))
+    for key, sf in lmap.items():
+        z = norm(str(key).partition("|")[0])
+        zone_in_lomr[z] = zone_in_lomr.get(z, Fraction(0)) + Fraction(str(sf or 0))
     by_zone: dict[str, Fraction] = {}
     other_sfha: set[str] = set()
     future = levee = water = False
@@ -424,13 +489,24 @@ def _flood(r: Mapping[str, Any], params: Mapping[str, Any]) -> tuple[str, list, 
         blockers.append("H4: FEMA regulatory floodway on parcel (always blocked; "
                         f"{LOMA_NOT_CHECKED})")
     if present_blocked:
-        hard = [z for z in present_blocked if not (z in relaxed and lomr == "intersects")]
+        def covered(z: str) -> bool:
+            # The LOMR union covers the zone's whole area on the parcel
+            # (review findings 3/4): inside >= floor, outside < floor.
+            inside = zone_in_lomr.get(z, Fraction(0))
+            outside = zone_all.get(z, Fraction(0)) - inside
+            return at_least(inside) and not at_least(outside)
+        hard = [z for z in present_blocked
+                if not (z in relaxed and lomr == "intersects" and covered(z))]
         soft = [z for z in present_blocked if z not in hard]
+        partial = [z for z in hard if z in relaxed and lomr == "intersects"
+                   and at_least(zone_in_lomr.get(z, Fraction(0)))]
         if hard:
+            note = (f"; a LOMR covers only part of zone {'/'.join(partial)} on the parcel"
+                    if partial else "")
             blockers.append(f"H4: FEMA SFHA zone {'/'.join(hard)} on parcel "
-                            f"(flood_zones_blocked; {LOMA_NOT_CHECKED})")
+                            f"(flood_zones_blocked{note}; {LOMA_NOT_CHECKED})")
         if soft:
-            reviews.append(f"H4 flood: zone {'/'.join(soft)} on parcel with an intersecting "
+            reviews.append(f"H4 flood: zone {'/'.join(soft)} on parcel lies wholly within a "
                            "LOMR: passes, flag for review (program.md 'may pass'); "
                            f"{LOMA_NOT_CHECKED}")
     for z in sorted(other_sfha):
@@ -570,14 +646,25 @@ def assess_parcels(conn: Any, parcel_ids: Sequence[str]) -> Mapping[str, Assessm
 # ---------------------------------------------------------------------------
 # Site fit texts (the deduction itself is SQL inside site_fit)
 # ---------------------------------------------------------------------------
-def deduction_text(flood_state: str, wetland_state: str) -> str:
+def deduction_text(flood_state: str, wetland_state: str, sfha_present: bool | None = None,
+                   wetland_present: bool | None = None, nfhl_gap: bool = False) -> str:
     """The FLOOD_WETLANDS constraint of a projection while the table is
-    enabled: what was actually deducted, never more (FW-14)."""
+    enabled: what was actually deducted, never more (FW-14). ``sfha_present``
+    / ``wetland_present`` say whether the fresh row holds a deductible
+    geometry (None = not known: the generic text); ``nfhl_gap`` that part of
+    the parcel has no FEMA determination (review finding 9)."""
     parts = []
     if flood_state == FRESH:
-        parts.append("SFHA incl. floodway deducted (0.2% zone not deducted)")
+        if sfha_present is False:
+            parts.append("no SFHA on parcel, nothing deducted for flood (0.2% zone not "
+                         "deducted)")
+        else:
+            parts.append("SFHA incl. floodway deducted (0.2% zone not deducted)")
+        if nfhl_gap:
+            parts.append("part of the parcel has no FEMA flood determination (not deducted)")
     if wetland_state == FRESH:
-        parts.append("NWI wetlands deducted")
+        parts.append("no NWI wetlands on parcel" if wetland_present is False
+                     else "NWI wetlands deducted")
     missing = [n for n, s in (("flood", flood_state), ("wetlands", wetland_state))
                if s != FRESH]
     if missing:

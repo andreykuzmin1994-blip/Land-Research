@@ -7,6 +7,7 @@ from __future__ import annotations
 import ast
 import io
 import json
+import struct
 import tempfile
 import unittest
 from contextlib import contextmanager, redirect_stdout
@@ -442,11 +443,12 @@ class FakeConn:
         yield self
 
 
-PARCELS = [("fulton-SECRET-PID-1", -84.5, 33.5, -84.501, 33.499, -84.499, 33.501),
-           ("fulton-SECRET-PID-2", -84.6, 33.6, -84.601, 33.599, -84.599, 33.601)]
+PARCELS = [("fulton-SECRET-PID-1", -84.5, 33.5, -84.501, 33.499, -84.499, 33.501, False),
+           ("fulton-SECRET-PID-2", -84.6, 33.6, -84.601, 33.599, -84.599, 33.601, False)]
 
 
-def answer_factory(*, mirror_baseline=False, table=True):
+def answer_factory(*, mirror_baseline=False, table=True, parcels=None, prev=0):
+    parcels = PARCELS if parcels is None else parcels
     def answer(sql, p):
         if sql == zoning_import._SQL_MIRROR_EXISTS:
             return [(mirror_baseline,)]
@@ -457,11 +459,13 @@ def answer_factory(*, mirror_baseline=False, table=True):
         if sql == hi._SQL_TABLE_EXISTS:
             return [(table,)]
         if sql == hi._SQL_LIST_PARCELS:
-            return PARCELS
+            return parcels
+        if sql in (hi._SQL_PREVIOUS_NOT_COVERED_NFHL, hi._SQL_PREVIOUS_NOT_COVERED_NWI):
+            return [(prev,)]
         if sql == hi._SQL_COUNT_PARCELS:
             return [(2,)]
         if sql == hi._SQL_BOXES_IN_SRID:
-            return [(r[0], r[3], r[4], r[5], r[6]) for r in PARCELS]
+            return [(r[0], r[3], r[4], r[5], r[6]) for r in parcels if not r[7]]
         if sql in (hi._SQL_UPSERT_NFHL, hi._SQL_UPSERT_NWI):
             return [(PARCELS[0][0], "13121C 1.1.1.0")]
         return []
@@ -549,6 +553,121 @@ class RunGuardTests(unittest.TestCase):
         self.assertTrue(out.strip().splitlines()[-1].startswith("1 source(s) FAILED: nfhl"))
         self.assertTrue(any(s == hi._SQL_UPSERT_NWI for s, _ in conn.executed))
         self.assertFalse(any(s == hi._SQL_UPSERT_NFHL for s, _ in conn.executed))
+
+
+def _nwi_inbox(inbox: Path, name: str = "GA") -> None:
+    write_shapefile(inbox / "nwi", name, [([cw([(-84.502, 33.498), (-84.49, 33.498),
+                                                (-84.49, 33.51), (-84.502, 33.51)])],
+                                           {"ATTRIBUTE": "PFO1A",
+                                            "WETLAND_TY": "Freshwater Forested/Shrub Wetland"})],
+                    NWI_DBF_FIELDS)
+
+
+def _nfhl_inbox(inbox: Path) -> None:
+    box = cw([(-84.7, 33.4), (-84.4, 33.4), (-84.4, 33.7), (-84.7, 33.7)])
+    write_shapefile(inbox / "nfhl", "S_FLD_HAZ_AR", [([box], {
+        "FLD_ZONE": "X", "ZONE_SUBTY": "AREA OF MINIMAL FLOOD HAZARD", "SFHA_TF": "F",
+        "STATIC_BFE": -9999, "DFIRM_ID": "13121C", "VERSION_ID": "1.1.1.0"})],
+        NFHL_DBF_FIELDS)
+
+
+class ReviewRoundTests(unittest.TestCase):
+    """Review findings 5, 6, 10 and 12 on the import tool."""
+
+    def test_empty_repaired_geometry_is_counted_apart(self):
+        parcels = PARCELS + [("fulton-SECRET-PID-3", None, None, None, None, None, None, True)]
+        conn = FakeConn(answer_factory(parcels=parcels))
+        with tempfile.TemporaryDirectory() as d, enabled():
+            inbox = Path(d)
+            _nwi_inbox(inbox)
+            _nfhl_inbox(inbox)
+            rc, out = run_tool(conn, mode="files", inbox=inbox, check_open_run=False)
+        self.assertEqual(rc, hi.EXIT_OK, out)
+        self.assertIn("3 Fulton parcels with geometry; 0 outside EPSG:2240's area of use "
+                      "(not imported); 1 with no polygonal area after repair", out)
+        ups = [p for s_, p in conn.executed if s_ == hi._SQL_UPSERT_NFHL]
+        self.assertEqual(sorted(ups[0][0]), sorted(r[0] for r in PARCELS))
+
+    def test_list_sql_uses_the_made_valid_geometry(self):
+        for sql in (hi._SQL_LIST_PARCELS, hi._SQL_BOXES_IN_SRID):
+            self.assertIn("ST_CollectionExtract(ST_MakeValid(geometry), 3)", sql)
+        self.assertNotIn("ST_Centroid(geometry)", hi._SQL_LIST_PARCELS)
+        self.assertIn("ST_IsEmpty(v)", hi._SQL_LIST_PARCELS)
+
+    def test_database_error_after_a_commit_names_the_committed_source(self):
+        base = answer_factory()
+
+        def answer(sql, p):
+            if sql == hi._SQL_UPSERT_NWI:
+                raise RuntimeError("server closed the connection")
+            return base(sql, p)
+        conn = FakeConn(answer)
+        with tempfile.TemporaryDirectory() as d, enabled(), \
+                mock.patch.object(hi, "_connection_unusable", return_value=True):
+            inbox = Path(d)
+            _nwi_inbox(inbox)
+            _nfhl_inbox(inbox)
+            rc, out = run_tool(conn, mode="files", inbox=inbox, check_open_run=False)
+        self.assertEqual(rc, hi.EXIT_DB)
+        self.assertNotIn("hazards not imported", out)
+        last = out.strip().splitlines()[-1]
+        self.assertIn("after source(s) nfhl committed; nwi not written", last)
+        self.assertIn("new run and baseline", last)
+
+    def test_database_error_before_any_commit_says_not_imported(self):
+        base = answer_factory()
+
+        def answer(sql, p):
+            if sql == hi._SQL_UPSERT_NFHL:
+                raise RuntimeError("server closed the connection")
+            return base(sql, p)
+        conn = FakeConn(answer)
+        with tempfile.TemporaryDirectory() as d, enabled(), \
+                mock.patch.object(hi, "_connection_unusable", return_value=True):
+            inbox = Path(d)
+            _nwi_inbox(inbox)
+            _nfhl_inbox(inbox)
+            rc, out = run_tool(conn, mode="files", inbox=inbox, check_open_run=False)
+        self.assertEqual(rc, hi.EXIT_DB)
+        self.assertIn("hazards not imported: database error", out)
+
+    def test_previously_imported_parcels_not_covered_are_counted(self):
+        conn = FakeConn(answer_factory(prev=7))
+        with tempfile.TemporaryDirectory() as d, enabled():
+            inbox = Path(d)
+            _nwi_inbox(inbox)
+            _nfhl_inbox(inbox)
+            rc, out = run_tool(conn, mode="files", inbox=inbox, check_open_run=False)
+        self.assertEqual(rc, hi.EXIT_OK, out)
+        self.assertEqual(out.count("7 previously imported parcels not covered "
+                                   "(previous values kept)"), 2)
+        q = [p for s_, p in conn.executed if s_ == hi._SQL_PREVIOUS_NOT_COVERED_NWI]
+        self.assertEqual(len(q), 1)
+
+    def test_nwi_package_with_several_shapefiles_picks_the_wetlands_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            nd = Path(d) / "nwi"
+            _nwi_inbox(Path(d), "GA_Wetlands")
+            _nwi_inbox(Path(d), "GA_Wetlands_Project_Metadata")
+            _nwi_inbox(Path(d), "GA_Wetlands_Historic_Map_Info")
+            self.assertEqual(hi._single_shp(nd).name, "GA_Wetlands.shp")
+            _nwi_inbox(Path(d), "XX_Wetlands")
+            with self.assertRaises(hi.SourceError):
+                hi._single_shp(nd)
+
+    def test_deleted_dbf_records_are_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            sq = cw([(0, 0), (1, 0), (1, 1), (0, 1)])
+            shp = write_shapefile(Path(d), "w", [
+                ([sq], {"ATTRIBUTE": "PFO1A", "WETLAND_TY": "Riverine"}),
+                ([sq], {"ATTRIBUTE": "PUBHx", "WETLAND_TY": "Lake"})], NWI_DBF_FIELDS)
+            dbf = shp.with_suffix(".dbf")
+            raw = bytearray(dbf.read_bytes())
+            head_len, rec_len = struct.unpack("<HH", raw[8:12])
+            raw[head_len + rec_len] = ord("*")          # second record deleted
+            dbf.write_bytes(bytes(raw))
+            feats, *_ = hi.read_shapefile(shp, hi.NWI_FIELDS, lambda s: [(-1, -1, 2, 2)])
+        self.assertEqual([f.attrs["ATTRIBUTE"] for f in feats], ["PFO1A"])
 
 
 class AsOfTests(unittest.TestCase):

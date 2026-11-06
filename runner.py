@@ -51,6 +51,7 @@ import reporting
 import research
 import zoning
 import site_fit  # protected: building prototypes (reviews/22_site_fit)
+import hazards  # protected: the H4/H6 metric-side audit (reviews/26_flood_wetlands)
 from pipeline_common import _COSTAR_BASE_DIR, _REPO_ROOT
 
 log = logging.getLogger("research")
@@ -1249,6 +1250,13 @@ def evaluate(
     ``site_fit.verify_prototypes_committed`` (building_prototypes.json), then
     ``verify_rules_sources_committed`` (rules_sources.json, reviews/23).
 
+    reviews/26_flood_wetlands (review finding 1): once ``hazards.enabled()``
+    (a human applied the parcel_hazards DDL), ``_hazard_audit`` re-checks
+    H4/H6 outside the sandbox before the metric read: any parcel the metric
+    would count that carries an H4/H6 blocker, an unreadable assessment, or
+    a parcel_hazards change during the experiment makes it a crash (metric
+    0, discarded and purged). While the gate is off nothing runs.
+
     prepare-mutation (2026-07-07): ``run_tag`` (None -> derived from the
     current git branch) scopes both the scoring cycle and the metric read
     to THIS RUN's rows. ``experiment_id`` (None -> generated) is stamped
@@ -1296,6 +1304,12 @@ def evaluate(
     error: str | None = None
 
     try:
+        # reviews/26_flood_wetlands (review finding 1): once a human has
+        # enabled the hazard table, H4/H6 are re-checked here, outside the
+        # sandbox, against the parcels the metric counts. While the gate is
+        # off nothing runs (no connection, no SQL): byte-identical.
+        hazard_fp_before = _hazard_fingerprint() if hazards.enabled() else None
+
         if not skip_ingestion:
             sub_summaries["ingestion"] = costar_ingest.run_ingestion_cycle()
 
@@ -1341,6 +1355,10 @@ def evaluate(
                         "possible purge evasion; inspect the exp commit diff",
                         stamp_violations, experiment_id,
                     )
+            if hazard_fp_before is not None:
+                sub_summaries["hazard_audit"] = _hazard_audit(
+                    conn, run_tag, hazard_fp_before,
+                )
             metric = prepare.calculate_actionable_pipeline_count(
                 conn, run_tag=run_tag,
             )
@@ -1541,6 +1559,85 @@ _SQL_STAMP_AUDIT = (
     "WHERE run_tag = %s AND scored_at >= %s "
     "AND experiment_id IS DISTINCT FROM %s"
 )
+
+# reviews/26_flood_wetlands (review finding 1): the H4/H6 metric-side audit.
+# parcel_hazards is written only by hazards_import.py between runs (it
+# refuses once a run has its baseline), so it must not change during an
+# experiment: a fingerprint before the sub-cycles and after them must agree.
+_SQL_HAZARD_FINGERPRINT = (
+    "SELECT COUNT(*), md5(COALESCE(string_agg(md5(h::text), '' ORDER BY h.parcel_id), '')) "
+    "FROM parcel_hazards h"
+)
+
+
+class HazardAuditFailed(RuntimeError):
+    """The experiment counted a parcel that fails H4/H6, or the hazard data
+    changed or could not be read during it. evaluate() reports the
+    experiment as a crash (metric 0), so the loop discards and purges it."""
+
+
+def _hazard_fingerprint(conn: Any = None) -> tuple[int, str]:
+    """(row count, md5 over every row's text) of parcel_hazards. Raises
+    HazardAuditFailed when the table cannot be read."""
+    try:
+        if conn is None:
+            with prepare.get_connection() as own:
+                return _hazard_fingerprint(own)
+        with conn.cursor() as cur:
+            cur.execute(_SQL_HAZARD_FINGERPRINT)
+            row = cur.fetchone()
+        return (int(row[0]), str(row[1]))
+    except HazardAuditFailed:
+        raise
+    except Exception as exc:  # noqa: BLE001 - fail closed, by type only
+        raise HazardAuditFailed(
+            f"hazard audit: parcel_hazards unreadable ({type(exc).__name__})"
+        ) from None
+
+
+def _hazard_audit(conn: Any, run_tag: str | None,
+                  before: tuple[int, str]) -> dict[str, int]:
+    """Re-assess, through the protected hazards module, every parcel the
+    metric would count (``prepare._metric_sql_and_params``: the SAME
+    universe, latest row per parcel, PASS + threshold). Raises
+    HazardAuditFailed when any counted parcel carries an H4/H6 blocker, when
+    any assessment is unreadable, or when parcel_hazards changed during the
+    experiment. Counts only in the message (SR-8)."""
+    if _hazard_fingerprint(conn) != before:
+        raise HazardAuditFailed(
+            "hazard audit: parcel_hazards changed during the experiment "
+            "(hazards_import.py runs between runs only)"
+        )
+    sql, params = prepare._metric_sql_and_params("parcel_id", run_tag)
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        ids = sorted({str(r[0]) for r in cur.fetchall()})
+    assessed = hazards.assess_parcels(conn, ids)
+    unreadable = sum(1 for a in assessed.values()
+                     if hazards.UNREADABLE in (a.flood_state, a.wetland_state))
+    if unreadable:
+        raise HazardAuditFailed(
+            f"hazard audit: {unreadable} counted parcel(s) unreadable in parcel_hazards"
+        )
+    blocked = sum(1 for a in assessed.values() if a.blocker)
+    stale = sum(1 for a in assessed.values()
+                if hazards.STALE in (a.flood_state, a.wetland_state))
+    absent = sum(1 for a in assessed.values()
+                 if hazards.ABSENT in (a.flood_state, a.wetland_state))
+    if blocked:
+        log.error(
+            "HAZARD AUDIT: %d of %d parcels counted by the metric carry an H4/H6 "
+            "blocker; the sandbox bypassed gate 4 — inspect the exp commit diff",
+            blocked, len(ids),
+        )
+        raise HazardAuditFailed(
+            f"hazard audit: {blocked} counted parcel(s) carry an H4/H6 blocker"
+        )
+    if stale:
+        log.warning("hazard audit: %d counted parcel(s) have stale hazard data "
+                    "(geometry changed since the import)", stale)
+    return {"counted": len(ids), "blocked": 0, "stale": stale, "absent": absent}
+
 
 _SQL_INSERT_RESEARCH_LOG_PURGE = (
     "INSERT INTO research_log (cycle_id, action_type, market, notes) "

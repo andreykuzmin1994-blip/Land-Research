@@ -50,8 +50,16 @@ There is no hazard table. The stage proposes one (`parcel_hazards`, keyed by
 fit; exact DDL in `01_prepare_mutation_proposal.md` and
 `hazards.PROPOSED_DDL`, compared by a test) and gates every consumer on a
 static, human-owned signal that costs no SQL: `hazards.enabled()` is true
-only when `prepare` has the constant `_DDL_PARCEL_HAZARDS` naming the
-table. Only a human can add it. While it is absent:
+only when prepare.py's source text assigns the module-level string
+`_DDL_PARCEL_HAZARDS` naming the table. The text is parsed from disk once,
+when `hazards` loads (`hazards._SOURCE_DDL`); the in-process `prepare`
+attribute is never consulted, so an assignment or deletion of
+`prepare._DDL_PARCEL_HAZARDS` at runtime (from research.py, say) can neither
+switch the gate on nor, once a human has switched it on, off (review
+finding 2). `tests/static_guards.prepare_write_problems` also fails the
+suite if research.py stores to, deletes, aliases or `setattr`s any
+`prepare.<attr>`, and research.py may not name the gate constant. Only a
+human can add it. While it is absent:
 
 - no consumer issues a hazard statement; discovery still writes the two
   stub flags; every `parcel_scores` field, flag text and statement is
@@ -103,19 +111,38 @@ collapse spaces, upper):
   human can decide, between runs, whether to add a parameters.json key
   (for example `flood_sfha_min_pct_of_parcel`) through the prepare-mutation
   protocol. That is an option for the human, not part of this stage.
-- **LOMR / LOMA** (FW-09): `"AE_with_LOMR"` is not an NFHL value. It is
-  read as "`<ZONE>_with_LOMR` relaxes `<ZONE>`": if AE (outside any
-  floodway) is present AND a polygon of the NFHL LOMR layer (located by its
-  name "LOMRs", never a hard-coded id; `S_LOMR` in the county package)
-  intersects the parcel by at least 1 SF, the AE block becomes a review
-  flag and the parcel passes. This is program.md's "may pass, flag for
-  review" clause and it RELAXES a block. LOMRs are already folded into the
-  effective NFHL polygons; the LOMR layer only shows where one exists. A
-  LOMA is never in layer 28 and never detectable here: every H4 text says
-  "LOMA not checked". Without LOMR data (`lomr_status` not_read), AE
-  blocks.
+- **LOMR / LOMA** (FW-09, review findings 3, 4 and 11; a metric-relevant
+  decision): `"AE_with_LOMR"` is not an NFHL value. It is read as
+  "`<ZONE>_with_LOMR` relaxes `<ZONE>`", and only where the LOMR is about
+  that zone: the AE block (outside any floodway) becomes a review flag and
+  the parcel passes ONLY when the union of the NFHL LOMR polygons (layer
+  located by its name "LOMRs", never a hard-coded id; `S_LOMR` in the
+  county package) covers the parcel's whole AE area: the AE inside the LOMR
+  union is at least 1 SF and the AE outside it is under 1 SF (the noise
+  floor), summed over every AE subtype. The import stores, per zone key,
+  the part of that zone on the parcel inside the LOMR union
+  (`nfhl_zone_lomr_sf`, unioned before `ST_Area`). A LOMR elsewhere on the
+  lot (a corner of the parcel away from the AE strip) relaxes nothing: the
+  effective NFHL already folds LOMRs in, so AE outside a LOMR is plain
+  effective AE and says nothing about the LOMR. A LOMR covering only part
+  of the AE blocks too, and the blocker says "a LOMR covers only part of
+  zone AE on the parcel". The first version relaxed AE whenever any LOMR
+  polygon touched the parcel; review found that too lenient and it was
+  narrowed. **For the human to confirm**: this is still program.md's "may
+  pass, flag for review" clause and it still RELAXES a block where a LOMR
+  covers all the AE. Even that AE is effective AE in layer 28 (the LOMR
+  revised it and it stayed AE), so the strictest reading, "AE always
+  blocks; a LOMR only adds a review flag", is also defensible. To get it,
+  remove `"AE_with_LOMR"` from `flood_zones_flag_for_review` (parameters.json,
+  between runs, prepare-mutation protocol). The code needs no change: an
+  empty list relaxes nothing. A LOMA is never in layer 28 and never
+  detectable here: every H4 text says "LOMA not checked". Without LOMR data
+  (`lomr_status` not_read) AE blocks.
 - **Review flags, never blocks**: other SFHA zones (SFHA_TF = 'T' outside
-  the blocked list: AH, AO, A99, AR, V, VE: not invented as blocked), the 1%
+  the blocked list: AH, AO, A99, AR, V, VE: not invented as blocked; an
+  open question for the human in `03_decision_note.md`, since program.md
+  calls H4 the "100-year floodplain" and these are 1% annual-chance zones
+  too), the 1%
   future-conditions floodplain (metro Atlanta FIRMs carry it and local
   ordinances regulate it), levee-reduced areas, open water.
 - **Data gap**: no NFHL polygon on the parcel, or any part of it in Zone D
@@ -222,7 +249,10 @@ style of reviews/24_rules_local_files: the operator downloads, in a
 browser, the NFHL county package for Fulton (13121C) from the FEMA Map
 Service Center and the NWI Georgia shapefile from the USFWS download page,
 and unpacks them into the gitignored `hazards_inbox/`
-(`nfhl/S_FLD_HAZ_AR.*`, optional `nfhl/S_LOMR.*`, `nwi/<one>.shp`). They are
+(`nfhl/S_FLD_HAZ_AR.*`, optional `nfhl/S_LOMR.*`, `nwi/<one>.shp`; when
+the state package unpacks several shapefiles, the single `*_Wetlands.shp`
+is read and any other ambiguity fails the source). dBASE records flagged
+deleted (`*`) are skipped. They are
 read with a pure standard-library .shp/.dbf/.prj reader (no shp2pgsql or
 ogr2ogr: SR-10 needs no decision): polygon records only, record bboxes
 pre-filtered against the parcel envelopes in the file's own SRID, outer
@@ -263,7 +293,14 @@ panel-seam or LOMR polygons count once; shares are ratios over that same
 parcel area. The service's Shape_Area, Shape_Length and ACRES are never
 requested or read (NWI's are Web Mercator, about 1.4x too large at 33.6 N,
 and unclipped). Parcels outside EPSG:2240's area of use or outside Fulton
-are not imported (absent -> data_gap). Features are sorted by id before
+are not imported (absent -> data_gap). The area-of-use test takes the
+centroid, and the REST/file pre-filter the envelope, of the SAME made-valid
+polygonal geometry (review finding 5: the raw centroid of a self-
+intersecting bowtie can fall more than 5 degrees from the parcel); a parcel
+whose repaired geometry is empty is counted apart ("no polygonal area
+after repair"), never as outside the area of use. On the 1,075 corridor
+parcels (57 invalid, "Hole lies outside shell") neither rule excludes any
+parcel. Features are sorted by id before
 insertion, so server order never changes a row; stored areas are rounded
 to 0.01 SF, percentages to 4 decimals, zone and type maps are JSONB (key
 order canonical) and `zones` is sorted. `parcels.geometry` is the largest
@@ -290,7 +327,47 @@ outcomes, requests, wall time); no owner or address field is requested.
 Exit codes: 0 imported; 1 refused (table not enabled or not in the
 database, bad arguments); 2 database; 3 a run has its baseline (TSV or
 experiment_log_mirror, read-only, zoning_import's guard); 4 a source failed
-(named on the last line).
+(named on the last line). Exit 2 can follow a partial commit (a source
+committed, then the connection died): the last line then names the
+source(s) committed and the one(s) not written, never "not imported"
+(review finding 6). Each source line also counts the parcels imported
+before that the current input no longer covers; their previous values are
+kept and still read as fresh while their geometry is unchanged, so a
+shrunken inbox file is visible (review finding 12).
+
+## Metric-side enforcement (review finding 1)
+
+Gate 4 lives in research.py, the agent sandbox, like H1-H3. An experiment
+that drops the hazard argument, sets `hazard = None` or forges assessments
+would turn every H4/H6 `FAIL:deal_killer` back into PASS and the ratchet
+would keep the higher metric. So once `hazards.enabled()`, the protected
+`runner.evaluate` re-checks H4/H6 outside the sandbox, before the metric
+read (`runner._hazard_audit`):
+
+- it lists the parcels the metric would count with
+  `prepare._metric_sql_and_params("parcel_id", run_tag)`, the same
+  latest-row CTE and PASS + threshold filter (no reimplementation), and
+  re-assesses them through `hazards.assess_parcels`;
+- any counted parcel with an H4/H6 blocker, any unreadable assessment, or
+  any change to `parcel_hazards` between a fingerprint taken before the
+  sub-cycles and one taken after them (count plus md5 of every row's text;
+  the import refuses during a run, so the table must not change) raises
+  `HazardAuditFailed`; evaluate reports a crash (metric 0) and the loop
+  discards and purges the experiment, as for any crash;
+- counts only in the error and the log; stale parcels in the counted set
+  are counted in the log (a warning) and in
+  `sub_summaries["hazard_audit"]`.
+
+While the gate is off it issues no statement and opens no connection
+(`tests/test_hazards_runner.DisabledTests`). Residual, accepted with
+SR-16: sandbox code runs in the runner's interpreter, so a deliberately
+adversarial edit could still rebind `hazards.assess_parcels` or the runner's
+functions in-process (static guards ban the reflective routes), and a
+discovery edit that perturbs parcel geometry makes rows stale (a data_gap
+pass, counted in the audit's log line). Both are visible in the `exp:`
+diff. A stricter, sandbox-proof option for the human is in
+`01_prepare_mutation_proposal.md`: put the H4/H6 exclusion into prepare.py's
+metric SQL.
 
 ## Terms and disclaimers (FW-20)
 

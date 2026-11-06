@@ -9,8 +9,10 @@
 ## What to add to prepare.py
 
 Two constants, with exactly these names (the code gates on the first one:
-`hazards.enabled()` is true iff `prepare._DDL_PARCEL_HAZARDS` exists and
-names `parcel_hazards`), placed after `_DDL_EXPERIMENT_LOG_MIRROR`, and
+`hazards.enabled()` is true iff prepare.py's source text assigns a string
+`_DDL_PARCEL_HAZARDS` at module level that names `parcel_hazards`; the text
+is read from disk once when `hazards` loads, so a runtime assignment to
+`prepare._DDL_PARCEL_HAZARDS` changes nothing; review finding 2), placed after `_DDL_EXPERIMENT_LOG_MIRROR`, and
 both appended to `_ALL_DDL` after `_DDL_EXPERIMENT_LOG_MIRROR` (the table
 references `parcels`, which `_ALL_DDL` creates first):
 
@@ -29,6 +31,7 @@ CREATE TABLE IF NOT EXISTS parcel_hazards (
     floodway_pct NUMERIC,
     x500_pct NUMERIC,
     nfhl_zone_sf JSONB,
+    nfhl_zone_lomr_sf JSONB,
     zones TEXT[],
     bfe_ft NUMERIC,
     lomr_status TEXT,
@@ -74,6 +77,7 @@ CREATE TABLE IF NOT EXISTS parcel_hazards (
     floodway_pct NUMERIC,
     x500_pct NUMERIC,
     nfhl_zone_sf JSONB,
+    nfhl_zone_lomr_sf JSONB,
     zones TEXT[],
     bfe_ft NUMERIC,
     lomr_status TEXT,
@@ -109,9 +113,10 @@ CREATE INDEX IF NOT EXISTS idx_hazards_wetland_geom ON parcel_hazards USING GIST
 | `sfha_sf`, `floodway_sf`, `x500_sf` | NFHL | union areas, SiteFit's precedence: floodway; SFHA including floodway; 0.2% zone outside the SFHA |
 | `sfha_pct`, `floodway_pct`, `x500_pct` | NFHL | display only (4 decimals); decisions use the SF columns, unrounded ratio |
 | `nfhl_zone_sf` | NFHL | JSONB, `"ZONE\|SUBTYPE\|T/F"` -> union SF (2 decimals) |
+| `nfhl_zone_lomr_sf` | NFHL | JSONB, `"ZONE\|SUBTYPE\|T/F"` -> SF of that zone key on the parcel inside the union of the LOMR polygons (2 decimals; keys with no overlap omitted). `AE_with_LOMR` relaxes AE only when this covers the parcel's whole AE area (review findings 3/4) |
 | `zones` | NFHL | sorted distinct FLD_ZONE values with at least 1 SF on the parcel |
 | `bfe_ft` | NFHL | highest STATIC_BFE of the SFHA polygons, the -9999 sentinel dropped |
-| `lomr_status` | NFHL | `intersects` / `none` / `not_read` (LOMR layer or S_LOMR file not available) |
+| `lomr_status` | NFHL | `intersects` (the union of the LOMR polygons meets the parcel by at least 1 SF) / `none` / `not_read` (LOMR layer or S_LOMR file not available); display and the "no LOMR data" case only, the relaxation reads `nfhl_zone_lomr_sf` |
 | `nfhl_as_of`, `nwi_as_of` | NFHL / NWI | DFIRM_ID + VERSION_ID of the polygons on the parcel (NFHL), the .dbf header date or the layer's last edit date; never empty (FW-20) |
 | `nfhl_source`, `nwi_source` | NFHL / NWI | which route wrote it (county/state file or REST layer) |
 | `nfhl_fetched_at`, `nwi_fetched_at` | NFHL / NWI | when this content was first written (an unchanged re-import does not touch the row) |
@@ -127,8 +132,45 @@ new NWI release) and must not be fetched during a run (SR-11, and both
 hosts' robots.txt). A table written by the between-runs import, keyed by
 parcel and stamped with the parcel geometry it was computed on, is the
 smallest honest store: no column on `parcels` (whose UPSERT would rewrite
-or drop it), no metric SQL change (gate 4 already exists), and no geometry
+or drop it), no metric SQL change needed for the gate itself (gate 4
+already exists; its sandbox-side enforcement is re-checked outside the
+sandbox by the protected `runner.evaluate`, review finding 1, and an
+optional prepare-side exclusion is below), and no geometry
 that the agent sandbox reads.
+
+## Optional: H4/H6 in the metric SQL itself (review finding 1)
+
+Gate 4 is evaluated in research.py, the agent sandbox. The protected
+`runner.evaluate` re-checks every counted parcel through `hazards.py` once
+the table is enabled and crashes (discards) an experiment that counted a
+parcel with an H4/H6 blocker (`00_design.md`, "Metric-side enforcement").
+That check runs in the runner's interpreter, so it carries SR-16's accepted
+in-process risk. A human who wants the metric itself to refuse such parcels
+can, in the SAME prepare-mutation, append this to `_LATEST_SCORE_FILTER`
+(both metric functions compose it, so they stay in agreement), with the
+threshold as one more bound parameter read from `_PARAMETERS` inside
+prepare.py:
+
+```sql
+AND NOT EXISTS (
+    SELECT 1 FROM parcel_hazards h JOIN parcels p ON p.parcel_id = h.parcel_id
+    WHERE h.parcel_id = latest.parcel_id AND (
+        (h.nfhl_fetched_at IS NOT NULL
+         AND h.nfhl_parcel_geom_md5 = md5(ST_AsBinary(p.geometry))
+         AND h.floodway_sf >= 1)
+     OR (h.nwi_fetched_at IS NOT NULL
+         AND h.nwi_parcel_geom_md5 = md5(ST_AsBinary(p.geometry))
+         AND h.nwi_parcel_sf > 0
+         AND 100 * h.wetland_sf > %s * h.nwi_parcel_sf)))
+```
+
+with `%s` = `_PARAMETERS["hard_filters"]["wetlands_max_pct_of_parcel"]`.
+It covers the floodway and H6 exactly as `hazards.py` decides them. It does
+not cover the `flood_zones_blocked` / `AE_with_LOMR` rule, which depends on
+the parameter lists and on `nfhl_zone_lomr_sf` coverage. Adding that in SQL
+is possible but duplicates `hazards._flood`; the runner audit already covers
+it. This is a metric DEFINITION change (new run + baseline), and the
+`validate-phase1.yml` CI exercises it. Not applied in this stage.
 
 ## Migration notes
 

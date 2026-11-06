@@ -106,3 +106,47 @@ def module_reference_problems(src: str, module: str, allowed: Iterable[str],
     if plain_imports != 1:
         problems.append(f"expected exactly one plain 'import {module}', found {plain_imports}")
     return problems
+
+
+def prepare_write_problems(src: str) -> list[str]:
+    """Every way ``src`` could rebind or delete an attribute of ``prepare``
+    (reviews/26_flood_wetlands, review finding 2): any use of the name
+    ``prepare`` other than ``prepare.<attr>`` READ (Load) after exactly one
+    plain ``import prepare``. Stores, deletes, augmented assignments,
+    tuple/for/with targets, ``setattr(prepare, ...)``, aliases and
+    from-imports all fail. Empty list = clean."""
+    tree = ast.parse(src)
+    parent = _parents(tree)
+    problems: list[str] = []
+    plain = 0
+    for node in ast.walk(tree):
+        at = getattr(node, "lineno", "?")
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                if a.name == "prepare":
+                    if a.asname is None:
+                        plain += 1
+                    else:
+                        problems.append(f"line {at}: import prepare as {a.asname}")
+                elif a.asname == "prepare":
+                    problems.append(f"line {at}: import {a.name} as prepare")
+        elif isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[0] == "prepare":
+                problems.append(f"line {at}: from prepare import ...")
+            for a in node.names:
+                if "prepare" in (a.name, a.asname):
+                    problems.append(f"line {at}: from-import binds prepare")
+        elif isinstance(node, ast.Name) and node.id == "prepare":
+            p = parent.get(node)
+            ok = (isinstance(node.ctx, ast.Load) and isinstance(p, ast.Attribute)
+                  and p.value is node and isinstance(p.ctx, ast.Load))
+            if not ok:
+                problems.append(f"line {at}: prepare used other than as a read of "
+                                "prepare.<attr>")
+        elif isinstance(node, ast.arg) and node.arg == "prepare":
+            problems.append(f"line {at}: parameter named prepare")
+        elif isinstance(node, (ast.Global, ast.Nonlocal)) and "prepare" in node.names:
+            problems.append(f"line {at}: global prepare")
+    if plain != 1:
+        problems.append(f"expected exactly one plain 'import prepare', found {plain}")
+    return problems

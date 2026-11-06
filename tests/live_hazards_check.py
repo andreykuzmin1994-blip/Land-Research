@@ -14,8 +14,10 @@ and imports them with ``hazards_import.run(mode="files")``:
   (b) rings and overlaps: a donut's hole is excluded, two overlapping AE
       features count once, a self-intersecting NWI ring does not raise,
       every share is in [0, 100] and SFHA >= floodway;
-  (c) LOMR: an intersecting LOMR turns AE into a review pass; a LOMR in
-      the parcel's bbox but off the parcel leaves the block;
+  (c) LOMR: a LOMR covering the parcel's whole AE area turns AE into a
+      review pass; a LOMR in the parcel's bbox but off the parcel, a LOMR
+      on the parcel but off its AE strip (review finding 4) and a LOMR
+      covering only part of the AE all leave the block;
   (d) noise floor: a 0.5 SF AE sliver passes, a 1.5 SF one blocks;
   (e) unmapped parcel -> gap; 0.2% zone -> pass; wetlands 25% -> fail,
       an excavated pond -> the deepwater/excavated review flag;
@@ -27,7 +29,13 @@ and imports them with ``hazards_import.run(mode="files")``:
   (h) a source failing mid-write leaves that source's columns byte-
       identical (exit 4) while a partial import changes only its parcels;
   (i) scoring: the cycle prefetch equals the per-parcel read, and a parcel
-      with no hazard row scores exactly as with the gate off.
+      with no hazard row scores exactly as with the gate off;
+  (j) an invalid (bowtie) parcel whose raw centroid lies outside EPSG:2240's
+      area of use is still imported (review finding 5);
+  (k) the runner's metric-side audit (review finding 1) on real SQL: a
+      sandbox-forged PASS row for the floodway parcel makes it raise; a
+      PASS row for a clear parcel passes; a parcel_hazards change between
+      the two fingerprints makes it raise.
 
 Refuses unless the DSN points at a local server (tests/live_txn_check.py's
 guard). Exit 0 = pass, 1 = fail, 2 = refused.
@@ -69,7 +77,17 @@ _SQL_ROW = "SELECT * FROM parcel_hazards WHERE parcel_id = %s"
 _SQL_DUMP = ("SELECT parcel_id, nfhl_parcel_geom_md5, nfhl_zone_sf::text, sfha_sf, floodway_sf, "
              "x500_sf, nfhl_as_of, nfhl_fetched_at::text, ST_AsEWKB(sfha_geom), "
              "nwi_parcel_geom_md5, wetland_sf, wetland_type_sf::text, nwi_fetched_at::text, "
-             "ST_AsEWKB(wetland_geom) FROM parcel_hazards ORDER BY parcel_id")
+             "ST_AsEWKB(wetland_geom), nfhl_zone_lomr_sf::text "
+             "FROM parcel_hazards ORDER BY parcel_id")
+_SQL_FORGED_PASS = (
+    "INSERT INTO parcel_scores (parcel_id, composite_score, confidence_score, actionability, "
+    "run_tag, experiment_id) VALUES (%s, 99, 0.9, 'PASS', 'livehz', 'exp-live')"
+)
+_SQL_TOUCH = "UPDATE parcel_hazards SET nwi_as_of = nwi_as_of || ' ' WHERE parcel_id = %s"
+_SQL_CENTROIDS = (
+    "SELECT ST_X(ST_Centroid(geometry)), ST_X(ST_Centroid(ST_CollectionExtract("
+    "ST_MakeValid(geometry), 3))), ST_IsValid(geometry) FROM parcels WHERE parcel_id = %s"
+)
 _SQL_AREA_RATIO = (
     "SELECT ST_Area(ST_Transform(g, 2240)) * 0.09290341161 / ST_Area(geography(g)) "
     "FROM (SELECT ST_CollectionExtract(ST_MakeValid(geometry), 3) AS g FROM parcels "
@@ -123,7 +141,8 @@ def fixture(conn: Any, d: Path, reverse: bool = False) -> dict[str, str]:
     """Parcels in the DB (first call) and shapefiles in ``d``."""
     import hazards_helpers as hh
     names = ["lh-HALF", "lh-DONUT", "lh-OVER", "lh-FW", "lh-LOMR", "lh-LOMRB", "lh-SLIV05",
-             "lh-SLIV15", "lh-WET25", "lh-WETX", "lh-BOWTIE", "lh-X500", "lh-UNMAP"]
+             "lh-SLIV15", "lh-WET25", "lh-WETX", "lh-BOWTIE", "lh-X500", "lh-UNMAP",
+             "lh-LOMRC", "lh-LOMRP", "lh-BOWP"]
     geo = {}
     for i, n in enumerate(names):
         x, y = at(i)
@@ -132,6 +151,11 @@ def fixture(conn: Any, d: Path, reverse: bool = False) -> dict[str, str]:
             x, y = X0 + 8 * STEP, Y0             # east of the X polygon: no NFHL at all
         if n == "lh-LOMRB":
             geo[n] = f"POLYGON(({x} {y},{x + 1000} {y},{x} {y + 1000},{x} {y}))"
+        elif n == "lh-BOWP":
+            # Invalid bowtie, lobes of nearly equal area and opposite
+            # orientation: the raw centroid flies far from the parcel.
+            geo[n] = (f"POLYGON(({x} {y},{x + 1000} {y + 1000},{x + 1000} {y},"
+                      f"{x} {y + 1000.2},{x} {y}))")
         else:
             geo[n] = rect(x, y, x + side, y + side)
     with conn.cursor() as cur:
@@ -161,6 +185,10 @@ def fixture(conn: Any, d: Path, reverse: bool = False) -> dict[str, str]:
     for k in (4, 5):
         x, y = at(k)
         nf.append((nad83(conn, rect(x - 10, y - 10, x + 1010, y + 1010)), Z))
+    x, y = at(13)
+    nf.append((nad83(conn, rect(x - 10, y - 10, x + 200, y + 1010)), Z))    # west AE strip
+    x, y = at(14)
+    nf.append((nad83(conn, rect(x - 10, y - 10, x + 1010, y + 1010)), Z))
     x, y = at(6)
     nf.append((nad83(conn, rect(x + 100, y - 10, x + 101, y + 0.5)), Z))     # 0.5 SF inside
     x, y = at(7)
@@ -176,7 +204,11 @@ def fixture(conn: Any, d: Path, reverse: bool = False) -> dict[str, str]:
     hh.write_shapefile(d / "nfhl", "S_FLD_HAZ_AR", nf, hh.NFHL_DBF_FIELDS)
     lomr = []
     x, y = at(4)
-    lomr.append((nad83(conn, rect(x + 200, y + 200, x + 400, y + 400)), {"CASE_NO": "1"}))
+    lomr.append((nad83(conn, rect(x - 20, y - 20, x + 1020, y + 1020)), {"CASE_NO": "1"}))
+    x, y = at(13)
+    lomr.append((nad83(conn, rect(x + 880, y + 880, x + 980, y + 980)), {"CASE_NO": "3"}))
+    x, y = at(14)
+    lomr.append((nad83(conn, rect(x - 20, y - 20, x + 500, y + 1020)), {"CASE_NO": "4"}))
     x, y = at(5)
     lomr.append((nad83(conn, rect(x + 700, y + 700, x + 990, y + 990)), {"CASE_NO": "2"}))
     hh.write_shapefile(d / "nfhl", "S_LOMR", lomr[::-1] if reverse else lomr,
@@ -240,8 +272,20 @@ def synthetic(conn: Any, res: Results, dsn: str) -> None:
     fixture(conn, tmp / "b", reverse=True)
     rc, out = run_import(tmp / "a")
     res.check(rc == 0, f"import exit {rc}")
+    res.check("0 outside EPSG:2240's area of use" in out and
+              "0 with no polygonal area after repair" in out,
+              "(j) no parcel excluded: " + out.splitlines()[1])
+    with conn.cursor() as cur:
+        cur.execute(_SQL_CENTROIDS, ("lh-BOWP",))
+        raw_x, valid_x, is_valid = cur.fetchone()
+    conn.rollback()
+    res.check(not is_valid and not hazards.in_area_of_use(raw_x, 33.6)
+              and hazards.in_area_of_use(valid_x, 33.6),
+              f"(j) bowtie parcel: raw centroid lon {raw_x:.3f} (outside the area of use), "
+              f"made-valid {valid_x:.3f}")
     ids = ["lh-HALF", "lh-DONUT", "lh-OVER", "lh-FW", "lh-LOMR", "lh-LOMRB", "lh-SLIV05",
-           "lh-SLIV15", "lh-WET25", "lh-WETX", "lh-BOWTIE", "lh-X500", "lh-UNMAP"]
+           "lh-SLIV15", "lh-WET25", "lh-WETX", "lh-BOWTIE", "lh-X500", "lh-UNMAP",
+           "lh-LOMRC", "lh-LOMRP", "lh-BOWP"]
     a = hazards.assess_parcels(conn, ids)
     conn.rollback()
 
@@ -283,7 +327,22 @@ def synthetic(conn: Any, res: Results, dsn: str) -> None:
             ok &= float(row["sfha_sf"]) + float(row["x500_sf"]) <= float(row["nfhl_parcel_sf"]) + 1
     res.check(ok, "(b) every share in [0, 100], SFHA >= floodway, SFHA + 0.2% <= parcel")
     res.check(a["lh-LOMR"].h4 == hazards.REVIEW and a["lh-LOMR"].blocker is None,
-              f"(c) AE + intersecting LOMR: H4 {a['lh-LOMR'].h4}")
+              f"(c) AE wholly inside a LOMR: H4 {a['lh-LOMR'].h4}")
+    res.check(a["lh-BOWP"].flood_state == hazards.FRESH,
+              f"(j) bowtie parcel imported: NFHL {a['lh-BOWP'].flood_state}")
+    res.check(a["lh-LOMRC"].h4 == hazards.BLOCK
+              and "covers only part" not in (a["lh-LOMRC"].blocker or ""),
+              f"(c) LOMR on the parcel but off its AE strip: H4 {a['lh-LOMRC'].h4}")
+    res.check(a["lh-LOMRP"].h4 == hazards.BLOCK
+              and "a LOMR covers only part of zone AE" in (a["lh-LOMRP"].blocker or ""),
+              f"(c) LOMR covering half of the AE: H4 {a['lh-LOMRP'].h4}")
+    lc = r("lh-LOMRC")
+    lmap = lc["nfhl_zone_lomr_sf"] or {}
+    res.check(lc["lomr_status"] == "intersects"
+              and not any(k.startswith("AE|") for k in lmap)
+              and abs(float(lmap.get("X|AREA OF MINIMAL FLOOD HAZARD|F", 0)) - 10_000) < 10,
+              f"(c) corner LOMR: status {lc['lomr_status']}, no AE inside it, "
+              f"{float(lmap.get('X|AREA OF MINIMAL FLOOD HAZARD|F', 0)):,.0f} SF of X inside it")
     res.check(a["lh-LOMRB"].h4 == hazards.BLOCK,
               f"(c) LOMR in the bbox but off the parcel: H4 {a['lh-LOMRB'].h4}")
     res.check(a["lh-SLIV05"].h4 == hazards.PASS and a["lh-SLIV15"].h4 == hazards.BLOCK,
@@ -317,7 +376,8 @@ def synthetic(conn: Any, res: Results, dsn: str) -> None:
     res.check(on.status == "ok" and disjoint and (on.buildable_sf or 0) < (off.buildable_sf or 0),
               f"(g) floodway strip deducted: buildable {off.buildable_sf:,} -> "
               f"{on.buildable_sf:,} SF; every envelope ST_Disjoint from the strip: {disjoint}")
-    res.check(on.flood_wetlands == hazards.deduction_text("fresh", "fresh")
+    res.check(on.flood_wetlands == hazards.deduction_text("fresh", "fresh", True, False, False)
+              and "no NWI wetlands on parcel" in on.flood_wetlands
               and hazards.STREAM_BUFFERS in on.constraints,
               f"(g) projection text: {on.flood_wetlands}")
     with conn.cursor() as cur:
@@ -385,6 +445,35 @@ def synthetic(conn: Any, res: Results, dsn: str) -> None:
     res.check(all(off_r[k] == on_r[k] for k in keys),
               f"(i) parcel without a hazard row scores as with the gate off "
               f"({on_r['actionability']})")
+    # (k) the runner's audit
+    import runner
+    fp = runner._hazard_fingerprint(conn)
+    with conn.cursor() as cur:
+        cur.execute(_SQL_FORGED_PASS, ("lh-X500",))
+    conn.commit()
+    summary = runner._hazard_audit(conn, "livehz", fp)
+    conn.rollback()
+    res.check(summary["counted"] == 1 and summary["blocked"] == 0,
+              f"(k) clear parcel counted: audit passes {summary}")
+    with conn.cursor() as cur:
+        cur.execute(_SQL_FORGED_PASS, ("lh-FW",))
+    conn.commit()
+    try:
+        runner._hazard_audit(conn, "livehz", fp)
+        res.check(False, "(k) forged PASS for the floodway parcel not caught")
+    except runner.HazardAuditFailed as exc:
+        res.check("1 counted parcel(s) carry an H4/H6 blocker" in str(exc),
+                  f"(k) forged PASS for the floodway parcel: {exc}")
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute(_SQL_TOUCH, ("lh-HALF",))
+    conn.commit()
+    try:
+        runner._hazard_audit(conn, "livehz", fp)
+        res.check(False, "(k) parcel_hazards change not caught")
+    except runner.HazardAuditFailed as exc:
+        res.check("changed during the experiment" in str(exc), f"(k) {exc}")
+    conn.rollback()
     if True:
         fw = research.score_parcel("lh-FW", conn=conn, cycle_id="score-live-3", params=params,
                                    run_tag=None)

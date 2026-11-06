@@ -1,7 +1,8 @@
 """Test helpers for the flood/wetland work (reviews/26_flood_wetlands). Offline (SR-6).
 
-- ``enabled()``: the hazard table gate ON (prepare carries the proposed DDL
-  constant) for the duration of a ``with`` block. Nothing on disk changes.
+- ``enabled()``: the hazard table gate ON (as if prepare.py carried the
+  proposed DDL constant: ``hazards._SOURCE_DDL`` and the prepare attribute
+  are patched) for the duration of a ``with`` block. Nothing on disk changes.
 - ``write_shapefile``: a minimal pure-stdlib writer of polygon .shp/.shx/
   .dbf/.prj files, for synthetic fixtures only.
 - ``row``: a read-row mapping for ``hazards.assess_row``.
@@ -10,6 +11,7 @@
 from __future__ import annotations
 
 import struct
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 from unittest import mock
@@ -41,10 +43,15 @@ NFHL_DBF_FIELDS = (("FLD_ZONE", "C", 17, 0), ("ZONE_SUBTY", "C", 76, 0),
 NWI_DBF_FIELDS = (("ATTRIBUTE", "C", 20, 0), ("WETLAND_TY", "C", 50, 0))
 
 
+@contextmanager
 def enabled(ddl: str | None = None):
-    """The hazard-table gate ON: prepare gains the proposed DDL constant."""
-    return mock.patch.object(prepare, hazards.GATE_CONSTANT, ddl or hazards.PROPOSED_DDL,
-                             create=True)
+    """The hazard-table gate ON: as if prepare.py's source text carried the
+    proposed DDL constant (``hazards._SOURCE_DDL``, frozen at load), and the
+    in-process prepare module the matching attribute."""
+    text = ddl or hazards.PROPOSED_DDL
+    with mock.patch.object(hazards, "_SOURCE_DDL", text), \
+            mock.patch.object(prepare, hazards.GATE_CONSTANT, text, create=True):
+        yield
 
 
 def _dbf_bytes(fields: Sequence[tuple], records: Sequence[Mapping[str, Any]]) -> bytes:
@@ -126,7 +133,8 @@ def row(**kw: Any) -> dict[str, Any]:
         "parcel_id": "fulton-H01", "geom_md5": "m", "nfhl_md5": "m",
         "nfhl_parcel_sf": 100000, "nfhl_mapped_sf": 100000, "nfhl_undetermined_sf": 0,
         "sfha_sf": 0, "floodway_sf": 0, "x500_sf": 0,
-        "nfhl_zone_sf": {"X|AREA OF MINIMAL FLOOD HAZARD|F": 100000}, "zones": ["X"],
+        "nfhl_zone_sf": {"X|AREA OF MINIMAL FLOOD HAZARD|F": 100000},
+        "nfhl_zone_lomr_sf": {}, "zones": ["X"],
         "bfe_ft": None, "lomr_status": "none", "nfhl_as_of": "13121C 1.1.1.0",
         "nfhl_fetched_at": "2026-11-06", "nwi_md5": "m", "nwi_parcel_sf": 100000,
         "wetland_sf": 0, "wetland_deep_excavated_sf": 0, "wetland_type_sf": {},

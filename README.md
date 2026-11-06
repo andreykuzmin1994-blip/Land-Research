@@ -249,14 +249,18 @@ setback on every edge and the fitted building, to open in SiteFit
 ## Flood and wetlands (H4/H6, operator, between runs)
 
 `hazards.py` and `hazards_import.py` (`reviews/26_flood_wetlands/`)
-implement program.md's H4 ("not in FEMA Zone A or AE"; Zone AE with an
-intersecting LOMR passes with a review flag; a floodway always blocks;
+implement program.md's H4 ("not in FEMA Zone A or AE"; Zone AE that lies
+wholly within a LOMR passes with a review flag, while a LOMR elsewhere on
+the lot relaxes nothing; a floodway always blocks;
 LOMA is never checked) and H6 ("no NWI-mapped wetlands covering more than
 20% of the parcel", from `parameters.json`), mirroring the operator's
 SiteFit categories (floodway, SFHA, 0.2% zone). Shares are computed in
 PostGIS (SRID 2240, feet) over the same parcel geometry as site fit. They
 are enforced at scoring, through gate 4: a block or fail makes the parcel
-`FAIL:deal_killer` with blocker text `H4: ...` / `H6: ...`. Review flags
+`FAIL:deal_killer` with blocker text `H4: ...` / `H6: ...`. Once enabled,
+`runner.evaluate` re-checks every parcel the metric would count, outside
+the agent sandbox, and discards an experiment that counted an H4/H6
+failure. Review flags
 use `flagged_items.flag_type = 'review'`, which no gate reads. Site fit
 then deducts the SFHA (floodway included) and NWI wetland area from the
 buildable area; the 0.2% zone, fill and stream/state-waters buffers are
@@ -269,7 +273,8 @@ Nothing of this is active until a human:
 2. downloads, in a browser, the FEMA NFHL county package for Fulton
    (13121C, Map Service Center) and the USFWS NWI Georgia shapefile, and
    unpacks them as `hazards_inbox/nfhl/S_FLD_HAZ_AR.*` (+ `S_LOMR.*`) and
-   `hazards_inbox/nwi/<name>.shp` (+ .dbf, .prj);
+   `hazards_inbox/nwi/<name>.shp` (+ .dbf, .prj; if the state package
+   unpacks several shapefiles, the `*_Wetlands.shp` one is read);
 3. runs `make hazards-import` (counts only on the console; exit 4 names a
    failed source and keeps its previous data), then starts a new run and
    baseline: the first populated import is a metric change.

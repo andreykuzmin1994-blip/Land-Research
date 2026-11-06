@@ -22,7 +22,8 @@ and the NWI state shapefile for Georgia from the USFWS download page, and
 unpacks them under the gitignored ``hazards_inbox/``:
 
     hazards_inbox/nfhl/S_FLD_HAZ_AR.shp (.dbf, .prj; optional S_LOMR.*)
-    hazards_inbox/nwi/<any name>.shp    (.dbf, .prj; exactly one .shp)
+    hazards_inbox/nwi/<any name>.shp    (.dbf, .prj; exactly one .shp, or
+                                         several with one *_Wetlands.shp)
 
 They are read with a pure standard-library .shp/.dbf reader (no new
 dependency, SR-10): polygon records only, ring orientation as the format
@@ -49,8 +50,10 @@ SAME made-valid parcel geometry as site_fit and S2: the union per NFHL
 category with SiteFit's precedence (floodway, then SFHA including floodway,
 then the 0.2% zone outside the SFHA), so categories are disjoint and no
 share exceeds 100%; per-zone-key union areas; the area no NFHL polygon
-covers or Zone D / AREA NOT INCLUDED covers; whether a LOMR polygon
-intersects the parcel by at least 1 SF; the highest static BFE (the -9999
+covers or Zone D / AREA NOT INCLUDED covers; whether the union of the LOMR
+polygons meets the parcel by at least 1 SF, and per zone key the part of
+that zone inside the LOMR union (``nfhl_zone_lomr_sf``: AE_with_LOMR relaxes
+AE only when the LOMRs cover the parcel's whole AE area); the highest static BFE (the -9999
 sentinel dropped); the union of every NWI polygon and per WETLAND_TYPE; the
 clipped SFHA and wetland geometry for the site-fit deduction; and
 md5(ST_AsBinary(geometry)) of the parcel as stored, so a later geometry
@@ -68,7 +71,9 @@ Output: counts only (parcels, features, share bands, H4/H6 outcomes, request
 counts) -- never a parcel id, an owner, an address or a feature attribute.
 
 Exit codes: 0 imported; 1 refused (hazard table not enabled or not in the
-database, bad arguments); 2 no database / database error; 3 a run has its
+database, bad arguments); 2 no database / database error (it can follow a
+partial commit: the last line then names the source(s) already committed
+and the one(s) not written); 3 a run has its
 baseline; 4 at least one source FAILED (named on the last line; its
 previous values kept), robots refusals included.
 
@@ -456,13 +461,17 @@ class Dbf:
                 out[w] = hit
         return out
 
-    def record(self, i: int, wanted: Sequence[str]) -> dict[str, Any]:
+    def record(self, i: int, wanted: Sequence[str]) -> dict[str, Any] | None:
+        """The wanted fields of record ``i``, or None when it is flagged
+        deleted (first byte '*')."""
         if not 0 <= i < self.count:
             raise SourceError(f"{self.path.name}: record {i} out of range")
         self.fh.seek(self.header_len + i * self.record_len)
         raw = self.fh.read(self.record_len)
         if len(raw) != self.record_len:
             raise SourceError(f"{self.path.name}: truncated record")
+        if raw[:1] == b"*":
+            return None      # dBASE deleted-record flag (review finding 12)
         out: dict[str, Any] = {}
         pos = 1
         for fd in self.fields:
@@ -631,6 +640,8 @@ def read_shapefile(shp: Path, fields: Sequence[str],
             if gj is None:
                 continue
             rec = dbf.record(idx, list(names.values()))
+            if rec is None:
+                continue
             feats.append(Feature(str(idx), {f: rec.get(n) for f, n in names.items()}, gj, srid))
         return feats, srid, dbf.date, fbox
     finally:
@@ -638,27 +649,42 @@ def read_shapefile(shp: Path, fields: Sequence[str],
 
 
 def _single_shp(d: Path) -> Path:
+    """The one .shp in ``d``; when there are several (the USFWS state
+    package ships project-metadata and historic-map shapefiles next to the
+    wetlands), the single one whose name ends in ``_Wetlands`` (review
+    finding 10). Anything else is ambiguous and fails the source."""
     shps = sorted(p for p in d.glob("*") if p.suffix.lower() == ".shp")
-    if len(shps) != 1:
-        raise SourceError(f"{d.name}/: expected exactly one .shp, found {len(shps)}")
-    return shps[0]
+    if len(shps) == 1:
+        return shps[0]
+    wet = [p for p in shps if p.stem.lower().endswith("_wetlands")]
+    if len(wet) == 1:
+        return wet[0]
+    raise SourceError(f"{d.name}/: expected exactly one .shp (or one *_Wetlands.shp), "
+                      f"found {len(shps)}")
 
 
 # ---------------------------------------------------------------------------
 # SQL (SR-2: module-level constants, %s placeholders only)
 # ---------------------------------------------------------------------------
 _SQL_TABLE_EXISTS = "SELECT to_regclass('parcel_hazards') IS NOT NULL"
-# Fulton parcels with geometry; centroid for EPSG:2240's area of use (FW-11).
+# Fulton parcels with geometry; centroid for EPSG:2240's area of use (FW-11)
+# and envelope, both of the SAME made-valid polygonal geometry every
+# computation uses (review finding 5: a self-intersecting ring's raw
+# centroid can fall far outside the parcel), plus whether that repaired
+# geometry is empty (counted apart, never called "outside the area of use").
 _SQL_LIST_PARCELS = (
-    "SELECT parcel_id, ST_X(ST_Centroid(geometry)), ST_Y(ST_Centroid(geometry)), "
-    "ST_XMin(geometry), ST_YMin(geometry), ST_XMax(geometry), ST_YMax(geometry) "
-    "FROM parcels WHERE county = %s AND geometry IS NOT NULL ORDER BY parcel_id"
+    "SELECT parcel_id, ST_X(ST_Centroid(v)), ST_Y(ST_Centroid(v)), "
+    "ST_XMin(v), ST_YMin(v), ST_XMax(v), ST_YMax(v), ST_IsEmpty(v) FROM ("
+    "SELECT parcel_id, ST_CollectionExtract(ST_MakeValid(geometry), 3) AS v "
+    "FROM parcels WHERE county = %s AND geometry IS NOT NULL) s ORDER BY parcel_id"
 )
-# Parcel envelopes (padded by 0.0005 deg) in a file's own SRID.
+# Parcel envelopes (padded by 0.0005 deg) in a file's own SRID, of the
+# made-valid polygonal geometry.
 _SQL_BOXES_IN_SRID = (
     "SELECT parcel_id, ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b) FROM ("
-    "SELECT parcel_id, ST_Transform(ST_Expand(ST_Envelope(geometry), 0.0005), %s) AS b "
-    "FROM parcels WHERE parcel_id = ANY(%s)) e"
+    "SELECT parcel_id, ST_Transform(ST_Expand(ST_Envelope("
+    "ST_CollectionExtract(ST_MakeValid(geometry), 3)), 0.0005), %s) AS b "
+    "FROM parcels WHERE parcel_id = ANY(%s)) e WHERE NOT ST_IsEmpty(b)"
 )
 _SQL_CREATE_TEMP = (
     "CREATE TEMP TABLE IF NOT EXISTS hazards_import_polys ("
@@ -701,10 +727,15 @@ _SQL_UPSERT_NFHL = (
     "MAX(bfe) FILTER (WHERE bfe > -9000 AND cat IN ('floodway', 'sfha')) AS bfe, "
     "array_agg(DISTINCT asof ORDER BY asof) FILTER (WHERE asof IS NOT NULL AND asof <> '') "
     "AS asof FROM pc GROUP BY parcel_id), "
-    "lm AS (SELECT pg.parcel_id, bool_or(ST_Area(ST_CollectionExtract("
-    "ST_Intersection(pg.g, z.geom), 3)) >= %s) AS hit "
+    "lu AS (SELECT pg.parcel_id, ST_Union(ST_CollectionExtract("
+    "ST_Intersection(pg.g, z.geom), 3)) AS lg "
     "FROM pg JOIN hazards_import_polys z ON z.src = 'lomr' AND z.geom && pg.g "
     "AND ST_Intersects(z.geom, pg.g) GROUP BY pg.parcel_id), "
+    "lm AS (SELECT parcel_id, ST_Area(lg) >= %s AS hit FROM lu), "
+    "pz AS (SELECT parcel_id, zkey, ST_Union(ig) AS u FROM pc GROUP BY parcel_id, zkey), "
+    "pl AS (SELECT pz.parcel_id, pz.zkey, "
+    "ST_Area(ST_CollectionExtract(ST_Intersection(pz.u, lu.lg), 3)) AS sf "
+    "FROM pz JOIN lu ON lu.parcel_id = pz.parcel_id), "
     "r AS (SELECT pg.parcel_id, pg.gmd5, ST_Area(pg.g) AS psf, "
     "COALESCE(ST_Area(agg.mp), 0) AS msf, COALESCE(ST_Area(agg.ud), 0) AS usf, "
     "COALESCE(ST_Area(agg.sh), 0) AS ssf, COALESCE(ST_Area(agg.fw), 0) AS fsf, "
@@ -712,6 +743,8 @@ _SQL_UPSERT_NFHL = (
     "ELSE ST_Area(ST_Difference(agg.x5, agg.sh)) END AS xsf, "
     "(SELECT jsonb_object_agg(pk.zkey, round(pk.sf::numeric, 2)) FROM pk "
     "WHERE pk.parcel_id = pg.parcel_id) AS zmap, "
+    "(SELECT jsonb_object_agg(pl.zkey, round(pl.sf::numeric, 2)) FROM pl "
+    "WHERE pl.parcel_id = pg.parcel_id AND pl.sf > 0) AS lmap, "
     "COALESCE((SELECT array_agg(DISTINCT split_part(pk.zkey, '|', 1) ORDER BY "
     "split_part(pk.zkey, '|', 1)) FROM pk WHERE pk.parcel_id = pg.parcel_id "
     "AND pk.sf >= %s), ARRAY[]::text[]) AS zones, "
@@ -723,15 +756,16 @@ _SQL_UPSERT_NFHL = (
     "LEFT JOIN lm ON lm.parcel_id = pg.parcel_id) "
     "INSERT INTO parcel_hazards (parcel_id, nfhl_parcel_geom_md5, nfhl_parcel_sf, "
     "nfhl_mapped_sf, nfhl_undetermined_sf, sfha_sf, floodway_sf, x500_sf, sfha_pct, "
-    "floodway_pct, x500_pct, nfhl_zone_sf, zones, bfe_ft, lomr_status, nfhl_as_of, "
-    "nfhl_source, nfhl_fetched_at, sfha_geom) "
+    "floodway_pct, x500_pct, nfhl_zone_sf, nfhl_zone_lomr_sf, zones, bfe_ft, lomr_status, "
+    "nfhl_as_of, nfhl_source, nfhl_fetched_at, sfha_geom) "
     "SELECT parcel_id, gmd5, round(psf::numeric, 2), round(msf::numeric, 2), "
     "round(usf::numeric, 2), round(ssf::numeric, 2), round(fsf::numeric, 2), "
     "round(xsf::numeric, 2), "
     "CASE WHEN psf > 0 THEN round((100 * ssf / psf)::numeric, 4) END, "
     "CASE WHEN psf > 0 THEN round((100 * fsf / psf)::numeric, 4) END, "
     "CASE WHEN psf > 0 THEN round((100 * xsf / psf)::numeric, 4) END, "
-    "COALESCE(zmap, '{}'::jsonb), zones, bfe, lomr, asof, %s, now(), sgeom FROM r "
+    "COALESCE(zmap, '{}'::jsonb), COALESCE(lmap, '{}'::jsonb), zones, bfe, lomr, asof, %s, "
+    "now(), sgeom FROM r "
     "ON CONFLICT (parcel_id) DO UPDATE SET "
     "nfhl_parcel_geom_md5 = EXCLUDED.nfhl_parcel_geom_md5, "
     "nfhl_parcel_sf = EXCLUDED.nfhl_parcel_sf, nfhl_mapped_sf = EXCLUDED.nfhl_mapped_sf, "
@@ -739,18 +773,21 @@ _SQL_UPSERT_NFHL = (
     "floodway_sf = EXCLUDED.floodway_sf, x500_sf = EXCLUDED.x500_sf, "
     "sfha_pct = EXCLUDED.sfha_pct, floodway_pct = EXCLUDED.floodway_pct, "
     "x500_pct = EXCLUDED.x500_pct, nfhl_zone_sf = EXCLUDED.nfhl_zone_sf, "
+    "nfhl_zone_lomr_sf = EXCLUDED.nfhl_zone_lomr_sf, "
     "zones = EXCLUDED.zones, bfe_ft = EXCLUDED.bfe_ft, lomr_status = EXCLUDED.lomr_status, "
     "nfhl_as_of = EXCLUDED.nfhl_as_of, nfhl_source = EXCLUDED.nfhl_source, "
     "nfhl_fetched_at = EXCLUDED.nfhl_fetched_at, sfha_geom = EXCLUDED.sfha_geom "
     "WHERE (parcel_hazards.nfhl_parcel_geom_md5, parcel_hazards.nfhl_parcel_sf, "
     "parcel_hazards.nfhl_mapped_sf, parcel_hazards.nfhl_undetermined_sf, "
     "parcel_hazards.sfha_sf, parcel_hazards.floodway_sf, parcel_hazards.x500_sf, "
-    "parcel_hazards.nfhl_zone_sf, parcel_hazards.zones, parcel_hazards.bfe_ft, "
+    "parcel_hazards.nfhl_zone_sf, parcel_hazards.nfhl_zone_lomr_sf, parcel_hazards.zones, "
+    "parcel_hazards.bfe_ft, "
     "parcel_hazards.lomr_status, parcel_hazards.nfhl_as_of, parcel_hazards.nfhl_source, "
     "ST_AsEWKB(parcel_hazards.sfha_geom)) IS DISTINCT FROM "
     "(EXCLUDED.nfhl_parcel_geom_md5, EXCLUDED.nfhl_parcel_sf, EXCLUDED.nfhl_mapped_sf, "
     "EXCLUDED.nfhl_undetermined_sf, EXCLUDED.sfha_sf, EXCLUDED.floodway_sf, "
-    "EXCLUDED.x500_sf, EXCLUDED.nfhl_zone_sf, EXCLUDED.zones, EXCLUDED.bfe_ft, "
+    "EXCLUDED.x500_sf, EXCLUDED.nfhl_zone_sf, EXCLUDED.nfhl_zone_lomr_sf, EXCLUDED.zones, "
+    "EXCLUDED.bfe_ft, "
     "EXCLUDED.lomr_status, EXCLUDED.nfhl_as_of, EXCLUDED.nfhl_source, "
     "ST_AsEWKB(EXCLUDED.sfha_geom)) "
     "RETURNING parcel_id, nfhl_as_of"
@@ -797,6 +834,17 @@ _SQL_UPSERT_NWI = (
     "RETURNING parcel_id, nwi_as_of"
 )
 _SQL_COUNT_PARCELS = "SELECT COUNT(*) FROM parcels"
+# Review finding 12: parcels this source imported before that the current
+# input does not cover (their previous values are kept, and still read as
+# fresh while the geometry is unchanged). Parameters: (covered ids,).
+_SQL_PREVIOUS_NOT_COVERED_NFHL = (
+    "SELECT COUNT(*) FROM parcel_hazards WHERE nfhl_fetched_at IS NOT NULL "
+    "AND NOT (parcel_id = ANY(%s))"
+)
+_SQL_PREVIOUS_NOT_COVERED_NWI = (
+    "SELECT COUNT(*) FROM parcel_hazards WHERE nwi_fetched_at IS NOT NULL "
+    "AND NOT (parcel_id = ANY(%s))"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -842,10 +890,16 @@ def write_source(conn: Any, data: SourceData) -> dict[str, int]:
         else:
             cur.execute(_SQL_UPSERT_NWI, (ids, fl, data.as_of, data.origin))
         changed = cur.fetchall()
+        if data.key == "nfhl":
+            cur.execute(_SQL_PREVIOUS_NOT_COVERED_NFHL, (ids,))
+        else:
+            cur.execute(_SQL_PREVIOUS_NOT_COVERED_NWI, (ids,))
+        prev = cur.fetchone()
     if any(not (r[1] or "").strip() for r in changed):
         raise SourceError(f"{data.key}: a row without as-of; nothing written (FW-20)")
     return {"covered": len(ids), "changed": len(changed),
-            "unchanged": len(ids) - len(changed), "features": len(data.features)}
+            "unchanged": len(ids) - len(changed), "features": len(data.features),
+            "not_covered_kept": int(prev[0]) if prev and prev[0] is not None else 0}
 
 
 def _connection_unusable(conn: Any) -> bool:
@@ -1042,17 +1096,21 @@ def run(*, mode: str = "files", inbox: Path = INBOX, fetcher: HazardsFetcher | N
         print("REFUSED: the database has no parcel_hazards table (apply prepare.py's schema "
               "first: make db-check).")
         return EXIT_REFUSED
-    inside = [r for r in parcels if hazards.in_area_of_use(r[1], r[2])]
+    empty = [r for r in parcels if len(r) > 7 and r[7]]
+    usable = [r for r in parcels if not (len(r) > 7 and r[7])]
+    inside = [r for r in usable if hazards.in_area_of_use(r[1], r[2])]
     ids = [str(r[0]) for r in inside]
     bbox = {str(r[0]): tuple(float(v) for v in r[3:7]) for r in inside}
-    print(f"parcels: {len(parcels)} Fulton parcels with geometry; {len(parcels) - len(ids)} "
-          "outside EPSG:2240's area of use (not imported)")
+    print(f"parcels: {len(parcels)} Fulton parcels with geometry; {len(usable) - len(ids)} "
+          f"outside EPSG:2240's area of use (not imported); {len(empty)} with no polygonal "
+          "area after repair (not imported)")
     if not ids:
         print("hazards_import: no parcels to import; nothing to do.")
         return EXIT_OK
     fetcher = fetcher if fetcher is not None else (HazardsFetcher() if mode == "rest" else None)
     results: dict[str, dict[str, int]] = {}
     failed: dict[str, str] = {}
+    committed: list[str] = []
     try:
         with prepare.get_connection() as conn:
             if mode == "files":
@@ -1072,13 +1130,18 @@ def run(*, mode: str = "files", inbox: Path = INBOX, fetcher: HazardsFetcher | N
                     if _count_parcels(conn) != n_before:
                         raise SourceError(f"{key}: the parcel count changed during the import")
                     conn.commit()
+                    committed.append(key)
                     results[key] = res
                     print(f"source {key}: {res['features']} features, {res['covered']} parcels "
                           f"covered, {res['changed']} changed, {res['unchanged']} unchanged; "
-                          f"{len(data.lomr) if data.lomr is not None else 'no'} LOMR features"
+                          f"{len(data.lomr) if data.lomr is not None else 'no'} LOMR features; "
+                          f"{res['not_covered_kept']} previously imported parcels not covered "
+                          "(previous values kept)"
                           if key == "nfhl" else
                           f"source {key}: {res['features']} features, {res['covered']} parcels "
-                          f"covered, {res['changed']} changed, {res['unchanged']} unchanged")
+                          f"covered, {res['changed']} changed, {res['unchanged']} unchanged; "
+                          f"{res['not_covered_kept']} previously imported parcels not covered "
+                          "(previous values kept)")
                 except Exception as exc:
                     conn.rollback()
                     if _connection_unusable(conn):
@@ -1095,7 +1158,16 @@ def run(*, mode: str = "files", inbox: Path = INBOX, fetcher: HazardsFetcher | N
                         for r in cur.fetchall()}
             conn.rollback()
     except Exception as exc:
-        print(f"hazards not imported: database error ({type(exc).__name__}).")
+        if committed:
+            # Review finding 6: a source already committed is durable.
+            rest = [k for k in SOURCES if k not in committed and k not in failed]
+            print(f"hazards import: database error ({type(exc).__name__}) after source(s) "
+                  f"{', '.join(committed)} committed; "
+                  + (f"{', '.join(rest)} not written. " if rest else "")
+                  + "The committed data changes H4/H6 and site fit: start a new run and "
+                  "baseline after a complete import; never import mid-run.")
+        else:
+            print(f"hazards not imported: database error ({type(exc).__name__}).")
         return EXIT_DB
     for line in summarise(assess, rows):
         print(line)

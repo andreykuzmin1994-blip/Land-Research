@@ -23,7 +23,7 @@ import site_fit
 import site_fit_golden_case as sg
 import zoning_golden_case as zg
 from hazards_helpers import db_row, enabled, row
-from static_guards import module_reference_problems
+from static_guards import module_reference_problems, prepare_write_problems
 from zoning_helpers import REPO_ROOT
 
 RESEARCH_SRC = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
@@ -38,7 +38,8 @@ MIXED = {
     "fulton-Z11": dict(sfha_sf=3000, floodway_sf=3000,
                        nfhl_zone_sf={"AE|FLOODWAY|T": 3000}),            # PASS >= 70 -> FAIL
     "fulton-S05": dict(wetland_sf=25000),                               # PASS < 70 -> FAIL
-    "fulton-Z02": dict(AE, lomr_status="intersects"),                   # review, stays PASS
+    "fulton-Z02": dict(AE, lomr_status="intersects",
+                       nfhl_zone_lomr_sf={"AE||T": 5000}),               # review, stays PASS
     "fulton-Z01": dict(x500_sf=40000),                                  # passes
     "fulton-Z12": dict(AE, geom_md5="changed"),                         # stale: gap pass
     "fulton-Z05": None,                                                 # absent: gap pass
@@ -261,6 +262,41 @@ class StaticResearchTests(unittest.TestCase):
         self.assertIn("hazard.blocker if hazard is not None else None", sp)
         self.assertNotIn("site_fit", RESEARCH_SRC.split("def _h6_filter(", 1)[1].split("\ndef ", 1)[0])
 
+    def test_research_never_writes_or_aliases_prepare(self):
+        """Review finding 2: research.py reaches prepare only as a read of
+        ``prepare.<attr>``: no store, delete, augmented assignment,
+        setattr/delattr, alias or from-import, so no runtime rebinding of a
+        prepare attribute (the hazard gate constant included)."""
+        self.assertEqual(prepare_write_problems(RESEARCH_SRC), [])
+
+    def test_prepare_write_guard_catches_the_probe(self):
+        base = RESEARCH_SRC
+        for bad in (
+            "prepare._DDL_PARCEL_HAZARDS = 'parcel_' + 'hazards '\n",
+            "prepare.get_parameters = lambda: {}\n",
+            "del prepare.get_parameters\n",
+            "prepare.x += 'a'\n",
+            "setattr(prepare, 'x', 1)\n",
+            "p = prepare\n",
+            "from prepare import get_parameters\n",
+            "import prepare as pp\n",
+            "def f():\n    (prepare.x, y) = (1, 2)\n",
+            "def f():\n    for prepare.x in (1,):\n        pass\n",
+            "def f():\n    with open('a') as prepare.x:\n        pass\n",
+        ):
+            self.assertNotEqual(prepare_write_problems(base + "\n" + bad), [], bad)
+
+    def test_research_never_names_the_gate(self):
+        for bad in ("GATE_CONSTANT", "_SOURCE_DDL", "_DDL_PARCEL_HAZARDS ", "ddl_from_prepare"):
+            self.assertNotIn(bad, RESEARCH_SRC)
+        tree = ast.parse(RESEARCH_SRC)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                self.assertNotIn("_DDL_PARCEL_HAZARDS", node.value)
+            if isinstance(node, ast.Attribute):
+                self.assertNotIn(node.attr, ("_DDL_PARCEL_HAZARDS", "GATE_CONSTANT",
+                                             "_SOURCE_DDL"))
+
     def test_static_guard_lists(self):
         import static_guards
         self.assertIn("hazards", static_guards.PROTECTED_NAMES)
@@ -270,7 +306,7 @@ class StaticResearchTests(unittest.TestCase):
 class SiteFitTests(unittest.TestCase):
     """FW-14 / FW-23 offline: the hazard SQL, its texts, the fallback."""
 
-    def proj(self, states, fail_hazards=False):
+    def proj(self, states, fail_hazards=False, extra=None):
         from test_site_fit import FakeConn, inner_rect
 
         class HzConn(FakeConn):
@@ -284,7 +320,8 @@ class SiteFitTests(unittest.TestCase):
                         if fail_hazards:
                             raise RuntimeError("relation parcel_hazards does not exist")
                         cur.rows = [("a", 1_000_000 * sg.M2_PER_SQFT, False, 322_000.0,
-                                     inner_rect(700, 460), False, states[0], states[1], 0.0)]
+                                     inner_rect(700, 460), False, states[0], states[1], 0.0)
+                                    + tuple(extra or ())]
                         return
                     orig(sql, params)
                 cur.execute = execute
@@ -305,6 +342,38 @@ class SiteFitTests(unittest.TestCase):
             self.assertEqual(p.status, site_fit.OK)
             self.assertEqual(p.flood_wetlands, site_fit.FLOOD_UNREADABLE)
             self.assertIn(site_fit._SQL_BUFFERED_FOR_FIT, [s for s, _ in conn.executed])
+
+    def test_texts_say_what_was_actually_deducted(self):
+        # Review finding 9: no "deducted" claim for a hazard the parcel lacks,
+        # and the no-FEMA-determination part is named.
+        with enabled():
+            p, conn = self.proj(("fresh", "fresh"), extra=(False, False, False))
+            self.assertIn("no SFHA on parcel", p.flood_wetlands)
+            self.assertIn("no NWI wetlands on parcel", p.flood_wetlands)
+            self.assertNotIn("SFHA incl. floodway deducted", p.flood_wetlands)
+            self.assertNotIn("NWI wetlands deducted", p.flood_wetlands)
+            params = [pr for s_, pr in conn.executed
+                      if s_ == site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS][0]
+            self.assertEqual(len(params), site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS.count("%s"))
+            self.assertEqual(params[12:15], (hazards.NOISE_FLOOR_SF,) * 3)
+            p, _ = self.proj(("fresh", "fresh"), extra=(True, True, True))
+            self.assertIn("SFHA incl. floodway deducted", p.flood_wetlands)
+            self.assertIn("NWI wetlands deducted", p.flood_wetlands)
+            self.assertIn("part of the parcel has no FEMA flood determination",
+                          p.flood_wetlands)
+            p, _ = self.proj(("fresh", "absent"), extra=(True, False, False))
+            self.assertIn("SFHA incl. floodway deducted", p.flood_wetlands)
+            self.assertIn("wetlands not deducted", p.flood_wetlands)
+            self.assertNotIn("no FEMA", p.flood_wetlands)
+
+    def test_hazard_sql_parameter_order(self):
+        # Review finding 8: the comment names all 16 placeholders.
+        sql = site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS
+        self.assertEqual(sql.count("%s"), 16)
+        self.assertEqual(len(site_fit._buffered_params_hazards(10.0, ["a"])), 16)
+        src = (REPO_ROOT / "site_fit.py").read_text(encoding="utf-8")
+        self.assertIn("# Parameters (16): (vertex limit, setback, t, setback, t, t, t, "
+                      "vertex limit,\n# setback, setback, t, t, floor, floor, floor, ids).", src)
 
     def test_stream_buffers_in_every_status_when_enabled(self):
         with enabled():

@@ -922,11 +922,20 @@ def _buffered_params(setback: float, ids: Sequence[str]) -> tuple:
 # deducted area. With no fresh hazard geometry the buffer is computed exactly
 # as _SQL_BUFFERED_FOR_FIT computes it, so the ring text (the fit cache key)
 # is unchanged; any deduction changes the ring text and so the cache key.
-# Parameters: (vertex limit, setback, t, t, t, vertex limit, setback, t, t, ids).
+# Columns 9-11 (review finding 9): whether the fresh row holds an SFHA
+# geometry, a wetland geometry, and whether part of the parcel has no FEMA
+# determination (the same three tests as the hazard module's flood
+# data_gap: mapped area under the noise floor, Zone D / AREA NOT INCLUDED,
+# or unmapped area at or above it), so the projection text says what was
+# actually deducted.
+# Parameters (16): (vertex limit, setback, t, setback, t, t, t, vertex limit,
+# setback, setback, t, t, floor, floor, floor, ids).
 _SQL_BUFFERED_FOR_FIT_HAZARDS = (
     "SELECT parcel_id, gross_m2, ST_IsEmpty(fit_g), ST_Area(inner_g), "
-    "ST_AsGeoJSON(fit_g, 2), simplified, flood_state, wet_state, hz_sf "
+    "ST_AsGeoJSON(fit_g, 2), simplified, flood_state, wet_state, hz_sf, "
+    "has_sg, has_wg, nfhl_gap "
     "FROM (SELECT parcel_id, gross_m2, inner_g, flood_state, wet_state, hz_sf, "
+    "has_sg, has_wg, nfhl_gap, "
     "CASE WHEN ST_NPoints(inner_g) > %s THEN ST_SimplifyPreserveTopology("
     "CASE WHEN hz IS NULL THEN ST_Buffer(t, -1.0 * (%s::float8 + 2.0 * %s::float8)) "
     "ELSE ST_CollectionExtract(ST_Difference(ST_Buffer(t, -1.0 * (%s::float8 + 2.0 * "
@@ -934,15 +943,18 @@ _SQL_BUFFERED_FOR_FIT_HAZARDS = (
     "ELSE inner_g END AS fit_g, "
     "(ST_NPoints(inner_g) > %s) AS simplified "
     "FROM (SELECT parcel_id, t, gross_m2, flood_state, wet_state, hz, "
+    "has_sg, has_wg, nfhl_gap, "
     "COALESCE(ST_Area(hz_raw), 0.0) AS hz_sf, "
     "CASE WHEN hz IS NULL THEN ST_Buffer(t, -1.0 * %s::float8) "
     "ELSE ST_CollectionExtract(ST_Difference(ST_Buffer(t, -1.0 * %s::float8), hz), 3) "
     "END AS inner_g "
     "FROM (SELECT parcel_id, t, gross_m2, flood_state, wet_state, hz_raw, "
+    "has_sg, has_wg, nfhl_gap, "
     "CASE WHEN hz_raw IS NULL OR ST_IsEmpty(hz_raw) THEN NULL "
     "ELSE ST_SimplifyPreserveTopology(ST_Buffer(hz_raw, 2.0 * %s::float8, 'quad_segs=2'), "
     "%s::float8) END AS hz "
     "FROM (SELECT parcel_id, t, ST_Area(geography(g)) AS gross_m2, flood_state, wet_state, "
+    "has_sg, has_wg, nfhl_gap, "
     "CASE WHEN flood_state = 'fresh' AND wet_state = 'fresh' "
     "THEN ST_Union(COALESCE(sg, wg), COALESCE(wg, sg)) "
     "WHEN flood_state = 'fresh' THEN sg WHEN wet_state = 'fresh' THEN wg END AS hz_raw "
@@ -953,7 +965,11 @@ _SQL_BUFFERED_FOR_FIT_HAZARDS = (
     "CASE WHEN h.parcel_id IS NULL OR h.nwi_fetched_at IS NULL "
     "OR h.nwi_parcel_geom_md5 IS NULL THEN 'absent' "
     "WHEN h.nwi_parcel_geom_md5 = v.gmd5 THEN 'fresh' ELSE 'stale' END AS wet_state, "
-    "h.sfha_geom AS sg, h.wetland_geom AS wg "
+    "h.sfha_geom AS sg, h.wetland_geom AS wg, "
+    "(h.sfha_geom IS NOT NULL) AS has_sg, (h.wetland_geom IS NOT NULL) AS has_wg, "
+    "COALESCE(h.nfhl_mapped_sf IS NULL OR h.nfhl_mapped_sf < %s "
+    "OR COALESCE(h.nfhl_undetermined_sf, 0) >= %s "
+    "OR h.nfhl_parcel_sf - h.nfhl_mapped_sf >= %s, TRUE) AS nfhl_gap "
     "FROM (SELECT parcel_id, ST_CollectionExtract(ST_MakeValid(geometry), 3) AS g, "
     "md5(ST_AsBinary(geometry)) AS gmd5 "
     "FROM parcels WHERE parcel_id = ANY(%s) AND geometry IS NOT NULL) v "
@@ -964,8 +980,9 @@ _SQL_BUFFERED_FOR_FIT_HAZARDS = (
 
 def _buffered_params_hazards(setback: float, ids: Sequence[str]) -> tuple:
     t = _SIMPLIFY_TOL_FT
+    fl = _hz.NOISE_FLOOR_SF
     return (_SIMPLIFY_ABOVE_VERTICES, setback, t, setback, t, t, t, _SIMPLIFY_ABOVE_VERTICES,
-            setback, setback, t, t, list(ids))
+            setback, setback, t, t, fl, fl, fl, list(ids))
 
 
 def _rings_from_geojson(text: Any) -> list[list[list[tuple[float, float]]]]:
@@ -1088,7 +1105,12 @@ def _fits_for(rings_text: str, gross_sf: float, rules: _Rules,
 
 def _row_flood_text(row: Sequence[Any] | None, flood: str | None) -> str | None:
     """reviews/26_flood_wetlands: the deduction text of a hazards-SQL row
-    (columns 6 and 7 are the NFHL and NWI states), else ``flood``."""
+    (columns 6 and 7 are the NFHL and NWI states; 9-11 whether an SFHA and a
+    wetland geometry exist and whether part of the parcel has no FEMA
+    determination), else ``flood``."""
+    if flood is None and row is not None and len(row) > 11:
+        return _hz.deduction_text(str(row[6]), str(row[7]), bool(row[9]), bool(row[10]),
+                                  bool(row[11]))
     if flood is None and row is not None and len(row) > 7:
         return _hz.deduction_text(str(row[6]), str(row[7]))
     return flood
