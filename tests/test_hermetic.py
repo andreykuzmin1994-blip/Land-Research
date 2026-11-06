@@ -71,6 +71,9 @@ _NEVER_COMMIT = (
     # Official ordinance files the operator drops in (reviews/24_rules_local_files, LF-09).
     "rules_inbox/south_fulton_udo.pdf",
     "rules_inbox/sub/fairburn_ch80.html",
+    # Flood/wetland downloads (reviews/26_flood_wetlands).
+    "hazards_inbox/nfhl/S_FLD_HAZ_AR.shp",
+    "hazards_inbox/nwi/GA_Wetlands.dbf",
 )
 
 

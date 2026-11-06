@@ -84,6 +84,8 @@ filter to a CoStar Land export)
 
 **Powers**: Implied land value calculations, spec development feasibility validation
 
+**Excel path**: an industrial Sale Comps export in a CoStar workbook is converted by `costar_import.py` instead (memo market rent and exit value only; `COSTAR_EXPORTS_README.md`, `reviews/28_building_comps/`).
+
 ### Export 4: Industrial Leasing Comps (Monthly)
 
 **Cadence**: First Monday of each month
@@ -101,6 +103,8 @@ filter to a CoStar Land export)
 - `lease_type` — NNN, MG, FSG
 
 **Powers**: Spec development feasibility (achievable rent assumptions), BTS strategy fit (tenant patterns)
+
+**Excel path**: a Lease Comps export in a CoStar workbook is converted by `costar_import.py` instead (signed NNN starting rents for the memo only; tenant names are never stored; `COSTAR_EXPORTS_README.md`, `reviews/28_building_comps/`).
 
 ### Export 5: Land Listings (Weekly)
 

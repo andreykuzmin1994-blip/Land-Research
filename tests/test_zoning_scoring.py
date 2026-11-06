@@ -455,7 +455,15 @@ class DiscoveryTests(unittest.TestCase):
         tree = ast.parse((REPO_ROOT / "research.py").read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_flag":
-                self.assertEqual(ast.literal_eval(node.args[4]), "data_gap", node.lineno)
+                # reviews/26_flood_wetlands (FW-17): the one other type is the
+                # hazards module's review type, which no gate reads.
+                arg = node.args[4]
+                if isinstance(arg, ast.Attribute):
+                    self.assertEqual((arg.value.id, arg.attr), ("hazards", "REVIEW_FLAG_TYPE"))
+                    continue
+                self.assertEqual(ast.literal_eval(arg), "data_gap", node.lineno)
+        import hazards
+        self.assertNotIn(hazards.REVIEW_FLAG_TYPE, ("actionability_block", "data_gap"))
         self.assertNotRegex((REPO_ROOT / "research.py").read_text(),
                             r"(?i)INSERT\s+INTO\s+flagged_items")
 
@@ -500,7 +508,8 @@ class ProtectionTests(unittest.TestCase):
     PIPELINE = ("research.py", "runner.py", "costar_ingest.py", "costar_import.py",
                 "reporting.py", "pipeline_common.py", "zoning.py", "zoning_import.py",
                 "connector_harness.py", "cli.py", "prepare.py", "site_fit.py",
-                "rules_scrape.py")
+                "rules_scrape.py", "hazards.py", "hazards_import.py", "adjacency.py",
+                "adjacency_import.py")
 
     def test_no_pipeline_module_writes_zoning_rules(self):
         writers = {"write_text", "write_bytes", "dump", "replace", "rename", "copy",

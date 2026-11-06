@@ -17,7 +17,9 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+import statistics
+from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -25,6 +27,9 @@ import prepare
 import research
 import zoning  # protected: renders imported zoning for the memo (reviews/21_zoning)
 import site_fit  # protected: building projections (reviews/22_site_fit)
+import hazards  # protected: flood/wetland lines (reviews/26_flood_wetlands)
+import adjacency  # protected: adjacency-buffer footnote (reviews/27_site_fit_buffers)
+import costar_import  # protected: building/lease comp facts (reviews/28_building_comps)
 from pipeline_common import (
     _REPO_ROOT,
     _SQL_FETCH_SUBMARKET_NAME,
@@ -348,7 +353,8 @@ def _format_date(v: Any, *, default: str = "—") -> str:
 # ---------------------------------------------------------------------------
 # Phase 9 data fetch
 # ---------------------------------------------------------------------------
-def _fetch_snapshot_data(conn: Any, parcel_id: str) -> dict[str, Any] | None:
+def _fetch_snapshot_data(conn: Any, parcel_id: str,
+                         today: date | None = None) -> dict[str, Any] | None:
     """Read every row Phase 9 needs for the per-parcel snapshot.
 
     Returns None if the parcel is not in the parcels table or has no
@@ -453,12 +459,23 @@ def _fetch_snapshot_data(conn: Any, parcel_id: str) -> dict[str, Any] | None:
     # failure renders '—' with the reason instead of aborting the snapshot.
     projection = site_fit.project_parcel(conn, parcel_id)
 
-    return {
+    bundle = {
         "parcel": parcel, "score": score, "market_context": mc,
         "comps": comps, "flags": flags,
         "submarket_name": submarket_name,
         "projection": projection,
     }
+    # reviews/26_flood_wetlands (FW-18): the H4/H6 lines, read ONLY while the
+    # hazard table is enabled (no SQL and no key otherwise). Never raises.
+    if hazards.enabled():
+        bundle["hazard"] = hazards.assess_parcels(conn, [parcel_id]).get(str(parcel_id))
+    # reviews/28_building_comps: read last, and only kept when the market
+    # holds this tool's rows (no key otherwise: byte-identical snapshot).
+    bc = fetch_building_comps(conn, parcel.get("market"), [parcel_id],
+                              today or datetime.now(timezone.utc).date())
+    if bc is not None:
+        bundle["building_comps"] = bc
+    return bundle
 
 
 # ---------------------------------------------------------------------------
@@ -509,6 +526,41 @@ _PROJECTION_FOOTNOTE = (
                  site_fit.CAR_PARKING, site_fit.FIT_RULE))
     + "; height not checked._"
 )
+# reviews/26_flood_wetlands: the footnote once the hazard table is enabled;
+# each highlight line then names what its projection deducted.
+_PROJECTION_FOOTNOTE_HAZARDS = (
+    "_Building projections (operator SiteFit prototypes, reviews/22_site_fit): "
+    + "; ".join((site_fit.RES_BUFFERS, "flood/wetlands deducted only where the hazard data "
+                 "is fresh (each line says what), fill/compensatory storage not considered",
+                 hazards.STREAM_BUFFERS, site_fit.DETENTION, site_fit.CAR_PARKING,
+                 site_fit.FIT_RULE))
+    + "; height not checked._"
+)
+
+
+
+
+def _projection_footnote() -> str:
+    """The memo footnote: exactly the old text while the adjacency table is
+    not enabled; once it is, the adjacency clause replaces RES_BUFFERS
+    (reviews/27_site_fit_buffers, BUF-24)."""
+    text = _PROJECTION_FOOTNOTE if not hazards.enabled() else _PROJECTION_FOOTNOTE_HAZARDS
+    if adjacency.enabled():
+        text = text.replace(site_fit.RES_BUFFERS, adjacency.FOOTNOTE, 1)
+    return text
+
+
+def _flood_lines(bundle: Mapping[str, Any]) -> tuple[str, str]:
+    """program.md's 'Flood zone' and 'Wetlands' snapshot lines. Exactly the
+    old text while the hazard table is not enabled (FW-18)."""
+    if "hazard" not in bundle:
+        return ("not yet wired (Phase 11+ wires FEMA NFIP)",
+                "not yet wired (Phase 11+ wires USGS NWI)")
+    a = bundle.get("hazard")
+    if not isinstance(a, hazards.Assessment):
+        return ("— (hazard data unavailable; H4 not assessed)",
+                "— (hazard data unavailable; H6 not assessed)")
+    return _md_cell(a.flood_line), _md_cell(a.wetlands_line)
 
 
 def _projection_summary(p: Any, used: bool) -> str:
@@ -520,7 +572,7 @@ def _projection_summary(p: Any, used: bool) -> str:
     use = "no" if not used else ("yes" if p.setback_from_rules
                                  else "yes, rated N/A (default setback)")
     tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "
-           f"{site_fit.FLOOD_WETLANDS}; adjacency buffers not applied")
+           f"{site_fit.flood_wetlands_text(p)}; {site_fit.adjacency_text(p)}")
     if best is None:
         return f"Projected max building: — ({_projection_reason(p)}; {tag})."
     return f"Projected max building: {_fmt_sf(best.building_sf)} {best.label} ({tag})."
@@ -547,7 +599,7 @@ def _render_development_potential(parcel: Mapping[str, Any], p: Any) -> str:
         f"- **Estimated buildable area**: 40% coverage of land per program.md: {forty}; "
         f"net of setbacks: {net}",
         f"- **Estimated max building SF**: {max_line}",
-        f"- **Building projection** ({p.rules_label}; {bts}; {site_fit.FLOOD_WETLANDS}):",
+        f"- **Building projection** ({p.rules_label}; {bts}; {site_fit.flood_wetlands_text(p)}):",
     ]
     if p.status == site_fit.OK and p.fits:
         lines += ["", "| Prototype | Building SF | L x W (ft) | Docks | Trailer stalls | "
@@ -567,6 +619,304 @@ def _render_development_potential(parcel: Mapping[str, Any], p: Any) -> str:
         lines.append(f"  - — ({_projection_reason(p)})")
     lines.append("- **Constraints applied**: " + "; ".join(_md_cell(c) for c in p.constraints))
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# reviews/28_building_comps — market rent and exit value from the CoStar
+# building sale and lease comps costar_import.py wrote. Memo only: no
+# scoring input. Reads ONLY that tool's rows (its import_origin, the same
+# predicate its DELETE uses) and re-applies its bands row by row, so a
+# hand-delivered CSV row (cap rate 5.5 'as given', any service type) never
+# reaches a median. Every window is counted from an injected 'today'
+# (never CURRENT_DATE). With no tool row in the market the section is
+# omitted entirely: memo and snapshot are byte-identical to before (BC-16).
+# ---------------------------------------------------------------------------
+_BC = costar_import
+_SQL_BC_LEASES = (
+    "SELECT submarket_id, starting_rent_psf_nnn::float8 FROM leasing_comps "
+    "WHERE " + _BC._SQL_TOOL_ROW + " AND " + _BC._SQL_IN_MARKET + " "
+    "AND lease_type = 'NNN' AND starting_rent_psf_nnn BETWEEN %s AND %s "
+    "AND building_sf_leased BETWEEN %s AND %s "
+    "AND raw->>'sign_date' BETWEEN %s AND %s"
+)
+# idx_comps_submarket_date serves the sales read; leasing_comps has no
+# index, and needs none: the market holds a few hundred rows at most.
+_SQL_BC_SALES = (
+    "SELECT submarket_id, price_psf::float8, cap_rate::float8 FROM sales_comps "
+    "WHERE comp_type = 'building' AND " + _BC._SQL_TOOL_ROW + " AND " + _BC._SQL_IN_MARKET + " "
+    "AND building_sf BETWEEN %s AND %s AND price_psf BETWEEN %s AND %s "
+    "AND sale_date BETWEEN %s AND %s"
+)
+# The submarket scoring uses (research._SQL_RESOLVED_SUBMARKET, through the
+# protected copy in costar_import), not the stored corridor name (BC-03).
+_SQL_BC_RESOLVED_SUBMARKETS = (
+    "SELECT p.parcel_id, " + _BC._SQL_RESOLVED_SUBMARKET + " AS submarket "
+    "FROM parcels p WHERE p.parcel_id = ANY(%s)"
+)
+_SQL_BC_SUBMARKET_NAMES = (
+    "SELECT submarket_id, submarket_name FROM submarkets WHERE submarket_id = ANY(%s)"
+)
+_BC_RENT_LABEL = "Signed NNN starting rent from lease comps"
+_BC_RENT_PHRASE = "signed NNN starting rent from lease comps"
+_BC_NOTE = (
+    "_CoStar building comps imported by costar_import.py (reviews/28_building_comps); "
+    "aggregates only. Leases: signed NNN starting rents, "
+    f"{_BC.BUILDING_MIN_SF:,}-{_BC.BUILDING_MAX_SF:,} SF leased, signed in the last "
+    f"{_BC.LEASE_WINDOW_MONTHS} months, in buildings built in the last "
+    f"{_BC.BUILDING_MAX_AGE_YEARS} years where the export gives the year built. Sales: warehouse/distribution buildings of "
+    f"{_BC.BUILDING_MIN_SF:,}-{_BC.BUILDING_MAX_SF:,} SF built in the last "
+    f"{_BC.BUILDING_MAX_AGE_YEARS} years, sold in the last {_BC.BUILDING_SALE_WINDOW_MONTHS} "
+    f"months, portfolio, partial-interest, leaseback and distressed sales excluded. A submarket "
+    f"needs at least {_BC.MIN_COMPS} comps, otherwise the market-wide value is shown and "
+    "labelled. Median = the average of the two middle values when n is even (the land-comps "
+    "clause in the thesis uses the upper middle value). The exit value is an estimate for "
+    "the projected building, not an appraisal: stabilised and 100% leased at the median "
+    "signed NNN starting rent, with no vacancy, credit loss or reserves, capitalised at "
+    "the median sale cap rate (CoStar's cap rate at sale, on in-place income), so it reads "
+    "high when rents have risen since those sales._"
+)
+_INTRANS, _IDLE = 2, 0  # psycopg.pq.TransactionStatus values (site_fit's pattern)
+
+
+@dataclass(frozen=True)
+class CompStat:
+    value: float
+    n: int
+    label: str                     # 'Alpha Park submarket' / 'Atlanta market-wide'
+    window: tuple[date, date]
+    verb: str                      # 'signed' / 'sold'
+
+    def where(self) -> str:
+        return (f"n={self.n}, {self.label}, {self.verb} {self.window[0].isoformat()} "
+                f"to {self.window[1].isoformat()}")
+
+
+@dataclass(frozen=True)
+class BuildingComps:
+    market_label: str
+    today: date
+    lease_window: tuple[date, date]
+    sale_window: tuple[date, date]
+    rents: Mapping[str | None, Sequence[float]]       # submarket_id -> values
+    psfs: Mapping[str | None, Sequence[float]]
+    caps: Mapping[str | None, Sequence[float]]
+    resolved: Mapping[str, str | None]                # parcel_id -> resolved submarket
+    names: Mapping[str, str]
+
+
+def comp_median(values: Sequence[float]) -> float:
+    """Deterministic median: the average of the two middle values when n is
+    even (the land thesis uses the upper middle value; documented)."""
+    return float(statistics.median(sorted(values)))
+
+
+def _bc_query(conn: Any, sql: str, params: tuple) -> list[tuple]:
+    """One read that never poisons the caller's connection (site_fit._query):
+    a SAVEPOINT inside an open transaction, a rollback on an idle one."""
+    status = getattr(getattr(conn, "info", None), "transaction_status", None)
+    status = int(status) if status is not None else None
+    if status == _INTRANS:
+        with conn.transaction():
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return list(cur.fetchall())
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            return list(cur.fetchall())
+    except Exception:
+        if status == _IDLE:
+            conn.rollback()
+        raise
+
+
+def _group(rows: Sequence[tuple], col: int, lo: float, hi: float) -> dict[str | None, list[float]]:
+    out: dict[str | None, list[float]] = {}
+    for r in rows:
+        v = r[col] if len(r) > col else None
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi:
+            out.setdefault(r[0], []).append(float(v))
+    return out
+
+
+def fetch_building_comps(conn: Any, market: Any, parcel_ids: Sequence[str],
+                         today: date) -> BuildingComps | None:
+    """The tool's comps of ``market`` and the resolved submarkets of
+    ``parcel_ids``: at most four reads whatever the number of parcels
+    (BC-15). None when the market has no tool row, or on any failure
+    (logged, never raised: the rest of the memo renders)."""
+    if not market:
+        return None
+    try:
+        lw = (_BC.months_before(today, _BC.LEASE_WINDOW_MONTHS), today)
+        sw = (_BC.months_before(today, _BC.BUILDING_SALE_WINDOW_MONTHS), today)
+        leases = _bc_query(conn, _SQL_BC_LEASES, (
+            _BC.LEASE_ORIGIN, market, _BC.NNN_RENT_MIN, _BC.NNN_RENT_MAX,
+            _BC.BUILDING_MIN_SF, _BC.BUILDING_MAX_SF, lw[0].isoformat(), lw[1].isoformat()))
+        sales = _bc_query(conn, _SQL_BC_SALES, (
+            _BC.BUILDING_ORIGIN, market, _BC.BUILDING_MIN_SF, _BC.BUILDING_MAX_SF,
+            _BC.SALE_PSF_MIN, _BC.SALE_PSF_MAX, sw[0], sw[1]))
+        if not leases and not sales:
+            return None
+        ids = sorted({str(p) for p in parcel_ids})
+        resolved = {str(r[0]): (str(r[1]) if r[1] is not None else None)
+                    for r in (_bc_query(conn, _SQL_BC_RESOLVED_SUBMARKETS, (ids,)) if ids else [])}
+        subs = sorted({s for s in resolved.values() if s})
+        names = {str(r[0]): str(r[1]) for r in
+                 (_bc_query(conn, _SQL_BC_SUBMARKET_NAMES, (subs,)) if subs else [])
+                 if r[1]}
+        return BuildingComps(
+            market_label=str(market).replace("_", " ").title(), today=today,
+            lease_window=lw, sale_window=sw,
+            rents=_group(leases, 1, _BC.NNN_RENT_MIN, _BC.NNN_RENT_MAX),
+            psfs=_group(sales, 1, _BC.SALE_PSF_MIN, _BC.SALE_PSF_MAX),
+            caps=_group(sales, 2, _BC.CAP_RATE_MIN, _BC.CAP_RATE_MAX),
+            resolved=resolved, names=names)
+    except Exception as exc:  # noqa: BLE001 — memo-only lines; never abort the memo
+        log.warning("building comps unavailable (%s); memo lines omitted", type(exc).__name__)
+        return None
+
+
+def comp_stat(bc: BuildingComps, kind: str, submarket_id: str | None) -> tuple[CompStat | None, str]:
+    """(statistic, why none). The submarket's value when it has MIN_COMPS,
+    else the market-wide value, labelled, when the market has them, else None."""
+    groups, window, verb = {
+        "rent": (bc.rents, bc.lease_window, "signed"),
+        "psf": (bc.psfs, bc.sale_window, "sold"),
+        "cap": (bc.caps, bc.sale_window, "sold"),
+    }[kind]
+    sub = list(groups.get(submarket_id, ())) if submarket_id else []
+    every = [v for vals in groups.values() for v in vals]
+    if len(sub) >= _BC.MIN_COMPS:
+        name = bc.names.get(str(submarket_id), str(submarket_id))
+        return CompStat(comp_median(sub), len(sub), f"{name} submarket", window, verb), ""
+    if len(every) >= _BC.MIN_COMPS:
+        label = f"{bc.market_label} market-wide"
+        if submarket_id is not None:
+            label += f"; {len(sub)} in the submarket"
+        return CompStat(comp_median(every), len(every), label, window, verb), ""
+    if submarket_id is None:       # the market-wide line, or no resolved submarket
+        return None, f"n={len(every)} market-wide; at least {_BC.MIN_COMPS} needed"
+    return None, (f"n={len(sub)} in the submarket, {len(every)} market-wide; "
+                  f"at least {_BC.MIN_COMPS} needed")
+
+
+def _fmt_rent(s: CompStat) -> str:
+    return f"${s.value:,.2f}/SF/yr"
+
+
+def _fmt_psf(s: CompStat) -> str:
+    return f"${s.value:,.0f}/SF"
+
+
+def _fmt_cap(s: CompStat) -> str:
+    return f"{s.value * 100:.1f}%"
+
+
+def _fmt_millions(v: float) -> str:
+    return f"${v / 1e6:,.1f}M"
+
+
+def exit_value_parts(p: Any, rent: CompStat | None, cap: CompStat | None,
+                     psf: CompStat | None) -> tuple[str, str] | None:
+    """(rules label, estimate text) for the projection the memo already
+    shows (site_fit.best_fit), or None (BC-08). Income method when rent and
+    cap rate both have their comps, else sale $/SF x SF, else nothing; never
+    a default cap rate, never a cap rate <= 0. Rounded to $0.1M."""
+    if not isinstance(p, site_fit.Projection) or p.status != site_fit.OK:
+        return None
+    best = site_fit.best_fit(p)
+    if best is None or not isinstance(best.building_sf, int) or best.building_sf <= 0:
+        return None
+    sf = best.building_sf
+    building = f"the projected {sf:,} SF {best.label}"
+    if rent is not None and cap is not None and cap.value > 0:
+        value = rent.value * sf / cap.value
+        return p.rules_label, (
+            f"{_fmt_millions(value)} = {building} x {_BC_RENT_PHRASE} "
+            f"{_fmt_rent(rent)} / cap rate {_fmt_cap(cap)} (rent {rent.where()}; "
+            f"cap rate {cap.where()}); stabilised, 100% leased, no vacancy or reserves; "
+            "an estimate, not an appraisal")
+    if psf is not None and psf.value > 0:
+        value = psf.value * sf
+        return p.rules_label, (
+            f"{_fmt_millions(value)} = {building} x building sale price "
+            f"{_fmt_psf(psf)} ({psf.where()}); no income method (too few lease or "
+            "cap-rate comps); an estimate, not an appraisal")
+    return None
+
+
+def exit_value_text(p: Any, rent: CompStat | None, cap: CompStat | None,
+                    psf: CompStat | None) -> str | None:
+    parts = exit_value_parts(p, rent, cap, psf)
+    return f"Exit value estimate ({parts[0]}): {parts[1]}" if parts else None
+
+
+def _stat_text(stat: CompStat | None, why: str, fmt: Any) -> str:
+    return f"{fmt(stat)} ({stat.where()})" if stat is not None else f"— ({why})"
+
+
+def _building_comps_snapshot_lines(bundle: Mapping[str, Any]) -> str:
+    """'' with no tool rows (byte-identical snapshot), else the Market
+    Context lines, each with its count, scope and window."""
+    bc = bundle.get("building_comps")
+    if not isinstance(bc, BuildingComps):
+        return ""
+    pid = str(bundle["parcel"].get("parcel_id"))
+    sub = bc.resolved.get(pid)
+    rent, rwhy = comp_stat(bc, "rent", sub)
+    psf, pwhy = comp_stat(bc, "psf", sub)
+    cap, cwhy = comp_stat(bc, "cap", sub)
+    parts = exit_value_parts(bundle.get("projection"), rent, cap, psf)
+    return "\n".join([
+        "",
+        f"- **{_BC_RENT_LABEL}**: {_stat_text(rent, rwhy, _fmt_rent)}",
+        f"- **Building sale comps**: {_stat_text(psf, pwhy, _fmt_psf)}; cap rate "
+        f"{_stat_text(cap, cwhy, _fmt_cap)}",
+        (f"- **Exit value estimate** ({parts[0]}): {parts[1]}" if parts else
+         "- **Exit value estimate**: — (no fitted building projection, or too few comps)"),
+    ])
+
+
+def _parse_today(today: Any) -> date:
+    """The memo/snapshot date the comp windows count from (injectable; UTC
+    today when absent or unreadable)."""
+    try:
+        return date.fromisoformat(str(today)[:10]) if today else datetime.now(timezone.utc).date()
+    except ValueError:
+        return datetime.now(timezone.utc).date()
+
+
+def _render_building_comps_section(bc: Any, top: Sequence[Mapping[str, Any]],
+                                   projections: Mapping[str, Any] | None) -> str:
+    """'' with no tool rows (byte-identical memo), else the memo section:
+    one market-wide line and one line per highlight (aggregates only)."""
+    if not isinstance(bc, BuildingComps):
+        return ""
+    rent, rwhy = comp_stat(bc, "rent", None)
+    psf, pwhy = comp_stat(bc, "psf", None)
+    cap, cwhy = comp_stat(bc, "cap", None)
+    lines = [
+        "## Building Comps (CoStar; estimates)", "", _BC_NOTE, "",
+        f"- **{bc.market_label} market-wide**: {_BC_RENT_PHRASE} "
+        f"{_stat_text(rent, rwhy, _fmt_rent)}; building sale price "
+        f"{_stat_text(psf, pwhy, _fmt_psf)}; cap rate {_stat_text(cap, cwhy, _fmt_cap)}",
+    ]
+    for r in top:
+        pid = str(r.get("parcel_id"))
+        sub = bc.resolved.get(pid)
+        rent, rwhy = comp_stat(bc, "rent", sub)
+        psf, pwhy = comp_stat(bc, "psf", sub)
+        cap, cwhy = comp_stat(bc, "cap", sub)
+        name = bc.names.get(str(sub), str(sub)) if sub else "no submarket"
+        text = exit_value_text((projections or {}).get(r.get("parcel_id")), rent, cap, psf)
+        lines.append(
+            f"- **{_md_cell(pid)}** ({_md_cell(name)}): rent {_stat_text(rent, rwhy, _fmt_rent)}; "
+            f"sale price {_stat_text(psf, pwhy, _fmt_psf)}; cap rate "
+            f"{_stat_text(cap, cwhy, _fmt_cap)}. "
+            + (text + "." if text else "Exit value estimate: — (no fitted building "
+               "projection, or too few comps)."))
+    return "\n".join(lines) + "\n\n"
 
 
 # ---------------------------------------------------------------------------
@@ -862,6 +1212,8 @@ def _render_snapshot_markdown(
     )
     thesis_md = _render_investment_thesis(parcel, score, mc, comps)
     dev_md = _render_development_potential(parcel, bundle.get("projection"))
+    flood_md, wetlands_md = _flood_lines(bundle)
+    bc_md = _building_comps_snapshot_lines(bundle)
 
     rec, rec_reason = _compute_recommendation(
         composite, actionability, threshold,
@@ -924,8 +1276,8 @@ def _render_snapshot_markdown(
 - **Water / Sewer / Electric / Gas / Fiber**: not yet wired (Phase 11+ wires utility provider service maps)
 
 ### Environmental
-- **Flood zone**: not yet wired (Phase 11+ wires FEMA NFIP)
-- **Wetlands**: not yet wired (Phase 11+ wires USGS NWI)
+- **Flood zone**: {flood_md}
+- **Wetlands**: {wetlands_md}
 - **EPA flags**: not yet wired (Phase 11+ wires EPA Envirofacts)
 
 ### Market Context
@@ -933,7 +1285,7 @@ def _render_snapshot_markdown(
 - **Submarket absorption (T12)**: {_format_int_thousands(mc.get("net_absorption_t12_sf"))} SF
 - **Competing pipeline (under construction)**: {_format_int_thousands(mc.get("under_construction_sf"))} SF
 - **Submarket asking rent (NNN)**: {_format_currency_psf(mc.get("asking_rent_nnn_psf"))}
-- **As of**: {_format_date(mc.get("as_of_date"))} ({_md_cell(mc.get("source"))})
+- **As of**: {_format_date(mc.get("as_of_date"))} ({_md_cell(mc.get("source"))}){bc_md}
 
 ### Ownership & Off-Market Signals
 - **Owner**: {_md_cell(parcel.get("owner_name"))}
@@ -1049,6 +1401,7 @@ def _render_memo_markdown(
     params: Mapping[str, Any],
     today: str,
     projections: Mapping[str, Any] | None = None,
+    building_comps: Any = None,
 ) -> str:
     """Render the strategy memo per program.md L757-L807. Always renders,
     even when ``rows`` is empty -- the "no pipeline this cycle" memo is
@@ -1151,7 +1504,8 @@ def _render_memo_markdown(
                     projections.get(r.get("parcel_id")), bool(r.get("_bts_projection_used")))
             top_lines.append(line)
         if projections is not None:
-            top_lines += ["", _PROJECTION_FOOTNOTE]
+            top_lines += ["", _PROJECTION_FOOTNOTE] if not (
+                hazards.enabled() or adjacency.enabled()) else ["", _projection_footnote()]
         top_md = "\n".join(top_lines)
     else:
         top_md = "_No actionable or qualified parcels in this cycle._"
@@ -1215,6 +1569,7 @@ def _render_memo_markdown(
     open_q_block = "\n".join(open_q_lines)
     rec_block = "\n".join(rec_lines)
     top_count = min(_MEMO_TOP_N, len(top10)) if top10 else 0
+    bc_block = _render_building_comps_section(building_comps, top10 or [], projections)
 
     md = f"""# {market.title()} Strategy Memo — {today}
 
@@ -1246,7 +1601,7 @@ def _render_memo_markdown(
 
 {top_md}
 
-## Open Questions and Recommended Human Decisions
+{bc_block}## Open Questions and Recommended Human Decisions
 
 {open_q_block}
 
@@ -1286,6 +1641,7 @@ def generate_snapshot(
     conn: Any = None,
     output_dir: Path | str | None = None,
     params: Mapping[str, Any] | None = None,
+    today: str | None = None,
 ) -> Path:
     """Render and persist the per-parcel investment thesis snapshot.
 
@@ -1317,7 +1673,7 @@ def generate_snapshot(
         ctx = prepare.get_connection()
         conn = ctx.__enter__()
     try:
-        bundle = _fetch_snapshot_data(conn, parcel_id)
+        bundle = _fetch_snapshot_data(conn, parcel_id, _parse_today(today))
         if bundle is None:
             raise LookupError(
                 f"snapshot requires a scored parcel; parcel_id={parcel_id!r} "
@@ -1438,9 +1794,12 @@ def generate_strategy_memo(
                 r["_bts_projection_used"] = _used_for_bts(
                     {"parcel_id": z[0], "zoning": z[1], "zoning_description": z[2]})
 
+        # reviews/28_building_comps: the highlights' comps, read last.
+        building_comps = fetch_building_comps(conn, market, top_ids, _parse_today(today))
         markdown = _render_memo_markdown(
             market, cycle_id, rows, flags, log_entries,
             params=params, today=today, projections=projections,
+            building_comps=building_comps,
         )
     finally:
         if own_conn and ctx is not None:
