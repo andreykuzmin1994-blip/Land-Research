@@ -42,7 +42,7 @@ process adds no protection for low-risk changes). The tier table lives in
 
 **Confirm Step 1 by stating** (in your response back to the human, verbatim, before doing anything else):
 > "Step 1 complete. I have read AUTORESEARCH_MECHANICS.md. I understand:
-> - The five-file contract: program.md (human-only), prepare.py (immutable during run), parameters.json (immutable during run), sources.json (locked during run), research.py (my sandbox); plus the human-owned zoning_rules.json, building_prototypes.json and rules_sources.json (never edited by the agent) and the immutable-during-run modules listed in AUTORESEARCH_MECHANICS.md (including zoning.py, site_fit.py, rules_scrape.py, hazards.py and hazards_import.py)
+> - The five-file contract: program.md (human-only), prepare.py (immutable during run), parameters.json (immutable during run), sources.json (locked during run), research.py (my sandbox); plus the human-owned zoning_rules.json, building_prototypes.json and rules_sources.json (never edited by the agent) and the immutable-during-run modules listed in AUTORESEARCH_MECHANICS.md (including zoning.py, site_fit.py, rules_scrape.py, hazards.py, hazards_import.py, adjacency.py and adjacency_import.py)
 > - I edit ONLY research.py during a run
 > - The metric (actionable_pipeline_count) is calculated by prepare.py and I cannot modify how it is calculated
 > - The experiment loop is keep-or-revert via git ratchet on a dedicated autoresearch/<tag> branch

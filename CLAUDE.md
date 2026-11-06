@@ -51,13 +51,22 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
 - **Immutable during a run**: `runner.py`, `costar_ingest.py`,
   `costar_import.py`, `reporting.py`, `pipeline_common.py`, `zoning.py`,
   `zoning_import.py`, `site_fit.py`, `rules_scrape.py`, `hazards.py`,
-  `hazards_import.py`. Between runs, changes there are Tier 2
-  (`STANDING_RISKS.md` § "Change tiers").
+  `hazards_import.py`, `adjacency.py`, `adjacency_import.py`. Between
+  runs, changes there are Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **Flood/wetlands (H4/H6)**: the facts, SQL and decision live in
   `hazards.py`; `hazards_import.py` (between runs only) writes the
   proposed `parcel_hazards` table. Both stay inert until a human applies
   the prepare-mutation proposal in `reviews/26_flood_wetlands/`; the first
   populated import changes the metric and needs a new run + baseline.
+- **Adjacency buffers (site fit)**: neighbour facts, the buffer-key
+  allow-list and the per-side plan live in `adjacency.py`;
+  `adjacency_import.py` (between runs only) writes the proposed
+  `parcel_adjacency` table from the zoning layers in `sources.json`. Inert
+  until a human applies the prepare-mutation proposal in
+  `reviews/27_site_fit_buffers/`; residential buffers further need a
+  human-written `neighbour_classes` table in `zoning_rules.json`. Once any
+  jurisdiction is verified, enabling the table plus a populated import
+  changes BTS and needs a new run + baseline.
 - **`research.py` is the agent sandbox** — the ONLY file the agent edits
   during an experiment run. One focused change per experiment, committed
   as `exp: <description>` on the `autoresearch/<tag>` branch;

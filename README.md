@@ -32,6 +32,14 @@ need a new table that only a human adds to `prepare.py` (the proposal is
 `reviews/26_flood_wetlands/01_prepare_mutation_proposal.md`). Until then H4/H6
 stay data_gap passes and every score is unchanged. See "Flood and wetlands".
 
+2026-11-06: site-fit adjacency buffers (residential, other-district, ROW) are
+built (`adjacency.py`, `make adjacency-import`, `reviews/27_site_fit_buffers/`)
+but **inert**: they need a new table that only a human adds to `prepare.py`
+(`reviews/27_site_fit_buffers/01_prepare_mutation_proposal.md`) and, for
+residential buffers, a human-written neighbour-class table in
+`zoning_rules.json`. Until then every projection and score is unchanged. See
+"Adjacency buffers".
+
 For live repo state, run `make status` (setup checks + last TSV rows) — prose snapshots of state in documents go stale; the command does not.
 
 ## Quick Start (Operator)
@@ -285,6 +293,33 @@ those queries, so it fails both sources without a data request. The data
 is screening only: not an official flood determination (the effective FIRM
 governs) and not a jurisdictional wetland delineation.
 
+## Adjacency buffers (site fit, operator, between runs)
+
+`adjacency.py` and `adjacency_import.py` (`reviews/27_site_fit_buffers/`)
+apply the zoning buffers each district's rules list (South Fulton / FID
+residential side 50 / rear 100 ft plus a 10 ft improvement setback, Union
+City 75 ft plus a 20 ft setback from it, Fairburn 50 ft from residential and
+from any other district, Atlanta 20 ft transitional yards) per side, where
+the neighbour's zoning is known. The import reads the zoning layers already
+registered in `sources.json` (robots.txt permitting, 1 request/second per
+host) and stores, per candidate parcel, which boundary parts face which raw
+neighbour district code, or that nothing is known there. Site fit then
+buffers each fresh, applicable part by max(uniform setback, buffer); it
+never relaxes the uniform setback. Frontage is unknown, so the rear value is
+applied to every abutting side; side parts with no zoning polygon read
+"adjacency unknown" (never ROW, never "no neighbour"); every projection
+says what was applied and what was not.
+
+Nothing of this is active until a human:
+
+1. applies `reviews/27_site_fit_buffers/01_prepare_mutation_proposal.md` to
+   `prepare.py` between runs (`make db-check` then creates `parcel_adjacency`);
+2. for residential/agricultural buffers, adds a cited `neighbour_classes`
+   table per jurisdiction to `zoning_rules.json` (same proposal document);
+3. runs `make adjacency-import` (counts only; exit 4 names a failed source,
+   whose territory then reads as adjacency unknown), then, once any
+   jurisdiction is verified, starts a new run and baseline.
+
 ## Zoning-code scraper (operator, between runs)
 
 `make rules-scrape` (`rules_scrape.py`, `reviews/23_rules_scraper/`) reads
@@ -416,6 +451,8 @@ land-site-selector/
 ├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (inert until the parcel_hazards proposal is applied)
 ├── hazards_import.py                  — IMMUTABLE during run: writes parcel_hazards from hazards_inbox/ files (operator, between runs)
 ├── hazards_inbox/                     — gitignored: NFHL county package + NWI state shapefile the operator downloads by hand
+├── adjacency.py                       — IMMUTABLE during run: neighbour adjacency facts, buffer-key allow-list, per-side buffer plan (inert until the parcel_adjacency proposal is applied)
+├── adjacency_import.py                — IMMUTABLE during run: writes parcel_adjacency from the registered zoning layers (operator, between runs)
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)

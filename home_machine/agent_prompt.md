@@ -33,7 +33,11 @@ without asking questions; nobody is watching this session.
    `research.py`. Flood and wetlands (H4/H6) are protected too: never edit
    `hazards.py` or `hazards_import.py`, never run the import, and take
    H4/H6 only from `hazards.assess_parcels` behind `hazards.enabled()`
-   (no thresholds, zone lists or hazard SQL in `research.py`).
+   (no thresholds, zone lists or hazard SQL in `research.py`). Adjacency
+   buffers are protected too: never edit `adjacency.py` or
+   `adjacency_import.py`, never run the import, and never name them or the
+   `parcel_adjacency` table in `research.py` (site fit applies the buffers
+   itself).
    If the best idea needs a new source, pick another idea and put
    `NEEDS-SOURCE: <what and why>` in the commit body. Never scrape CoStar.
 5. Run exactly `python -m unittest discover -s tests`. It must pass. Fix your change if
