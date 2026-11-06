@@ -311,7 +311,11 @@ document (`official: <title>, <section> (obtained from ..., <date>)`),
 never a file path. A changed file is reported "changed (operator replaced
 file)" by `make rules-watch`; a pinned sha256 that no longer matches is
 refused (exit 4). Scanned PDFs without a text layer are reported "no text
-layer (scanned PDF): route to --assisted". Before `--llm` on an export,
+layer (scanned PDF): ask for a text PDF; values cannot be verified" (exit 4;
+an `--assisted` record for such a section is rejected and counted, because
+there is no text to check its quote against). A text PDF or text file
+prints a two-column table as label, spaces, value; `label_value` reads that
+too. A cut section whose parser reads no value at all exits 4. Before `--llm` on an export,
 check the export's terms. The registry edits to make are in
 `reviews/24_rules_local_files/rules_sources_patch.json`.
 

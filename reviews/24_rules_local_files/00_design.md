@@ -37,11 +37,15 @@ stays draft.
 
 - `TERMS_BLOCKED_DOMAINS = frozenset({"zoneomics.com"})`, a code constant.
   No registry key, CLI flag, environment variable or parameter changes it.
-  `terms_blocked(host)` works on a normalised host: lower case, no
-  userinfo, no port, no trailing dot, IDNA form. It matches the domain and
+  `terms_blocked(host)` works on a normalised host: percent-decoded, lower
+  case, no userinfo, no port, no trailing dot, IDNA form. It matches the domain and
   every subdomain (`h == d or h.endswith("." + d)`). `url_terms_blocked`
-  also fails closed on a userinfo or backslash trick and on an unparsable
-  URL.
+  also fails closed on a userinfo or backslash trick, on any `%` in the
+  authority (requests decodes `zoneomics%2ecom` before it connects) and on
+  an unparsable URL. A registry URL or host key with `%` in the authority
+  refuses the registry. `host_denied` (Municode) checks the decoded host
+  too, and `_raw_get` re-checks both lists on the host of the URL requests
+  actually prepares (review round 1, finding 1).
 - It is distinct from the Municode denylist (`host_denied`), which makes a
   registry fail to load. A registry source on a blocked host loads as a
   `SourceDef` with `blocked_reason`, so FID and Union City keep working
@@ -94,7 +98,8 @@ Registry entry (`kind: local_file`; its own key set, no `url`):
   without a scheme), or a denylisted URL. `obtained_on` must be an ISO date
   between 2000-01-01 and today. `sha256` must be 64 lower-case hex digits
   or `"record on first use"`. An enabled entry with a placeholder (`<`,
-  `>` or `TODO`) is refused. Parser and format must match (all sources):
+  `>` or `TODO`) in title, obtained_from, obtained_on or any section
+  label, start or end marker is refused. Parser and format must match (all sources):
   `district_grid` and `use_table` need html, `pdf_grid` needs pdf, and txt
   allows `label_value` and `llm_prose` only.
 - **Read (`read_local`).** The inbox must exist, must not be a symlink,
@@ -136,6 +141,10 @@ Registry entry (`kind: local_file`; its own key set, no `url`):
   (the record for "record on first use"). `--watch` reports a different
   sha256 as "changed (operator replaced file)", with the section hashes
   compared as usual.
+- **Diff.** A disabled or terms-blocked entry over the same district and
+  field (a kept mirror, the second local entry still off) never masks why
+  an enabled source failed: the category is taken from the enabled,
+  unblocked sources when there are any (review round 1, finding 2).
 - **Statuses.** `read` (ok). `refused` (path, file, format, pin or
   provenance problem; exit 4). `unreachable: file not in rules_inbox/`
   (exit 4). Error texts name the source key and a reason class only:
@@ -146,9 +155,13 @@ Registry entry (`kind: local_file`; its own key set, no `url`):
 | Format | Deterministic | Otherwise |
 |---|---|---|
 | Municode-style HTML export (div wrappers, `Sec. 80-85. - ...` headings, tables in divs, `<sup>` footnotes) | `label_value`, `district_grid`, `use_table` work. Tested on a synthetic export, including the round-1 chain rule. | — |
-| City PDF with a text layer | `label_value` when label and value share a line; `pdf_grid` for aligned grids. Tested on a PDF built in the test. | Merged-header tables (South Fulton Table 4-1 as a PDF) go to `llm_prose` or `--assisted`. |
-| Scanned PDF (no text layer) | — | "no text layer (scanned PDF): route to --assisted" (exit 4). No OCR dependency (SR-10). A human must type the values into an assisted file, but the verifier needs text to check a quote against, so a scan cannot be verified. Ask the clerk for a text PDF. |
-| Plain text | `label_value` | Tables lose their structure, so `district_grid`, `use_table` and `pdf_grid` are refused at load. Use `llm_prose` or `--assisted` for tables. |
+| City PDF with a text layer | `label_value` when label and value share a line, separated by `:`, a dash, a dot leader or `\|`, or (pdf and txt only) a run of two or more spaces or a tab, which is how `pdftotext -layout` prints a two-column table. `pdf_grid` for aligned grids. Tested on PDFs built in the test, including a two-column table with the patch's Fairburn markers. | A value that wraps to the next line is reported "label found, no separator or value after it on its line" and the run exits 4: use `llm_prose` or `--assisted`. Merged-header tables (South Fulton Table 4-1 as a PDF) go to `llm_prose` or `--assisted`. |
+| Scanned PDF (no text layer) | — | "no text layer (scanned PDF): ask for a text PDF; values cannot be verified" (exit 4). No OCR dependency (SR-10). The verifier needs text to check a quote against, so a scan cannot be verified, and an `--assisted` record aimed at such a section is rejected and counted, with its reason on the console. Ask the clerk for a text PDF. |
+| Plain text | `label_value` (same separators as a PDF) | Tables lose their structure, so `district_grid`, `use_table` and `pdf_grid` are refused at load. Use `llm_prose` or `--assisted` for tables. |
+
+A section that is cut but whose deterministic parser reads no value at all
+exits 4 ("found but no value read"), so a copy whose labels do not fit is
+never a silent exit 0.
 
 `pdftotext` now runs with the 120 s timeout and a 64 MB stdout cap (the
 process is killed beyond either). `pdfinfo` runs only for local PDFs.
@@ -161,14 +174,22 @@ process is killed beyond either). `pdfinfo` runs only for local PDFs.
 1. `disable_sources`: set `enabled: false` on all 8 Zoneomics sources
    (South Fulton x2, Fairburn, Atlanta x2, East Point, Hapeville; College
    Park is already off).
-2. `set_hosts`: replace the three host entries. Zoneomics `terms_url` is
-   now `/terms-of-use`, with the operator's finding in `note`. For Fulton
-   County and Union City, `note` carries the proposed text "reviewed: no
-   terms page found; public government document", marked NOT CHECKED BY
-   THE AGENT and `<OPERATOR SIGNS>`. `terms_reviewed_by` and
-   `terms_reviewed_on` stay null until a human checks the footer (Terms,
-   Disclaimer, Site Policies; Akamai bot policy for Union City) and fills
-   both.
+2. `set_hosts`: replace four host entries. Zoneomics `terms_url` is now
+   `/terms-of-use`, with the operator's finding in `note`. For
+   `www.fultoncountyga.gov`, `www.unioncityga.gov` and
+   `gismaps.fultoncountyga.gov`, `note` carries the proposed review text
+   "reviewed: no terms page found; public government document", marked
+   NOT CHECKED BY THE AGENT and `<OPERATOR SIGNS>`, and the two review
+   fields hold `<OPERATOR: ...>` placeholders for the human's name and
+   date. **Deviation from decision 3, on purpose:** the registry has no
+   free-text review field, and `terms_reviewed_by`/`_on` are the human's
+   signature (they decide whether the tool may fetch without
+   `--allow-unreviewed-terms`), so the agent puts the proposed text in
+   `note` and leaves the signature to the human. `Registry.terms_reviewed`
+   treats a placeholder as unsigned, so applying the patch unsigned
+   changes nothing. A human checks the footer (Terms, Disclaimer, Site
+   Policies; Akamai bot policy for Union City; the ArcGIS server's terms
+   for gismaps) and replaces both placeholders.
 3. `set_jurisdiction_notes`: replace those jurisdictions' `note`.
 4. `add_sources`: append these entries to the jurisdiction's `sources`.
    South Fulton gets three sources over one file
@@ -176,7 +197,7 @@ process is killed beyond either). `pdfinfo` runs only for local PDFs.
    `district_grid`, Sec. 207.06 Table 2-4 as `use_table`, and Sec. 405 and
    Sec. 510 as `llm_prose`. Fairburn gets two sources over
    `rules_inbox/fairburn/chapter80.html`: Sec. 80-85 and Sec. 80-86 as
-   `label_value`, and Sec. 80-337, 80-367 and 80-372 as `llm_prose`. All are
+   `label_value` (an html or a text PDF copy; see "Official formats"), and Sec. 80-337, 80-367 and 80-372 as `llm_prose`. All are
    `enabled: false` with `<OPERATOR: ...>` placeholders and `sha256:
    "record on first use"`. Before enabling one: put the file at that path,
    fill title, `obtained_from` (name the channel: "City Clerk" or
@@ -258,8 +279,7 @@ terms review yet. Every request the session sent was recorded.
 
 ## Not done
 
-- No independent post-change adversarial review in this session (the
-  implementer's context wrote the code). One is needed before merge (Tier 2).
+- The independent post-change review is recorded in `03_decision_note.md`.
 - The real South Fulton and Fairburn files are not in hand, so their
   markers, labels and headers are not validated against official text.
 - No OCR for scanned PDFs (SR-10).

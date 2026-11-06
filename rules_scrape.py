@@ -210,7 +210,7 @@ MAX_TABLE_CELLS = 20_000               # cells in one table of a local document
 MAX_PDFTEXT_BYTES = 64 * 1024 * 1024   # pdftotext stdout cap
 PDFTEXT_TIMEOUT_S = 120
 MIN_TEXT_LAYER_CHARS = 40              # fewer non-space characters: a scanned PDF
-NO_TEXT_LAYER = "no text layer (scanned PDF): route to --assisted"
+NO_TEXT_LAYER = "no text layer (scanned PDF): ask for a text PDF; values cannot be verified"
 LOCAL_MISSING = "file not in rules_inbox/"
 OFFICIAL_CITE_PREFIX = "official:"
 READ_STATUSES = ("fetched", "replayed", "read")
@@ -286,15 +286,25 @@ def registrable_domain(host: str) -> str:
 
 
 def host_denied(host: str | None) -> bool:
-    h = (host or "").lower().rstrip(".")
-    return not h or h in _DENY_HOSTS or bool(_DENY_HOST_RE.search(h))
+    """The Municode denylist, on the raw spelling AND the normalised host
+    (percent-decoded, IDNA), so 'library.%6Dunicode.com' is denied too."""
+    raw = (host or "").lower().rstrip(".")
+    h = norm_host(host)
+    return not raw or not h or "%" in h or any(
+        x in _DENY_HOSTS or bool(_DENY_HOST_RE.search(x)) for x in (raw, h))
 
 
 def norm_host(host: str | None) -> str:
-    """Lower case, no userinfo, no port, no trailing dot, IDNA (ASCII) form,
-    so 'ZONEOMICS.COM.', 'www.zoneomics.com:443' and a full-width spelling
-    all compare equal to 'zoneomics.com' / 'www.zoneomics.com' (LF-03)."""
-    h = str(host or "").strip().lower().rsplit("@", 1)[-1]
+    """Percent-decoded, lower case, no userinfo, no port, no trailing dot,
+    IDNA (ASCII) form, so 'ZONEOMICS.COM.', 'www.zoneomics.com:443',
+    'zoneomics%2ecom' (requests decodes that before it connects) and a
+    full-width spelling all compare equal to 'zoneomics.com' (LF-03)."""
+    h = str(host or "").strip()
+    for _ in range(3):                       # '%252e' -> '%2e' -> '.'
+        if "%" not in h:
+            break
+        h = unquote(h)
+    h = h.lower().rsplit("@", 1)[-1]
     if h.startswith("["):
         return h
     h = h.split(":", 1)[0].rstrip(".")
@@ -321,6 +331,10 @@ def url_terms_blocked(url: Any) -> bool:
         host, netloc = p.hostname, p.netloc.lower()
     except ValueError:
         return True
+    if "%" in netloc:
+        # A percent-encoded authority is decoded by requests before it
+        # connects ('zoneomics%2ecom' -> zoneomics.com): fail closed (LF-03).
+        return True
     if terms_blocked(host):
         return True
     return ("@" in netloc or "\\" in s.split("?", 1)[0]) and any(
@@ -342,6 +356,10 @@ def _blocked_names() -> tuple[str, ...]:
     return tuple(sorted(doms | {d.split(".")[0] for d in doms}))
 
 
+_CF_DROP = {cp: None for cp in range(0x80, 0x110000)
+            if unicodedata.category(chr(cp)) == "Cf"}
+
+
 def mentions_blocked_host(text: str) -> bool:
     """Does the text name a terms-blocked or mirror host, also behind HTML
     entities, percent-encoding or inserted whitespace?"""
@@ -352,6 +370,11 @@ def mentions_blocked_host(text: str) -> bool:
     except (ValueError, TypeError):
         u = t.lower()
     variants |= {u, _WS_RE.sub("", u), unicodedata.normalize("NFKC", u)}
+    # Invisible format characters (Unicode Cf: soft hyphen, zero-width
+    # space/joiner, bidi marks) inside a name ('zone\u00adomics') would
+    # survive the variants above (review round 1, finding 5).
+    bare = {v if v.isascii() else v.translate(_CF_DROP) for v in variants}
+    variants |= bare | {_WS_RE.sub("", unicodedata.normalize("NFKC", v)) for v in bare}
     return any(n in v for v in variants for n in _blocked_names())
 
 
@@ -529,16 +552,24 @@ class Registry:
         return next((s for s in self.sources if s.key == key), None)
 
     def terms_reviewed(self, host: str) -> bool:
-        """A human filled both review fields. Never lifts the terms block."""
+        """A human filled both review fields (a '<OPERATOR: ...>' placeholder
+        is not a signature). Never lifts the terms block."""
         h = self.hosts.get(host) or {}
-        return bool(h.get("terms_reviewed_by") and h.get("terms_reviewed_on"))
+        by, on = h.get("terms_reviewed_by"), h.get("terms_reviewed_on")
+        return bool(by and on) and not _placeholder(by) and not _placeholder(on)
 
 
 def _https_url(u: Any) -> bool:
     if not isinstance(u, str) or not u.startswith("https://"):
         return False
-    p = urlparse(u)
-    return bool(p.hostname) and not host_denied(p.hostname) and p.username is None
+    try:
+        p = urlparse(u)
+        host = p.hostname
+    except ValueError:
+        return False
+    # No '%' in the authority: requests would decode it before connecting.
+    return bool(host) and "%" not in p.netloc and not host_denied(host) \
+        and p.username is None
 
 
 def _placeholder(v: Any) -> bool:
@@ -657,7 +688,8 @@ def validate_registry(data: Any, *, today: date | None = None) -> Registry:
     if not isinstance(hosts, dict) or not hosts:
         raise Refused("rules_sources.json: hosts must be a non-empty object")
     for i, (h, meta) in enumerate(sorted(hosts.items())):
-        if host_denied(h) or not isinstance(meta, dict) or set(meta) - _HOST_KEYS:
+        if host_denied(h) or "%" in str(h) or not isinstance(meta, dict) \
+                or set(meta) - _HOST_KEYS:
             raise Refused(f"rules_sources.json: hosts[{i}] malformed or denylisted")
         for k in ("terms_reviewed_by", "terms_reviewed_on"):
             if meta.get(k) is not None and not isinstance(meta.get(k), str):
@@ -751,6 +783,10 @@ def validate_registry(data: Any, *, today: date | None = None) -> Registry:
                 if not (isinstance(st, list) and st and all(isinstance(x, str) and x.strip()
                                                             for x in st)):
                     raise Refused(f"{cw}: start must be text or a list of text")
+                if kind == "local_file" and s["enabled"] and any(
+                        _placeholder(x) for x in (sec["label"], sec["end"], *st)):
+                    raise Refused(f"{cw}: label/start/end is a placeholder; re-derive it from "
+                                  "the file before enabling the source")
                 if sec.get("pick", "longest") not in ("longest", "last"):
                     raise Refused(f"{cw}: pick must be 'longest' or 'last'")
                 d = sec.get("district")
@@ -1058,6 +1094,16 @@ class PoliteFetcher:
         if host_denied(host):
             raise Unreachable("denylisted host")
         if url_terms_blocked(url):          # backstop: nothing reaches a blocked host (LF-03)
+            raise Unreachable(TERMS_BLOCKED)
+        # Backstop on the URL requests will actually contact: its preparation
+        # decodes percent-escapes and applies IDNA to the host.
+        try:
+            prepared = requests.Request("GET", url).prepare().url or ""
+        except Exception:                   # noqa: BLE001 - any failure: refuse
+            raise Unreachable("URL cannot be prepared") from None
+        if host_denied(urlparse(prepared).hostname):
+            raise Unreachable("denylisted host")
+        if url_terms_blocked(prepared):
             raise Unreachable(TERMS_BLOCKED)
         if self.total() >= self.max_requests:
             raise BudgetExceeded(f"request budget of {self.max_requests} spent")
@@ -1565,17 +1611,21 @@ def _run_capped(argv: Sequence[str], timeout: float, cap: int) -> bytes | None:
     t = threading.Thread(target=pump, daemon=True)
     t.start()
     t.join(timeout)
-    if t.is_alive() or over.is_set():
-        proc.kill()
-        proc.wait()
-        t.join(5)
-        return None
     try:
-        rc = proc.wait(timeout=10)
-    except subprocess.SubprocessError:
-        proc.kill()
-        return None
-    return bytes(buf) if rc == 0 else None
+        if t.is_alive() or over.is_set():
+            proc.kill()
+            proc.wait()
+            t.join(5)
+            return None
+        try:
+            rc = proc.wait(timeout=10)
+        except subprocess.SubprocessError:
+            proc.kill()
+            return None
+        return bytes(buf) if rc == 0 else None
+    finally:
+        if proc.stdout is not None and not t.is_alive():
+            proc.stdout.close()
 
 
 def pdf_document(body: bytes, info: Mapping[str, Any] | None, *,
@@ -2427,6 +2477,20 @@ def parse_district_grid(section: Section) -> ParseResult:
     return res
 
 
+class _GapMatch:
+    """The slice of a label_value hit found with a whitespace gap, shaped
+    like the re.Match the separator path uses (start, start('val'), group)."""
+
+    def __init__(self, start: int, val_start: int, val: str):
+        self._start, self._val_start, self._val = start, val_start, val
+
+    def start(self, name: str | None = None) -> int:
+        return self._val_start if name == "val" else self._start
+
+    def group(self, name: str) -> str:
+        return self._val
+
+
 def parse_label_value(section: Section) -> ParseResult:
     cfg = section.defn.config
     res = ParseResult()
@@ -2435,12 +2499,23 @@ def parse_label_value(section: Section) -> ParseResult:
         res.review.append("label_value sections must be district-scoped")
         return res
     lines = section.text.split("\n")
+    # A text PDF or a plain-text file prints a two-column table as label, a
+    # run of spaces (or a tab), value: 'Minimum front yard   47 feet'
+    # (pdftotext -layout). The normalised section lines lose that gap, so
+    # for pdf/txt sources the source's raw lines are read as well, with 2+
+    # spaces or a tab as one more separator. The quote is the normalised
+    # line, which must be a whole line of the cut. HTML joins its cells with
+    # '|' and never needs this (review round 1, finding 3).
+    line_set = set(lines)
+    gap_lines = [(raw, cl) for raw in section.raw_lines
+                 for cl in (_clean_line(raw),) if cl in line_set] \
+        if section.source.format in ("pdf", "txt") else []
     for item in cfg["labels"]:
         label = norm_ws(item["label"])
+        words = r"\s+".join(re.escape(w) for w in label.split())
         # label, optional qualifying words (', as measured from ...'), then a
         # separator (':', '—', '–', ' - ', '|' of a two-column table, '...').
-        rx = re.compile(r"\s+".join(re.escape(w) for w in label.split())
-                        + r"(?:(?!\s-\s)[^|:–—]){0,80}?\s*(?:[:–—|]|\s-\s|\s*\.{2,})"
+        rx = re.compile(words + r"(?:(?!\s-\s)[^|:–—]){0,80}?\s*(?:[:–—|]|\s-\s|\s*\.{2,})"
                         + r"\s*(?P<val>.*)$", re.I)
         hit = None
         for ln in lines:
@@ -2448,8 +2523,27 @@ def parse_label_value(section: Section) -> ParseResult:
             if m:
                 hit = (ln, m)
                 break
+        if hit is None and gap_lines:
+            grx = re.compile(words + r"(?:(?![ \u00a0]{2}|\t)[^|:–—]){0,80}?"
+                             r"(?:[ \u00a0]{2,}|[ \u00a0]*\t[ \u00a0\t]*)(?P<val>\S.*)$", re.I)
+            for raw, cl in gap_lines:
+                m = grx.search(raw)
+                if m:
+                    # Re-match on the quote line so offsets refer to it.
+                    val = norm_ws(m.group("val"))
+                    k = cl.rfind(val)
+                    if k > 0:
+                        lab = re.search(words, cl, re.I)
+                        if lab is not None and lab.end() <= k:
+                            hit = (cl, _GapMatch(lab.start(), k, val))
+                            break
         if hit is None:
-            res.review.append(f"{item['field']}: label not found in the section")
+            bare = re.compile(words, re.I)
+            if any(bare.search(ln) for ln in lines):
+                res.review.append(f"{item['field']}: label found, no separator or value after "
+                                  "it on its line")
+            else:
+                res.review.append(f"{item['field']}: label not found in the section")
             continue
         ln, m = hit
         cell = m.group("val").strip()
@@ -2979,6 +3073,10 @@ class ScrapeResult:
     needs_extraction: list[tuple[str, str]] = field(default_factory=list)
     llm_rejected: int = 0
     assisted_rejected: int = 0
+    # (source key, section id, why): assisted records aimed at a section that
+    # was not cut (scanned, not found, source disabled/blocked/unreachable/
+    # refused). Counted in assisted_rejected, never dropped silently.
+    assisted_unusable: list[tuple[str, str, str]] = field(default_factory=list)
     pdftotext: dict[str, Any] | None = None
 
 
@@ -3117,9 +3215,22 @@ def scrape(reg: Registry, *, fetcher: PoliteFetcher | None, cache: Cache, offlin
                     res.needs_extraction.append((src.key, sd.id))
             for rec in recs:
                 _emit(res, rec, sec, reg, vfn)
+    outcome_by_key = {o.source.key: o for o in res.outcomes}
     for rec in assisted:
         sec = sections_by_key.get((rec.source_key, rec.section_id))
         if sec is None or sec.status != "found":
+            src = reg.source(rec.source_key)
+            if src is not None and only is not None and src.jurisdiction not in only:
+                continue                    # out of the --jurisdiction selection
+            if sec is not None:
+                why = sec.status
+            else:
+                o = outcome_by_key.get(rec.source_key)
+                why = f"source {o.status}" if o is not None else "source not registered"
+                if o is not None and o.status != "disabled" and o.reason:
+                    why += f" ({o.reason})"
+            res.assisted_rejected += 1
+            res.assisted_unusable.append((rec.source_key, rec.section_id, why))
             continue
         _emit(res, rec, sec, reg, vfn)
     return res
@@ -3439,11 +3550,17 @@ def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
         secs = covered.get((j, d), [])
         relevant = [s for s in secs if f in fields_by_section.get(
             f"{s.source.key}/{s.defn.id}", set())]
+        # A disabled or terms-blocked entry (a kept mirror, a second local
+        # entry still off) must not mask why an enabled source over the same
+        # field failed: categorise by the enabled, unblocked sources when
+        # there are any (review round 1, finding 2).
+        active = [s for s in relevant if outcome_of[s.source.key].status
+                  not in ("disabled", STATUS_BLOCKED)] or relevant
         if not relevant:
             cat = "not covered by a registered source"
         else:
-            sts = {s.status for s in relevant}
-            o_st = {outcome_of[s.source.key].status for s in relevant}
+            sts = {s.status for s in active}
+            o_st = {outcome_of[s.source.key].status for s in active}
             if "unreachable" in o_st and len(o_st) == 1:
                 cat = "source unreachable"
             elif o_st == {"refused"}:
@@ -3458,7 +3575,7 @@ def diff(res: ScrapeResult, current: Mapping[str, Any], reg: Registry,
                 cat = "not found in source"
             elif "pdf text unavailable" in sts:
                 cat = "pdf text unavailable"
-            elif any((s.source.key, s.defn.id) in res.needs_extraction for s in relevant):
+            elif any((s.source.key, s.defn.id) in res.needs_extraction for s in active):
                 cat = "needs extraction"
             else:
                 cat = REMOVED_NOT_EXTRACTED
@@ -4033,7 +4150,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
                      offline=args.offline, llm=llm, assisted=assisted,
                      allow_unreviewed_terms=args.allow_unreviewed_terms,
                      jurisdictions=args.jurisdiction or None, inbox=inbox)
-        res.assisted_rejected = a_rej
+        res.assisted_rejected += a_rej
         gis: dict[str, dict[str, Any]] = {}
         if args.watch:
             for sig in reg.signals:
@@ -4132,6 +4249,15 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
     scanned = [f"{o.source.key}/{sec.defn.id}" for o in res.outcomes
                if o.status in READ_STATUSES for sec in o.sections
                if sec.status == NO_TEXT_LAYER]
+    if res.assisted_unusable:
+        print(f"{len(res.assisted_unusable)} assisted record(s) rejected, their section was not "
+              "read: " + "; ".join(sorted({f"{k}/{i} ({w})"
+                                           for k, i, w in res.assisted_unusable})))
+    produced = {(e.record.source_key, e.record.section_id) for e in (*res.emitted, *res.rejected)}
+    empty = [f"{o.source.key}/{sec.defn.id}" for o in res.outcomes
+             if o.status in READ_STATUSES and o.source.parser in DETERMINISTIC
+             for sec in o.sections
+             if sec.status == "found" and (o.source.key, sec.defn.id) not in produced]
     blocked = [o.source.key for o in res.outcomes if o.status == STATUS_BLOCKED]
     if blocked:
         # One line, never an exit 4: the block is policy, not a failure (LF-05).
@@ -4144,7 +4270,13 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         print(f"{len(failed)} enabled source(s) unreachable or refused: "
               f"{', '.join(o.source.key for o in failed)}. Exit 4.")
         return EXIT_PARTIAL
-    if missing or scanned:
+    if missing or scanned or empty:
+        if empty:
+            # A section was cut but its parser read no value at all: the
+            # labels or headers do not fit this copy (review round 1, F3).
+            print(f"{len(empty)} section(s) found but no value read (labels or headers do not "
+                  f"match the text; see the section-level needs_review): "
+                  f"{', '.join(empty)}. Exit 4.")
         if missing:
             print(f"{len(missing)} enabled section(s) not found in a reachable source: "
                   f"{', '.join(missing)}. Exit 4.")

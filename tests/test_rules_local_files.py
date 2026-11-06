@@ -25,6 +25,7 @@ import unittest
 from datetime import date, timedelta
 from pathlib import Path
 from unittest import mock
+from urllib.parse import urlparse
 
 import requests
 
@@ -92,20 +93,21 @@ CITY_TXT = "\n".join(["synthetic fixture: invented values", *CITY_PDF_LINES]) + 
 
 
 def make_pdf(lines=(), hex_lines=(), info: bytes = b"") -> bytes:
-    """A one-page PDF with a Courier text layer (or none). hex_lines are
+    """A one-page PDF with a Courier (WinAnsi, so em dashes work) text layer
+    (or none). hex_lines are
     written as hex strings, so they appear only in the text layer, not as
     plain bytes in the file."""
     def esc(s):
-        return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)").encode("latin-1")
+        return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)").encode("cp1252")
     ops = b"".join(b"(" + esc(ln) + b") Tj T* " for ln in lines)
-    ops += b"".join(b"<" + ln.encode("latin-1").hex().encode() + b"> Tj T* " for ln in hex_lines)
+    ops += b"".join(b"<" + ln.encode("cp1252").hex().encode() + b"> Tj T* " for ln in hex_lines)
     content = (b"BT /F1 10 Tf 12 TL 40 760 Td " + ops + b"ET") if (lines or hex_lines) else b"q Q"
     objs = [b"<< /Type /Catalog /Pages 2 0 R >>",
             b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
             b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
             b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
-            b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>",
             b"<< " + info + b" >>"]
     out = bytearray(b"%PDF-1.4\n")
     offs = []
@@ -950,7 +952,8 @@ class OfficialFormatTests(InboxTest):
         self.assertEqual({s.status for s in res.outcomes[0].sections}, {rs.NO_TEXT_LAYER})
         code, console = self.run_tool(d)
         self.assertEqual(code, rs.EXIT_PARTIAL)
-        self.assertIn("route to --assisted", console)
+        self.assertIn("ask for a text PDF; values cannot be verified", console)
+        self.assertNotIn("route to --assisted", console)
         rows = json.loads((self.out / "report.json").read_text())["rows"]
         self.assertNotIn("not found in source", {r["category"] for r in rows})
 
@@ -1169,6 +1172,319 @@ class DiffLocalTests(InboxTest):
                 "dimensions": {"front_setback_ft": {"value": 47, "cite": cite}}}}}}}
             row = next(r for r in rs.diff(res, cur, reg) if r.field == "front_setback_ft")
             self.assertEqual(row.category, want, cite)
+
+
+# ---------------------------------------------------------------------------
+# Post-change review, round 1 (reviews/24_rules_local_files/03_decision_note.md)
+# ---------------------------------------------------------------------------
+PCT_ZONE_URLS = ("https://zoneomics%2ecom/x", "https://%7Aoneomics.com/x",
+                 "https://www%2Ezoneomics.com/code/south-fulton-GA/chapter_4",
+                 "https://www%2ezoneomics.com/code/x", "https://www%252ezoneomics.com/x")
+PCT_MUNI = "library.%6Dunicode.com"
+
+# Fairburn-shaped markers (as in the registry patch), a two-column table as
+# pdftotext -layout prints it: label, a run of spaces, value. Invented values.
+TWO_COL_LINES = [
+    "CHAPTER 80 ZONING (synthetic fixture, invented values)",
+    "Sec. 80-85. - M-1—Light Industrial Zoning District.",
+    "(f) M-1—Development standards.",
+    "   Minimum front yard setback                    47 feet",
+    "   Minimum side yard setback                     13 feet",
+    "   Minimum rear yard setback                     29 feet",
+    "(g) M-1—Design standards.",
+]
+
+
+class ReviewRound1Tests(InboxTest):
+    # -- finding 1: percent-encoded hosts ------------------------------------
+    def test_percent_encoded_host_predicates(self):
+        for u in PCT_ZONE_URLS:
+            self.assertTrue(rs.url_terms_blocked(u), u)
+            self.assertFalse(rs._https_url(u), u)
+            if "%25" not in u:     # what requests would actually contact: the blocked host
+                self.assertTrue(rs.terms_blocked(urlparse_host(
+                    requests.Request("GET", u).prepare().url)), u)
+        self.assertEqual(rs.norm_host("www%2ezoneomics.com"), "www.zoneomics.com")
+        self.assertEqual(rs.norm_host("%7Aoneomics.com"), "zoneomics.com")
+        self.assertTrue(rs.terms_blocked("zoneomics%2ecom"))
+        self.assertTrue(rs.mirror_host("www%2Ezoneomics.com"))
+        self.assertTrue(rs.host_denied(PCT_MUNI))
+        self.assertTrue(rs.host_denied("LIBRARY.MUNICODE.COM."))
+        self.assertFalse(rs._https_url(f"https://{PCT_MUNI}/ga/x"))
+        self.assertEqual(urlparse_host(requests.Request("GET", f"https://{PCT_MUNI}/ga/x")
+                                       .prepare().url), "library.municode.com")
+        self.assertFalse(rs.host_denied("www.fultoncountyga.gov"))
+        self.assertFalse(rs.url_terms_blocked("https://www.fultoncountyga.gov/a%20b.pdf"))
+
+    def test_percent_encoded_host_refused_in_the_registry(self):
+        for cls in ("mirror", "official"):
+            for host, url in (("www%2ezoneomics.com", "https://www%2ezoneomics.com/code/x"),
+                              (PCT_MUNI, f"https://{PCT_MUNI}/ga/x")):
+                d = local_registry(dict(county_src("zp"), url=url, source_class=cls))
+                d["hosts"][host] = {"terms_url": None, "terms_reviewed_by": "op",
+                                    "terms_reviewed_on": "2026-11-05", "note": "x"}
+                with self.assertRaises(rs.Refused, msg=(cls, host)):
+                    rs.validate_registry(d)
+        d = local_registry(county_src())
+        d["jurisdictions"]["fairburn"]["change_signals"] = [
+            {"key": "zsig", "enabled": True, "kind": "layer",
+             "url": "https://www%2ezoneomics.com/arcgis/rest/services/x/FeatureServer/0"}]
+        d["hosts"]["www%2ezoneomics.com"] = d["hosts"][COUNTY]
+        with self.assertRaises(rs.Refused):
+            rs.validate_registry(d)
+
+    def test_percent_encoded_host_never_contacted(self):
+        f, http, _ = fetcher({})
+        for u in PCT_ZONE_URLS + (f"https://{PCT_MUNI}/ga/x",):
+            with self.assertRaises(rs.Unreachable, msg=u):
+                f.fetch(u)
+            with self.assertRaises(rs.Unreachable, msg=u):
+                f._raw_get(u)
+        self.assertTrue(f.robots_for("https://www%2ezoneomics.com").deny_all)
+        self.assertEqual(http.calls, [])
+        # A redirect to a percent-encoded blocked host is not followed either.
+        r = routes_for({})
+        r[f"https://{COUNTY}/a.html"] = FakeResp(302, b"", {
+            "Location": "https://www%2ezoneomics.com/x"})
+        f, http, _ = fetcher(r)
+        with self.assertRaises(rs.Unreachable):
+            f.fetch(f"https://{COUNTY}/a.html")
+        self.assertFalse([c for c in http.calls if "zoneomics" in c.lower()])
+
+    def test_raw_get_backstop_checks_the_prepared_url(self):
+        # Even with the front checks fooled, _raw_get refuses: it re-checks
+        # the host of the URL requests will actually contact.
+        real_tb, real_hd = rs.url_terms_blocked, rs.host_denied
+        with mock.patch.object(rs, "url_terms_blocked",
+                               lambda u: False if "%" in str(u) else real_tb(u)), \
+                mock.patch.object(rs, "host_denied",
+                                  lambda h: False if "%" in str(h) else real_hd(h)):
+            f, http, _ = fetcher({})
+            with self.assertRaises(rs.Unreachable) as cm:
+                f._raw_get("https://www%2ezoneomics.com/code/x")
+            self.assertEqual(cm.exception.reason, rs.TERMS_BLOCKED)
+            with self.assertRaises(rs.Unreachable) as cm:
+                f._raw_get(f"https://{PCT_MUNI}/ga/x")
+            self.assertEqual(cm.exception.reason, "denylisted host")
+        self.assertEqual(http.calls, [])
+
+    def test_percent_encoded_host_cache_and_signal(self):
+        u = "https://www%2ezoneomics.com/code/x"
+        with self.assertRaises(rs.Unreachable):
+            self.cache.store(rs.Fetched(u, u, 200, "text/html", b"<p>x</p>", ""))
+        self.seed_cache(u)
+        with self.assertRaises(rs.Unreachable):
+            self.cache.load(u)
+        ok = f"https://{COUNTY}/art10.html"
+        self.seed_cache(ok, final_url=u)
+        with self.assertRaises(rs.Unreachable):
+            self.cache.load(ok)
+        sig = rs.SignalDef("fairburn", "zsig", True, "https://www%2ezoneomics.com/x/FeatureServer/0",
+                           "layer", None, None, ())
+        f, http, _ = fetcher({})
+        out = rs.gis_signal(f, sig)
+        self.assertEqual((out["reason"], out.get("skipped")), (rs.TERMS_BLOCKED, True))
+        self.assertEqual(http.calls, [])
+
+    def seed_cache(self, url, final_url=None):
+        body = COUNTY_HTML.encode()
+        b, m = self.cache._paths(url)
+        self.cache.root.mkdir(parents=True, exist_ok=True)
+        b.write_bytes(body)
+        m.write_text(json.dumps({"url": url, "final_url": final_url or url, "status": 200,
+                                 "content_type": "text/html", "fetched_at": "2026-11-05",
+                                 "sha256": hashlib.sha256(body).hexdigest()}))
+
+    # -- finding 3: two-column table PDF / text ------------------------------
+    def fb_pdf_src(self, path="fairburn/chapter80.pdf", fmt="pdf"):
+        return local_src("fb", path, fmt, sections=[
+            {"id": "m1_standards", "label": "Sec. 80-85(f)-(g)",
+             "start": ["Sec. 80-85. - M-1—Light Industrial Zoning District.",
+                       "M-1—Development standards."],
+             "end": "M-1—Design standards.", "district": "M-1",
+             "config": {"labels": LABELS_M1}}])
+
+    def test_two_column_table_pdf_reads_with_label_value(self):
+        if rs.pdftotext_info() is None:
+            self.skipTest("pdftotext not installed")
+        self.put("fairburn/chapter80.pdf", make_pdf(TWO_COL_LINES))
+        d = local_registry(self.fb_pdf_src())
+        res = self.scrape(d)
+        got = {e.record.field: (e.record.value, e.verdict.outcome) for e in res.emitted}
+        self.assertEqual(got, {"front_setback_ft": (47, "accepted"),
+                               "side_setback_ft": (13, "accepted"),
+                               "rear_setback_ft": (29, "accepted")})
+        for e in res.emitted:      # the quote is the normalised line of the cut
+            self.assertIn(e.record.quote, e.section.text.split("\n"))
+        code, _console = self.run_tool(d)
+        self.assertEqual(code, rs.EXIT_OK)
+
+    def test_tab_separated_txt_and_html_unchanged(self):
+        txt = "\n".join(["synthetic fixture", *TWO_COL_LINES[1:3],
+                         "Minimum front yard setback\t47 feet",
+                         "Minimum side yard setback \t 13 feet",
+                         "Minimum rear yard setback 29 feet",      # one space: not a separator
+                         TWO_COL_LINES[-1]]) + "\n"
+        self.put("fairburn/ch80.txt", txt)
+        res = self.scrape(local_registry(self.fb_pdf_src("fairburn/ch80.txt", "txt")))
+        self.assertEqual(sorted((e.record.field, e.record.value) for e in res.emitted),
+                         [("front_setback_ft", 47), ("side_setback_ft", 13)])
+        self.assertIn(("fb", "m1_standards", "rear_setback_ft: label found, no separator or "
+                       "value after it on its line"), res.section_review)
+        # HTML is unchanged: whitespace inside one cell never separates.
+        html = MUNI_HTML.replace("<td><p>Minimum front yard setback</p></td><td><p>47 feet</p></td>",
+                                 "<td><p>Minimum front yard setback    47 feet</p></td>")
+        self.put("m.html", html)
+        res = self.scrape(local_registry(local_src("fb", "m.html")))
+        self.assertNotIn("front_setback_ft", {e.record.field for e in res.emitted})
+
+    def test_label_without_separator_reported_and_exit_4(self):
+        lines = [re.sub(r"(?<=\S) {2,}", " ", ln) for ln in TWO_COL_LINES]
+        self.put("fairburn/ch80.txt", "\n".join(lines) + "\n")
+        d = local_registry(self.fb_pdf_src("fairburn/ch80.txt", "txt"))
+        res = self.scrape(d)
+        self.assertEqual(res.emitted, [])
+        msgs = [m for _k, _i, m in res.section_review]
+        self.assertTrue(msgs and all("label found, no separator" in m for m in msgs), msgs)
+        code, console = self.run_tool(d)
+        self.assertEqual(code, rs.EXIT_PARTIAL)
+        self.assertIn("found but no value read", console)
+        self.assertIn("fb/m1_standards", console)
+
+    # -- finding 4: assisted records for an unusable section -----------------
+    def test_assisted_record_for_a_scanned_section_is_counted(self):
+        if rs.pdftotext_info() is None:
+            self.skipTest("pdftotext not installed")
+        self.put("fairburn/chapter80.pdf", make_pdf())
+        d = local_registry(self.fb_pdf_src(), dict(local_src("off", "x.html"), enabled=False))
+        recs = {"extractor": "assisted", "records": [
+            {"source": "fb", "section": "m1_standards", "district": "M-1",
+             "field": "front_setback_ft", "value": 47,
+             "quote": "Minimum front yard setback 47 feet"},
+            {"source": "off", "section": "m1", "district": "M-1",
+             "field": "front_setback_ft", "value": 47,
+             "quote": "Minimum front yard setback: 47 feet"}]}
+        ap = self.tmp / "assisted.json"
+        ap.write_text(json.dumps(recs))
+        code, console = self.run_tool(d, "--assisted", str(ap))
+        self.assertEqual(code, rs.EXIT_PARTIAL)
+        self.assertIn("assisted rejected 2", console)
+        self.assertIn("2 assisted record(s) rejected, their section was not read", console)
+        self.assertIn(f"fb/m1_standards ({rs.NO_TEXT_LAYER})", console)
+        self.assertIn("off/m1 (source disabled)", console)
+        self.assertIn("values: none", console)
+        res = self.scrape(d, assisted=rs.load_assisted(ap, self.reg(d))[0])
+        self.assertEqual(res.assisted_rejected, 2)
+        self.assertEqual(sorted(k for k, _i, _w in res.assisted_unusable), ["fb", "off"])
+        # out of the --jurisdiction selection: not counted
+        res = self.scrape(d, assisted=rs.load_assisted(ap, self.reg(d))[0],
+                          jurisdictions=["fid"])
+        self.assertEqual(res.assisted_rejected, 0)
+
+    # -- finding 5: invisible characters in a mirror name --------------------
+    def test_invisible_characters_do_not_hide_a_mirror_name(self):
+        for t in ("zone­omics", "zone​omics.com", "www.zone‍omics.com",
+                  "zone⁠omics", "zone﻿omics", "zone&shy;omics", "zone%C2%ADomics"):
+            self.assertTrue(rs.mentions_blocked_host(t), repr(t))
+        self.assertFalse(rs.mentions_blocked_host("Fulton County Zoning Resolution"))
+        html = MUNI_HTML.replace("</body>", "<p>Saved from www.zone­omics.com</p></body>")
+        self.put("m.html", html)
+        res = self.scrape(local_registry(local_src("fb", "m.html")))
+        self.assertEqual(res.outcomes[0].status, "refused")
+        self.assertEqual(res.emitted, [])
+
+    # -- finding 8: placeholder markers in an enabled local entry ------------
+    def test_placeholder_markers_refused_when_enabled(self):
+        for over in ({"start": "<OPERATOR: re-derive from the file>"},
+                     {"start": ["Sec. 80-85.", "<OPERATOR: x>"]},
+                     {"end": "<OPERATOR: re-derive from the file>"},
+                     {"label": "TODO section label"}):
+            src = local_src("fb", "f.html")
+            src["sections"][0].update(over)
+            with self.assertRaises(rs.Refused, msg=over) as cm:
+                rs.validate_registry(local_registry(src))
+            self.assertIn("placeholder", str(cm.exception))
+            self.assertNotIn("OPERATOR", str(cm.exception))
+            rs.validate_registry(local_registry(dict(src, enabled=False)))
+
+    # -- findings 6/7: a placeholder signature is not a terms review ----------
+    def test_placeholder_terms_signature_is_not_a_review(self):
+        d = base_registry()
+        d["hosts"][COUNTY].update({"terms_reviewed_by": "<OPERATOR: your name>",
+                                   "terms_reviewed_on": "<OPERATOR: YYYY-MM-DD>"})
+        reg = rs.validate_registry(d)
+        self.assertFalse(reg.terms_reviewed(COUNTY))
+        d["hosts"][COUNTY].update({"terms_reviewed_by": "A. Operator",
+                                   "terms_reviewed_on": "2026-11-06"})
+        self.assertTrue(rs.validate_registry(d).terms_reviewed(COUNTY))
+
+
+def urlparse_host(u):
+    return urlparse(u).hostname
+
+
+# ---------------------------------------------------------------------------
+# Finding 2: diff categories in the PATCHED registry (kept disabled entries)
+# ---------------------------------------------------------------------------
+class PatchedDiffTests(InboxTest):
+    def setUp(self):
+        super().setUp()
+        patch = json.loads(PATCH_PATH.read_text(encoding="utf-8"))
+        self.live_raw = rs.REGISTRY_PATH.read_bytes()
+        self.data = apply_patch(json.loads(self.live_raw.decode("utf-8")), patch)
+        self.current = json.loads(rs.RULES_PATH.read_text(encoding="utf-8"))
+
+    def enable_fairburn(self, **over):
+        d = copy.deepcopy(self.data)
+        src = next(s for s in d["jurisdictions"]["fairburn"]["sources"]
+                   if s["key"] == "fairburn_ch80_standards_local")
+        src.update({"enabled": True, "title": "Synthetic Code of Ordinances, Chapter 80",
+                    "obtained_from": "City Clerk (synthetic)", "obtained_on": "2026-11-01"})
+        src.update(over)
+        return d, src
+
+    def fairburn_rows(self, d):
+        reg = rs.validate_registry(d)
+        res = self.scrape(d, offline=True, jurisdictions=["fairburn"])
+        rows = [r for r in rs.diff(res, self.current, reg, jurisdictions=["fairburn"])]
+        return res, rows
+
+    def assert_category(self, d, want):
+        res, rows = self.fairburn_rows(d)
+        st = {o.source.key: o.status for o in res.outcomes}
+        self.assertEqual(st["fairburn_ch2_mirror"], "disabled")
+        self.assertEqual(st["fairburn_ch80_prose_local"], "disabled")
+        cats = {r.category for r in rows}
+        self.assertNotIn(rs.REMOVED_NOT_EXTRACTED, cats, (want, cats))
+        self.assertIn(want, cats)
+        return rows
+
+    def test_missing_file_is_source_unreachable(self):
+        self.assert_category(self.enable_fairburn()[0], "source unreachable")
+
+    def test_pin_mismatch_is_source_refused(self):
+        self.put("fairburn/chapter80.html", MUNI_HTML)
+        d, _src = self.enable_fairburn(sha256="0" * 64)
+        self.assert_category(d, "source refused (local file)")
+
+    def test_markers_absent_is_not_found_in_source(self):
+        self.put("fairburn/chapter80.html", "<!-- synthetic --><html><body><p>Sec. 1. Other."
+                                            "</p></body></html>")
+        self.assert_category(self.enable_fairburn()[0], "not found in source")
+
+    def test_image_only_pdf_is_no_text_layer(self):
+        if rs.pdftotext_info() is None:
+            self.skipTest("pdftotext not installed")
+        self.put("fairburn/chapter80.pdf", make_pdf())
+        d, _src = self.enable_fairburn(path="fairburn/chapter80.pdf", format="pdf")
+        self.assert_category(d, "no text layer (scanned PDF)")
+
+    def test_a_good_file_gives_values_and_the_real_registry_is_untouched(self):
+        self.put("fairburn/chapter80.html", MUNI_HTML)
+        res, rows = self.fairburn_rows(self.enable_fairburn()[0])
+        m1 = {r.field: r for r in rows if r.district == "M-1"}
+        self.assertEqual(m1["front_setback_ft"].candidate, 47)
+        self.assertEqual(rs.REGISTRY_PATH.read_bytes(), self.live_raw)
 
 
 if __name__ == "__main__":

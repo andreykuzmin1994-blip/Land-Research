@@ -56,3 +56,31 @@
 - Added: a required `title` on local_file sources (the document identity
   the cite needs), and `PARSER_FORMATS` applied to url sources too (the
   live registry passes it).
+
+## Amended after the post-change review (round 1)
+
+The review (`03_decision_note.md`) showed four of the dispositions above
+were incomplete. They now read:
+
+- LF-03: the host is also percent-decoded (`norm_host`), any `%` in a URL
+  authority fails closed, `host_denied` checks the decoded host, and
+  `_raw_get` re-checks the host of the prepared URL. Tests
+  `ReviewRound1Tests.test_percent_encoded_host_*`,
+  `test_raw_get_backstop_checks_the_prepared_url`.
+- LF-12: the scanned-PDF text is "ask for a text PDF; values cannot be
+  verified"; assisted records aimed at a section that was not cut are
+  rejected and counted; a two-column table PDF reads with `label_value`;
+  a section cut with no value read exits 4. Tests
+  `test_two_column_table_pdf_reads_with_label_value`,
+  `test_tab_separated_txt_and_html_unchanged`,
+  `test_label_without_separator_reported_and_exit_4`,
+  `test_assisted_record_for_a_scanned_section_is_counted`.
+- LF-13 / LF-14: placeholders are also refused in an enabled entry's
+  section label/start/end; the patch puts placeholders in the host review
+  fields, which `terms_reviewed` treats as unsigned, and covers
+  `gismaps.fultoncountyga.gov`. Tests
+  `test_placeholder_markers_refused_when_enabled`,
+  `test_placeholder_terms_signature_is_not_a_review`.
+- LF-22: true in the deployed (patched) configuration now, not only in
+  one-source registries. Tests `PatchedDiffTests` (missing file, pin
+  mismatch, markers absent, image-only PDF, a good file).

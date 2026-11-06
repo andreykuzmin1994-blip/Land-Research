@@ -1,5 +1,5 @@
 {
-  "_comment": "Registry edits for the OPERATOR to apply by hand to rules_sources.json (human-owned; the agent never edits it), then commit. Written by the reviews/24_rules_local_files change and validated only on a throwaway copy (tests/test_rules_local_files.py, RegistryPatchTests). How to apply: see 00_design.md 'Registry patch'. Every new local_file source ships enabled:false with '<OPERATOR: ...>' placeholders: the tool refuses an enabled local_file whose title, obtained_from or obtained_on is a placeholder. Before enabling, drop the file into rules_inbox/ at the given path, fill the placeholders, and re-derive every start/end marker, label and column header from the actual file (the ones given are the mirror's and may not match official text).",
+  "_comment": "Registry edits for the OPERATOR to apply by hand to rules_sources.json (human-owned; the agent never edits it), then commit. Written by the reviews/24_rules_local_files change and validated only on a throwaway copy (tests/test_rules_local_files.py, RegistryPatchTests). How to apply: see 00_design.md 'Registry patch'. Every new local_file source ships enabled:false with '<OPERATOR: ...>' placeholders: the tool refuses an enabled local_file whose title, obtained_from, obtained_on or any section label/start/end is a placeholder, and treats a host whose terms_reviewed_by/on is a placeholder as unreviewed. Before enabling, drop the file into rules_inbox/ at the given path, fill the placeholders, and re-derive every start/end marker, label and column header from the actual file (the ones given are the mirror's and may not match official text).",
   "base_registry_sha256": "e1fe19831fe7013237b1edfcc0569fdf8f89ffe0cf55df8f94c9bc76317bc638",
   "disable_sources": [
     "sf_ch4_mirror",
@@ -20,15 +20,21 @@
     },
     "www.fultoncountyga.gov": {
       "terms_url": null,
-      "terms_reviewed_by": null,
-      "terms_reviewed_on": null,
-      "note": "Official Fulton County site (Zoning Resolution PDFs with a text layer). Proposed review text: 'reviewed: no terms page found; public government document'. NOT CHECKED BY THE AGENT. <OPERATOR SIGNS>: look for a footer 'Terms', 'Terms of Use', 'Disclaimer' or 'Site Policies' link before filling terms_reviewed_by / terms_reviewed_on."
+      "terms_reviewed_by": "<OPERATOR: your name, after checking the site yourself>",
+      "terms_reviewed_on": "<OPERATOR: YYYY-MM-DD of your check>",
+      "note": "Official Fulton County site (Zoning Resolution PDFs with a text layer). Terms review (proposed, NOT CHECKED BY THE AGENT): 'reviewed: no terms page found; public government document'. <OPERATOR SIGNS>: look for a footer 'Terms', 'Terms of Use', 'Disclaimer' or 'Site Policies' link first. Then replace both terms_reviewed_* placeholders; until then the tool treats the host as unreviewed."
     },
     "www.unioncityga.gov": {
       "terms_url": null,
-      "terms_reviewed_by": null,
-      "terms_reviewed_on": null,
-      "note": "Official Union City site, behind Akamai (403 to the survey on 2026-11-05). Proposed review text: 'reviewed: no terms page found; public government document'. NOT CHECKED BY THE AGENT. <OPERATOR SIGNS>: look for a footer 'Terms', 'Disclaimer' or 'Site Policies' link (Granicus/OpenCities sites often carry one) and any Akamai bot policy before filling terms_reviewed_by / terms_reviewed_on."
+      "terms_reviewed_by": "<OPERATOR: your name, after checking the site yourself>",
+      "terms_reviewed_on": "<OPERATOR: YYYY-MM-DD of your check>",
+      "note": "Official Union City site, behind Akamai (403 to the survey on 2026-11-05). Terms review (proposed, NOT CHECKED BY THE AGENT): 'reviewed: no terms page found; public government document'. <OPERATOR SIGNS>: look for a footer 'Terms', 'Disclaimer' or 'Site Policies' link (Granicus/OpenCities sites often carry one) and any Akamai bot policy first. Then replace both terms_reviewed_* placeholders; until then the tool treats the host as unreviewed."
+    },
+    "gismaps.fultoncountyga.gov": {
+      "terms_url": null,
+      "terms_reviewed_by": "<OPERATOR: your name, after checking the site yourself>",
+      "terms_reviewed_on": "<OPERATOR: YYYY-MM-DD of your check>",
+      "note": "Fulton County GIS (PropertyMapViewer layer 34 zoning, used by zoning_import and the fc_layer34_zoning change signal). Terms review (proposed, NOT CHECKED BY THE AGENT): 'reviewed: no terms page found; public government document'. <OPERATOR SIGNS>: check the ArcGIS server's and fultoncountyga.gov's terms or disclaimer first. Then replace both terms_reviewed_* placeholders; until then the tool treats the host as unreviewed."
     }
   },
   "set_jurisdiction_notes": {
@@ -218,7 +224,7 @@
         "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
         "obtained_on": "<OPERATOR: YYYY-MM-DD>",
         "sha256": "record on first use",
-        "note": "Sec. 80-85 (f)-(g) and Sec. 80-86 (f)-(g). Starting point: the mirror's markers and labels. Official text may punctuate headings differently ('Sec. 80-85. - ...' in a Municode export); re-derive start/end and labels from the file before enabling. A PDF copy works with label_value when each label and its value sit on one line.",
+        "note": "Sec. 80-85 (f)-(g) and Sec. 80-86 (f)-(g). Starting point: the mirror's markers and labels. Official text may punctuate headings differently ('Sec. 80-85. - ...' in a Municode export); re-derive start/end and labels from the file before enabling. A PDF or text copy works with label_value when each label and its value sit on one line, separated by ':', a dash, a dot leader, or a run of two or more spaces or a tab (how pdftotext prints a two-column table). A value that wraps onto the next line is not read: the run reports 'label found, no separator or value after it on its line' and exits 4; use llm_prose or --assisted for that section.",
         "sections": [
           {
             "id": "m1_standards",
