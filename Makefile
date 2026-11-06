@@ -315,7 +315,7 @@ mirror-restore:  ## Disaster recovery: rebuild a MISSING experiment_log.tsv from
 # CoStar Excel import (reviews/19_costar_import) -- between runs only
 # ---------------------------------------------------------------------
 .PHONY: costar-import
-costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas + industrial land comps. Between runs, before make baseline (refuses after it). FILE=path
+costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas + industrial land comps + building sale/lease comps (memo only). Between runs, before make baseline (refuses after it). FILE=path
 	@if [ -z "$(FILE)" ]; then echo "==> usage: make costar-import FILE=path/to/export.xlsx"; exit 1; fi
 	@python costar_import.py "$(FILE)"
 

@@ -24,6 +24,7 @@ on:
       - 'tests/test_postgis_smoke.py'
       - 'tests/live_txn_check.py'
       - 'tests/live_submarket_check.py'
+      - 'tests/live_building_comps_check.py'
       - 'costar_import.py'
       - 'zoning.py'
       - 'zoning_import.py'
@@ -54,6 +55,7 @@ on:
       - 'tests/test_postgis_smoke.py'
       - 'tests/live_txn_check.py'
       - 'tests/live_submarket_check.py'
+      - 'tests/live_building_comps_check.py'
       - 'costar_import.py'
       - 'zoning.py'
       - 'zoning_import.py'
@@ -149,6 +151,12 @@ jobs:
       # CoStar area writer against real PostGIS. Own market, cleans up.
       - name: Run live submarket resolution check
         run: python tests/live_submarket_check.py
+
+      # reviews/28_building_comps: building sale and lease comps (memo only):
+      # scores equal before and after an import, DELETE scoping, dedupe,
+      # resolver agreement, windows, rollback, SAVEPOINT. Own market, cleans up.
+      - name: Run live building-comps check
+        run: python tests/live_building_comps_check.py
 
       # reviews/21_zoning: the S9 precedent SQL (metres, self-match, index)
       # and zoning_import's PostGIS overlay + UPDATE against real PostGIS.

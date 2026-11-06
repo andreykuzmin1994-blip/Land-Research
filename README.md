@@ -254,6 +254,26 @@ setback on every edge and the fitted building, to open in SiteFit
 (Studies > Open file…) and refine by hand. Keep the SiteFit tool file itself out of the repo
 (`SiteFit.html` is gitignored).
 
+## Building comps: market rent and exit value (memo only)
+
+`costar_import.py` also takes a CoStar industrial building **Sale Comps**
+sheet and a **Lease Comps** sheet (`reviews/28_building_comps/`;
+which searches and columns to export: `COSTAR_EXPORTS_README.md`). It keeps
+comparable sales (sold in the last 36 months, warehouse/distribution,
+100,000-1,000,000 SF, built in the last 15 years, no portfolio, partial
+interest, leaseback, distressed or similar sale conditions) and signed NNN
+starting rents (signed in the last 24 months, 100,000-1,000,000 SF leased,
+no subleases or renewals), and writes them to `sales_comps`
+(`comp_type = 'building'`) and `leasing_comps`. The snapshot's Market
+Context and a memo section then show, per parcel's resolved submarket (or
+the labelled market-wide value when the submarket has fewer than 5 comps),
+the median signed NNN rent, sale $/SF and cap rate with counts and date
+windows, and an **exit-value estimate** for the projected building (rent x
+SF / cap rate, or sale $/SF x SF; never a default cap rate), labelled with
+the projection's rules (draft or verified). These are **no scoring input**:
+the metric is unchanged. With no such rows the memo and snapshot are
+exactly as before. Import between runs only, like every CoStar workbook.
+
 ## Flood and wetlands (H4/H6, operator, between runs)
 
 `hazards.py` and `hazards_import.py` (`reviews/26_flood_wetlands/`)
@@ -443,7 +463,7 @@ land-site-selector/
 ├── costar_ingest.py                   — IMMUTABLE during run: CoStar export ETL
 ├── reporting.py                       — Snapshot + strategy memo rendering
 ├── pipeline_common.py                 — Shared paths/helpers/SQL for the pipeline modules
-├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import (operator, between runs)
+├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import: stats, areas, land, building and lease comps (operator, between runs)
 ├── zoning.py                          — IMMUTABLE during run: loads + freezes zoning_rules.json, classifies districts
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings

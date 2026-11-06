@@ -112,12 +112,114 @@ Sheets are recognized by their headers:
     needs at least 3 comps in a parcel's submarket.
   - Details: `reviews/20_next_improvements/05_*`.
 
+- **Building sale comps and lease comps** (memo only, no scoring input;
+  `reviews/28_building_comps/`) feed the memo's market rent and the
+  exit-value estimate for the projected building. Details in the next
+  section.
+
 The building sale comps do NOT feed S8 (land basis); only the Land sheet
 above or a `land_sales_comps` CSV does. Other counties' parcel numbers are not located yet
 (Fulton is the only configured county).
 
 Without a database the stats CSV is still written and the tool exits 2
-("areas not written"). Output shows counts only: CoStar data is licensed
+("areas not written").
+
+### Building sale comps and lease comps (memo rent and exit value)
+
+No real building export has been seen yet, so the column names below are
+the documented assumptions about CoStar's standard Sale Comps and Lease
+Comps exports. Headers are matched **exactly** (case and surrounding
+spaces aside) against these lists; nothing is matched by substring, so
+`Price Per SF Land` is never read as the building $/SF. A sheet that looks
+like building sales (`RBA`/`Building SF`/`Total SF` plus `Sale Price`) or
+lease comps (`SF Leased`) but lacks a required column is **refused (exit
+1)** with the names of the expected columns it lacks: add them in the
+column picker and export again. If CoStar names a column differently,
+tell the developer the exact header; the alias lists are in
+`costar_import.py` (`BUILDING_COLUMNS`, `LEASE_COLUMNS`).
+
+**CoStar search 1: Sale Comps** (Sales > Sale Comps).
+- Filters: Property Type **Industrial**; Market **Atlanta**; Sale Date in
+  the last **36 months**; RBA **100,000 to 1,000,000 SF**; Sale Status
+  **Sold** (the tool re-checks every filter).
+- Columns (required): `Property Address`, `Property Type`,
+  `Secondary Type`, `Sale Status`, `Sale Date`, `Sale Price`, `RBA`
+  (else `Building SF`, else `Total SF`), `Sale Condition`, `Year Built`,
+  `Latitude`, `Longitude`.
+- Columns (used when present): `Price Per SF` (cross-checked against
+  price / RBA, 5% tolerance), `Actual Cap Rate` (or `Cap Rate`),
+  `Number Of Properties`, `Property Name`, `Ceiling Height` (or `Clear
+  Height`).
+- Kept: sold; warehouse or distribution secondary type (flex, R&D,
+  manufacturing, truck terminal, cold storage and data-centre types are
+  dropped); 100,000-1,000,000 SF; built in the last 15 years; $30-$400/SF;
+  inside Georgia. Dropped with a counted reason: sale conditions portfolio
+  or bulk, partial interest, condo, sale-leaseback, distressed (REO,
+  bankruptcy, short sale, foreclosure, receivership), auction,
+  redevelopment or land value, non-arm's length, leased fee or ground
+  lease, business value included; "Part of a N Property" names and
+  `Number Of Properties` above 1; duplicates (address, date, size).
+- Cap rates: `5.5`, `5.50%` and `0.055` all mean 5.5% and are stored as
+  the fraction 0.055 (`sales_comps.cap_rate` of this tool's rows is a
+  fraction). A blank cap rate, or one outside 3-12%, keeps the sale (for
+  $/SF) without a cap rate; the console counts both.
+
+**CoStar search 2: Lease Comps** (Lease > Lease Comps).
+- Filters: Property Type **Industrial**; Market **Atlanta**; Sign Date in
+  the last **24 months**; SF Leased **100,000 to 1,000,000**.
+- Columns (required): `Property Address`, `Property Type`,
+  `Secondary Type`, `SF Leased`, `Sign Date`, `Service Type`, `Latitude`,
+  `Longitude`, and a starting rent: `Starting Rent/SF/Yr` (or
+  `Starting Rent/SF`, `Starting Rent`), or `Rent/SF/Yr` together with
+  `Rent Type`.
+- Columns (used when present): `Start Date` (stored as the lease start;
+  recency always uses the Sign Date), `Rent Type`, `Asking Rent/SF/Yr`
+  (only to name a drop "asking rent only"), `Lease Type` and `Deal Type`
+  (subleases and renewals/extensions), `Lease Term` (`5 Years 3 Months` ->
+  63 months; a bare number is ambiguous and stored as unknown) or
+  `Term (Months)`, `RBA`, `Year Built`.
+- Kept: signed in the last 24 months; 100,000-1,000,000 SF leased;
+  warehouse or distribution; service type NNN / Triple Net; a disclosed
+  starting rent of $2-$25/SF/yr (a monthly rent such as $0.55 falls out);
+  inside Georgia. Dropped with a counted reason: gross, modified gross and
+  full-service leases, asking-only, effective-only and withheld rents,
+  subleases, renewals and extensions, duplicates (address, sign date, SF
+  leased; two suites of one building on one day are two leases).
+
+**What is stored.** Located from the export's Latitude/Longitude only (no
+county lookup, no network call), assigned to the submarket area a parcel
+at the same point resolves to (nearest within 3 km), and written straight
+to `sales_comps` (`comp_type = 'building'`) and `leasing_comps`, one
+transaction per table, replacing only this tool's earlier rows
+(`raw->>'import_origin'` = `costar_import_building` / `costar_import_lease`).
+Contacts, brokers, phone numbers, e-mails, tenants, buyers, sellers and
+comments are never stored; `raw` holds only coordinates, year built,
+clear height, secondary type, sign date, service type and deal type. The
+kept comps are also saved in `costar_exports/.building_sales_snapshot.json`
+and `.lease_comps_snapshot.json`: with no areas yet they wait there (exit
+0), and every workbook that redraws the areas assigns them again. A comp a
+`building_sales_comps`/`leasing_comps` CSV already delivered is not stored
+again (counted); prefer one path for each comp type, since the memo reads
+only this tool's filtered rows.
+
+**Sheet roles.** Every sheet gets exactly one role, and two sheets with
+the same role are refused. A lease sheet is never an area sheet. A sheet
+with `Submarket Name` and `Parcel Number 1 (Min)` keeps its area role
+exactly as before; when it also carries every building column above, its
+sales are ALSO imported as building comps, after its areas are written
+(the console says so). An area sheet without those columns imports areas
+only and names the building columns it lacks.
+
+**Where it shows.** The snapshot's Market Context gains "Signed NNN
+starting rent from lease comps" (distinct from the stats sheet's asking
+rent), "Building sale comps" ($/SF and cap rate) and "Exit value
+estimate"; the memo gains a "Building Comps" section with one line per
+highlight. Each value is the median of the parcel's resolved submarket
+when it has at least 5 comps, else the labelled market-wide median, else
+"—", always with its count and date window, counted from the memo date.
+The exit value uses the building the memo's projection shows (with its
+draft/verified label): signed rent x SF / cap rate when both have 5
+comps, else sale $/SF x SF, else nothing; never a default cap rate. Output shows counts only: CoStar data is licensed
 and stays under the gitignored `costar_exports/`.
 
 ---
