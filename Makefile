@@ -343,6 +343,14 @@ rules-watch:  ## Re-fetch the registered sources, report what changed (sections,
 	@python rules_scrape.py --watch $(ARGS)
 
 # ---------------------------------------------------------------------
+# Flood / wetlands import (reviews/26_flood_wetlands) -- between runs only.
+# Refuses until a human applies the parcel_hazards proposal to prepare.py.
+# ---------------------------------------------------------------------
+.PHONY: hazards-import
+hazards-import:  ## Write parcel_hazards (FEMA NFHL flood zones, USFWS NWI wetlands) from the files in the gitignored hazards_inbox/ (ARGS='--mode rest' tries the public services, robots.txt permitting). Between runs, before make baseline (refuses after it).
+	@python hazards_import.py $(ARGS)
+
+# ---------------------------------------------------------------------
 # Higher-level recipes
 # ---------------------------------------------------------------------
 .PHONY: resume
