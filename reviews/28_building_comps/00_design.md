@@ -34,7 +34,10 @@ CoStar workbooks, and the database already has `sales_comps`
    an import.
 3. **Sheet roles are exclusive** (`costar_import.sheet_role`), checked in
    this order: stats (`Geography Name` + `Concept Name`); lease (any of
-   `SF Leased`, `Square Feet Leased`, `Leased SF`); area comps
+   `SF Leased`, `Square Feet Leased`, `Leased SF`, together with a
+   lease-only header: `Sign Date`, `Service Type`, `Rent Type` or a rent
+   column, so a leased-area column on a building sheet does not make it a
+   lease sheet; review finding 9); area comps
    (`Submarket Name` + `Parcel Number 1 (Min)`), which is ALSO building
    comps when every building column is present ("areas+building"); land
    (the existing `is_land_sheet`, unchanged); building (a building SF
@@ -52,16 +55,27 @@ CoStar workbooks, and the database already has `sales_comps`
    area import must not break).
 5. **Exact headers, documented aliases, loud refusal.** Headers are
    stripped and case-folded, never substring-matched. A sheet that looks
-   like building or lease data but lacks a required column is refused
-   (exit 1) naming only the expected headers. No real building export has
+   like building or lease data but matches no layout gets the role
+   `incomplete-building` / `incomplete-lease` with a message naming only
+   expected headers. "Looks like" covers a marker header with a missing
+   column, and also a sheet with no marker that still carries `Sale Price`
+   with `Sale Date` or `Sale Status`, or a lease-only header, so a size
+   column under an unknown name (`Bldg SF`, `Leased Square Feet`) is named
+   rather than ignored (review finding 2). Alone in the workbook it is
+   refused (exit 1) with that message; next to a sheet that matches, it is
+   named on the console ("building: NOT imported: ...") and the rest of
+   the workbook is imported as usual (review finding 1), so a look-alike
+   never blocks the stats, area or land paths. No real building export has
    been seen; every assumed header is listed below and in
    `COSTAR_EXPORTS_README.md`.
 6. **Units.** Cap rate: one stored convention, a FRACTION (0.055); a value
    with `%` or above 1 is a percent. Rent: annual NNN $/SF/yr; a monthly
    value falls outside the $2-25 band. Building SF: `RBA`, then `Building
    SF`, then `Total SF`; a lease's size is `SF Leased`, never the
-   building's RBA (stored separately in raw). Dates: the existing
-   `_sale_date` with the workbook's 1904 flag; leases use the Sign Date for
+   building's RBA (stored separately in raw). Dates: `comp_date` = the
+   existing `_sale_date` with the workbook's 1904 flag, plus a trailing
+   time and month-name text (`Mar 2, 2026`), on the building and lease
+   sheets only (the land path keeps `_sale_date`, unchanged); leases use the Sign Date for
    recency and store the Start Date as `lease_start_date`. Lease term:
    `N Years M Months` or a months column; a bare number in `Lease Term` is
    ambiguous and stored as NULL.
@@ -74,9 +88,16 @@ CoStar workbooks, and the database already has `sales_comps`
    'submarket')`: every CSV-delivered row has a `submarket` key in raw (a
    required CSV column), so a CSV that forges the two tool keys is still
    not the tool's. The DELETE, the other-origin key read and the memo
-   read share this predicate. Comps another origin delivered (address and
-   date for sales; address, start date and SF for leases) are skipped and
-   counted.
+   read share this predicate. Comps another origin also delivered
+   (address and date for sales; address, start date and SF for leases;
+   never matched when the address is empty) are counted and STORED as
+   well: the memo reads only the tool's rows, so skipping them would leave
+   them out of every median (review finding 3). Nothing else reads
+   building `sales_comps` or `leasing_comps` (BC-04), so no reader counts
+   such a comp twice. The predicate is a convention: a row written by hand
+   or by any other tool must not use the `costar_import_building` /
+   `costar_import_lease` origins together with an `imported_on` key and no
+   `submarket` key, or the next import replaces it (review finding 7).
 9. **Transactions and snapshots.** One transaction per table, after the
    areas and land commits; a failure rolls back that table and the
    console says which steps committed (exit 2). The kept rows (allowlisted
@@ -110,7 +131,16 @@ CoStar workbooks, and the database already has `sales_comps`
     their comps; else sale $/SF x SF; else no line. Never a default cap
     rate; a cap rate at or below 0 is never divided by. Rounded to $0.1M,
     with each input's count, scope and window, and "an estimate, not an
-    appraisal".
+    appraisal". The income method assumes a stabilised building, 100%
+    leased at the median signed starting rent, with no vacancy, credit
+    loss or reserves, and divides by CoStar's cap rate at sale (on
+    in-place income): it reads high when rents have risen since the
+    sales. The memo note and the exit line say so (review finding 10).
+13. **One empty sheet does not block the others** (review finding 5). A
+    Land sheet in which no sale qualifies is treated as absent when the
+    workbook also holds a building or lease sheet; without one the
+    workbook is refused exactly as at 3898047 (the land, area and stats
+    shapes are unchanged).
 
 ## Constants (all in `costar_import.py`, with rationale in comments)
 
@@ -119,7 +149,7 @@ CoStar workbooks, and the database already has `sales_comps`
 | `BUILDING_MIN_SF` / `MAX` | 100,000 / 1,000,000 | prototypes project 104,000-520,000 SF; same bulk product |
 | `BUILDING_SALE_WINDOW_MONTHS` | 36 | sales are sparse; starts after the 2022-23 rate reset |
 | `LEASE_WINDOW_MONTHS` | 24 | rents move several % a year; enough 100K+ leases |
-| `BUILDING_MAX_AGE_YEARS` | 15 | exit comps for a new building (32-36 ft clear generation) |
+| `BUILDING_MAX_AGE_YEARS` | 15 | exit comps for a new building (32-36 ft clear generation); also applied to a lease whose `Year Built` is given, so rent and cap rate describe the same stock (review finding 4; a lease without it is kept) |
 | `CAP_RATE_MIN` / `MAX` | 3% / 12% | brackets plausible stabilised industrial caps |
 | `SALE_PSF_MIN` / `MAX` | $30 / $400 | below = land value or distress; above = data centre / cold storage |
 | `PRICE_PSF_TOLERANCE` | 5% | CoStar `Price Per SF` vs price / RBA |
@@ -152,9 +182,13 @@ type, latitude, longitude, and a starting rent (or `Rent/SF/Yr` plus
 `Rent Type`).
 
 Service type values kept: `NNN`, `Triple Net`, `Net Net Net` (case and
-spacing aside). Rent type values: `Starting` kept; `Asking` dropped as
-asking-only; any other (Effective, ...) dropped as not a starting rent.
-Secondary types kept: `Warehouse`, `Distribution`.
+spacing aside). Rent type values: `Starting` / `Starting Rent` kept;
+`Asking` / `Asking Rent` dropped as asking-only; any other (Effective, ...)
+dropped as not a starting rent. Secondary types kept: `Warehouse`,
+`Distribution`, or a combination of only those two
+(`Warehouse/Distribution`). Cap-rate cells `-`, `--`, `n/a`, `na`,
+`none` count as blank; any other unreadable cell (`5.5% (Est)`) is
+counted as "cap rate not a number" (the sale is kept for $/SF).
 
 ## Not done
 
@@ -163,4 +197,8 @@ Secondary types kept: `Warehouse`, `Distribution`.
 - No cap-rate default, no NOI from the export (the contract's
   `noi_at_sale` is CSV-only), no rent escalation.
 - No real export tested: the first real workbook will be diagnosed by the
-  refusal message (BC-12).
+  look-alike message (BC-12, review finding 2).
+- The baseline refusal reads only `experiment_log.tsv`, not the database
+  experiment mirror (pre-existing for the land and area path; review
+  finding 8). Mirroring `zoning_import`'s mirror check is a separate
+  Tier 2 change.

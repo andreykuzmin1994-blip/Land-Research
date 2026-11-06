@@ -524,9 +524,9 @@ class LeaseFilterTests(unittest.TestCase):
         self.assertEqual(len(res.rows), 1)
         self.assertEqual(res.dropped, {"rent type not stated": 1})
         no_type = [h for h in header if h != "Rent Type"]
-        with self.assertRaises(ci.ImportError_) as cm:
-            ci.sheet_role([no_type])
-        self.assertIn("'Rent Type'", str(cm.exception))
+        role, (msg,) = ci.sheet_role([no_type])
+        self.assertEqual(role, "incomplete-lease")
+        self.assertIn("'Rent Type'", msg)
 
     def test_bc06_snapshot_rent_lines_carry_distinct_labels(self):
         conn = _ReadConn(leases=_leases("atlanta__alpha", [5, 6, 7, 8, 9]),
@@ -676,8 +676,8 @@ class ExitValueTests(unittest.TestCase):
             "- **Exit value estimate** (draft rules): $39.0M = the projected 312,000 SF "
             "cross-dock x signed NNN starting rent from lease comps $7.50/SF/yr / cap rate 6.0% "
             "(rent n=6, Alpha Park submarket, signed 2024-11-06 to 2026-11-06; cap rate n=5, "
-            "Atlanta market-wide; 4 in the submarket, sold 2023-11-06 to 2026-11-06); an "
-            "estimate, not an appraisal",
+            "Atlanta market-wide; 4 in the submarket, sold 2023-11-06 to 2026-11-06); "
+            "stabilised, 100% leased, no vacancy or reserves; an estimate, not an appraisal",
         ]))
 
 
@@ -706,17 +706,30 @@ class OriginTests(unittest.TestCase):
         self.assertFalse(conn.run(ci._SQL_DELETE_TOOL_LAND_COMPS))
         self.assertEqual(conn.transactions, 1)
 
-    def test_bc09_a_comp_another_origin_delivered_is_stored_once(self):
+    def test_bc09_a_comp_a_csv_also_delivered_is_counted_and_still_stored(self):
+        # Review finding 3: the memo reads only this tool's rows, so a comp
+        # skipped here would count nowhere. It is stored and counted.
         conn = _CompsConn(other_building=[("1 TEST ST", date(2026, 3, 2))])
         out = ci.write_comps(conn, ci.BUILDING_KIND, self.rows(), TODAY)
-        self.assertEqual((out["assigned"], out["already_delivered"]), (1, 1))
-        (ins,) = conn.run(costar_ingest._SQL_INSERT_BUILDING_SALES)
-        self.assertEqual(ins[0], "3 Test St")
+        self.assertEqual((out["assigned"], out["also_delivered"]), (2, 1))
+        self.assertEqual(sorted(p[0] for p in conn.run(costar_ingest._SQL_INSERT_BUILDING_SALES)),
+                         ["1 Test St", "3 Test St"])
         lease = ci.convert_lease([LEASE_HEADER, lease_row()], today=TODAY).rows
         conn = _CompsConn(other_lease=[("2 Test St", date(2026, 7, 1), 250000.0)])
         out = ci.write_comps(conn, ci.LEASE_KIND, lease, TODAY)
-        self.assertEqual((out["already_delivered"], out["kept_previous"]), (1, 1))
-        self.assertFalse(conn.run(ci._SQL_DELETE_TOOL_LEASE_COMPS))
+        self.assertEqual((out["assigned"], out["also_delivered"], out["kept_previous"]),
+                         (1, 1, 0))
+        self.assertTrue(conn.run(ci._SQL_DELETE_TOOL_LEASE_COMPS))
+        line = ci._comps_line("lease", out, "leases")
+        self.assertIn("1 also in a CSV-delivered row, stored here too because the memo's "
+                      "medians read only this tool's rows", line)
+
+    def test_bc09_an_address_less_comp_is_never_matched_across_origins(self):
+        rows = ci.convert_building([BUILDING_HEADER, building_row(**{"Property Address": None})],
+                                   today=TODAY).rows
+        conn = _CompsConn(other_building=[(None, date(2026, 3, 2)), ("", date(2026, 3, 2))])
+        out = ci.write_comps(conn, ci.BUILDING_KIND, rows, TODAY)
+        self.assertEqual((out["assigned"], out["also_delivered"]), (1, 0))
 
     def test_bc09_reimport_is_idempotent(self):
         a, b = _CompsConn(), _CompsConn()
@@ -919,10 +932,9 @@ class HeaderTests(unittest.TestCase):
     def test_bc12_no_substring_matching(self):
         header = [("Starting Rent/SF/Yr (Est.)" if h == "Starting Rent/SF/Yr" else h)
                   for h in LEASE_HEADER]
-        with self.assertRaises(ci.ImportError_) as cm:
-            ci.sheet_role([header, lease_row()])
-        self.assertIn("'Starting Rent/SF/Yr' or 'Starting Rent/SF' or 'Starting Rent'",
-                      str(cm.exception))
+        role, (msg,) = ci.sheet_role([header, lease_row()])
+        self.assertEqual(role, "incomplete-lease")
+        self.assertIn("'Starting Rent/SF/Yr' or 'Starting Rent/SF' or 'Starting Rent'", msg)
 
     def test_bc12_price_per_sf_land_is_never_the_building_price_per_sf(self):
         header = [h for h in BUILDING_HEADER if h != "Price Per SF"]
@@ -1094,6 +1106,212 @@ class ContractTests(unittest.TestCase):
                         and node.func.attr == "execute" and node.args):
                     self.assertIsInstance(node.args[0], (ast.Name, ast.Attribute, ast.Constant),
                                           ast.dump(node.args[0])[:80])
+
+
+
+# ---------------------------------------------------------------------------
+# Review round 1 (reviews/28_building_comps/03_decision_note.md)
+# ---------------------------------------------------------------------------
+PARTIAL_BUILDING = [["Property Address", "rba", "sale price", "Sale Date"]]
+# Every lease column, but the size column under a name no alias covers.
+ODD_LEASE = [[("Leased Square Feet" if h == "SF Leased" else h) for h in LEASE_HEADER],
+             lease_row()]
+# Every building column, but the size column under a name no alias covers.
+ODD_BUILDING = [[("Bldg SF" if h == "RBA" else h) for h in BUILDING_HEADER], building_row()]
+
+
+class LookalikeSheetTests(unittest.TestCase):
+    """Findings 1, 2 and 9: a sheet that looks like building or lease comps
+    but matches no layout is named with the expected headers it lacks. It
+    never blocks the other sheets; alone, it refuses (exit 1)."""
+
+    def test_f1_land_plus_partial_building_sheet_imports_the_land(self):
+        roles = ci.classify_tables([[LAND_HEADER, land_row()], PARTIAL_BUILDING])
+        self.assertIsNotNone(roles.land)
+        ((label, msg),) = roles.incomplete
+        self.assertEqual(label, "building")
+        self.assertIn("'Property Type'", msg)
+        conn = _CompsConn()
+        rc, _, out = run_import(self, {"land": [LAND_HEADER, land_row()],
+                                       "x": PARTIAL_BUILDING}, conn)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("building: NOT imported: a sheet looks like CoStar building sale comps", out)
+        self.assertIn("'Secondary Type'", out)
+        self.assertTrue(conn.run(costar_ingest._SQL_INSERT_LAND_SALES))
+        self.assertFalse(conn.run(costar_ingest._SQL_INSERT_BUILDING_SALES))
+
+    def test_f1_partial_sheet_alone_is_refused_naming_the_missing_headers(self):
+        conn = _CompsConn()
+        rc, _, out = run_import(self, {"x": PARTIAL_BUILDING}, conn)
+        self.assertEqual(rc, 1)
+        self.assertIn("REFUSED: a sheet looks like CoStar building sale comps", out)
+        self.assertIn("'Sale Status'", out)
+        self.assertEqual(conn.executed, [])
+
+    def test_f2_unrecognised_size_header_is_named_never_dropped_silently(self):
+        for odd, label, alias_text in (
+                (ODD_LEASE, "lease", "'SF Leased' or 'Square Feet Leased' or 'Leased SF'"),
+                (ODD_BUILDING, "building", "'RBA' or 'Building SF' or 'Total SF'")):
+            with self.subTest(label=label):
+                role, (msg,) = ci.sheet_role(odd)
+                self.assertEqual(role, f"incomplete-{label}")
+                self.assertIn(alias_text, msg)
+                # With a recognised sheet: imported, the odd one named.
+                rc, _, out = run_import(self, {"s": stats_rows(), "x": odd}, _CompsConn(),
+                                        areas=False)
+                self.assertEqual(rc, 0, out)
+                self.assertIn(f"{label}: NOT imported", out)
+                self.assertIn(alias_text, out)
+                # Alone: refused with the same list.
+                rc, _, out = run_import(self, {"x": odd}, _CompsConn())
+                self.assertEqual(rc, 1)
+                self.assertIn(alias_text, out)
+                for cell in SECRET_CELLS:
+                    self.assertNotIn(cell, out)
+
+    def test_f2_land_sheet_missing_a_land_header_names_both_layouts(self):
+        header = [h for h in LAND_HEADER if h != "Zoning"]
+        row = [v for h, v in zip(LAND_HEADER, land_row()) if h != "Zoning"]
+        role, (msg,) = ci.sheet_role([header, row])
+        self.assertEqual(role, "incomplete-building")
+        self.assertIn("as a CoStar Land sales sheet it lacks 'Zoning'", msg)
+
+    def test_f2_expected_layouts_list_every_marker_alias(self):
+        for alias in ci._BUILDING_MARKERS + ci._LEASE_MARKERS:
+            self.assertIn(f"'{alias}'", ci.EXPECTED_LAYOUTS)
+
+    def test_f2_unrelated_sheets_are_still_ignored(self):
+        self.assertEqual(ci.sheet_role([["Name", "Notes"], ["a", "b"]]), (None, []))
+        self.assertEqual(ci.sheet_role(AREA_ONLY)[0], "areas")
+
+    def test_f9_a_leased_sf_column_on_a_building_sheet_keeps_the_building_role(self):
+        rows = [BUILDING_HEADER + ["Leased SF"], building_row() + [150_000]]
+        self.assertEqual(ci.sheet_role(rows), ("building", []))
+        rc, _, out = run_import(self, {"s": stats_rows(), "b": rows}, _CompsConn(), areas=False)
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("NOT imported", out)
+
+    def test_f1_two_sheets_with_one_role_still_refuse(self):
+        with self.assertRaises(ci.ImportError_):
+            ci.classify_tables([[LEASE_HEADER, lease_row()], [LEASE_HEADER, lease_row()],
+                                PARTIAL_BUILDING])
+
+
+class EmptyLandSheetTests(unittest.TestCase):
+    """Finding 5: a land sheet with no qualifying sale no longer blocks the
+    building and lease comps of the same workbook; land/area/stats shapes
+    refuse exactly as before."""
+
+    RETAIL = [LAND_HEADER, land_row(**{"Property Type": "Retail"})]
+
+    def test_f5_building_comps_still_go_in(self):
+        conn = _CompsConn()
+        rc, _, out = run_import(self, {"land": self.RETAIL,
+                                       "b": [BUILDING_HEADER, building_row()]}, conn)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("land: no industrial land sale qualifies; the land comps are left "
+                      "unchanged (the other sheets are imported).", out)
+        self.assertTrue(conn.run(costar_ingest._SQL_INSERT_BUILDING_SALES))
+        self.assertFalse(conn.run(ci._SQL_DELETE_TOOL_LAND_COMPS))
+        self.assertFalse(conn.run(costar_ingest._SQL_INSERT_LAND_SALES))
+
+    def test_f5_land_and_stats_refuse_as_before(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        rc, base, out = run_import(self, {"s": stats_rows(), "land": self.RETAIL}, _CompsConn(),
+                                   base=Path(d) / "costar_exports")
+        self.assertEqual(rc, 1)
+        self.assertIn("REFUSED: no industrial land sale qualifies; land comps left unchanged", out)
+        self.assertFalse(base.exists())               # nothing written, stats CSV included
+
+
+class LeaseAgeTests(unittest.TestCase):
+    """Finding 4: a lease in a building older than BUILDING_MAX_AGE_YEARS is
+    dropped when the export gives 'Year Built'; without it the lease stays."""
+
+    def test_f4_old_building_lease_is_dropped_and_counted(self):
+        rows = [LEASE_HEADER, lease_row(),
+                lease_row(**{"Property Address": "5 Test St", "Year Built": 1988}),
+                lease_row(**{"Property Address": "6 Test St", "Year Built": None}),
+                lease_row(**{"Property Address": "7 Test St",
+                             "Year Built": TODAY.year - ci.BUILDING_MAX_AGE_YEARS})]
+        res = ci.convert_lease(rows, today=TODAY)
+        self.assertEqual(sorted(r["address"] for r in res.rows),
+                         ["2 Test St", "6 Test St", "7 Test St"])
+        self.assertEqual(res.dropped, {"building not built within 15 years": 1})
+
+    def test_f4_lease_export_without_year_built_keeps_every_lease(self):
+        header = [h for h in LEASE_HEADER if h != "Year Built"]
+        row = [v for h, v in zip(LEASE_HEADER, lease_row(**{"Year Built": 1980}))
+               if h != "Year Built"]
+        self.assertEqual(len(ci.convert_lease([header, row], today=TODAY).rows), 1)
+
+    def test_f4_replayed_leases_are_refiltered_for_age(self):
+        (r,) = ci.convert_lease([LEASE_HEADER, lease_row()], today=TODAY).rows
+        keep, n_old = ci.refilter_lease([r, {**r, "year_built": 1990},
+                                         {**r, "year_built": None}], TODAY)
+        self.assertEqual((len(keep), n_old), (2, 1))
+
+    def test_f4_memo_note_states_the_lease_age_rule(self):
+        self.assertIn("in buildings built in the last 15 years where the export gives the "
+                      "year built", reporting._BC_NOTE)
+
+
+class ParsingDetailTests(unittest.TestCase):
+    """Finding 11 (b)-(d)."""
+
+    def test_f11b_text_dates_with_a_time_or_a_month_name(self):
+        for v in ("03/02/2026 12:00:00 AM", "3/2/2026 0:00", "2026-03-02T00:00:00",
+                  "Mar 2, 2026", "March 2, 2026"):
+            self.assertEqual(ci.comp_date(v, False), date(2026, 3, 2), v)
+        self.assertIsNone(ci.comp_date("soon", False))
+        rows = [BUILDING_HEADER, building_row(**{"Sale Date": "03/02/2026 12:00:00 AM"})]
+        self.assertEqual(ci.convert_building(rows, today=TODAY).rows[0]["sale_date"],
+                         "2026-03-02")
+        rows = [LEASE_HEADER, lease_row(**{"Sign Date": "May 1, 2026"})]
+        self.assertEqual(ci.convert_lease(rows, today=TODAY).rows[0]["sign_date"], "2026-05-01")
+        # The land path is unchanged (its parser is _sale_date).
+        self.assertIsNone(ci._sale_date("03/02/2026 12:00:00 AM", False))
+
+    def test_f11c_unreadable_cap_rate_has_its_own_reason(self):
+        rows = [BUILDING_HEADER] + [building_row(**{"Actual Cap Rate": v,
+                                                    "Property Address": f"{i} Test St"})
+                                    for i, v in enumerate(("5.5% (Est)", "-", None))]
+        res = ci.convert_building(rows, today=TODAY)
+        self.assertEqual(len(res.rows), 3)
+        self.assertEqual(res.cap_dropped, {"cap rate not a number": 1, "cap rate blank": 2})
+
+    def test_f11d_phrase_forms_of_rent_type_and_secondary_type(self):
+        rows = [LEASE_HEADER, lease_row(**{"Rent Type": "Starting Rent",
+                                           "Secondary Type": "Warehouse/Distribution"}),
+                lease_row(**{"Property Address": "8 Test St", "Rent Type": "Asking Rent"}),
+                lease_row(**{"Property Address": "9 Test St", "Secondary Type": "Warehouse/Flex"})]
+        res = ci.convert_lease(rows, today=TODAY)
+        self.assertEqual([r["address"] for r in res.rows], ["2 Test St"])
+        self.assertEqual(res.dropped, {"asking rent only": 1,
+                                       "secondary type not warehouse or distribution": 1})
+        rows = [BUILDING_HEADER, building_row(**{"Secondary Type": "Distribution & Warehouse"})]
+        self.assertEqual(len(ci.convert_building(rows, today=TODAY).rows), 1)
+
+
+class MemoWordingTests(unittest.TestCase):
+    """Findings 10 and 11 (a)."""
+
+    def test_f10_exit_value_states_its_assumptions(self):
+        self.assertIn("100% leased at the median signed NNN starting rent, with no vacancy, "
+                      "credit loss or reserves", reporting._BC_NOTE)
+        text = reporting.exit_value_text(_projection(), _stat(6.5), _stat(0.06), None)
+        self.assertIn("stabilised, 100% leased, no vacancy or reserves", text)
+
+    def test_f11a_market_wide_line_never_mentions_a_submarket(self):
+        conn = _ReadConn(leases=_leases("atlanta__alpha", [5.0, 6.0, 7.0]), sales=[],
+                         resolved=[], names=[])
+        bc = reporting.fetch_building_comps(conn, "atlanta", [], date(2026, 11, 6))
+        stat, why = reporting.comp_stat(bc, "rent", None)
+        self.assertIsNone(stat)
+        self.assertEqual(why, "n=3 market-wide; at least 5 needed")
+        stat, why = reporting.comp_stat(bc, "rent", "atlanta__alpha")
+        self.assertEqual(why, "n=3 in the submarket, 3 market-wide; at least 5 needed")
 
 
 if __name__ == "__main__":

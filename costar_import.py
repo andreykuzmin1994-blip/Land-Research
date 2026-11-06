@@ -58,8 +58,9 @@ What it does with the workbook (sheets are found by their headers):
    market rent and exit-value lines only (reviews/28_building_comps). They
    are NO scoring input. Headers match exactly (case and surrounding spaces
    aside) against the alias lists BUILDING_COLUMNS / LEASE_COLUMNS; a sheet
-   that looks like one of them but lacks a required column is REFUSED with
-   the names of the missing expected columns. Each sheet has exactly one
+   that looks like one of them but matches no layout is named on the
+   console with the expected columns it lacks and skipped; alone in the
+   workbook it is REFUSED (exit 1) with that list. Each sheet has exactly one
    role; two sheets with the same role are refused. A sheet with
    'Submarket Name' and 'Parcel Number 1 (Min)' keeps the area role exactly
    as before; when it also carries every building column it ALSO yields
@@ -74,7 +75,7 @@ before (notes start with AREA_NOTE_PREFIX) or empty ones: a human-seeded
 bbox is never overwritten. A tool-written area whose submarket no longer
 qualifies in the new export is cleared, so no area outlives its data.
 Without a database the CSV is still written and the tool exits 2 ("areas
-not written").
+and comps not written: no DATABASE_URL").
 
 CoStar data is licensed: everything lands under costar_exports/
 (gitignored); the console shows counts only, never names or values.
@@ -97,7 +98,7 @@ import time
 import xml.etree.ElementTree as ET
 import zipfile
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -1044,7 +1045,10 @@ BUILDING_SALE_WINDOW_MONTHS = 36
 LEASE_WINDOW_MONTHS = 24
 # Exit comps describe a NEW building: older stock has lower clear heights
 # and trades at lower $/SF and higher cap rates. 15 years = built 2011 on
-# for a 2026 import, roughly the 32-36 ft clear generation.
+# for a 2026 import, roughly the 32-36 ft clear generation. The same rule
+# applies to a lease whose 'Year Built' is given, so the income method's
+# rent and cap rate describe the same stock (review finding 4); 'Year
+# Built' is optional on a lease export, and a lease without it is kept.
 BUILDING_MAX_AGE_YEARS = 15
 # One stored convention: sales_comps.cap_rate of OUR rows is a FRACTION
 # (0.055 = 5.5%). 3-12% brackets every plausible stabilised industrial cap
@@ -1138,11 +1142,20 @@ LEASE_COLUMNS: dict[str, tuple[str, ...]] = {
 }
 LEASE_REQUIRED = ("address", "property_type", "secondary_type", "sf_leased", "sign_date",
                   "service_type", "latitude", "longitude")
-# Marker columns: a sheet with one of these is a lease sheet (checked first)
-# or, with 'Sale Price' too, a building sales sheet.
+# Marker columns: a sheet with one of these AND a lease-only header is a
+# lease sheet (checked right after stats); a sheet with a building marker
+# and 'Sale Price' is a building sales sheet. 'Leased SF' alone is not
+# enough: building and property exports can carry a leased-area column
+# (review finding 9).
 _LEASE_MARKERS = LEASE_COLUMNS["sf_leased"]
 _BUILDING_MARKERS = BUILDING_COLUMNS["building_sf"]
-
+_LEASE_ONLY_HEADERS = (LEASE_COLUMNS["sign_date"] + LEASE_COLUMNS["service_type"]
+                       + LEASE_COLUMNS["starting_rent"] + LEASE_COLUMNS["annual_rent"]
+                       + LEASE_COLUMNS["asking_rent"] + LEASE_COLUMNS["rent_type"])
+# A sheet left without a role that still carries these looks like a comp
+# export whose size column is named differently (review finding 2): it is
+# named on the console with the expected headers it lacks, never ignored.
+_SALE_LOOKALIKE = (("Sale Price",), ("Sale Date", "Sale Status"))
 # Raw JSONB allowlists (BC-05): nothing else from the export is stored --
 # no contacts, brokers, phone numbers, e-mails, tenants or comments.
 BUILDING_RAW_KEYS = frozenset({"import_origin", "imported_on", "latitude", "longitude",
@@ -1166,7 +1179,11 @@ _SQL_DELETE_TOOL_BUILDING_COMPS = (
 _SQL_DELETE_TOOL_LEASE_COMPS = (
     "DELETE FROM leasing_comps WHERE " + _SQL_TOOL_ROW + " AND " + _SQL_IN_MARKET
 )
-# Building and lease rows delivered another way (a CSV): never stored twice.
+# Building and lease rows delivered another way (a CSV): counted on the
+# console, and the tool's filtered row is stored as well, because the memo
+# reads only this tool's rows (review finding 3). Nothing else reads
+# building sales_comps or leasing_comps (BC-04), so the copy is never
+# counted twice.
 _SQL_OTHER_BUILDING_KEYS = (
     "SELECT address, sale_date FROM sales_comps WHERE comp_type = 'building' "
     "AND NOT COALESCE(" + _SQL_TOOL_ROW + ", FALSE) AND " + _SQL_IN_MARKET
@@ -1250,30 +1267,52 @@ class SheetRoles:
     # An area sheet that looks like building sales but lacks columns: the
     # expected names it lacks (areas are imported as before).
     areas_building_missing: list[str] = field(default_factory=list)
+    # Sheets that look like building sale or lease comps but match no
+    # layout: (console label, message naming only EXPECTED headers). They
+    # are named and skipped; the workbook is refused only when nothing
+    # else in it has a role (review findings 1 and 2).
+    incomplete: list[tuple[str, str]] = field(default_factory=list)
 
     def any(self) -> bool:
         return any(x is not None for x in (self.stats, self.areas, self.land,
                                            self.building, self.lease))
 
 
-def sheet_role(rows: list[list[Any]]) -> tuple[str | None, list[str]]:
-    """(role, missing building columns of an area sheet). Exactly one role:
-    'stats', 'lease', 'areas', 'areas+building', 'building', 'land' or None.
+def _aliases(names: Sequence[str]) -> str:
+    return " or ".join(f"'{a}'" for a in names)
 
-    Raises ImportError_ for a sheet that looks like lease or building comps
-    but lacks a required column (the message names only expected headers).
+
+def _lacks_message(kind: str, marker: str, miss: Sequence[str]) -> str:
+    return (f"a sheet looks like CoStar {kind} ({marker}) but lacks the expected column(s) "
+            + ", ".join(miss) + "; add them in CoStar's column picker, or rename the header "
+            "to one of the names listed (COSTAR_EXPORTS_README.md)")
+
+
+def _lease_lacks(cols: dict[str, int]) -> str:
+    return _lacks_message("lease comps", _aliases(_LEASE_MARKERS), _lease_missing(cols))
+
+
+def _building_lacks(miss: Sequence[str]) -> str:
+    return _lacks_message("building sale comps",
+                          f"{_aliases(_BUILDING_MARKERS)} with 'Sale Price'", miss)
+
+
+def sheet_role(rows: list[list[Any]]) -> tuple[str | None, list[str]]:
+    """(role, detail). Exactly one role: 'stats', 'lease', 'areas',
+    'areas+building', 'building', 'land', 'incomplete-lease',
+    'incomplete-building' or None.
+
+    detail: for 'areas', the building columns the sheet lacks; for an
+    'incomplete-*' role, one message naming only expected headers (BC-05).
+    Never raises: a look-alike sheet is reported, not fatal (finding 1).
     """
     if find_header(rows, "Geography Name", "Concept Name"):
         return "stats", []
-    lease = _folded_header(rows, [_LEASE_MARKERS])
+    lease = _folded_header(rows, [_LEASE_MARKERS, _LEASE_ONLY_HEADERS])
     if lease:
         cols = _columns(lease[0], LEASE_COLUMNS)
-        miss = _lease_missing(cols)
-        if miss:
-            raise ImportError_("a sheet looks like CoStar lease comps ('SF Leased') but lacks "
-                               "the expected column(s) " + ", ".join(miss)
-                               + "; add them in CoStar's column picker "
-                               "(COSTAR_EXPORTS_README.md)")
+        if _lease_missing(cols):
+            return "incomplete-lease", [_lease_lacks(cols)]
         return "lease", []
     building = _folded_header(rows, [_BUILDING_MARKERS, ("Sale Price",)])
     miss = _missing(_columns(building[0], BUILDING_COLUMNS), BUILDING_COLUMNS,
@@ -1286,22 +1325,39 @@ def sheet_role(rows: list[list[Any]]) -> tuple[str | None, list[str]]:
         return "land", []
     if building:
         if miss:
-            raise ImportError_("a sheet looks like CoStar building sale comps ('RBA' and "
-                               "'Sale Price') but lacks the expected column(s) "
-                               + ", ".join(miss) + "; add them in CoStar's column picker "
-                               "(COSTAR_EXPORTS_README.md)")
+            return "incomplete-building", [_building_lacks(miss)]
         return "building", []
+    # No marker matched. A sheet that still looks like a comp export has
+    # its size column under another name: say so, never drop it silently.
+    lease_like = (_folded_header(rows, [_LEASE_MARKERS])
+                  or _folded_header(rows, [_LEASE_ONLY_HEADERS]))
+    if lease_like:
+        return "incomplete-lease", [_lease_lacks(_columns(lease_like[0], LEASE_COLUMNS))]
+    sale_like = _folded_header(rows, _SALE_LOOKALIKE)
+    if sale_like:
+        cols = _columns(sale_like[0], BUILDING_COLUMNS)
+        msg = _building_lacks(_missing(cols, BUILDING_COLUMNS, BUILDING_REQUIRED))
+        land_miss = [f"'{h}'" for h in LAND_HEADERS if _fold(h) not in sale_like[0]]
+        if _fold("Land Area AC") in sale_like[0] or _fold("Zoning") in sale_like[0]:
+            msg += ("; as a CoStar Land sales sheet it lacks " + (", ".join(land_miss)
+                    or "nothing, but carries a building or parcel-number column ("
+                    + ", ".join(f"'{h}'" for h in LAND_EXCLUDING_HEADERS) + ")"))
+        return "incomplete-building", [msg]
     return None, []
 
 
 def classify_tables(tables: Sequence[list[list[Any]]]) -> SheetRoles:
     """Every sheet's one role; two sheets with the same role are refused
-    rather than the first one taken (BC-01)."""
+    rather than the first one taken (BC-01). Look-alike sheets are listed
+    in ``incomplete`` (the caller decides whether that refuses)."""
     roles = SheetRoles()
     seen: dict[str, int] = {}
     for rows in tables:
-        role, miss = sheet_role(rows)
+        role, detail = sheet_role(rows)
         if role is None:
+            continue
+        if role.startswith("incomplete-"):
+            roles.incomplete.append((role.split("-", 1)[1], detail[0]))
             continue
         for r in role.split("+"):
             seen[r] = seen.get(r, 0) + 1
@@ -1313,7 +1369,7 @@ def classify_tables(tables: Sequence[list[list[Any]]]) -> SheetRoles:
             roles.building_from_areas = True
         elif role == "areas":
             roles.areas = rows
-            roles.areas_building_missing = miss
+            roles.areas_building_missing = detail
         else:
             setattr(roles, role, rows)
     return roles
@@ -1324,8 +1380,50 @@ _ROLE_LABELS = {"stats": "submarket stats", "areas": "area sale comps", "land": 
 EXPECTED_LAYOUTS = (
     "stats ('Geography Name', 'Concept Name'); area sale comps ('Submarket Name', "
     "'Parcel Number 1 (Min)'); land sales (" + ", ".join(f"'{h}'" for h in LAND_HEADERS)
-    + "); building sale comps ('RBA', 'Sale Price', ...); lease comps ('SF Leased', ...)"
+    + "); building sale comps (" + _aliases(_BUILDING_MARKERS) + ", with 'Sale Price', "
+    "'Sale Date', 'Sale Status', ...); lease comps (" + _aliases(_LEASE_MARKERS)
+    + ", with " + _aliases(LEASE_COLUMNS["sign_date"]) + ", 'Service Type', a starting "
+    "rent, ...)"
 )
+
+
+# Cap-rate cells that mean "not given" (counted as blank, not as an
+# unreadable number).
+_BLANK_TOKENS = frozenset({"", "-", "--", "n/a", "na", "none"})
+# 'Rent Type' as CoStar words it, and the phrase forms seen in exports.
+_RENT_TYPE_WORDS = {"starting rent": "starting", "asking rent": "asking",
+                    "effective rent": "effective"}
+_SECONDARY_SPLIT_RE = re.compile(r"\s*(?:/|&|,|\band\b)\s*")
+_TIME_SUFFIX_RE = re.compile(r"(?i)^(.*?\d)[\sT]+\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:[AP]M)?$")
+
+
+def secondary_type_ok(folded: str) -> bool:
+    """'Warehouse', 'Distribution', or a combination of them only
+    ('Warehouse/Distribution'); 'Warehouse/Flex' is not comparable."""
+    parts = [p for p in _SECONDARY_SPLIT_RE.split(folded) if p]
+    return bool(parts) and all(p in BUILDING_SECONDARY_TYPES for p in parts)
+
+
+def comp_date(value: Any, date1904: bool) -> date | None:
+    """_sale_date plus the text forms building and lease CSVs carry: a
+    trailing time ('3/2/2026 12:00:00 AM') and a month name ('Mar 2, 2026',
+    'March 2, 2026'). The land path keeps _sale_date unchanged."""
+    d = _sale_date(value, date1904)
+    if d is not None or not isinstance(value, str):
+        return d
+    s = value.strip()
+    m = _TIME_SUFFIX_RE.match(s)
+    if m:
+        d = _sale_date(m.group(1), date1904)
+        if d is not None:
+            return d
+        s = m.group(1)
+    for fmt in ("%b %d, %Y", "%B %d, %Y", "%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def cap_rate_fraction(value: Any) -> float | None:
@@ -1396,11 +1494,11 @@ def convert_building(rows: list[list[Any]], *, today: date, date1904: bool = Fal
         if _fold(get(row, "property_type") or "") != "industrial":
             drop("not industrial"); continue
         secondary = _fold(get(row, "secondary_type") or "")
-        if secondary not in BUILDING_SECONDARY_TYPES:
+        if not secondary_type_ok(secondary):
             drop("secondary type not warehouse or distribution"); continue
         if _fold(get(row, "sale_status") or "") != "sold":
             drop("not sold"); continue
-        sold = _sale_date(get(row, "sale_date"), date1904)
+        sold = comp_date(get(row, "sale_date"), date1904)
         if sold is None:
             drop("no sale date"); continue
         if sold > today:
@@ -1446,9 +1544,12 @@ def convert_building(rows: list[list[Any]], *, today: date, date1904: bool = Fal
         if key in seen:
             drop("duplicate address, date and size"); continue
         seen.add(key)
-        cap = cap_rate_fraction(get(row, "cap_rate"))
+        cap_cell = get(row, "cap_rate")
+        cap = cap_rate_fraction(cap_cell)
         if cap is None:
-            out.cap_dropped["cap rate blank"] = out.cap_dropped.get("cap rate blank", 0) + 1
+            why = ("cap rate blank" if _fold(cap_cell if cap_cell is not None else "")
+                   in _BLANK_TOKENS else "cap rate not a number")
+            out.cap_dropped[why] = out.cap_dropped.get(why, 0) + 1
         elif not CAP_RATE_MIN <= cap <= CAP_RATE_MAX:
             why = f"cap rate outside {CAP_RATE_MIN:.0%}-{CAP_RATE_MAX:.0%}"
             out.cap_dropped[why] = out.cap_dropped.get(why, 0) + 1
@@ -1482,6 +1583,7 @@ def convert_lease(rows: list[list[Any]], *, today: date, date1904: bool = False)
     start = found[1]
     rent_col = "starting_rent" if "starting_rent" in cols else "annual_rent"
     oldest = months_before(today, LEASE_WINDOW_MONTHS)
+    min_year = today.year - BUILDING_MAX_AGE_YEARS
     out = CompsResult([])
     seen: set[tuple[str, date, int]] = set()
 
@@ -1494,14 +1596,14 @@ def convert_lease(rows: list[list[Any]], *, today: date, date1904: bool = False)
             continue
         if _fold(get(row, "property_type") or "") != "industrial":
             drop("not industrial"); continue
-        if _fold(get(row, "secondary_type") or "") not in BUILDING_SECONDARY_TYPES:
+        if not secondary_type_ok(_fold(get(row, "secondary_type") or "")):
             drop("secondary type not warehouse or distribution"); continue
         kinds = f"{get(row, 'lease_type') or ''} {get(row, 'deal_type') or ''}"
         if _SUBLEASE_RE.search(kinds):
             drop("sublease"); continue
         if _RENEWAL_RE.search(kinds):
             drop("renewal or extension"); continue
-        signed = _sale_date(get(row, "sign_date"), date1904)
+        signed = comp_date(get(row, "sign_date"), date1904)
         if signed is None:
             drop("no sign date"); continue
         if signed > today:
@@ -1513,9 +1615,13 @@ def convert_lease(rows: list[list[Any]], *, today: date, date1904: bool = False)
             drop("no SF leased"); continue
         if not BUILDING_MIN_SF <= sf <= BUILDING_MAX_SF:
             drop(f"outside {BUILDING_MIN_SF:,}-{BUILDING_MAX_SF:,} SF leased"); continue
+        built = _finite(get(row, "year_built"))
+        if built is not None and 1800 < built < 2200 and built < min_year:
+            drop(f"building not built within {BUILDING_MAX_AGE_YEARS} years"); continue
         if not _NNN_RE.match(str(get(row, "service_type") or "")):
             drop("service type not NNN"); continue
-        rent_type = _fold(get(row, "rent_type") or "")
+        rent_type = _RENT_TYPE_WORDS.get(_fold(get(row, "rent_type") or ""),
+                                         _fold(get(row, "rent_type") or ""))
         rent = _finite(get(row, rent_col))
         if rent_col == "annual_rent" and not rent_type:
             drop("rent type not stated"); continue
@@ -1538,9 +1644,9 @@ def convert_lease(rows: list[list[Any]], *, today: date, date1904: bool = False)
         if key in seen:
             drop("duplicate address, sign date and SF"); continue
         seen.add(key)
-        started = _sale_date(get(row, "start_date"), date1904)
+        started = comp_date(get(row, "start_date"), date1904)
         deal = next((d for d in _DEAL_TYPES if d in _fold(kinds)), None)
-        rba, built = _finite(get(row, "building_rba")), _finite(get(row, "year_built"))
+        rba = _finite(get(row, "building_rba"))
         out.rows.append({
             "address": address or None,
             "sf_leased": int(round(sf)),
@@ -1586,6 +1692,8 @@ def refilter_lease(rows: list[Any], today: date) -> tuple[list[dict[str, Any]], 
             ok = (BUILDING_MIN_SF <= r["sf_leased"] <= BUILDING_MAX_SF
                   and oldest <= str(r["sign_date"]) <= today.isoformat()
                   and NNN_RENT_MIN <= r["rent_psf_nnn"] <= NNN_RENT_MAX
+                  and (r.get("year_built") is None
+                       or r["year_built"] >= today.year - BUILDING_MAX_AGE_YEARS)
                   and _in_georgia(float(r["latitude"]), float(r["longitude"])))
         except (TypeError, KeyError, ValueError):
             ok = False
@@ -1686,12 +1794,15 @@ def write_comps(conn: Any, kind: _CompsKind, rows: list[dict[str, Any]], today: 
     Mirrors write_land: each comp goes to the area a parcel at the same
     point resolves to (nearest within 3 km); no areas at all -> nothing
     touched ('deferred'); nothing assignable -> the earlier rows are kept
-    ('kept_previous'); comps another origin already delivered are skipped.
+    ('kept_previous'). A comp another origin (a CSV) also delivered is
+    counted ('also_delivered') and stored too: the memo reads only this
+    tool's rows, so skipping it would leave it out of every median
+    (finding 3). An address-less comp is never matched across origins.
     Only rows matching _SQL_TOOL_ROW with this kind's origin are deleted.
     """
     market_id = costar_ingest._slugify(market_name)
     counts = {"deferred": 0, "assigned": 0, "no_area": 0, "submarkets": 0, "replaced": 0,
-              "already_delivered": 0, "kept_previous": 0}
+              "also_delivered": 0, "kept_previous": 0}
     if not rows:
         raise ImportError_(f"no {kind.label} qualify; left unchanged")
     with conn.transaction():
@@ -1715,10 +1826,11 @@ def write_comps(conn: Any, kind: _CompsKind, rows: list[dict[str, Any]], today: 
             r = rows[int(ordinal) - 1]
             if submarket_id is None:
                 counts["no_area"] += 1
-            elif kind.key(r) in delivered:
-                counts["already_delivered"] += 1
-            else:
-                todo.append((r, submarket_id))
+                continue
+            key = kind.key(r)
+            if key[0] and key in delivered:
+                counts["also_delivered"] += 1
+            todo.append((r, submarket_id))
         if not todo:
             counts["kept_previous"] = 1
             return counts
@@ -1747,12 +1859,12 @@ def _comps_line(label: str, c: dict[str, int], what: str) -> str:
         return (f"{label}: saved; no submarket areas exist yet, so the {what} are assigned "
                 "when a workbook with sale comps is imported.")
     if c["kept_previous"]:
-        return (f"{label}: no {what[:-1]} lies within 3 km of an area ({c['no_area']}) or each "
-                f"was already delivered ({c['already_delivered']}); the earlier {label} comps "
-                "are kept unchanged.")
+        return (f"{label}: no {what[:-1]} lies within 3 km of an area ({c['no_area']}); the "
+                f"earlier {label} comps are kept unchanged.")
     return (f"{label}: {c['assigned']} {what} in {c['submarkets']} submarket areas "
-            f"({c['no_area']} farther than 3 km from every area; {c['already_delivered']} "
-            f"already delivered by a CSV; {c['replaced']} earlier tool-imported rows replaced)")
+            f"({c['no_area']} farther than 3 km from every area; {c['also_delivered']} "
+            "also in a CSV-delivered row, stored here too because the memo's medians read "
+            f"only this tool's rows; {c['replaced']} earlier tool-imported rows replaced)")
 
 
 def _replay(name: str, label: str, base: Path, today: date, refilter: Any
@@ -1789,9 +1901,18 @@ def run(path: Path, *, areas: bool = True, locator: Any = None,
     roles = classify_tables(tables)
     stats_rows, comps_rows, land_sheet = roles.stats, roles.areas, roles.land
     if not roles.any():
+        if roles.incomplete:
+            # The operator's first real export with an unexpected header
+            # lands here: name what is missing (finding 2).
+            print("REFUSED: " + "; ".join(msg for _, msg in roles.incomplete) + ".")
+            return 1
         print("REFUSED: no CoStar sheet found in this file. Expected one of: "
               + EXPECTED_LAYOUTS + ".")
         return 1
+    for label, msg in roles.incomplete:
+        # Other sheets have a role: import them, name this one (finding 1).
+        print(f"{label}: NOT imported: {msg}. The other sheets are imported; fix the "
+              "export and import it again.")
     date1904 = xlsx_date1904(path)
 
     land: LandResult | None = None
@@ -1800,7 +1921,14 @@ def run(path: Path, *, areas: bool = True, locator: Any = None,
         print(f"land: {len(land.rows)} industrial land sales kept; dropped "
               + (", ".join(f"{n} {why}" for why, n in sorted(land.dropped.items())) or "none"))
         if not land.rows:
-            raise ImportError_("no industrial land sale qualifies; land comps left unchanged")
+            if roles.building is None and roles.lease is None:
+                # The land, area and stats shapes refuse as before.
+                raise ImportError_("no industrial land sale qualifies; land comps left unchanged")
+            # Building and lease comps in the same workbook still go in
+            # (finding 5); the land sheet is treated as if it were absent.
+            print("land: no industrial land sale qualifies; the land comps are left "
+                  "unchanged (the other sheets are imported).")
+            land = None
 
     building: CompsResult | None = None
     if roles.building is not None:

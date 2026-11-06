@@ -662,14 +662,18 @@ _BC_NOTE = (
     "_CoStar building comps imported by costar_import.py (reviews/28_building_comps); "
     "aggregates only. Leases: signed NNN starting rents, "
     f"{_BC.BUILDING_MIN_SF:,}-{_BC.BUILDING_MAX_SF:,} SF leased, signed in the last "
-    f"{_BC.LEASE_WINDOW_MONTHS} months. Sales: warehouse/distribution buildings of "
+    f"{_BC.LEASE_WINDOW_MONTHS} months, in buildings built in the last "
+    f"{_BC.BUILDING_MAX_AGE_YEARS} years where the export gives the year built. Sales: warehouse/distribution buildings of "
     f"{_BC.BUILDING_MIN_SF:,}-{_BC.BUILDING_MAX_SF:,} SF built in the last "
     f"{_BC.BUILDING_MAX_AGE_YEARS} years, sold in the last {_BC.BUILDING_SALE_WINDOW_MONTHS} "
     f"months, portfolio, partial-interest, leaseback and distressed sales excluded. A submarket "
     f"needs at least {_BC.MIN_COMPS} comps, otherwise the market-wide value is shown and "
     "labelled. Median = the average of the two middle values when n is even (the land-comps "
     "clause in the thesis uses the upper middle value). The exit value is an estimate for "
-    "the projected building, not an appraisal._"
+    "the projected building, not an appraisal: stabilised and 100% leased at the median "
+    "signed NNN starting rent, with no vacancy, credit loss or reserves, capitalised at "
+    "the median sale cap rate (CoStar's cap rate at sale, on in-place income), so it reads "
+    "high when rents have risen since those sales._"
 )
 _INTRANS, _IDLE = 2, 0  # psycopg.pq.TransactionStatus values (site_fit's pattern)
 
@@ -791,6 +795,8 @@ def comp_stat(bc: BuildingComps, kind: str, submarket_id: str | None) -> tuple[C
         if submarket_id is not None:
             label += f"; {len(sub)} in the submarket"
         return CompStat(comp_median(every), len(every), label, window, verb), ""
+    if submarket_id is None:       # the market-wide line, or no resolved submarket
+        return None, f"n={len(every)} market-wide; at least {_BC.MIN_COMPS} needed"
     return None, (f"n={len(sub)} in the submarket, {len(every)} market-wide; "
                   f"at least {_BC.MIN_COMPS} needed")
 
@@ -829,7 +835,8 @@ def exit_value_parts(p: Any, rent: CompStat | None, cap: CompStat | None,
         return p.rules_label, (
             f"{_fmt_millions(value)} = {building} x {_BC_RENT_PHRASE} "
             f"{_fmt_rent(rent)} / cap rate {_fmt_cap(cap)} (rent {rent.where()}; "
-            f"cap rate {cap.where()}); an estimate, not an appraisal")
+            f"cap rate {cap.where()}); stabilised, 100% leased, no vacancy or reserves; "
+            "an estimate, not an appraisal")
     if psf is not None and psf.value > 0:
         value = psf.value * sf
         return p.rules_label, (

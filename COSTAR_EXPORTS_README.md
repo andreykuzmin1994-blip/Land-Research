@@ -122,7 +122,7 @@ above or a `land_sales_comps` CSV does. Other counties' parcel numbers are not l
 (Fulton is the only configured county).
 
 Without a database the stats CSV is still written and the tool exits 2
-("areas not written").
+("areas and comps not written: no DATABASE_URL ...").
 
 ### Building sale comps and lease comps (memo rent and exit value)
 
@@ -131,12 +131,32 @@ the documented assumptions about CoStar's standard Sale Comps and Lease
 Comps exports. Headers are matched **exactly** (case and surrounding
 spaces aside) against these lists; nothing is matched by substring, so
 `Price Per SF Land` is never read as the building $/SF. A sheet that looks
-like building sales (`RBA`/`Building SF`/`Total SF` plus `Sale Price`) or
-lease comps (`SF Leased`) but lacks a required column is **refused (exit
-1)** with the names of the expected columns it lacks: add them in the
-column picker and export again. If CoStar names a column differently,
-tell the developer the exact header; the alias lists are in
-`costar_import.py` (`BUILDING_COLUMNS`, `LEASE_COLUMNS`).
+like building sales or lease comps but matches no layout is **named on the
+console with the expected columns it lacks** ("building: NOT imported: ..."
+or "lease: NOT imported: ..."): add them in the column picker, or rename
+the header to one of the listed names, and import again. "Looks like"
+means: building sales = `RBA`/`Building SF`/`Total SF` with `Sale Price`,
+or `Sale Price` with `Sale Date` or `Sale Status` (so a size column under
+an unknown name, such as `Bldg SF`, is still caught); lease comps =
+`SF Leased`/`Square Feet Leased`/`Leased SF`, or any of `Sign Date`,
+`Service Type`, `Rent Type` or a rent column (so `Leased Square Feet` is
+still caught). If such a sheet is the only one in the workbook, the import
+is **refused (exit 1)** with that list; if the workbook also holds a stats,
+area, land, building or lease sheet that matches, those are imported as
+usual (exit 0) and only the look-alike is skipped. A `Leased SF` column on
+a building sales sheet does not make it a lease sheet: a lease sheet also
+needs a lease-only header (`Sign Date`, `Service Type`, `Rent Type` or a
+rent column). If CoStar names a column differently, tell the developer
+the exact header; the alias lists are in `costar_import.py`
+(`BUILDING_COLUMNS`, `LEASE_COLUMNS`).
+
+Text dates: an Excel date, `2026-03-02`, `3/2/2026`, a trailing time
+(`3/2/2026 12:00:00 AM`) and a month name (`Mar 2, 2026`, `March 2, 2026`)
+are read on the building and lease sheets (the Land sheet keeps its
+narrower parser). `Secondary Type` may be `Warehouse`, `Distribution` or a
+combination of only those two (`Warehouse/Distribution`); `Rent Type` may
+read `Starting` or `Starting Rent` (`Asking`/`Asking Rent` and
+`Effective`/`Effective Rent` are dropped, counted).
 
 **CoStar search 1: Sale Comps** (Sales > Sale Comps).
 - Filters: Property Type **Industrial**; Market **Atlanta**; Sale Date in
@@ -161,8 +181,9 @@ tell the developer the exact header; the alias lists are in
   `Number Of Properties` above 1; duplicates (address, date, size).
 - Cap rates: `5.5`, `5.50%` and `0.055` all mean 5.5% and are stored as
   the fraction 0.055 (`sales_comps.cap_rate` of this tool's rows is a
-  fraction). A blank cap rate, or one outside 3-12%, keeps the sale (for
-  $/SF) without a cap rate; the console counts both.
+  fraction). A blank cap rate (`-` and `n/a` count as blank), an
+  unreadable one (`5.5% (Est)`) or one outside 3-12% keeps the sale (for
+  $/SF) without a cap rate; the console counts each reason.
 
 **CoStar search 2: Lease Comps** (Lease > Lease Comps).
 - Filters: Property Type **Industrial**; Market **Atlanta**; Sign Date in
@@ -177,9 +198,11 @@ tell the developer the exact header; the alias lists are in
   (only to name a drop "asking rent only"), `Lease Type` and `Deal Type`
   (subleases and renewals/extensions), `Lease Term` (`5 Years 3 Months` ->
   63 months; a bare number is ambiguous and stored as unknown) or
-  `Term (Months)`, `RBA`, `Year Built`.
+  `Term (Months)`, `RBA`, `Year Built` (strongly recommended: see below).
 - Kept: signed in the last 24 months; 100,000-1,000,000 SF leased;
-  warehouse or distribution; service type NNN / Triple Net; a disclosed
+  when `Year Built` is given, built in the last 15 years (the same rule as
+  the sales, so rent and cap rate describe the same new-building stock; a
+  lease without a year built is kept); warehouse or distribution; service type NNN / Triple Net; a disclosed
   starting rent of $2-$25/SF/yr (a monthly rent such as $0.55 falls out);
   inside Georgia. Dropped with a counted reason: gross, modified gross and
   full-service leases, asking-only, effective-only and withheld rents,
@@ -198,9 +221,18 @@ clear height, secondary type, sign date, service type and deal type. The
 kept comps are also saved in `costar_exports/.building_sales_snapshot.json`
 and `.lease_comps_snapshot.json`: with no areas yet they wait there (exit
 0), and every workbook that redraws the areas assigns them again. A comp a
-`building_sales_comps`/`leasing_comps` CSV already delivered is not stored
-again (counted); prefer one path for each comp type, since the memo reads
-only this tool's filtered rows.
+`building_sales_comps`/`leasing_comps` CSV also delivered is counted on
+the console ("N also in a CSV-delivered row") and stored by this tool as
+well, because the memo reads only this tool's filtered rows (nothing else
+reads building or lease comps, so it is never counted twice). Prefer one
+path for each comp type all the same: a later CSV re-ingest deletes a tool
+row with the same submarket, address and date until the next import of
+the CoStar workbook restores it.
+
+**One empty sheet does not block the others.** A Land sheet in which no
+sale qualifies leaves the land comps unchanged; when the workbook also
+holds a building or lease sheet, those are still imported (the console
+says so). Without one, the workbook is refused exactly as before.
 
 **Sheet roles.** Every sheet gets exactly one role, and two sheets with
 the same role are refused. A lease sheet is never an area sheet. A sheet
@@ -219,7 +251,11 @@ when it has at least 5 comps, else the labelled market-wide median, else
 "—", always with its count and date window, counted from the memo date.
 The exit value uses the building the memo's projection shows (with its
 draft/verified label): signed rent x SF / cap rate when both have 5
-comps, else sale $/SF x SF, else nothing; never a default cap rate. Output shows counts only: CoStar data is licensed
+comps, else sale $/SF x SF, else nothing; never a default cap rate. The
+income method assumes a stabilised building, 100% leased at the median
+signed NNN starting rent, with no vacancy, credit loss or reserves, and
+divides by CoStar's cap rate at sale (on in-place income), so it reads
+high when rents have risen since those sales. Output shows counts only: CoStar data is licensed
 and stays under the gitignored `costar_exports/`.
 
 ---

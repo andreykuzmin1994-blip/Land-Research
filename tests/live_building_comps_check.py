@@ -15,8 +15,10 @@ against a throwaway database of your own:
       unchanged (an import that holds no area sheet never redraws areas).
   (b) BC-09 / SR-9: the tool's DELETE spares land rows, CSV-delivered
       building and lease rows and a CSV row whose raw forges the tool's
-      import_origin and imported_on; a comp a CSV already delivered is
-      stored once; a second import gives the same rows.
+      import_origin and imported_on; a comp a CSV also delivered is
+      counted and stored by the tool too, so the memo (which reads only
+      the tool's rows) counts it (review finding 3); a second import gives
+      the same rows.
   (c) BC-03: reporting resolves each parcel to the area research.py
       resolves it to (both resolvers agree per parcel), and a parcel whose
       stored submarket names another area shows its resolved area's rent.
@@ -211,8 +213,8 @@ def main() -> int:
             cb = ci.write_comps(conn, ci.BUILDING_KIND, b_rows, TODAY, market_name=market)
             cl = ci.write_comps(conn, ci.LEASE_KIND, l_rows, TODAY, market_name=market)
             conn.commit()
-        res.check((cb["assigned"], cb["already_delivered"]) == (5, 1),
-                  "(b) a building comp a CSV already delivered is stored once", repr(cb))
+        res.check((cb["assigned"], cb["also_delivered"]) == (6, 1),
+                  "(b) a building comp a CSV also delivered is counted and stored", repr(cb))
         res.check(cl["assigned"] == 6 and cl["submarkets"] == 2, "(b) leases assigned", repr(cl))
 
         old = research._MARKET_TO_COUNTIES
@@ -244,8 +246,10 @@ def main() -> int:
                    ("building", "11 Test St")} <= kept,
                   "(b) land, CSV and forged-origin CSV rows survive the tool's DELETE",
                   repr(sorted(kept)))
-        res.check(sum(1 for t, addr, *_ in sales2 if addr == "11 Test St") == 1,
-                  "(b) the duplicate sale is stored once")
+        res.check(sorted((str(o) for t, addr, o, _s in sales2 if addr == "11 Test St"))
+                  == sorted(["None", ci.BUILDING_ORIGIN]),
+                  "(b) the CSV row and the tool's own row of the shared sale are both kept",
+                  repr([r for r in sales2 if r[1] == "11 Test St"]))
         res.check(("7 Csv St", ci.LEASE_ORIGIN, True) in leases2,
                   "(b) the CSV lease with a forged origin survives")
 
@@ -264,10 +268,12 @@ def main() -> int:
                   "(c) the snapshot shows the resolved area's rent", repr(rent))
         psf, _ = reporting.comp_stat(bc, "psf", a)
         cap, _ = reporting.comp_stat(bc, "cap", a)
-        res.check(psf is not None and psf.value == 130.0 and cap is None,
-                  "(c) sale $/SF median of the tool's rows; CSV cap 5.5 never counted",
+        # Six tool sales (the one a CSV also delivered included, finding 3).
+        res.check(psf is not None and psf.value == 125.0 and psf.n == 6
+                  and cap is not None and cap.value == 0.06 and cap.n == 5,
+                  "(c) sale $/SF and cap medians of the tool's rows; CSV cap 5.5 never counted",
                   f"{psf} {cap}")
-        res.check(sorted(bc.caps.get(a, [])) == [0.05, 0.06, 0.065, 0.07],
+        res.check(sorted(bc.caps.get(a, [])) == [0.05, 0.055, 0.06, 0.065, 0.07],
                   "(c) the cap rates read are the tool's fractions only", repr(bc.caps))
 
         # (d) window boundary: the first day is in, the day before is out.
