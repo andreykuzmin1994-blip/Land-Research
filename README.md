@@ -240,6 +240,75 @@ setback on every edge and the fitted building, to open in SiteFit
 (Studies > Open file…) and refine by hand. Keep the SiteFit tool file itself out of the repo
 (`SiteFit.html` is gitignored).
 
+## Zoning-code scraper (operator, between runs)
+
+`make rules-scrape` (`rules_scrape.py`, `reviews/23_rules_scraper/`) reads
+the zoning-code pages listed in `rules_sources.json` and drafts a
+**candidate** rules file. It never writes `zoning_rules.json` and it is no
+scoring input. What a human does with it:
+
+1. First, once per host: a human reads the host's terms of use in a
+   browser and fills `terms_reviewed_by` / `terms_reviewed_on` in
+   `rules_sources.json` (commit the edit). Then run it between runs:
+   `make rules-scrape`. Until a host's terms are reviewed it is skipped as
+   unreachable; `--allow-unreviewed-terms` overrides that and is an
+   exception for a one-off run, never a default. It writes, under the
+   gitignored `rules_out/`,
+   `zoning_rules.CANDIDATE.json` (every jurisdiction `draft`, every value
+   with a cite, a short verbatim quote, `source_class` official or mirror
+   and the source page's SHA-256) and `rules_diff_report.md` / `.json`
+   (per jurisdiction, district and field: same, same but mirror vs mirror
+   (not independent), same value with a new cite, changed, added, removed
+   (section read, value not extracted), not found in source, source
+   unreachable, needs extraction, ...). The candidate is a per-value draft
+   to compare, not a drop-in replacement for `zoning_rules.json`. The
+   console shows counts only.
+2. Read the diff. Values marked needs_review carry a footnote,
+   cross-reference, "whichever is greater", adjacency or limiting wording
+   ("for initial ...", "may be reduced", a range), a section note about
+   the field, a quote spanning several source lines or a unit
+   conversion: read the cited section yourself. Agreement with a mirror is
+   not verification.
+3. Edit `zoning_rules.json` **by hand**, per value, between runs, and
+   commit. Flipping a jurisdiction to `verified` is a human act; start a
+   new run and baseline afterwards (`reviews/21_zoning`).
+
+Other modes: `--offline` replays `rules_cache/` (no network; refuses a
+cache entry whose bytes changed); `make rules-watch` re-fetches and
+reports per source section, newest "Ord. No." date and GIS layer edits
+whether each is changed / unchanged / unknown (never applies anything;
+GIS checks are skipped while `.experiment_loop.lock` exists);
+`--assisted FILE` reads hand-written extraction records that go through
+the same verbatim-quote verifier; `--llm` extracts prose sections with the
+Claude CLI (`claude -p`, no tools, fixed JSON schema, empty working
+directory; needs `ANTHROPIC_API_KEY`, as it runs with `--bare`), otherwise
+prose sections are reported "needs extraction"; `--flags` (read-only
+database, refuses after a run's baseline like `make zoning-import`) lists
+parcels with conditions of zoning on file (an Atlanta `-C` district or an
+approved case polygon covering at least 5% of the parcel or of the case;
+smaller overlaps are listed apart as adjacent cases), counts on the
+console and parcel ids only in `rules_out/conditions_flags.json` (with
+`--flags`, `--report` must point outside the repository or under
+`rules_out/`). Pull those conditions by hand. Inside the repository the
+tool writes only under `rules_out/`, `rules_cache/` and
+`reviews/23_rules_scraper/`.
+
+The fetcher never contacts Municode (hard-coded denylist, also for
+redirects), honours robots.txt for its own token and for AI-agent tokens,
+sends one fixed User-Agent, waits 1 s between requests to a host (longer
+when Crawl-delay asks) and treats any challenge or WAF page as
+unreachable without retrying (a 429 or 5xx with a Retry-After above 30 s
+too). The watch keeps the previous baseline for anything it could not
+observe and reports a section whose markers vanished as "changed (section
+lost)". Exit codes: 0 done, 1 refused, 2 database error (`--flags`), 3 run
+has its baseline (`--flags`), 4 done but a source was unreachable or an
+enabled section was not found, 5 request budget spent.
+
+**Prerequisite**: PDF sources need `pdftotext` (poppler-utils, e.g.
+`sudo apt-get install -y poppler-utils`); without it PDF sections are
+reported "pdf text unavailable". No Python package is added
+(`requirements.txt` is unchanged).
+
 ## Repository Structure
 
 ```
@@ -259,6 +328,7 @@ land-site-selector/
 ├── sources.json                       — Registry of data source URLs (LOCKED — agent never writes)
 ├── zoning_rules.json                  — Human-owned zoning facts per jurisdiction/district (agent never writes)
 ├── building_prototypes.json           — Human-owned building prototypes from the operator's SiteFit tool (agent never writes)
+├── rules_sources.json                 — Human-owned source registry of the zoning-code scraper (agent never writes)
 ├── connector_registry.json            — Harness-only config overlay (test bboxes, expected extents)
 ├── prepare.py                         — IMMUTABLE: metric calculation, DDL, frozen parameters
 ├── research.py                        — Agent sandbox — the ONLY file the agent modifies in a run
@@ -270,6 +340,7 @@ land-site-selector/
 ├── zoning.py                          — IMMUTABLE during run: loads + freezes zoning_rules.json, classifies districts
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings
+├── rules_scrape.py                    — IMMUTABLE during run: zoning-code scraper, writes a CANDIDATE only (operator, between runs)
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)

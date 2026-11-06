@@ -18,7 +18,7 @@ RULES_PATH = REPO_ROOT / "zoning_rules.json"
 # module before running any test); tests/test_zz_human_files_unchanged.py
 # compares them after every other test has run (Z-17: no test patches them).
 HUMAN_OWNED = ("sources.json", "parameters.json", "program.md", "zoning_rules.json",
-               "building_prototypes.json")
+               "building_prototypes.json", "rules_sources.json")
 HUMAN_OWNED_AT_LOAD = {
     name: hashlib.sha256((REPO_ROOT / name).read_bytes()).hexdigest() for name in HUMAN_OWNED
 }

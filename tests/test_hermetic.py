@@ -65,6 +65,9 @@ _NEVER_COMMIT = (
     ".env",
     # Raw ArcGIS responses carry owner PII (SR-8, R-30).
     "sources/disco-fulton-20260101T000000Z-abcd/south_fulton_campbellton_0.json",
+    # Rules scraper cache and outputs (reviews/23_rules_scraper, RS-17).
+    "rules_cache/0123abcd.body",
+    "rules_out/zoning_rules.CANDIDATE.json",
 )
 
 

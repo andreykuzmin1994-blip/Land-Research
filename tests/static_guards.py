@@ -17,7 +17,7 @@ from typing import Iterable
 
 # Modules that import site_fit / zoning themselves, so ``<mod>.site_fit``
 # would reach the protected module through them.
-REEXPORTING_MODULES = frozenset({"reporting", "runner", "cli", "zoning_import"})
+REEXPORTING_MODULES = frozenset({"reporting", "runner", "cli", "zoning_import", "rules_scrape"})
 PROTECTED_NAMES = REEXPORTING_MODULES | {"site_fit", "zoning"}
 REFLECTIVE_NAMES = frozenset({"__import__", "eval", "exec", "compile", "globals", "vars",
                               "locals", "importlib", "attrgetter"})
