@@ -17,8 +17,12 @@ from typing import Iterable
 
 # Modules that import site_fit / zoning themselves, so ``<mod>.site_fit``
 # would reach the protected module through them.
-REEXPORTING_MODULES = frozenset({"reporting", "runner", "cli", "zoning_import", "rules_scrape"})
-PROTECTED_NAMES = REEXPORTING_MODULES | {"site_fit", "zoning"}
+# reviews/26_flood_wetlands: hazards_import imports hazards (and zoning);
+# site_fit imports hazards too, but site_fit is reached only through its own
+# allowed names (its scan), so it is not listed here.
+REEXPORTING_MODULES = frozenset({"reporting", "runner", "cli", "zoning_import", "rules_scrape",
+                                 "hazards_import"})
+PROTECTED_NAMES = REEXPORTING_MODULES | {"site_fit", "zoning", "hazards"}
 REFLECTIVE_NAMES = frozenset({"__import__", "eval", "exec", "compile", "globals", "vars",
                               "locals", "importlib", "attrgetter"})
 REFLECTIVE_ATTRS = frozenset({"__dict__", "__globals__", "__builtins__", "__code__",

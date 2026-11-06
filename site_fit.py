@@ -1,7 +1,8 @@
 """Site fit: project the largest operator-prototype building a parcel can hold.
 
 Protected module (reviews/22_site_fit/): immutable during a run, like
-zoning.py. It imports only the standard library and ``zoning``; never
+zoning.py. It imports only the standard library, ``zoning`` and the
+flood/wetland facts module (aliased ``_hz``, reviews/26_flood_wetlands); never
 ``research`` (the agent's sandbox), ``runner``, ``reporting``,
 ``zoning_import`` or anything under screener/.
 
@@ -39,9 +40,15 @@ applies. A default setback is never a BTS input, even in a verified
 jurisdiction. Adjacency buffers (residential or other-district neighbours)
 are NOT applied: the database stores only candidate parcels, so neighbour
 zoning is incomplete; each buffer the district's rules list is named in the
-projection. Flood (H4), wetlands (H6) and stormwater detention are NOT
-deducted; every projection says so. Coverage is building SF over the
-parcel's gross geography area.
+projection. Stormwater detention is NOT deducted; every projection says so.
+Flood (H4) and wetlands (H6) are not deducted either until a human enables
+the proposed hazard table (reviews/26_flood_wetlands): from then on the
+FRESH SFHA (floodway included) and NWI wetland geometry of the parcel is
+differenced from the setback buffer in PostGIS, the 0.2% zone is not, and
+each projection states what was deducted plus "stream/state-waters buffers
+not deducted". BTS still moves only through ``meets_bts_footprint`` for
+verified zoning. Coverage is building SF over the parcel's gross geography
+area.
 
 The fitted length is a lower bound: the slab sweep tries every vertex event
 plus a fixed grid of positions, each checked exactly, so a
@@ -72,6 +79,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 import zoning
+# reviews/26_flood_wetlands (FW-14, FW-26): the flood/wetland storage gate and
+# texts. Deliberate change to this module's import allowlist; no FEMA/NWI
+# host is ever named or contacted here.
+import hazards as _hz
 
 PROTOTYPES_PATH = Path(__file__).resolve().parent / "building_prototypes.json"
 
@@ -113,6 +124,12 @@ SIMPLIFIED = (f"buffered ring simplified for fitting ({_SIMPLIFY_TOL_FT:g} ft, i
               f"{2 * _SIMPLIFY_TOL_FT:g} ft setback)")
 # Every projection carries these, whatever its status (tests pin it).
 NOT_MODELLED = (RES_BUFFERS, FLOOD_WETLANDS, DETENTION, CAR_PARKING)
+# reviews/26_flood_wetlands: once the hazard table is enabled, FLOOD_WETLANDS
+# is replaced on each projection by what was actually deducted, and the
+# stream/state-waters buffer note is added (FW-14, FW-23). A projection
+# that never read hazard geometry says so.
+FLOOD_NOT_READ = "flood/wetlands not deducted (no buildable geometry read)"
+FLOOD_UNREADABLE = "flood/wetlands not deducted (hazard data unreadable)"
 
 OK = "ok"
 EMPTY = "empty_after_setbacks"
@@ -759,6 +776,7 @@ class Projection:
     constraints: tuple[str, ...]
     multipart: bool = False
     setback_from_rules: bool = False
+    flood_wetlands: str = FLOOD_WETLANDS
     _origin: tuple[float, float] | None = None
     _geometry: str | None = field(default=None, repr=False, compare=False)
 
@@ -776,7 +794,15 @@ def _issue(p: Projection) -> Projection:
     return p
 
 
-def _base_constraints(rules: _Rules | None) -> list[str]:
+def _flood_text(flood: str | None) -> str:
+    """The flood/wetland constraint: FLOOD_WETLANDS while the hazard table
+    is not enabled (byte-identical to before reviews/26_flood_wetlands)."""
+    if not _hz.enabled():
+        return FLOOD_WETLANDS
+    return flood or FLOOD_NOT_READ
+
+
+def _base_constraints(rules: _Rules | None, flood: str | None = None) -> list[str]:
     out = []
     if rules is not None:
         out.append(f"setback {_fmt_ft(rules.setback_ft)} ft all sides = {rules.setback_source}, "
@@ -784,12 +810,24 @@ def _base_constraints(rules: _Rules | None) -> list[str]:
         out.append(FIT_RULE)
         out.append(rules.cap_text)
         out.extend(rules.notes)
-    out.extend(NOT_MODELLED)
+    if not _hz.enabled():
+        out.extend(NOT_MODELLED)
+        return out
+    out.extend(_flood_text(flood) if c == FLOOD_WETLANDS else c for c in NOT_MODELLED)
+    out.append(_hz.STREAM_BUFFERS)
     return out
 
 
+def flood_wetlands_text(p: Any) -> str:
+    """What a projection deducted for flood and wetlands (memo, CLI)."""
+    if isinstance(p, Projection):
+        return p.flood_wetlands
+    return _flood_text(None)
+
+
 def _empty(pid: str, status: str, reason: str, rules: _Rules | None,
-           gross: int | None = None, extra: Sequence[str] = ()) -> Projection:
+           gross: int | None = None, extra: Sequence[str] = (),
+           flood: str | None = None) -> Projection:
     return _issue(Projection(
         parcel_id=pid, status=status, reason=reason,
         rules_label=rules.label if rules else NO_RULE_LABEL,
@@ -798,8 +836,9 @@ def _empty(pid: str, status: str, reason: str, rules: _Rules | None,
         setback_source=rules.setback_source if rules else "",
         gross_sf=gross, buildable_sf=0 if status == EMPTY else None,
         coverage_cap_pct=rules.cap_pct if rules else None, fits=(),
-        constraints=tuple(_base_constraints(rules)) + tuple(extra),
-        setback_from_rules=rules.from_rules if rules else False))
+        constraints=tuple(_base_constraints(rules, flood)) + tuple(extra),
+        setback_from_rules=rules.from_rules if rules else False,
+        flood_wetlands=_flood_text(flood)))
 
 
 def max_building_sf(p: Any) -> int | None:
@@ -869,6 +908,64 @@ _SQL_BUFFERED_FOR_FIT = (
 def _buffered_params(setback: float, ids: Sequence[str]) -> tuple:
     return (_SIMPLIFY_ABOVE_VERTICES, setback, _SIMPLIFY_TOL_FT, _SIMPLIFY_TOL_FT,
             _SIMPLIFY_ABOVE_VERTICES, setback, list(ids))
+
+
+# reviews/26_flood_wetlands (FW-14): the same buffer with the parcel's FRESH
+# hazard geometry differenced out, read here (hook semantics: never passed in
+# by a caller), and only while the hazard table is enabled. SFHA (floodway
+# included) and NWI wetlands are deducted; the 0.2% zone is not. A source is
+# fresh when its row's stored md5(ST_AsBinary(geometry)) equals the parcel's
+# current one; a stale or absent source deducts nothing and says so. The
+# hazard geometry is first expanded outward (buffer +2t, then simplified by t,
+# so it still covers the original: conservative), and the simplified branch
+# differences it buffered by another 2t, so a fitted envelope never enters a
+# deducted area. With no fresh hazard geometry the buffer is computed exactly
+# as _SQL_BUFFERED_FOR_FIT computes it, so the ring text (the fit cache key)
+# is unchanged; any deduction changes the ring text and so the cache key.
+# Parameters: (vertex limit, setback, t, t, t, vertex limit, setback, t, t, ids).
+_SQL_BUFFERED_FOR_FIT_HAZARDS = (
+    "SELECT parcel_id, gross_m2, ST_IsEmpty(fit_g), ST_Area(inner_g), "
+    "ST_AsGeoJSON(fit_g, 2), simplified, flood_state, wet_state, hz_sf "
+    "FROM (SELECT parcel_id, gross_m2, inner_g, flood_state, wet_state, hz_sf, "
+    "CASE WHEN ST_NPoints(inner_g) > %s THEN ST_SimplifyPreserveTopology("
+    "CASE WHEN hz IS NULL THEN ST_Buffer(t, -1.0 * (%s::float8 + 2.0 * %s::float8)) "
+    "ELSE ST_CollectionExtract(ST_Difference(ST_Buffer(t, -1.0 * (%s::float8 + 2.0 * "
+    "%s::float8)), ST_Buffer(hz, 2.0 * %s::float8, 'quad_segs=2')), 3) END, %s::float8) "
+    "ELSE inner_g END AS fit_g, "
+    "(ST_NPoints(inner_g) > %s) AS simplified "
+    "FROM (SELECT parcel_id, t, gross_m2, flood_state, wet_state, hz, "
+    "COALESCE(ST_Area(hz_raw), 0.0) AS hz_sf, "
+    "CASE WHEN hz IS NULL THEN ST_Buffer(t, -1.0 * %s::float8) "
+    "ELSE ST_CollectionExtract(ST_Difference(ST_Buffer(t, -1.0 * %s::float8), hz), 3) "
+    "END AS inner_g "
+    "FROM (SELECT parcel_id, t, gross_m2, flood_state, wet_state, hz_raw, "
+    "CASE WHEN hz_raw IS NULL OR ST_IsEmpty(hz_raw) THEN NULL "
+    "ELSE ST_SimplifyPreserveTopology(ST_Buffer(hz_raw, 2.0 * %s::float8, 'quad_segs=2'), "
+    "%s::float8) END AS hz "
+    "FROM (SELECT parcel_id, t, ST_Area(geography(g)) AS gross_m2, flood_state, wet_state, "
+    "CASE WHEN flood_state = 'fresh' AND wet_state = 'fresh' "
+    "THEN ST_Union(COALESCE(sg, wg), COALESCE(wg, sg)) "
+    "WHEN flood_state = 'fresh' THEN sg WHEN wet_state = 'fresh' THEN wg END AS hz_raw "
+    "FROM (SELECT v.parcel_id, v.g, ST_Transform(v.g, 2240) AS t, "
+    "CASE WHEN h.parcel_id IS NULL OR h.nfhl_fetched_at IS NULL "
+    "OR h.nfhl_parcel_geom_md5 IS NULL THEN 'absent' "
+    "WHEN h.nfhl_parcel_geom_md5 = v.gmd5 THEN 'fresh' ELSE 'stale' END AS flood_state, "
+    "CASE WHEN h.parcel_id IS NULL OR h.nwi_fetched_at IS NULL "
+    "OR h.nwi_parcel_geom_md5 IS NULL THEN 'absent' "
+    "WHEN h.nwi_parcel_geom_md5 = v.gmd5 THEN 'fresh' ELSE 'stale' END AS wet_state, "
+    "h.sfha_geom AS sg, h.wetland_geom AS wg "
+    "FROM (SELECT parcel_id, ST_CollectionExtract(ST_MakeValid(geometry), 3) AS g, "
+    "md5(ST_AsBinary(geometry)) AS gmd5 "
+    "FROM parcels WHERE parcel_id = ANY(%s) AND geometry IS NOT NULL) v "
+    "LEFT JOIN parcel_hazards h ON h.parcel_id = v.parcel_id "
+    "WHERE NOT ST_IsEmpty(v.g)) w) x) y) b) c"
+)
+
+
+def _buffered_params_hazards(setback: float, ids: Sequence[str]) -> tuple:
+    t = _SIMPLIFY_TOL_FT
+    return (_SIMPLIFY_ABOVE_VERTICES, setback, t, setback, t, t, t, _SIMPLIFY_ABOVE_VERTICES,
+            setback, setback, t, t, list(ids))
 
 
 def _rings_from_geojson(text: Any) -> list[list[list[tuple[float, float]]]]:
@@ -989,25 +1086,34 @@ def _fits_for(rings_text: str, gross_sf: float, rules: _Rules,
     return out
 
 
+def _row_flood_text(row: Sequence[Any] | None, flood: str | None) -> str | None:
+    """reviews/26_flood_wetlands: the deduction text of a hazards-SQL row
+    (columns 6 and 7 are the NFHL and NWI states), else ``flood``."""
+    if flood is None and row is not None and len(row) > 7:
+        return _hz.deduction_text(str(row[6]), str(row[7]))
+    return flood
+
+
 def _project_row(pid: str, rules: _Rules, row: Sequence[Any] | None,
-                 data: Mapping[str, Any]) -> Projection:
+                 data: Mapping[str, Any], flood: str | None = None) -> Projection:
     """Pure: one buffered-geometry row -> Projection."""
+    flood = _row_flood_text(row, flood)
     if row is None or row[1] is None:
-        return _empty(pid, NO_GEOMETRY, "no parcel geometry", rules)
+        return _empty(pid, NO_GEOMETRY, "no parcel geometry", rules, flood=flood)
     gross = float(row[1]) * SQFT_PER_M2
     if gross <= 0:
-        return _empty(pid, NO_GEOMETRY, "parcel geometry has no area", rules)
+        return _empty(pid, NO_GEOMETRY, "parcel geometry has no area", rules, flood=flood)
     simplified = bool(row[5]) if len(row) > 5 else False
     extra = (SIMPLIFIED,) if simplified else ()
     if row[2] or row[4] is None:
         return _empty(pid, EMPTY, "nothing left inside the setbacks", rules, int(round(gross)),
-                      extra)
+                      extra, flood=flood)
     nverts = sum(len(r) for part in _rings_from_geojson(str(row[4])) for r in part)
     if nverts > _MAX_FIT_VERTICES:
         return _empty(pid, ERROR, f"buffered geometry too complex ({nverts} vertices > "
-                      f"{_MAX_FIT_VERTICES})", rules, int(round(gross)), extra)
+                      f"{_MAX_FIT_VERTICES})", rules, int(round(gross)), extra, flood=flood)
     fits, multipart, origin = _fits_for(str(row[4]), gross, rules, data)
-    constraints = _base_constraints(rules) + list(extra)
+    constraints = _base_constraints(rules, flood) + list(extra)
     if multipart:
         constraints.append("multipart buildable area: each envelope fitted inside one part")
     return _issue(Projection(
@@ -1016,14 +1122,16 @@ def _project_row(pid: str, rules: _Rules, row: Sequence[Any] | None,
         setback_source=rules.setback_source, gross_sf=int(round(gross)),
         buildable_sf=int(round(float(row[3] or 0.0))), coverage_cap_pct=rules.cap_pct,
         fits=fits, constraints=tuple(constraints), multipart=multipart,
-        setback_from_rules=rules.from_rules, _origin=origin, _geometry=str(row[4])))
+        setback_from_rules=rules.from_rules, flood_wetlands=_flood_text(flood),
+        _origin=origin, _geometry=str(row[4])))
 
 
 def _flood_wetland_exclusions(parcel_id: str) -> list[Any]:
-    """Hook for H4 (FEMA flood) and H6 (NWI wetlands), both unwired in this
-    repo: returns no exclusion geometry. When they are wired, the exclusion
-    polygons are read HERE (never passed in by a caller) and differenced
-    from the buildable area in PostGIS; FLOOD_WETLANDS then changes."""
+    """Hook for H4 (FEMA flood) and H6 (NWI wetlands). Returns no Python
+    geometry, ever: the exclusion polygons are read in PostGIS by
+    _SQL_BUFFERED_FOR_FIT_HAZARDS (never passed in by a caller) and
+    differenced from the buildable area there, only while the hazard table
+    is enabled (reviews/26_flood_wetlands, FW-14)."""
     return []
 
 
@@ -1082,22 +1190,36 @@ def project_parcels(conn: Any, parcel_ids: Iterable[str]) -> Mapping[str, Projec
     for pid in ids:
         _flood_wetland_exclusions(pid)
         groups.setdefault(rules[pid].setback_ft, []).append(pid)
+    use_hazards = _hz.enabled()
     for setback in sorted(groups):
         group = groups[setback]
+        flood = None
         try:
-            rows = {r[0]: r for r in _query(conn, _SQL_BUFFERED_FOR_FIT,
-                                            _buffered_params(setback, group))
-                    if len(r) >= 5}
+            rows = None
+            if use_hazards:
+                # reviews/26_flood_wetlands: a failed hazard read falls back
+                # to the plain buffer, labelled (never an error status).
+                try:
+                    rows = {r[0]: r for r in _query(conn, _SQL_BUFFERED_FOR_FIT_HAZARDS,
+                                                    _buffered_params_hazards(setback, group))
+                            if len(r) >= 5}
+                except Exception:
+                    rows, flood = None, FLOOD_UNREADABLE
+            if rows is None:
+                rows = {r[0]: r for r in _query(conn, _SQL_BUFFERED_FOR_FIT,
+                                                _buffered_params(setback, group))
+                        if len(r) >= 5}
         except Exception as exc:
             for pid in group:
                 out[pid] = _empty(pid, ERROR, f"geometry read failed ({type(exc).__name__})",
-                                  rules[pid])
+                                  rules[pid], flood=flood)
             continue
         for pid in group:
             try:
-                out[pid] = _project_row(pid, rules[pid], rows.get(pid), data)
+                out[pid] = _project_row(pid, rules[pid], rows.get(pid), data, flood)
             except Exception as exc:
-                out[pid] = _empty(pid, ERROR, f"fit failed ({type(exc).__name__})", rules[pid])
+                out[pid] = _empty(pid, ERROR, f"fit failed ({type(exc).__name__})", rules[pid],
+                                  flood=flood)
     return types.MappingProxyType(out)
 
 

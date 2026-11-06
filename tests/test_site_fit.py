@@ -910,9 +910,13 @@ class BoundaryTests(unittest.TestCase):
                 mods |= {a.name.split(".")[0] for a in node.names}
             elif isinstance(node, ast.ImportFrom):
                 mods.add((node.module or "").split(".")[0])
+        # reviews/26_flood_wetlands (FW-26): "hazards" added deliberately,
+        # imported once under the alias _hz (the host ban below still holds).
         allowed = {"__future__", "hashlib", "json", "math", "re", "subprocess", "types",
-                   "weakref", "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning"}
+                   "weakref", "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning",
+                   "hazards"}
         self.assertEqual(mods - allowed, set())
+        self.assertIn("import hazards as _hz\n", self.SRC)
 
     def test_requirements_unchanged(self):
         self.assertEqual((REPO_ROOT / "requirements.txt").read_text(encoding="utf-8").split(),

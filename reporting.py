@@ -25,6 +25,7 @@ import prepare
 import research
 import zoning  # protected: renders imported zoning for the memo (reviews/21_zoning)
 import site_fit  # protected: building projections (reviews/22_site_fit)
+import hazards  # protected: flood/wetland lines (reviews/26_flood_wetlands)
 from pipeline_common import (
     _REPO_ROOT,
     _SQL_FETCH_SUBMARKET_NAME,
@@ -453,12 +454,17 @@ def _fetch_snapshot_data(conn: Any, parcel_id: str) -> dict[str, Any] | None:
     # failure renders '—' with the reason instead of aborting the snapshot.
     projection = site_fit.project_parcel(conn, parcel_id)
 
-    return {
+    bundle = {
         "parcel": parcel, "score": score, "market_context": mc,
         "comps": comps, "flags": flags,
         "submarket_name": submarket_name,
         "projection": projection,
     }
+    # reviews/26_flood_wetlands (FW-18): the H4/H6 lines, read ONLY while the
+    # hazard table is enabled (no SQL and no key otherwise). Never raises.
+    if hazards.enabled():
+        bundle["hazard"] = hazards.assess_parcels(conn, [parcel_id]).get(str(parcel_id))
+    return bundle
 
 
 # ---------------------------------------------------------------------------
@@ -509,6 +515,29 @@ _PROJECTION_FOOTNOTE = (
                  site_fit.CAR_PARKING, site_fit.FIT_RULE))
     + "; height not checked._"
 )
+# reviews/26_flood_wetlands: the footnote once the hazard table is enabled;
+# each highlight line then names what its projection deducted.
+_PROJECTION_FOOTNOTE_HAZARDS = (
+    "_Building projections (operator SiteFit prototypes, reviews/22_site_fit): "
+    + "; ".join((site_fit.RES_BUFFERS, "flood/wetlands deducted only where the hazard data "
+                 "is fresh (each line says what), fill/compensatory storage not considered",
+                 hazards.STREAM_BUFFERS, site_fit.DETENTION, site_fit.CAR_PARKING,
+                 site_fit.FIT_RULE))
+    + "; height not checked._"
+)
+
+
+def _flood_lines(bundle: Mapping[str, Any]) -> tuple[str, str]:
+    """program.md's 'Flood zone' and 'Wetlands' snapshot lines. Exactly the
+    old text while the hazard table is not enabled (FW-18)."""
+    if "hazard" not in bundle:
+        return ("not yet wired (Phase 11+ wires FEMA NFIP)",
+                "not yet wired (Phase 11+ wires USGS NWI)")
+    a = bundle.get("hazard")
+    if not isinstance(a, hazards.Assessment):
+        return ("— (hazard data unavailable; H4 not assessed)",
+                "— (hazard data unavailable; H6 not assessed)")
+    return _md_cell(a.flood_line), _md_cell(a.wetlands_line)
 
 
 def _projection_summary(p: Any, used: bool) -> str:
@@ -520,7 +549,7 @@ def _projection_summary(p: Any, used: bool) -> str:
     use = "no" if not used else ("yes" if p.setback_from_rules
                                  else "yes, rated N/A (default setback)")
     tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "
-           f"{site_fit.FLOOD_WETLANDS}; adjacency buffers not applied")
+           f"{site_fit.flood_wetlands_text(p)}; adjacency buffers not applied")
     if best is None:
         return f"Projected max building: — ({_projection_reason(p)}; {tag})."
     return f"Projected max building: {_fmt_sf(best.building_sf)} {best.label} ({tag})."
@@ -547,7 +576,7 @@ def _render_development_potential(parcel: Mapping[str, Any], p: Any) -> str:
         f"- **Estimated buildable area**: 40% coverage of land per program.md: {forty}; "
         f"net of setbacks: {net}",
         f"- **Estimated max building SF**: {max_line}",
-        f"- **Building projection** ({p.rules_label}; {bts}; {site_fit.FLOOD_WETLANDS}):",
+        f"- **Building projection** ({p.rules_label}; {bts}; {site_fit.flood_wetlands_text(p)}):",
     ]
     if p.status == site_fit.OK and p.fits:
         lines += ["", "| Prototype | Building SF | L x W (ft) | Docks | Trailer stalls | "
@@ -862,6 +891,7 @@ def _render_snapshot_markdown(
     )
     thesis_md = _render_investment_thesis(parcel, score, mc, comps)
     dev_md = _render_development_potential(parcel, bundle.get("projection"))
+    flood_md, wetlands_md = _flood_lines(bundle)
 
     rec, rec_reason = _compute_recommendation(
         composite, actionability, threshold,
@@ -924,8 +954,8 @@ def _render_snapshot_markdown(
 - **Water / Sewer / Electric / Gas / Fiber**: not yet wired (Phase 11+ wires utility provider service maps)
 
 ### Environmental
-- **Flood zone**: not yet wired (Phase 11+ wires FEMA NFIP)
-- **Wetlands**: not yet wired (Phase 11+ wires USGS NWI)
+- **Flood zone**: {flood_md}
+- **Wetlands**: {wetlands_md}
 - **EPA flags**: not yet wired (Phase 11+ wires EPA Envirofacts)
 
 ### Market Context
@@ -1151,7 +1181,8 @@ def _render_memo_markdown(
                     projections.get(r.get("parcel_id")), bool(r.get("_bts_projection_used")))
             top_lines.append(line)
         if projections is not None:
-            top_lines += ["", _PROJECTION_FOOTNOTE]
+            top_lines += ["", _PROJECTION_FOOTNOTE] if not hazards.enabled() else [
+                "", _PROJECTION_FOOTNOTE_HAZARDS]
         top_md = "\n".join(top_lines)
     else:
         top_md = "_No actionable or qualified parcels in this cycle._"
