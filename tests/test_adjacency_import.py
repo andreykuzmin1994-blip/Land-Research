@@ -253,6 +253,19 @@ class FetchTests(unittest.TestCase):
         self.assertEqual([x.oid for x in a.features], sorted(x.oid for x in a.features))
 
 
+    def test_unreadable_codes_are_no_polygon(self):
+        """Review finding 10: 'UNKNOWN', 'TBD', 'N/A' are not districts; their
+        area reads uncovered (adjacency unknown), counted with no district."""
+        def placeholders(n, body):
+            for ft, code in zip(body["features"], ("UNKNOWN", "TBD", "N/A", "R-3")):
+                ft["attributes"]["ZClass"] = code
+            return js(body)
+        f, _, _ = fetcher(Layer(n=4, corrupt=placeholders))
+        d = ai.fetch_source(f, src(), BOXES)
+        self.assertEqual([x.district for x in d.features], ["R-3"])
+        self.assertEqual(d.no_district, 3)
+
+
 class RobotsTests(unittest.TestCase):
     """BUF-19: rules_scrape's robots policy unchanged; a refusal is a source
     failure with zero data requests."""
@@ -395,8 +408,10 @@ def answer_factory(*, mirror_baseline=False, table=True, parcels=None, changed=N
             return [(len(parcels),)]
         if sql == ai._SQL_CHANGED:
             return [(x,) for x in (changed if changed is not None else [r[0] for r in parcels])]
-        if sql in (ai._SQL_SRID_CHECK, ai._SQL_AMBIGUOUS):
+        if sql == ai._SQL_SRID_CHECK:
             return [(0,)]
+        if sql == ai._SQL_AMBIGUOUS:
+            return []
         if sql == ai._SQL_SLIVERS:
             return [(0, 0)]
         if sql == ai._SQL_NEW_SUMMARY:
@@ -615,6 +630,24 @@ class OutputTests(unittest.TestCase):
         self.assertIn("1 residential", lines[0])
 
 
+class AmbiguityTests(unittest.TestCase):
+    """Review finding 8: a part facing the parcel's OWN district polygon (an
+    overhang) and a neighbour is not two neighbour districts."""
+
+    def test_own_overhang_counted_apart(self):
+        stored = {"p1": SF_STORED, "p2": SF_STORED, "p3": SF_STORED}
+        pairs = [("p1", "M-1", "south_fulton", "R-3", "south_fulton"),     # own overhang
+                 ("p2", "M1", "south_fulton", "R-3", "south_fulton"),      # own, spelled M1
+                 ("p3", "R-3", "south_fulton", "R-4", "south_fulton"),     # two neighbours
+                 ("p3", "M-1", "south_fulton", "R-4", "south_fulton")]
+        self.assertEqual(ai.ambiguity_counts(stored, pairs), (1, 2))
+        self.assertEqual(ai.ambiguity_counts({}, pairs[2:3]), (1, 0))
+
+    def test_console_line_names_both_counts(self):
+        self.assertIn("own district polygon overhangs", (REPO_ROOT / "adjacency_import.py")
+                      .read_text(encoding="utf-8"))
+
+
 class StaticTests(unittest.TestCase):
     """BUF-18 / BUF-22: no DDL outside prepare.py, layering, SQL constants."""
 
@@ -665,7 +698,21 @@ class StaticTests(unittest.TestCase):
     def test_tolerances_come_from_the_protected_module(self):
         self.assertNotIn("ABUT_TOL_FT =", self.SRC)
         self.assertNotIn("MIN_SEGMENT_LEN_FT =", self.SRC)
+        self.assertNotIn("MISALIGNMENT_ALLOWANCE_FT =", self.SRC)
+        self.assertIn("a.MISALIGNMENT_ALLOWANCE_FT", self.SRC)
         self.assertNotRegex(self.SRC, r"add_argument\(\"--(tol|tolerance|min)")
+
+    def test_slivers_are_dropped_per_part_and_reach_is_required(self):
+        """Review findings 4 and 7: the cover is opened (every part under the
+        sliver width dropped, not only a cover thin everywhere), and a zoned
+        part must lie within the reach of its edge."""
+        cover = ai._SQL_INSERT_COVER
+        self.assertIn("ST_Buffer(ST_Buffer(c, -0.5 * %s::float8), 0.5 * %s::float8)", cover)
+        self.assertEqual(cover.count("%s"), 3)
+        self.assertIn("JOIN adjacency_import_reach r ON r.eid = e.eid AND r.src = c.src",
+                      ai._SQL_INSERT_ZONED)
+        self.assertIn("r.reach", ai._SQL_INSERT_ZONED)
+        self.assertIn("ST_DWithin(d.geom, e.e, 0.01)", ai._SQL_INSERT_REACH)
 
     def test_never_writes_files(self):
         writers = {"write_text", "write_bytes", "dump", "replace", "rename", "unlink"}

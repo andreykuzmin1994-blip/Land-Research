@@ -23,7 +23,7 @@ import runner
 import site_fit
 import adjacency_golden_case as golden
 import site_fit_golden_case as sg
-from adjacency_helpers import enabled, with_classes
+from adjacency_helpers import MAX, enabled, with_classes
 from hazards_helpers import enabled as hz_enabled
 from zoning_helpers import REPO_ROOT, patch_rules, stored, verified
 
@@ -129,7 +129,8 @@ def adj_row(aid, pid, district="R-3", kind="zoned", fresh=True):
 
 
 SF = stored("south_fulton", "south_fulton_zoning", "M-1")
-CLASSES = verified("south_fulton", mutate=with_classes("south_fulton", residential=["R-*"]))
+CLASSES = verified("south_fulton", mutate=with_classes("south_fulton", residential=["R-*"],
+                                                     readings=MAX))
 
 
 def project(conn, ids=("a", "b"), rules=CLASSES):
@@ -166,7 +167,7 @@ class SiteFitTests(unittest.TestCase):
         named = dict(zip(site_fit._BUFFERED_ADJ_NAMES, adj_params))
         self.assertEqual(named["adj_ids"], [7])
         self.assertEqual(named["adj_dists"], [110.0])
-        self.assertEqual(named["octagon"], adjacency.OCTAGON_FACTOR)
+        self.assertEqual(named["vertex_factor"], adjacency.VERTEX_FACTOR)
         self.assertEqual(named["ids"], ["a"])
         self.assertEqual(named["setback"], 40.0)
         self.assertIn("residential 110 ft on 1 side", out["a"].adjacency)
@@ -264,9 +265,12 @@ class ComposedSqlTests(unittest.TestCase):
             self.assertIn("(SELECT *" + body + ") c1", comp)
             self.assertEqual(comp.count("%s"), len(names))
             self.assertNotIn("{", comp)
-            self.assertIn("'quad_segs=2'", comp)
+            # review findings 5/6: flat ends, round joins, tight vertex polygons
+            self.assertIn("'endcap=flat join=round quad_segs=2'", comp)
+            self.assertIn(f"'quad_segs={adjacency.VERTEX_QUAD_SEGS}'", comp)
+            self.assertNotIn("ST_Buffer(ST_Points(", comp)
             self.assertIn("unnest(%s::bigint[], %s::float8[])", comp)
-            self.assertEqual(names[:3], ("octagon", "adj_ids", "adj_dists"))
+            self.assertEqual(names[:3], ("adj_ids", "adj_dists", "vertex_factor"))
         with self.assertRaises(ValueError):
             site_fit._with_adjacency(("SELECT 1", ()), False)
 
@@ -397,6 +401,13 @@ class RunnerAuditTests(unittest.TestCase):
         self.assertEqual(result["metric"], 0)
         self.assertIn("parcel_adjacency changed during the experiment", result["error"])
 
+    def test_fingerprint_covers_the_writing_transaction(self):
+        """Review finding 2: a delete-and-restore with the same ids changes
+        every restored row's xmin, so the fingerprint (live check (j))."""
+        sql = runner._SQL_ADJACENCY_FINGERPRINT
+        self.assertIn("a.xmin::text", sql)
+        self.assertIn("a::text", sql)
+
     def test_unreadable_crashes(self):
         conn = _RConn(error=True)
         with enabled():
@@ -410,11 +421,33 @@ class StaticResearchTests(unittest.TestCase):
     """BUF-12: research.py never names the adjacency modules or table."""
 
     BANNED = ("parcel_adjacency", "adjacency_import", "_DDL_PARCEL_ADJACENCY")
+    FRAGMENTS = ("adjacen",)
+    # Today's harmless uses in research.py (S11 sub-score name and label, the
+    # H5 docstring); anything else holding "adjacen" fails.
+    ALLOWED = ("S11_rail_adjacency", "rail adjacency", "500 ft adjacency buffer")
+
+    def problems(self, src: str) -> list[str]:
+        import static_guards
+        return static_guards.absent_module_problems(
+            src, ("adjacency", "adjacency_import"), self.BANNED, self.FRAGMENTS, self.ALLOWED)
 
     def test_research_is_clean(self):
-        import static_guards
-        self.assertEqual(static_guards.absent_module_problems(
-            RESEARCH_SRC, ("adjacency", "adjacency_import"), self.BANNED), [])
+        self.assertEqual(self.problems(RESEARCH_SRC), [])
+
+    def test_composed_strings_are_caught(self):
+        """Review finding 2: no single literal names the table."""
+        for bad in ('X = "DELETE FROM parcel_" + "adjacency"\n',
+                    'X = "DELETE FROM parcel_%s" % "adjacency"\n',
+                    'X = "".join(["parcel_", "adjacency"])\n',
+                    'X = "DELETE FROM {}".format("parcel_" "adj" "acency")\n',
+                    'A = "parcel"\nB = "_adj"\nX = f"DELETE FROM {A}{B}acency"\n',
+                    'X = "DELETE FROM PARCEL_ADJACENCY"\n',
+                    'X = "parcel_"\n',
+                    'X = "adja" + "cency"\n',
+                    'def f(cur):\n    t = "adjacency"\n    cur.execute("DELETE FROM parcel_" + t)\n'):
+            self.assertNotEqual(self.problems(RESEARCH_SRC + "\n" + bad), [], bad)
+        # the allow-list is exact: a new use of the word fails
+        self.assertNotEqual(self.problems(RESEARCH_SRC + '\nX = "adjacency buffers"\n'), [])
 
     def test_planted_references_are_caught(self):
         import static_guards
@@ -423,9 +456,7 @@ class StaticResearchTests(unittest.TestCase):
                     "SQL = 'SELECT * FROM parcel_adjacency'\n",
                     "def f():\n    return adjacency.enabled()\n",
                     "import site_fit as adjacency\n"):
-            self.assertNotEqual(static_guards.absent_module_problems(
-                RESEARCH_SRC + "\n" + bad, ("adjacency", "adjacency_import"), self.BANNED),
-                [], bad)
+            self.assertNotEqual(self.problems(RESEARCH_SRC + "\n" + bad), [], bad)
 
     def test_static_guard_lists(self):
         import static_guards

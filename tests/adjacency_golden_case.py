@@ -135,8 +135,10 @@ def differences_on_empty(want: dict[str, Any], got: dict[str, Any], site_fit: An
             bad.append(f"scoring cycle {k}")
     if strip(w["cycle"]["executed"]) != strip(g["cycle"]["executed"]):
         bad.append("scoring cycle executed")
+    # ADJ_NO_DISTRICT (review finding 1): a parcel whose district the rules do
+    # not resolve says so, never ADJ_NO_RULE.
     adj_texts = {adjacency.ADJ_NOT_IMPORTED, adjacency.ADJ_NO_RULE, adjacency.ADJ_NO_GEOMETRY,
-                 adjacency.HEIGHT_NOT_APPLIED}
+                 adjacency.ADJ_NO_DISTRICT, adjacency.HEIGHT_NOT_APPLIED}
     for label in want:
         wp, gp = want[label], got[label]
         if strip(wp["executed"]) != strip(gp["executed"]):

@@ -45,16 +45,24 @@ What it owns
      is applied only from a ROW source, and none is registered;
    - stale rows (the parcel geometry changed since the import) or no rows
      at all: nothing applied, and the projection says why.
-   Side vs rear is unknown (frontage is unknown), so the larger value
-   applicable to a neighbour class is used on every abutting side and the
-   projection says "rear value applied (frontage unknown)" (BUF-07). The
-   per-side distance is max(uniform setback, buffer + listed additive keys):
-   buffers only ever subtract (BUF-06); a distance at or under the uniform
-   setback deducts nothing and is named.
+   Side vs rear is unknown (frontage is unknown). Which value then applies
+   on every abutting side is a READING the human writes in the rules
+   (``neighbour_classes.readings.side_rear``: "max" = the larger value, the
+   projection says "rear value applied (frontage unknown)"; "side" = the
+   side value); while it is not written, a buffer whose side and rear values
+   differ is not applied and the projection says so (BUF-07). Likewise
+   Fairburn's "abut all other zoning districts" buffer applies only once the
+   human writes ``readings.other_district`` ("literal": any other district;
+   "non_industrial": other districts the table does not list as
+   industrial). The per-side distance is max(uniform setback, buffer + listed
+   additive keys): buffers only ever subtract (BUF-06); a distance at or
+   under the uniform setback deducts nothing and is named.
 
 The deduction itself is SQL inside site_fit (``ST_Buffer`` of each applied
-stored segment, SRID 2240 feet, plus circumscribed octagons at its vertices
-so the round caps and joins are covered; BUF-09, BUF-10).
+stored segment, SRID 2240 feet, with FLAT ends: the buffer is a strip along
+the abutting boundary part, not a disc past its ends; round joins, plus
+circumscribed 64-gons of tight tolerance at the joins and where two applied
+segments meet; BUF-09, BUF-10).
 """
 
 from __future__ import annotations
@@ -171,26 +179,61 @@ SRID_FEET = 2240
 # across a 50-60 ft street (Atlanta's transitional yard excludes an
 # intervening street; no rule in zoning_rules.json says "across a street").
 ABUT_TOL_FT = 20.0
-# A covered ring piece is a sliver (counted, never a buffer) when it is under
-# MIN_OVERLAP_AREA_SF or nowhere at least MIN_SLIVER_WIDTH_FT wide (2 ft
-# misdigitisation strips), or when the boundary part it faces is under
-# MIN_SEGMENT_LEN_FT.
+# Every part of a covered ring piece that is under MIN_SLIVER_WIDTH_FT wide
+# is a sliver (counted, never a buffer): the cover is "opened" (eroded by
+# half the width, then dilated back), so a thin misdigitisation strip is
+# dropped even where the same district is solid elsewhere on the ring. What
+# remains must be at least MIN_OVERLAP_AREA_SF, and a facing boundary part
+# under MIN_SEGMENT_LEN_FT is dropped.
 MIN_SLIVER_WIDTH_FT = 3.0
 MIN_OVERLAP_AREA_SF = 50.0
 MIN_SEGMENT_LEN_FT = 10.0
-# Round caps and joins of ST_Buffer(segment, d, 'quad_segs=2') are inscribed
-# in the circle; an octagon of circumradius d / cos(pi/8) around every segment
-# vertex contains the circle of radius d, so the union of both contains every
-# point within d of the segment (BUF-10: conservative).
+# A neighbour polygon abuts an edge only where it is the FIRST zoning polygon
+# of its layer outward from the edge: it must come within
+# MISALIGNMENT_ALLOWANCE_FT of the edge, or of an uncovered gap of the layer
+# that touches the edge (a layer offset from the parcel fabric). A neighbour
+# separated from the edge by more than this of another polygon of the same
+# layer (typically the parcel's own district digitised to a street
+# centreline) does not abut; the polygon in between does.
+MISALIGNMENT_ALLOWANCE_FT = 5.0
+# The segment buffer uses quad_segs=2 (its round joins are inscribed arcs);
+# at every join, and at an end shared with another applied segment, a
+# polygon of VERTEX_QUAD_SEGS segments per quarter and circumradius
+# d / cos(pi / (4 * VERTEX_QUAD_SEGS)) contains the circle of radius d and
+# overshoots it by under 0.0013 d (0.14 ft at 110 ft; BUF-10).
 QUAD_SEGS = 2
-OCTAGON_FACTOR = 1.0 / math.cos(math.pi / (4 * QUAD_SEGS))
+VERTEX_QUAD_SEGS = 16
+VERTEX_FACTOR = 1.0 / math.cos(math.pi / (4 * VERTEX_QUAD_SEGS))
+# District codes a layer uses for "no district" (compared on letters and
+# digits only, after zoning.normalize): read as no zoning polygon (uncovered,
+# so "adjacency unknown"), never as another district.
+PLACEHOLDER_CODES = frozenset({"NA", "TBD", "TBA", "PENDING", "UNDETERMINED"})
+
+
+def readable_code(code: Any) -> bool:
+    """A neighbour district code that names a district: it normalises to a
+    code with a letter or digit that is not a placeholder."""
+    base = zoning.normalize(code)[0]
+    if base is None:
+        return False
+    alnum = "".join(ch for ch in base if ch.isalnum())
+    return bool(alnum) and alnum not in PLACEHOLDER_CODES
 
 # ---------------------------------------------------------------------------
 # Neighbour classes and the buffer-key allow-list (BUF-01, BUF-02)
 # ---------------------------------------------------------------------------
 RESIDENTIAL, AGRICULTURAL, NON_RESIDENTIAL = "residential", "agricultural", "non_residential"
+INDUSTRIAL = "industrial"
 OTHER_DISTRICT, ROW = "other_district", "row"
-NEIGHBOUR_CLASS_KEYS = (RESIDENTIAL, AGRICULTURAL, NON_RESIDENTIAL)
+# Matched in this order; "industrial" (optional) is a non-residential class
+# the human lists only for the "non_industrial" other-district reading.
+NEIGHBOUR_CLASS_KEYS = (RESIDENTIAL, AGRICULTURAL, INDUSTRIAL, NON_RESIDENTIAL)
+# Readings the human writes in neighbour_classes.readings (never defaulted).
+READING_OTHER, READING_SIDE_REAR = "other_district", "side_rear"
+READING_VALUES: Mapping[str, tuple[str, ...]] = {
+    READING_OTHER: ("literal", "non_industrial"),
+    READING_SIDE_REAR: ("max", "side"),
+}
 SIDE, REAR, BUFFER, ADDITIVE, TEXT = "side", "rear", "buffer", "additive", "text"
 # Strictest first: the order classes are reported in.
 CLASS_ORDER = (RESIDENTIAL, AGRICULTURAL, OTHER_DISTRICT, ROW)
@@ -231,7 +274,8 @@ _FB_RES = ("zoning_rules.json fairburn M-1/M-2 cite: Sec. 80-85(f)/80-86(f) note
            "(not added to the setback)")
 _FB_OTHER = ("zoning_rules.json fairburn cite: Sec. 80-372 'When C-1, C-2, M-1, or M-2 zoned "
              "properties abut all other zoning districts; a 50 feet buffer shall be required' "
-             "(read literally; Sec. 80-369: within required yards)")
+             "(which other districts: readings.other_district, written by the human; "
+             "Sec. 80-369: within required yards)")
 _FB_ROW = ("zoning_rules.json fairburn cite: Sec. 80-367, buffer along all public ROW "
            "(Sec. 80-369: within required yards)")
 
@@ -261,6 +305,12 @@ BUFFER_KEYS: Mapping[tuple[str, str], BufferKey] = {
 USE_TRIGGER_TABLES: Mapping[str, str] = {"south_fulton": _SF_CITE, "fid": _FID_CITE}
 # Table-specific reading notes, each stated on every projection it affects.
 FAIRBURN_LITERAL = "Fairburn Sec. 80-372 read literally (includes other industrial districts)"
+FAIRBURN_NON_INDUSTRIAL = ("Fairburn Sec. 80-372 read as other non-industrial districts (reading "
+                           "set in the rules)")
+SIDE_APPLIED = "side value applied on every side (frontage unknown; reading set in the rules)"
+READING_UNDECIDED = "reading not decided in the rules"
+CODE_UNREADABLE = "neighbour district code unreadable"
+STRIP_ENDS = "buffer measured as a strip along the abutting boundary (flat ends)"
 UNION_CITY_FRONT = "Union City front-yard exemption not applied (frontage unknown)"
 REAR_APPLIED = "rear value applied (frontage unknown)"
 USE_NOT_CHECKED = "residential USE not checked (zoning-based adjacency only)"
@@ -277,6 +327,10 @@ ADJ_STALE = ("adjacency buffers not applied (adjacency unknown (stale): parcel g
 ADJ_UNREADABLE = "adjacency buffers not applied (adjacency data unreadable)"
 ADJ_NO_GEOMETRY = "adjacency buffers not applied (no buildable geometry read)"
 ADJ_NO_RULE = "adjacency buffers: none listed in the rules for this district"
+# A parcel whose district the rules do not resolve (no stored zoning, an
+# unparsed or unlisted code): nothing was checked, so nothing is claimed.
+ADJ_NO_DISTRICT = "adjacency buffers not applied (no district rule for this parcel)"
+ADJ_RULES_UNAVAILABLE = "adjacency buffers not applied (zoning rules unavailable)"
 # Memo footnote once the gate is on (BUF-24).
 FOOTNOTE = ("adjacency buffers applied where neighbour zoning is known (each line says which "
             "class, distance and how many sides; unknown sides listed, never treated as ROW or "
@@ -332,14 +386,22 @@ def neighbour_classes_table(table: str) -> tuple[Mapping[str, frozenset] | None,
 
 
 def _matches(code: str, entries: frozenset) -> bool:
-    """An entry ending in '*' is a prefix the HUMAN wrote, matched literally
-    (e.g. 'R-*' matches 'R-3', never 'RM'); every other entry matches one code,
-    hyphens ignored on both sides as in ``same_district``."""
+    """An entry ending in '*' is a prefix the HUMAN wrote; every entry
+    ignores hyphens on both sides, as ``same_district`` does. A prefix that
+    ends in a hyphen marks the end of the letters: 'R-*' matches 'R-3' and
+    'R3', never 'RM' or 'RG-3'. Every other entry matches one code ('M-1' =
+    'M1')."""
     c = code.translate(_NO_HYPHEN)
     for e in entries:
         if e.endswith("*"):
-            if code.startswith(e[:-1]):
-                return True
+            p = e[:-1]
+            ps = p.translate(_NO_HYPHEN)
+            if not c.startswith(ps):
+                continue
+            if p.endswith("-") and len(c) > len(ps) and c[len(ps)].isalpha() \
+                    and not code.startswith(p):
+                continue
+            return True
         elif c == e.translate(_NO_HYPHEN):
             return True
     return False
@@ -351,9 +413,9 @@ def identity(jurisdiction: str, code: Any) -> tuple[str, str] | None:
     governing jurisdiction and its district_conversions). Neighbours are
     never in a jurisdiction's unincorporated_parcel_ids (no neighbour id is
     stored), so a governed jurisdiction always resolves to its governor."""
-    base = zoning.normalize(code)[0]
-    if base is None:
+    if not readable_code(code):
         return None
+    base = zoning.normalize(code)[0]
     rules = _rules()
     jurs = (rules or {}).get("jurisdictions") or {}
     j = jurs.get(jurisdiction)
@@ -367,6 +429,28 @@ def identity(jurisdiction: str, code: Any) -> tuple[str, str] | None:
 
 
 _NO_HYPHEN = str.maketrans("", "", "-")
+
+
+def neighbour_identities(jurisdictions: Sequence[str], code: Any,
+                         own_table: str | None = None) -> list[tuple[str, str]]:
+    """Every identity of one stored neighbour code: under each of the layer's
+    jurisdictions (``identity``), plus, when the parcel itself uses a
+    governed jurisdiction's OWN table (an unincorporated FID parcel), the
+    identity under that table too: a county-zoned neighbour of such a parcel
+    may be unincorporated as well, so its own district and class are tried
+    under both tables (same-district under either; the strictest class)."""
+    out: list[tuple[str, str]] = []
+    for j in (jurisdictions or ("",)):
+        i = identity(j, code)
+        if i is None:
+            continue
+        if i not in out:
+            out.append(i)
+        if own_table is not None and j == own_table and i[0] != j:
+            alt = (j, zoning.normalize(code)[0] or "")
+            if alt[1] and alt not in out:
+                out.append(alt)
+    return out
 
 
 def same_district(a: tuple[str, str] | None, b: tuple[str, str] | None) -> bool:
@@ -399,10 +483,27 @@ def classify_neighbour(identities: Sequence[tuple[str, str]]) -> tuple[str | Non
             whys.append("neighbour district not classified in the rules")
     for k in NEIGHBOUR_CLASS_KEYS:
         if k in found:
-            if k == NON_RESIDENTIAL and whys:
+            # A non-residential answer from one table while another table
+            # could not classify the code is no answer (it may be residential).
+            if k in (INDUSTRIAL, NON_RESIDENTIAL) and whys:
                 return None, whys[0]
             return k, ""
     return None, (whys[0] if whys else CLASS_TABLE_MISSING)
+
+
+def reading(table: str, key: str) -> str | None:
+    """The human's reading ``key`` of one rules table
+    (``neighbour_classes.readings.<key>``), or None when the class table is
+    absent or malformed, or the reading is missing or not an allowed value.
+    Never defaulted in code."""
+    t, _why = neighbour_classes_table(table)
+    if t is None:
+        return None
+    rules = _rules() or {}
+    nc = ((rules.get("jurisdictions") or {}).get(table) or {}).get("neighbour_classes") or {}
+    r = nc.get("readings") if isinstance(nc, Mapping) else None
+    v = r.get(key) if isinstance(r, Mapping) else None
+    return v if isinstance(v, str) and v in READING_VALUES.get(key, ()) else None
 
 
 # ---------------------------------------------------------------------------
@@ -449,14 +550,28 @@ def component_distance(t: Terms, cls: str, role: str | None = None) -> float | N
     return max(base) + add
 
 
-def effective_distance(t: Terms, classes: Iterable[str]) -> tuple[float | None, str | None]:
+def needs_side_rear(t: Terms, cls: str) -> bool:
+    """True when the class has both a side and a rear value and they differ,
+    so which one applies on a side of unknown orientation is a reading."""
+    side = component_distance(t, cls, SIDE)
+    rear = component_distance(t, cls, REAR)
+    roles = {b.role for b, _ in t.terms if cls in b.classes}
+    return SIDE in roles and REAR in roles and side != rear
+
+
+def effective_distance(t: Terms, classes: Iterable[str], side_rear: str = "max"
+                       ) -> tuple[float | None, str | None]:
     """(distance, class that set it) for a side with these neighbour classes:
-    the largest component over the classes, None when none applies."""
+    the largest component over the classes, None when none applies. With
+    ``side_rear`` "side" a class with differing side and rear values uses its
+    side value; "max" (the composition helper's default; plan_parcel passes
+    the human's reading) the larger."""
     best: tuple[float | None, str | None] = (None, None)
     for c in CLASS_ORDER:
         if c not in classes:
             continue
-        d = component_distance(t, c)
+        role = SIDE if side_rear == "side" and needs_side_rear(t, c) else None
+        d = component_distance(t, c, role)
         if d is not None and (best[0] is None or d > best[0]):
             best = (d, c)
     return best
@@ -467,14 +582,6 @@ def side_distance(t: Terms, classes: Iterable[str], setback: float) -> float:
     below the uniform setback (BUF-06)."""
     d, _ = effective_distance(t, classes)
     return setback if d is None else max(setback, d)
-
-
-def _rear_over_side(t: Terms, cls: str) -> bool:
-    side = component_distance(t, cls, SIDE)
-    rear = component_distance(t, cls, REAR)
-    roles = {b.role for b, _ in t.terms if cls in b.classes}
-    return SIDE in roles and REAR in roles and rear is not None and side is not None \
-        and rear > side
 
 
 def classes_needed(t: Terms) -> frozenset:
@@ -559,18 +666,23 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
     uniform setback site_fit already applies (never relaxed)."""
     if rows is None:
         return Plan((), ADJ_UNREADABLE)
+    if _rules() is None:
+        return Plan((), ADJ_RULES_UNAVAILABLE)
     st = zoning.parse_stored(stored[0], stored[1]) if stored else None
     dist = zoning.district_for_stored(stored[0], stored[1], parcel_id) if stored else None
-    dims = dist.dimensions if dist is not None else None
-    raw = None
-    if dims is not None:
-        v = dims.get("residential_adjacency_buffer_ft")
-        raw = v.get("value") if isinstance(v, Mapping) else v
-    table = dist.table_jurisdiction if dist is not None else ""
+    if dist is None or dist.dimensions is None:
+        # No stored zoning, an unparsed code, or a district the rules do not
+        # list: no rule was read, so none is claimed (never ADJ_NO_RULE).
+        return Plan((), ADJ_NO_DISTRICT)
+    dims = dist.dimensions
+    v = dims.get("residential_adjacency_buffer_ft")
+    raw = v.get("value") if isinstance(v, Mapping) else v
+    table = dist.table_jurisdiction
     terms = buffer_terms(table, raw)
     extra: list[str] = []
-    hv = _height_value(dims)
-    if hv is not None and _num(hv) is None:
+    if _height_value(dims) is not None:
+        # Height is never modelled, so a height rule (number or prose) is
+        # never applied and always named.
         extra.append(HEIGHT_NOT_APPLIED)
     if not terms.terms and not terms.ignored:
         return Plan((), ADJ_NO_RULE, tuple(extra))
@@ -579,16 +691,22 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
     if not all(r.fresh for r in rows):
         return Plan((), ADJ_STALE, tuple(extra))
     split = bool(st.split) if st is not None else False
-    own = (dist.table_jurisdiction, dist.district) if dist is not None else None
+    own = (dist.table_jurisdiction, dist.district)
     needed = classes_needed(terms)
+    res_needed = bool(needed & {RESIDENTIAL, AGRICULTURAL})
+    other_reading = reading(table, READING_OTHER) if OTHER_DISTRICT in needed else None
+    side_rear = reading(table, READING_SIDE_REAR)
     applied: dict[tuple[str, float], int] = {}
     within: dict[tuple[str, float], int] = {}
     deductions: list[tuple[int, float]] = []
-    c = {"sides": 0, "same_district": 0, "unknown": 0, "class_unknown": 0,
-         "other_unknown": 0, "applied": 0, "within_setback": 0, "other_industrial": 0,
+    c = {"sides": 0, "same_district": 0, "unknown": 0, "code_unreadable": 0,
+         "class_unknown": 0, "other_unknown": 0, "other_undecided": 0,
+         "other_class_unknown": 0, "other_industrial_skipped": 0, "side_rear_undecided": 0,
+         "applied": 0, "within_setback": 0, "other_industrial": 0,
          RESIDENTIAL: 0, AGRICULTURAL: 0, OTHER_DISTRICT: 0, "split": int(split)}
     class_why: dict[str, int] = {}
-    rear_used = False
+    other_why: dict[str, int] = {}
+    rear_used = side_used = False
     for r in rows:
         c["sides"] += 1
         classes: set[str] = set()
@@ -598,24 +716,42 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
         if r.kind == KIND_ROW:
             classes.add(ROW)
         elif r.kind == KIND_ZONED:
-            ids = [i for i in (identity(j, r.district) for j in (r.jurisdictions or ("",)))
-                   if i is not None]
+            ids = neighbour_identities(r.jurisdictions, r.district, own[0])
+            if not ids:
+                # 'UNKNOWN', 'TBD', ...: not a district, so not a neighbour
+                # class either; the side's adjacency is unknown.
+                c["code_unreadable"] += 1
+                continue
             # A layer serving several jurisdictions (Fulton layer 34: South
             # Fulton and FID) carries one code: it is the parcel's own district
             # when it resolves to it under any of them (M-1A via FID's
             # conversion is M-1).
-            if own is not None and not split and ids and any(same_district(i, own)
-                                                             for i in ids):
+            if not split and any(same_district(i, own) for i in ids):
                 c["same_district"] += 1
                 continue
-            if own is None or split or not ids:
+            ncls: str | None = None
+            why = ""
+            if res_needed or other_reading == "non_industrial":
+                ncls, why = classify_neighbour(ids)
+            if split:
                 c["other_unknown"] += 1
             else:
-                classes.add(OTHER_DISTRICT)
                 c[OTHER_DISTRICT] += 1
                 c["other_industrial"] += int(_looks_industrial_class(ids))
-            if needed & {RESIDENTIAL, AGRICULTURAL}:
-                ncls, why = classify_neighbour(ids)
+                if OTHER_DISTRICT in needed:
+                    if other_reading == "literal":
+                        classes.add(OTHER_DISTRICT)
+                    elif other_reading == "non_industrial":
+                        if ncls is None:
+                            c["other_class_unknown"] += 1
+                            other_why[why] = other_why.get(why, 0) + 1
+                        elif ncls == INDUSTRIAL:
+                            c["other_industrial_skipped"] += 1
+                        else:
+                            classes.add(OTHER_DISTRICT)
+                    else:
+                        c["other_undecided"] += 1
+            if res_needed:
                 if ncls in (RESIDENTIAL, AGRICULTURAL):
                     classes.add(ncls)
                     c[ncls] += 1
@@ -625,11 +761,17 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
         else:
             c["unknown"] += 1
             continue
-        d, by = effective_distance(terms, classes)
+        if side_rear is None:
+            undecided = {k for k in classes if needs_side_rear(terms, k)}
+            if undecided:
+                c["side_rear_undecided"] += 1
+                classes -= undecided
+        d, by = effective_distance(terms, classes, side_rear or "max")
         if d is None or by is None:
             continue
-        if by in (RESIDENTIAL, AGRICULTURAL) and _rear_over_side(terms, by):
-            rear_used = True
+        if by in (RESIDENTIAL, AGRICULTURAL) and needs_side_rear(terms, by):
+            rear_used = rear_used or side_rear == "max"
+            side_used = side_used or side_rear == "side"
         if d <= setback:
             within[(by, d)] = within.get((by, d), 0) + 1
             c["within_setback"] += 1
@@ -647,18 +789,34 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
     if c["unknown"]:
         summary += (f"; {_plural(c['unknown'])} adjacency unknown (no zoning polygon within "
                     f"{_fmt(ABUT_TOL_FT)} ft; not treated as ROW or as no neighbour)")
+    if c["code_unreadable"]:
+        summary += f"; {_plural(c['code_unreadable'])} adjacency unknown ({CODE_UNREADABLE})"
     lines: list[str] = []
     for k, n in sorted(within.items(), key=lambda kv: (CLASS_ORDER.index(kv[0][0]), -kv[0][1])):
         lines.append(f"{k[0]} buffer {_fmt(k[1])} ft within the {_fmt(setback)} ft setback on "
                      f"{_plural(n)}")
+    if deductions:
+        lines.append(STRIP_ENDS)
     if rear_used:
         lines.append(REAR_APPLIED)
+    if side_used:
+        lines.append(SIDE_APPLIED)
+    if c["side_rear_undecided"]:
+        lines.append(f"residential/agricultural buffer not applied on "
+                     f"{_plural(c['side_rear_undecided'])} (side/rear {READING_UNDECIDED})")
     for why, n in sorted(class_why.items()):
         lines.append(f"residential/agricultural buffer not applied on {_plural(n)} ({why})")
     if c["other_unknown"] and OTHER_DISTRICT in needed:
-        why = "split-zoned parcel" if split else "parcel district unknown"
         lines.append(f"other-district buffer not applied on {_plural(c['other_unknown'])} "
-                     f"(adjacency unknown ({why}))")
+                     f"(adjacency unknown (split-zoned parcel))")
+    if c["other_undecided"]:
+        lines.append(f"other-district buffer not applied on {_plural(c['other_undecided'])} "
+                     f"(which other districts: {READING_UNDECIDED})")
+    for why, n in sorted(other_why.items()):
+        lines.append(f"other-district buffer not applied on {_plural(n)} ({why})")
+    if c["other_industrial_skipped"]:
+        lines.append(f"other-district buffer not applied on "
+                     f"{_plural(c['other_industrial_skipped'])} (industrial neighbour)")
     if split:
         lines.append("adjacency unknown on internal district lines (split-zoned parcel)")
     if ROW in needed:
@@ -668,11 +826,13 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
             note += (f"; {_fmt(max(row_vals))} ft is within the {_fmt(setback)} ft setback "
                      "anyway")
         lines.append(note)
-    if table == "fairburn" and OTHER_DISTRICT in needed:
+    if table == "fairburn" and other_reading == "literal":
         lines.append(FAIRBURN_LITERAL)
-    if table == "union_city" and needed & {RESIDENTIAL, AGRICULTURAL}:
+    if table == "fairburn" and other_reading == "non_industrial":
+        lines.append(FAIRBURN_NON_INDUSTRIAL)
+    if table == "union_city" and res_needed:
         lines.append(UNION_CITY_FRONT)
-    if needed & {RESIDENTIAL, AGRICULTURAL}:
+    if res_needed:
         lines.append(ACROSS_STREET)
     if table in USE_TRIGGER_TABLES:
         lines.append(USE_NOT_CHECKED)

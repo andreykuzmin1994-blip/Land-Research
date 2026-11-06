@@ -1656,10 +1656,13 @@ def _hazard_audit(conn: Any, run_tag: str | None,
 
 # reviews/27_site_fit_buffers (BUF-12): parcel_adjacency is written only by
 # adjacency_import.py between runs (it refuses once a run has its baseline),
-# so it must not change during an experiment.
+# so it must not change during an experiment. Each row's xmin (the id of the
+# transaction that wrote it) is part of the fingerprint, so deleting rows and
+# restoring them unchanged, ids included, still reads as a change (review
+# finding 2).
 _SQL_ADJACENCY_FINGERPRINT = (
-    "SELECT COUNT(*), md5(COALESCE(string_agg(md5(a::text), '' ORDER BY a.adjacency_id), '')) "
-    "FROM parcel_adjacency a"
+    "SELECT COUNT(*), md5(COALESCE(string_agg(md5(a::text || '|' || a.xmin::text), '' "
+    "ORDER BY a.adjacency_id), '')) FROM parcel_adjacency a"
 )
 
 

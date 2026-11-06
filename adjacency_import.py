@@ -42,17 +42,25 @@ What it computes (in PostGIS, SRID 2240 US survey feet, ONE transaction)
 ------------------------------------------------------------------------
 Over the SAME made-valid parcel geometry site fit buffers: the outward ring
 buffer(parcel, ABUT_TOL_FT) - parcel; per (source, district) the part of
-the ring its polygons cover; a covered part is a sliver (counted, never
-stored) under MIN_OVERLAP_AREA_SF or nowhere MIN_SLIVER_WIDTH_FT wide; each
-part of the parcel boundary (outer rings and holes of every part) whose
-outward band (the one-sided flat buffer, ABUT_TOL_FT deep, on the
-outside of each boundary edge) meets a solid covered part is stored as a
-'zoned' segment with the RAW district code, the source key and the source's
-jurisdictions (only the part of the edge that faces the neighbour: no
-wrap around corners, no diagonal neighbours); boundary parts that face no
-solid covered part are stored as 'uncovered' (adjacency unknown; never ROW,
-never "no neighbour", BUF-04). Pieces shorter than MIN_SEGMENT_LEN_FT are
-dropped. Every row carries
+the ring its polygons cover, OPENED by MIN_SLIVER_WIDTH_FT (eroded by half
+of it, dilated back), so every part under that width is a sliver (counted,
+never stored) even where the same district is solid elsewhere on the ring;
+an opened cover under MIN_OVERLAP_AREA_SF is a sliver too. Each part of the
+parcel boundary (outer rings and holes of every part) whose outward band
+(the one-sided flat buffer, ABUT_TOL_FT deep, on the outside of each
+boundary edge) meets an opened cover WITHIN REACH is stored as a 'zoned'
+segment with the RAW district code, the source key and the source's
+jurisdictions (only the part of the edge that faces the neighbour: no wrap
+around corners, no diagonal neighbours). Within reach = within
+MISALIGNMENT_ALLOWANCE_FT of the edge, or of a gap of the source's covers
+that touches the edge: a neighbour behind more than that of another
+polygon of the same layer (a parcel's own district digitised to a street
+centreline) does not abut; the polygon in between does. Boundary parts that
+face no cover within reach are stored as 'uncovered' (adjacency unknown;
+never ROW, never "no neighbour", BUF-04). Pieces shorter than
+MIN_SEGMENT_LEN_FT are dropped. A feature whose district code is not
+readable ('UNKNOWN', 'TBD', ...; ``adjacency.readable_code``) is no polygon:
+its area reads uncovered. Every row carries
 md5(ST_AsBinary(geometry)) of the parcel as stored, so a later geometry
 change reads stale (BUF-13). Spatial work runs in TEMP tables with GiST
 indexes (BUF-23). A parcel's rows are replaced only when their content
@@ -323,7 +331,7 @@ def fetch_source(f: AdjacencyFetcher, src: "zoning_import.ZoningSource",
                 if gj is None:
                     raise SourceError(f"{host}: a feature without polygon geometry")
                 z = zoning_import._val(a, src.zoning_field)
-                if z is None:
+                if z is None or not adjacency.readable_code(z):
                     data.no_district += 1
                     continue
                 if not _in_area(rings):
@@ -391,22 +399,25 @@ _SQL_INDEX_PARCELS = "CREATE INDEX ON adjacency_import_parcels USING GIST (ring)
 _SQL_CREATE_COVER = (
     "CREATE TEMP TABLE IF NOT EXISTS adjacency_import_cover ("
     "parcel_id TEXT NOT NULL, src TEXT NOT NULL, district TEXT NOT NULL, jurs TEXT NOT NULL, "
-    "asof TEXT NOT NULL, c geometry, solid BOOLEAN) ON COMMIT DROP"
+    "asof TEXT NOT NULL, c geometry, raw geometry, solid BOOLEAN) ON COMMIT DROP"
 )
-# Per parcel and (source, district): the ring part its polygons cover, and
-# whether it is solid (area and width floors; BUF-08). Parameters: (min
-# area, min width).
+# Per parcel and (source, district): the ring part its polygons cover (raw),
+# that part opened by the sliver width (c: every part under the width
+# removed, review finding 4), and whether the opened part is solid (area
+# floor; BUF-08). Parameters: (min area, min width, min width).
 _SQL_INSERT_COVER = (
-    "INSERT INTO adjacency_import_cover (parcel_id, src, district, jurs, asof, c, solid) "
-    "SELECT parcel_id, src, district, jurs, asof, c, "
-    "(ST_Area(c) >= %s::float8 AND NOT ST_IsEmpty(ST_Buffer(c, -0.5 * %s::float8))) "
+    "INSERT INTO adjacency_import_cover (parcel_id, src, district, jurs, asof, c, raw, solid) "
+    "SELECT parcel_id, src, district, jurs, asof, o, c, "
+    "(NOT ST_IsEmpty(o) AND ST_Area(o) >= %s::float8) FROM ("
+    "SELECT parcel_id, src, district, jurs, asof, c, ST_CollectionExtract(ST_Buffer(ST_Buffer("
+    "c, -0.5 * %s::float8), 0.5 * %s::float8), 3) AS o "
     "FROM (SELECT pr.parcel_id, z.src, z.district, z.jurs, z.asof, "
     "ST_CollectionExtract(ST_Union(ST_CollectionExtract(ST_Intersection(pr.ring, z.geom), 3) "
     "ORDER BY z.oid, ST_AsBinary(z.geom)), 3) AS c "
     "FROM adjacency_import_parcels pr JOIN adjacency_import_polys z "
     "ON z.geom && pr.ring AND ST_Intersects(z.geom, pr.ring) "
-    "GROUP BY pr.parcel_id, z.src, z.district, z.jurs, z.asof) s "
-    "WHERE c IS NOT NULL AND NOT ST_IsEmpty(c)"
+    "GROUP BY pr.parcel_id, z.src, z.district, z.jurs, z.asof) s1 "
+    "WHERE c IS NOT NULL AND NOT ST_IsEmpty(c)) s"
 )
 _SQL_CREATE_EDGES = (
     "CREATE TEMP TABLE IF NOT EXISTS adjacency_import_edges ("
@@ -425,17 +436,40 @@ _SQL_INSERT_EDGES = (
     "FROM adjacency_import_parcels) s WHERE ST_Length(e) > 0 ORDER BY parcel_id, e"
 )
 _SQL_INDEX_EDGES = "CREATE INDEX ON adjacency_import_edges USING GIST (band)"
+_SQL_CREATE_REACH = (
+    "CREATE TEMP TABLE IF NOT EXISTS adjacency_import_reach ("
+    "eid BIGINT NOT NULL, src TEXT NOT NULL, reach geometry) ON COMMIT DROP"
+)
+# Per edge and source (review finding 7): the part of the edge's band a
+# neighbour must reach to abut it: the strip within the misalignment
+# allowance of the edge, plus the allowance around every gap of the
+# source's opened covers that touches the edge (a layer offset from the
+# parcel fabric). A polygon behind more than the allowance of another
+# polygon of the same layer (an own district digitised to a street
+# centreline) is out of reach. Parameters: (allowance, allowance).
+_SQL_INSERT_REACH = (
+    "INSERT INTO adjacency_import_reach (eid, src, reach) "
+    "SELECT q.eid, q.src, ST_CollectionExtract(ST_Intersection(q.band, CASE WHEN q.gap IS NULL "
+    "THEN q.near ELSE ST_Union(q.near, ST_Buffer(q.gap, %s::float8)) END), 3) FROM ("
+    "SELECT e.eid, u.src, e.band, ST_Buffer(e.e, %s::float8, 'side=right endcap=flat') AS near, "
+    "(SELECT ST_Union(d.geom ORDER BY ST_AsBinary(d.geom)) FROM ST_Dump(ST_CollectionExtract("
+    "ST_Difference(e.band, u.u), 3)) d WHERE ST_DWithin(d.geom, e.e, 0.01)) AS gap "
+    "FROM adjacency_import_edges e JOIN ("
+    "SELECT parcel_id, src, ST_Union(c ORDER BY district) AS u FROM adjacency_import_cover "
+    "GROUP BY parcel_id, src) u ON u.parcel_id = e.parcel_id) q"
+)
+_SQL_INDEX_REACH = "CREATE INDEX ON adjacency_import_reach (eid, src)"
 _SQL_CREATE_NEW = (
     "CREATE TEMP TABLE IF NOT EXISTS adjacency_import_new ("
     "parcel_id TEXT NOT NULL, kind TEXT NOT NULL, district TEXT, jurs TEXT, source TEXT NOT NULL, "
     "asof TEXT, gmd5 TEXT NOT NULL, segment geometry) ON COMMIT DROP"
 )
-# Per edge and per solid covered part: each polygon piece of (band
-# intersect cover) is projected back onto the edge (its extreme
-# ST_LineLocatePoint fractions), so only the part of the edge that faces the
-# neighbour is stored, and two separate pieces of one edge are never
-# bridged. Merged per (source, district); pieces under the length floor
-# dropped. Parameters: (min length).
+# Per edge and per solid opened cover: each polygon piece of (band
+# intersect cover intersect reach) is projected back onto the edge (its
+# extreme ST_LineLocatePoint fractions), so only the part of the edge that
+# faces the neighbour is stored, and two separate pieces of one edge are
+# never bridged. Merged per (source, district); pieces under the length
+# floor dropped. Parameters: (min length).
 _SQL_INSERT_ZONED = (
     "INSERT INTO adjacency_import_new (parcel_id, kind, district, jurs, source, asof, gmd5, "
     "segment) "
@@ -448,7 +482,9 @@ _SQL_INSERT_ZONED = (
     "FROM adjacency_import_cover c "
     "JOIN adjacency_import_parcels pr ON pr.parcel_id = c.parcel_id "
     "JOIN adjacency_import_edges e ON e.parcel_id = c.parcel_id AND e.band && c.c "
-    "CROSS JOIN LATERAL ST_Dump(ST_CollectionExtract(ST_Intersection(e.band, c.c), 3)) part "
+    "JOIN adjacency_import_reach r ON r.eid = e.eid AND r.src = c.src "
+    "CROSS JOIN LATERAL ST_Dump(ST_CollectionExtract(ST_Intersection(ST_CollectionExtract("
+    "ST_Intersection(e.band, c.c), 3), r.reach), 3)) part "
     "CROSS JOIN LATERAL ST_DumpPoints(part.geom) pt "
     "WHERE c.solid AND ST_Area(part.geom) > 0.01 "
     "GROUP BY c.parcel_id, c.district, c.jurs, c.src, c.asof, pr.gmd5, e.eid, e.e, part.path"
@@ -472,19 +508,30 @@ _SQL_INSERT_UNCOVERED = (
     "ON zu.parcel_id = pr.parcel_id) q "
     "WHERE ST_Length(piece) >= %s::float8 GROUP BY parcel_id, gmd5"
 )
-# Counts only: covered ring parts that are slivers (never a buffer).
-_SQL_SLIVERS = (
-    "SELECT COUNT(*), COUNT(DISTINCT parcel_id) FROM adjacency_import_cover WHERE NOT solid"
-)
-# Parcels where one boundary part faces two different district codes within
-# the tolerance (both rows are stored; the read applies the stricter).
+# Counts only: covered ring parts that are slivers (never a buffer): whole
+# covers with no solid opened part, and thin parts removed from a solid one
+# (each at least the length floor long: perimeter >= twice it).
 # Parameters: (min length).
+_SQL_SLIVERS = (
+    "SELECT COUNT(*), COUNT(DISTINCT parcel_id) FROM ("
+    "SELECT parcel_id FROM adjacency_import_cover WHERE NOT solid UNION ALL "
+    "SELECT cv.parcel_id FROM adjacency_import_cover cv CROSS JOIN LATERAL ST_Dump("
+    "ST_CollectionExtract(ST_Difference(cv.raw, ST_Buffer(cv.c, 0.01)), 3)) d "
+    "WHERE cv.solid AND ST_Perimeter(d.geom) >= 2.0 * %s::float8) s"
+)
+# Pairs of zoned rows of one parcel with different district codes that
+# share a boundary part (both rows are stored; the read applies the
+# stricter). Classified in Python against the parcel's own district (review
+# finding 8): a pair with the parcel's own code is its own polygon
+# overhanging the band, not two neighbours. Parameters: (min length).
 _SQL_AMBIGUOUS = (
-    "SELECT COUNT(DISTINCT a.parcel_id) FROM adjacency_import_new a "
+    "SELECT DISTINCT a.parcel_id, a.district, a.jurs, b.district, b.jurs "
+    "FROM adjacency_import_new a "
     "JOIN adjacency_import_new b ON a.parcel_id = b.parcel_id AND a.kind = 'zoned' "
     "AND b.kind = 'zoned' AND a.district < b.district "
     "AND ST_Length(ST_CollectionExtract(ST_Intersection(a.segment, "
-    "ST_Buffer(b.segment, 0.01)), 2)) >= %s::float8"
+    "ST_Buffer(b.segment, 0.01)), 2)) >= %s::float8 "
+    "ORDER BY 1, 2, 3, 4, 5"
 )
 _SQL_SRID_CHECK = (
     "SELECT COUNT(*) FROM adjacency_import_new WHERE ST_SRID(segment) <> 2240 "
@@ -533,7 +580,7 @@ class WriteResult:
     unchanged: int = 0
     slivers: int = 0
     sliver_parcels: int = 0
-    ambiguous_parcels: int = 0
+    ambiguous_pairs: list[tuple[str, str, str, str, str]] = field(default_factory=list)
     summary: list[tuple[str, str, str | None, str | None]] = field(default_factory=list)
 
 
@@ -556,10 +603,14 @@ def compute_and_write(conn: Any, ids: Sequence[str], sources: Sequence[SourceDat
         cur.execute(_SQL_INSERT_PARCELS, (tol, list(ids)))
         cur.execute(_SQL_INDEX_PARCELS)
         cur.execute(_SQL_CREATE_COVER)
-        cur.execute(_SQL_INSERT_COVER, (a.MIN_OVERLAP_AREA_SF, a.MIN_SLIVER_WIDTH_FT))
+        cur.execute(_SQL_INSERT_COVER, (a.MIN_OVERLAP_AREA_SF, a.MIN_SLIVER_WIDTH_FT,
+                                        a.MIN_SLIVER_WIDTH_FT))
         cur.execute(_SQL_CREATE_EDGES)
         cur.execute(_SQL_INSERT_EDGES, (tol,))
         cur.execute(_SQL_INDEX_EDGES)
+        cur.execute(_SQL_CREATE_REACH)
+        cur.execute(_SQL_INSERT_REACH, (a.MISALIGNMENT_ALLOWANCE_FT, a.MISALIGNMENT_ALLOWANCE_FT))
+        cur.execute(_SQL_INDEX_REACH)
         cur.execute(_SQL_CREATE_NEW)
         cur.execute(_SQL_INSERT_ZONED, (a.MIN_SEGMENT_LEN_FT,))
         cur.execute(_SQL_INSERT_UNCOVERED, (a.MIN_SEGMENT_LEN_FT,))
@@ -567,11 +618,12 @@ def compute_and_write(conn: Any, ids: Sequence[str], sources: Sequence[SourceDat
         bad = int((cur.fetchone() or (0,))[0] or 0)
         if bad:
             raise SourceError(f"{bad} computed segment(s) not MultiLineString in SRID 2240")
-        cur.execute(_SQL_SLIVERS)
+        cur.execute(_SQL_SLIVERS, (a.MIN_SEGMENT_LEN_FT,))
         row = cur.fetchone() or (0, 0)
         res.slivers, res.sliver_parcels = int(row[0] or 0), int(row[1] or 0)
         cur.execute(_SQL_AMBIGUOUS, (a.MIN_SEGMENT_LEN_FT,))
-        res.ambiguous_parcels = int((cur.fetchone() or (0,))[0] or 0)
+        res.ambiguous_pairs = [tuple(str(v) if v is not None else "" for v in r[:5])
+                               for r in cur.fetchall()]
         cur.execute(_SQL_CHANGED, (list(ids), list(ids)))
         changed = [str(r[0]) for r in cur.fetchall()]
         if changed:
@@ -606,8 +658,8 @@ def summarise(stored: Mapping[str, tuple[Any, Any]], summary: Iterable[Sequence[
             continue
         dist = zoning.district_for_stored(z[0], z[1], pid)
         own = (dist.table_jurisdiction, dist.district) if dist is not None else None
-        ids = [i for i in (adjacency.identity(x, district)
-                           for x in str(jurs or "").split(",") if x) if i is not None]
+        ids = adjacency.neighbour_identities([x for x in str(jurs or "").split(",") if x],
+                                             district, own[0] if own is not None else None)
         if own is not None and ids and any(adjacency.same_district(i, own) for i in ids):
             continue
         b["other"].add(pid)
@@ -625,6 +677,32 @@ def summarise(stored: Mapping[str, tuple[Any, Any]], summary: Iterable[Sequence[
                    f"{len(v['unclassified'])} with an unclassified neighbour; "
                    f"{len(v['unknown'])} with an unknown side")
     return out
+
+
+def ambiguity_counts(stored: Mapping[str, tuple[Any, Any]],
+                     pairs: Iterable[Sequence[Any]]) -> tuple[int, int]:
+    """(parcels with a boundary part facing two NEIGHBOUR districts, parcels
+    where the part faces the parcel's own district polygon overhanging the
+    band and a neighbour beyond it). Own = the code resolves to the parcel's
+    current stored district (adjacency.neighbour_identities, same_district),
+    as the read decides it. Counts only."""
+    two: set[str] = set()
+    own_overhang: set[str] = set()
+    for pid, da, ja, db, jb in pairs:
+        z = stored.get(pid, (None, None))
+        dist = zoning.district_for_stored(z[0], z[1], pid)
+        own = (dist.table_jurisdiction, dist.district) if dist is not None else None
+
+        def is_own(code: Any, jurs: Any) -> bool:
+            ids = adjacency.neighbour_identities(
+                [x for x in str(jurs or "").split(",") if x], code,
+                own[0] if own is not None else None)
+            return own is not None and any(adjacency.same_district(i, own) for i in ids)
+        if is_own(da, ja) or is_own(db, jb):
+            own_overhang.add(pid)
+        else:
+            two.add(pid)
+    return len(two), len(own_overhang - two)
 
 
 def _bucket(sf: int | None) -> str:
@@ -781,10 +859,12 @@ def run(*, sources_path: Path = SOURCES_PATH, fetcher: AdjacencyFetcher | None =
     except Exception as exc:
         print(f"adjacency not imported: database error ({type(exc).__name__}); nothing written.")
         return EXIT_DB
+    two, overhang = ambiguity_counts(stored, res.ambiguous_pairs)
     print(f"written: {res.processed} parcels; {res.changed} changed, {res.unchanged} unchanged; "
           f"{res.slivers} sliver pieces on {res.sliver_parcels} parcels (never a buffer); "
-          f"{res.ambiguous_parcels} parcels with a side facing two districts (stricter applied "
-          "at read)")
+          f"{two} parcels with a side facing two neighbour districts (stricter applied at "
+          f"read); {overhang} more where the parcel's own district polygon overhangs a "
+          "neighbour's side (own coverage reads as the same district)")
     for line in summarise(stored, res.summary):
         print(line)
     print("requests: " + (", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items()))

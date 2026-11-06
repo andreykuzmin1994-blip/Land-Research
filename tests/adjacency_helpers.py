@@ -29,13 +29,27 @@ def enabled(ddl: str | None = None):
 
 
 def with_classes(table: str, residential: Sequence[str] = (), agricultural: Sequence[str] = (),
-                 non_residential: Sequence[str] = (), cite: str = "test table"
-                 ) -> Callable[[dict[str, Any]], None]:
+                 non_residential: Sequence[str] = (), cite: str = "test table",
+                 industrial: Sequence[str] | None = None,
+                 readings: dict[str, str] | None = None) -> Callable[[dict[str, Any]], None]:
+    """``readings`` (e.g. {"side_rear": "max", "other_district": "literal"})
+    are the human's reading switches; omitted, no reading is decided."""
     def mutate(data: dict[str, Any]) -> None:
-        data["jurisdictions"][table]["neighbour_classes"] = {
+        nc: dict[str, Any] = {
             "residential": list(residential), "agricultural": list(agricultural),
             "non_residential": list(non_residential), "cite": cite}
+        if industrial is not None:
+            nc["industrial"] = list(industrial)
+        if readings is not None:
+            nc["readings"] = dict(readings)
+        data["jurisdictions"][table]["neighbour_classes"] = nc
     return mutate
+
+
+# The reading switches a human would write to get the shipped design's
+# behaviour (rear value everywhere; Fairburn Sec. 80-372 literally).
+MAX = {"side_rear": "max"}
+LITERAL = {"other_district": "literal"}
 
 
 def chain(*fns: Callable[[dict[str, Any]], None]) -> Callable[[dict[str, Any]], None]:

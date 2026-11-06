@@ -15,7 +15,7 @@ import tests  # noqa: F401  (suite guards)
 import adjacency as adj
 import prepare
 import zoning
-from adjacency_helpers import chain, enabled, row, with_classes
+from adjacency_helpers import LITERAL, MAX, chain, enabled, row, with_classes
 from zoning_helpers import REPO_ROOT, patch_rules, repo_rules, stored, verified
 
 SF = stored("south_fulton", "south_fulton_zoning", "M-1")
@@ -202,6 +202,17 @@ class ClassificationTests(unittest.TestCase):
             self.assertEqual(adj.classify_neighbour([("south_fulton", "CUP")])[1],
                              "neighbour district not classified in the rules")
 
+    def test_prefix_entries_ignore_hyphens(self):
+        """Review finding 11: 'R-*' matches 'R4' as it matches 'R-4'; a hyphen
+        ending the prefix still ends the letters (never 'RM', 'RG-3')."""
+        e = frozenset({"R-*"})
+        for code, want in (("R-4", True), ("R4", True), ("R-4A", True), ("RM", False),
+                           ("RG-3", False), ("RG3", False), ("M-1", False)):
+            self.assertEqual(adj._matches(code, e), want, code)
+        self.assertTrue(adj._matches("RG3", frozenset({"RG-*"})))
+        self.assertTrue(adj._matches("MR-3", frozenset({"MR*"})))
+        self.assertTrue(adj._matches("M1A", frozenset({"M-1*"})))
+
     def test_malformed_table(self):
         def bad(data):
             data["jurisdictions"]["south_fulton"]["neighbour_classes"] = {"residential": "R-3"}
@@ -238,7 +249,9 @@ def plan(stored_, rows, setback, rules=None):
 
 
 SF_CLASSES = verified("south_fulton", mutate=with_classes(
-    "south_fulton", residential=["R-*"], agricultural=["AG-1"], non_residential=["M-2"]))
+    "south_fulton", residential=["R-*"], agricultural=["AG-1"], non_residential=["M-2"],
+    readings=MAX))
+FB_LITERAL = verified("fairburn", mutate=with_classes("fairburn", readings=LITERAL))
 
 
 class PlanTests(unittest.TestCase):
@@ -268,7 +281,7 @@ class PlanTests(unittest.TestCase):
         self.assertNotIn(adj.FAIRBURN_LITERAL, p.lines)
 
     def test_fid_parcel_resolves_to_south_fulton_rules(self):
-        rules = chain(with_classes("south_fulton", residential=["R-*"]))
+        rules = chain(with_classes("south_fulton", residential=["R-*"], readings=MAX))
         p = plan(FID, [row(1, district="R-4", jurisdictions=("south_fulton", "fid")),
                        row(2, district="M-1A", jurisdictions=("south_fulton", "fid"))],
                  40.0, verified("south_fulton", "fid", mutate=rules))
@@ -287,7 +300,7 @@ class PlanTests(unittest.TestCase):
 
     def test_fairburn_literal_reading(self):
         p = plan(FB1, [row(1, district="M-2", jurisdictions=("fairburn",)),
-                       row(2, district="M1", jurisdictions=("fairburn",))], 35.0)
+                       row(2, district="M1", jurisdictions=("fairburn",))], 35.0, FB_LITERAL)
         self.assertEqual(p.deductions, ((1, 50.0),))
         self.assertIn("other_district 50 ft on 1 side", p.summary)
         self.assertIn(adj.FAIRBURN_LITERAL, p.lines)
@@ -302,11 +315,12 @@ class PlanTests(unittest.TestCase):
     def test_fairburn_own_zoning_change_recomputes(self):
         rows = [row(1, district="M-2", jurisdictions=("fairburn",)),
                 row(2, district="M-1", jurisdictions=("fairburn",))]
-        self.assertEqual(plan(FB1, rows, 35.0).deductions, ((1, 50.0),))
-        self.assertEqual(plan(FB2, rows, 40.0).deductions, ((2, 50.0),))
+        self.assertEqual(plan(FB1, rows, 35.0, FB_LITERAL).deductions, ((1, 50.0),))
+        self.assertEqual(plan(FB2, rows, 40.0, FB_LITERAL).deductions, ((2, 50.0),))
 
     def test_other_jurisdiction_is_another_district(self):
-        p = plan(FB1, [row(1, district="M-1", jurisdictions=("south_fulton",))], 35.0)
+        p = plan(FB1, [row(1, district="M-1", jurisdictions=("south_fulton",))], 35.0,
+                 FB_LITERAL)
         self.assertEqual(p.deductions, ((1, 50.0),))
 
     def test_atlanta_buffer_within_setback(self):
@@ -334,7 +348,20 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(plan(SF, [row(1, fresh=False)], 40.0, SF_CLASSES).deductions, ())
         pd = stored("fairburn", "fairburn_zoning", "PD")
         self.assertEqual(plan(pd, [row(1)], 25.0).summary, adj.ADJ_NO_RULE)
-        self.assertEqual(plan(None, [row(1)], 25.0).summary, adj.ADJ_NO_RULE)
+
+    def test_unknown_district_is_never_no_rule(self):
+        """Review finding 1: no stored row, an unparsed or unlisted code, or no
+        rules: nothing was checked, so the text never says 'none listed'."""
+        unlisted = stored("fairburn", "fairburn_zoning", "ZZ-9")
+        for st_ in (None, ("ZZ-9 unknown", None), unlisted):
+            for rows_ in ([], [row(1)]):
+                with self.subTest(stored=st_, rows=len(rows_)):
+                    p = plan(st_, rows_, 25.0)
+                    self.assertEqual((p.summary, p.deductions), (adj.ADJ_NO_DISTRICT, ()))
+        with mock.patch.object(adj, "_rules", return_value=None):
+            self.assertEqual(adj.plan_parcel("a", SF, [row(1)], 40.0).summary,
+                             adj.ADJ_RULES_UNAVAILABLE)
+        self.assertNotIn("none listed", adj.ADJ_NO_DISTRICT)
 
     def test_split_parcel(self):
         split = stored("south_fulton", "south_fulton_zoning", "M-1", split=True)
@@ -343,7 +370,7 @@ class PlanTests(unittest.TestCase):
         self.assertIn("adjacency unknown on internal district lines (split-zoned parcel)",
                       p.lines)
         fsplit = stored("fairburn", "fairburn_zoning", "M-1", split=True)
-        p = plan(fsplit, [row(1, district="M-2", jurisdictions=("fairburn",))], 35.0)
+        p = plan(fsplit, [row(1, district="M-2", jurisdictions=("fairburn",))], 35.0, FB_LITERAL)
         self.assertEqual(p.deductions, ())
         self.assertIn("other-district buffer not applied on 1 side (adjacency unknown "
                       "(split-zoned parcel))", p.lines)
@@ -373,10 +400,122 @@ class PlanTests(unittest.TestCase):
             self.assertNotIn("R-3", t)
 
     def test_strictest_wins_on_a_side_facing_two_classes(self):
-        rules = verified("fairburn", mutate=with_classes("fairburn", residential=["R-*"]))
+        rules = verified("fairburn", mutate=with_classes("fairburn", residential=["R-*"],
+                                                         readings=LITERAL))
         p = plan(FB1, [row(1, district="R-3", jurisdictions=("fairburn",))], 35.0, rules)
         self.assertEqual(p.deductions, ((1, 50.0),))
         self.assertIn("residential 50 ft on 1 side", p.summary)
+
+
+    def test_height_note_whenever_a_height_rule_exists(self):
+        """Review finding 9: a numeric height_based_extra_setback is named too."""
+        def numeric(data):
+            data["jurisdictions"]["union_city"]["districts"]["M-1"]["dimensions"][
+                "height_based_extra_setback"] = {"value": 12, "cite": "test"}
+        p = plan(UC, [row(1, jurisdictions=("union_city",))], 50.0,
+                 verified("union_city", mutate=numeric))
+        self.assertIn(adj.HEIGHT_NOT_APPLIED, p.lines)
+
+    def test_unreadable_neighbour_code_is_unknown(self):
+        """Review finding 10: 'UNKNOWN', 'TBD', 'N/A' are no district."""
+        for code in ("UNKNOWN", "TBD", "N/A", "?", " "):
+            with self.subTest(code=code):
+                p = plan(FB1, [row(1, district=code, jurisdictions=("fairburn",))], 35.0,
+                         FB_LITERAL)
+                self.assertEqual(p.deductions, ())
+                self.assertEqual((p.counts["code_unreadable"], p.counts["other_district"]),
+                                 (1, 0))
+                self.assertIn(f"1 side adjacency unknown ({adj.CODE_UNREADABLE})", p.summary)
+                self.assertFalse(any(adj.CLASS_TABLE_MISSING in x for x in p.lines))
+        self.assertFalse(adj.readable_code("TBD"))
+        self.assertTrue(adj.readable_code("R-4A"))
+
+    def test_fid_parcel_on_its_own_table(self):
+        """Review finding 12: an unincorporated FID parcel compares county
+        neighbours under the FID table too (same code = same district)."""
+        def unincorporated(data):
+            data["jurisdictions"]["fid"]["unincorporated_parcel_ids"] = ["a"]
+        rules = verified("south_fulton", "fid", mutate=chain(
+            unincorporated, with_classes("fid", residential=["R-*"], readings=MAX),
+            with_classes("south_fulton", non_residential=["R-4"], readings=MAX)))
+        fid_m1 = stored("fid", "fulton_layer34_zoning", "M-1")
+        with patch_rules(rules):
+            own = zoning.district_for_stored(*fid_m1, "a")
+        self.assertEqual((own.table_jurisdiction, own.district), ("fid", "M-1"))
+        p = plan(fid_m1, [row(1, district="M-1", jurisdictions=("south_fulton", "fid")),
+                       row(2, district="R-4", jurisdictions=("south_fulton", "fid"))],
+                 40.0, rules)
+        self.assertEqual(p.counts["same_district"], 1)
+        # classified under both tables; the strictest (FID: residential) wins
+        self.assertEqual(p.deductions, ((2, 110.0),))
+
+
+class ReadingTests(unittest.TestCase):
+    """Review finding 3: ambiguous readings are human switches in the rules
+    (neighbour_classes.readings), never defaulted in code."""
+
+    def test_fairburn_other_district_needs_the_reading(self):
+        rows = [row(1, district="M-2", jurisdictions=("fairburn",))]
+        for rules in (None, verified("fairburn", mutate=with_classes("fairburn")),
+                      verified("fairburn", mutate=with_classes(
+                          "fairburn", readings={"other_district": "everything"}))):
+            p = plan(FB1, rows, 35.0, rules)
+            self.assertEqual(p.deductions, ())
+            self.assertIn("other-district buffer not applied on 1 side (which other districts: "
+                          f"{adj.READING_UNDECIDED})", p.lines)
+            self.assertNotIn(adj.FAIRBURN_LITERAL, p.lines)
+            self.assertEqual(p.counts["other_undecided"], 1)
+
+    def test_fairburn_non_industrial_reading(self):
+        rules = verified("fairburn", mutate=with_classes(
+            "fairburn", non_residential=["C-1"], industrial=["M-*"],
+            readings={"other_district": "non_industrial"}))
+        rows = [row(1, district="M-2", jurisdictions=("fairburn",)),
+                row(2, district="C-1", jurisdictions=("fairburn",)),
+                row(3, district="PD", jurisdictions=("fairburn",))]
+        p = plan(FB1, rows, 35.0, rules)
+        self.assertEqual(p.deductions, ((2, 50.0),))
+        self.assertIn(adj.FAIRBURN_NON_INDUSTRIAL, p.lines)
+        self.assertIn("other-district buffer not applied on 1 side (industrial neighbour)",
+                      p.lines)
+        self.assertIn("other-district buffer not applied on 1 side (neighbour district not "
+                      "classified in the rules)", p.lines)
+
+    def test_side_rear_needs_the_reading(self):
+        no_reading = verified("south_fulton", mutate=with_classes(
+            "south_fulton", residential=["R-*"]))
+        p = plan(SF, [row(1, district="R-3")], 40.0, no_reading)
+        self.assertEqual(p.deductions, ())
+        self.assertIn("residential/agricultural buffer not applied on 1 side (side/rear "
+                      f"{adj.READING_UNDECIDED})", p.lines)
+        side = verified("south_fulton", mutate=with_classes(
+            "south_fulton", residential=["R-*"], readings={"side_rear": "side"}))
+        p = plan(SF, [row(1, district="R-3")], 40.0, side)
+        self.assertEqual(p.deductions, ((1, 60.0),))      # side 50 + improvement 10
+        self.assertIn(adj.SIDE_APPLIED, p.lines)
+        self.assertNotIn(adj.REAR_APPLIED, p.lines)
+        p = plan(SF, [row(1, district="R-3")], 40.0, SF_CLASSES)
+        self.assertEqual(p.deductions, ((1, 110.0),))
+        self.assertIn(adj.REAR_APPLIED, p.lines)
+        self.assertIn(adj.STRIP_ENDS, p.lines)
+
+    def test_buffer_only_tables_need_no_side_rear_reading(self):
+        rules = verified("union_city", mutate=with_classes("union_city", residential=["R-*"]))
+        p = plan(UC, [row(1, district="R-2", jurisdictions=("union_city",))], 50.0, rules)
+        self.assertEqual(p.deductions, ((1, 95.0),))
+        atl = verified("atlanta", mutate=with_classes("atlanta", residential=["R-*"]))
+        p = plan(ATL, [row(1, district="R-4", jurisdictions=("atlanta",))], 40.0, atl)
+        self.assertEqual(p.counts["side_rear_undecided"], 0)   # side 20 == rear 20
+
+    def test_reading_requires_a_wellformed_table(self):
+        def bad(data):
+            data["jurisdictions"]["fairburn"]["neighbour_classes"] = {
+                "readings": {"other_district": "literal"}}      # no cite
+        with patch_rules(verified("fairburn", mutate=bad)):
+            self.assertIsNone(adj.reading("fairburn", adj.READING_OTHER))
+        with patch_rules(FB_LITERAL):
+            self.assertEqual(adj.reading("fairburn", adj.READING_OTHER), "literal")
+            self.assertIsNone(adj.reading("fairburn", adj.READING_SIDE_REAR))
 
 
 class StaticTests(unittest.TestCase):
@@ -433,7 +572,12 @@ class StaticTests(unittest.TestCase):
         self.assertEqual(adj.ABUT_TOL_FT, 20.0)
         self.assertEqual((adj.MIN_SLIVER_WIDTH_FT, adj.MIN_OVERLAP_AREA_SF,
                           adj.MIN_SEGMENT_LEN_FT), (3.0, 50.0, 10.0))
-        self.assertAlmostEqual(adj.OCTAGON_FACTOR, 1.0823922, places=6)
+        self.assertEqual((adj.QUAD_SEGS, adj.VERTEX_QUAD_SEGS), (2, 16))
+        self.assertAlmostEqual(adj.VERTEX_FACTOR, 1.0012059, places=6)
+        # review finding 5: the vertex polygons overshoot d by under 0.5 ft
+        # at the largest buffer in the rules (110 ft).
+        self.assertLess(110.0 * (adj.VERTEX_FACTOR - 1.0), 0.5)
+        self.assertEqual(adj.MISALIGNMENT_ALLOWANCE_FT, 5.0)
         self.assertNotRegex((REPO_ROOT / "adjacency.py").read_text(), r"3857|900913")
 
     def test_read_sql_is_batched_and_fresh(self):

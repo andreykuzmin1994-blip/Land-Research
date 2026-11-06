@@ -1072,19 +1072,34 @@ def _buffer_values(setback: float, ids: Sequence[str]) -> dict[str, Any]:
             "tol": _SIMPLIFY_TOL_FT, "floor": _hz.NOISE_FLOOR_SF, "ids": list(ids)}
 
 
-# The deduction per parcel: every applied stored segment buffered by its own
-# distance (round caps and joins, quad_segs=2: inscribed arcs), unioned with
-# an octagon of circumradius distance * _adj.OCTAGON_FACTOR around each of
-# its vertices, which contains the circle of that radius. The union holds
-# every point within the distance of the segment (exact on straight sides),
-# so a fitted envelope never comes closer than the distance (BUF-10).
+# The deduction per parcel (review findings 5 and 6): every applied stored
+# segment buffered by its own distance with FLAT ends and round joins
+# (quad_segs=2: inscribed arcs), so the buffer is a strip along the abutting
+# boundary part and never a disc past its ends; unioned with a polygon of
+# circumradius distance * _adj.VERTEX_FACTOR (VERTEX_QUAD_SEGS per quarter,
+# contains the circle of that radius, overshoots it by under 0.0013 x the
+# distance) at every interior vertex (the joins), at both ends of a closed
+# line, and at an end shared with another applied segment of the parcel (two
+# abutting parts meeting at a corner). So a fitted envelope never comes
+# closer than the distance to the strip of an abutting part (BUF-10), and the
+# deduction exceeds that strip by at most 0.14 ft at 110 ft.
 _ADJ_DEDUCTION = (
-    "SELECT pa.parcel_id, ST_Union(ST_Union("
-    "ST_Buffer(pa.segment, d.dist, 'quad_segs=2'), "
-    "ST_Buffer(ST_Points(pa.segment), d.dist * {octagon}::float8, 'quad_segs=2'))) AS ad "
-    "FROM unnest({adj_ids}::bigint[], {adj_dists}::float8[]) AS d(adjacency_id, dist) "
-    "JOIN parcel_adjacency pa ON pa.adjacency_id = d.adjacency_id "
-    "GROUP BY pa.parcel_id"
+    "WITH ad_rows AS (SELECT pa.parcel_id, pa.adjacency_id, pa.segment, x.dist "
+    "FROM unnest({adj_ids}::bigint[], {adj_dists}::float8[]) AS x(adjacency_id, dist) "
+    "JOIN parcel_adjacency pa ON pa.adjacency_id = x.adjacency_id), "
+    "ad_lines AS (SELECT r.parcel_id, r.adjacency_id, r.dist, dl.path[1] AS part, "
+    "dl.geom AS line FROM ad_rows r CROSS JOIN LATERAL ST_Dump(r.segment) dl), "
+    "ad_points AS (SELECT l.parcel_id, l.dist, dp.geom AS pt FROM ad_lines l "
+    "CROSS JOIN LATERAL ST_DumpPoints(l.line) dp "
+    "WHERE (dp.path[1] > 1 AND dp.path[1] < ST_NPoints(l.line)) OR ST_IsClosed(l.line) "
+    "OR EXISTS (SELECT 1 FROM ad_lines o WHERE o.parcel_id = l.parcel_id "
+    "AND (o.adjacency_id <> l.adjacency_id OR o.part <> l.part) "
+    "AND ST_DWithin(o.line, dp.geom, 0.01))) "
+    "SELECT parcel_id, ST_Union(g) AS ad FROM ("
+    "SELECT parcel_id, ST_Buffer(segment, dist, 'endcap=flat join=round quad_segs=2') AS g "
+    "FROM ad_rows UNION ALL "
+    "SELECT parcel_id, ST_Buffer(pt, dist * {vertex_factor}::float8, 'quad_segs=16') "
+    "FROM ad_points) u GROUP BY parcel_id"
 )
 _ADJ_OUT_COLS = ", flood_state, wet_state, hz_sf, has_sg, has_wg, nfhl_gap"
 
@@ -1137,7 +1152,7 @@ def _buffered_params_adj(setback: float, ids: Sequence[str], hazards: bool,
                          deductions: Sequence[tuple[int, float]]) -> tuple:
     """Parameters of the adjacency statement, by name."""
     values = _buffer_values(setback, ids)
-    values.update({"octagon": _adj.OCTAGON_FACTOR,
+    values.update({"vertex_factor": _adj.VERTEX_FACTOR,
                    "adj_ids": [int(a) for a, _ in deductions],
                    "adj_dists": [float(d) for _, d in deductions]})
     return _named_params(_BUFFERED_HAZARDS_ADJ_NAMES if hazards else _BUFFERED_ADJ_NAMES,

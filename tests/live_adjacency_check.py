@@ -20,9 +20,9 @@ disk changes. Neighbour polygons are synthetic, in EPSG:2240 feet, handed to
       no buffer, side unknown);
   (c) BUF-04 polygon gap / uncovered city / county line: the side reads
       'adjacency unknown', nothing deducted;
-  (d) BUF-10 L-shape, hole bordered by residential, multipart: every fitted
-      envelope is at least the distance from the residential segments
-      (exact ST_Distance on the result);
+  (d) BUF-10 L-shape, hole bordered by residential, multipart: no fitted
+      envelope enters the exact strip (flat ends, round joins, 64 segments
+      per quarter) of the residential segments;
   (e) BUF-14 Fairburn M-1 next to M-2: 50 ft with the literal-reading label;
       'M1' and own-district polygons are not 'other district'; own zoning
       changed to M-2 recomputes at read time (BUF-13); BUF-17 split parcel;
@@ -31,7 +31,17 @@ disk changes. Neighbour polygons are synthetic, in EPSG:2240 feet, handed to
   (h) BUF-11 2x2 matrix hazards on/off x adjacency on/off on one parcel; the
       adjacency-on/empty ring text equals adjacency-off;
   (i) BUF-06 no parcel gains buildable or building SF with the gate on;
-  (j) BUF-12 the runner's adjacency audit raises on a row change.
+  (j) BUF-12 the runner's adjacency audit raises on a row change, and on a
+      delete-and-restore of every row with the same ids (xmin);
+  (k) review finding 4: one R-3 polygon solid along the north side and a
+      1 ft R-3 strip along the south side: only the north side is stored;
+  (l) review finding 7: own M-1 digitised 14 ft past the lot line (a street
+      centreline), R-3 beyond it: no R-3 row, nothing deducted;
+  (m) review finding 6: R-3 along the west half of the north side only:
+      buildable 846,400 - 460 x 70 = 814,200 SF (flat ends, no disc past the
+      end of the abutting part);
+  (n) review finding 5: every applied deduction covers the exact strip of
+      its distance and lies within 0.5 ft of it.
 
 Refuses unless the DSN points at a local server (tests/live_txn_check.py's
 guard). Exit 0 = pass, 1 = fail, 2 = refused.
@@ -75,6 +85,20 @@ _SQL_MIN_DIST = (
     "SELECT MIN(ST_Distance(ST_GeomFromText(%s, 2240), a.segment)) FROM parcel_adjacency a "
     "WHERE a.parcel_id = %s AND a.neighbour_district = %s"
 )
+# The exact strip (flat ends, round joins, 64 segments per quarter) of the
+# rows of one district, shrunk by 0.02 ft: an envelope must not enter it.
+_SQL_IN_STRIP = (
+    "SELECT COALESCE(bool_or(ST_Intersects(ST_GeomFromText(%s, 2240), ST_Buffer(a.segment, "
+    "%s::float8, 'endcap=flat join=round quad_segs=64'))), false) FROM parcel_adjacency a "
+    "WHERE a.parcel_id = %s AND a.neighbour_district = %s"
+)
+_SQL_RESTORE_ALL = (
+    "CREATE TEMP TABLE adj_copy AS SELECT * FROM parcel_adjacency; "
+    "DELETE FROM parcel_adjacency; INSERT INTO parcel_adjacency SELECT * FROM adj_copy; "
+    "DROP TABLE adj_copy"
+)
+_SQL_ROW_IDS = ("SELECT adjacency_id FROM parcel_adjacency WHERE parcel_id = %s AND "
+                "neighbour_district = %s ORDER BY adjacency_id")
 _SQL_SHIFT = ("UPDATE parcels SET geometry = ST_Translate(geometry, 0.00001, 0) "
               "WHERE parcel_id = %s")
 _SQL_SET_ZONING = "UPDATE parcels SET zoning = %s, zoning_description = %s WHERE parcel_id = %s"
@@ -232,6 +256,27 @@ def fixture(conn: Any) -> tuple[dict[str, str], list[Any]]:
     parcels["la-STALE"] = (w, sf("M-1"))
     sfz += [("R-3", rect(x - 300, y + 1000, x + 1300, y + 1600)),
             ("M-1", rect(x - 300, y - 300, x + 1300, y + 1000))]
+    # (k) MIXSLV: R-3 solid north, a 1 ft R-3 strip along the south lot line,
+    # own M-1 beyond the strip and on the east and west.
+    x, y, w = square(12)
+    parcels["la-MIXSLV"] = (w, sf("M-1"))
+    sfz += [("R-3", rect(x - 300, y + 1000, x + 1300, y + 1600)),
+            ("R-3", rect(x, y - 1, x + 1000, y)),
+            ("M-1", rect(x - 300, y - 300, x + 1300, y - 1)),
+            ("M-1", rect(x - 300, y - 1, x, y + 1000)),
+            ("M-1", rect(x + 1000, y - 1, x + 1300, y + 1000))]
+    # (l) CL: own M-1 digitised to a street centreline 14 ft north of the lot
+    # line, R-3 beyond it.
+    x, y, w = square(13)
+    parcels["la-CL"] = (w, sf("M-1"))
+    sfz += [("M-1", rect(x - 300, y - 300, x + 1300, y + 1014)),
+            ("R-3", rect(x - 300, y + 1014, x + 1300, y + 1600))]
+    # (m) PART: R-3 along the west half of the north side only.
+    x, y, w = square(14)
+    parcels["la-PART"] = (w, sf("M-1"))
+    sfz += [("R-3", rect(x - 300, y + 1000, x + 500, y + 1600)),
+            ("M-1", rect(x + 500, y + 1000, x + 1300, y + 1600)),
+            ("M-1", rect(x - 300, y - 300, x + 1300, y + 1000))]
     with conn.cursor() as cur:
         for pid, (w, (z, d)) in parcels.items():
             cur.execute(_SQL_INSERT_FT, (pid, 23.0, w, w, z, d))
@@ -264,7 +309,7 @@ def synthetic(conn: Any, res: Results) -> None:
     import site_fit
     import zoning
     import runner
-    from adjacency_helpers import chain, enabled, with_classes
+    from adjacency_helpers import LITERAL, MAX, chain, enabled, with_classes
     from zoning_helpers import patch_rules, verified
     geo, sources = fixture(conn)
     ids = sorted(geo)
@@ -279,9 +324,11 @@ def synthetic(conn: Any, res: Results) -> None:
               and sum(r[2] for r in sq if r[1] == "M-1") == 3000.0 and
               not any(r[0] == "uncovered" for r in sq),
               f"(a) SQ rows: R-3 north 1,000 ft, own M-1 3,000 ft, nothing unknown ({sq})")
-    classes = chain(with_classes("south_fulton", residential=["R-*", "AG-1"]),
+    # The human's reading switches (in memory only): rear value on every
+    # side, Fairburn Sec. 80-372 literally.
+    classes = chain(with_classes("south_fulton", residential=["R-*", "AG-1"], readings=MAX),
                     with_classes("atlanta", residential=["R-*"]),
-                    with_classes("fairburn", residential=["R-*"]))
+                    with_classes("fairburn", residential=["R-*"], readings=LITERAL))
     real = verified("south_fulton", "fairburn", "atlanta")
     table = verified("south_fulton", "fairburn", "atlanta", mutate=classes)
     site_fit._FIT_CACHE.clear()
@@ -329,15 +376,17 @@ def synthetic(conn: Any, res: Results) -> None:
         p = on[pid]
         po = off_t[pid]
         ok_fits = [f for f in p.fits if f.fits]
-        dmin = None
+        dmin, entered = None, False
         with conn.cursor() as cur:
             for f in ok_fits:
                 cur.execute(_SQL_MIN_DIST, (envelope_wkt(p, f), pid, "R-3"))
                 d = float(cur.fetchone()[0])
                 dmin = d if dmin is None else min(dmin, d)
-        res.check(p.buildable_sf < po.buildable_sf and (dmin is None or dmin >= dist - 0.02),
-                  f"(d) BUF-10 {pid}: buildable {p.buildable_sf} < {po.buildable_sf}; "
-                  f"every envelope >= {dist:g} ft from R-3 (min {dmin})")
+                cur.execute(_SQL_IN_STRIP, (envelope_wkt(p, f), dist - 0.02, pid, "R-3"))
+                entered = entered or bool(cur.fetchone()[0])
+        res.check(p.buildable_sf < po.buildable_sf and ok_fits and not entered,
+                  f"(d) BUF-10 {pid}: buildable {p.buildable_sf} < {po.buildable_sf}; no "
+                  f"envelope enters the {dist:g} ft strip of R-3 (min distance {dmin})")
     fbp = on["la-FB"]
     res.check("other_district 50 ft on 1 side" in fbp.adjacency
               and adjacency.FAIRBURN_LITERAL in fbp.constraints
@@ -434,6 +483,65 @@ def synthetic(conn: Any, res: Results) -> None:
         except runner.AdjacencyAuditFailed:
             raised = True
     res.check(ok and raised, "(j) BUF-12 runner audit: unchanged passes, a row change raises")
+    with enabled():
+        fp = runner._adjacency_fingerprint(conn)
+        with conn.cursor() as cur:
+            cur.execute(_SQL_DUMP)
+            before = cur.fetchall()
+            cur.execute(_SQL_RESTORE_ALL)
+        conn.commit()
+        with conn.cursor() as cur:
+            cur.execute(_SQL_DUMP)
+            same = cur.fetchall() == before
+        try:
+            runner._adjacency_audit(conn, fp)
+            raised = False
+        except runner.AdjacencyAuditFailed:
+            raised = True
+    res.check(same and raised, "(j) review finding 2: delete-and-restore with the same ids and "
+                               "fetched_at raises (row text identical, xmin differs)")
+    # (k) a thin strip of a district that is solid elsewhere is a sliver.
+    mx = rows(conn, "la-MIXSLV")
+    res.check([r[2] for r in mx if r[1] == "R-3"] == [1000.0]
+              and abs(on["la-MIXSLV"].buildable_sf - 920 * 850) <= 1,
+              f"(k) finding 4: 1 ft R-3 strip on the south not stored, north found; buildable "
+              f"{on['la-MIXSLV'].buildable_sf} == 782,000 ({mx})")
+    # (l) a neighbour beyond 14 ft of the own district does not abut.
+    cl = rows(conn, "la-CL")
+    res.check(not any(r[1] == "R-3" for r in cl)
+              and abs(on["la-CL"].buildable_sf - 920 * 920) <= 1,
+              f"(l) finding 7: own M-1 to a 14 ft centreline, R-3 beyond: no R-3 row, nothing "
+              f"deducted ({on['la-CL'].buildable_sf}; {cl})")
+    # (m) flat ends.
+    pt = on["la-PART"]
+    res.check(abs(pt.buildable_sf - (920 * 920 - 460 * 70)) <= 1
+              and adjacency.STRIP_ENDS in pt.constraints,
+              f"(m) finding 6: R-3 on the west half of the north side: buildable "
+              f"{pt.buildable_sf} == 814,200 (flat ends), named")
+    # (n) tolerance of the deduction: covers the exact strip, within 0.5 ft.
+    sql, names = site_fit._compile(site_fit._ADJ_DEDUCTION)
+    bad = []
+    with conn.cursor() as cur:
+        for pid in ("la-SQ", "la-LSH", "la-HOLE", "la-MULTI", "la-PART", "la-MIXSLV"):
+            cur.execute(_SQL_ROW_IDS, (pid, "R-3"))
+            rid = [int(r[0]) for r in cur.fetchall()]
+            params = site_fit._named_params(names, {
+                "adj_ids": rid, "adj_dists": [110.0] * len(rid),
+                "vertex_factor": adjacency.VERTEX_FACTOR})
+            cur.execute(
+                "WITH ded AS (" + sql + ") SELECT ST_Covers(ST_Buffer(d.ad, 0.001), s.inner_s), "
+                "ST_Covers(s.outer_s, d.ad), ST_HausdorffDistance(d.ad, s.exact) FROM ded d, "
+                "(SELECT ST_Union(ST_Buffer(segment, 109.99, 'endcap=flat join=round "
+                "quad_segs=64')) AS inner_s, ST_Union(ST_Buffer(segment, 110.5, "
+                "'quad_segs=64')) AS outer_s, ST_Union(ST_Buffer(segment, 110.0, "
+                "'endcap=flat join=round quad_segs=64')) AS exact FROM parcel_adjacency "
+                "WHERE adjacency_id = ANY(%s)) s", params + (rid,))
+            cov, within, haus = cur.fetchone()
+            if not (cov and within):
+                bad.append((pid, cov, within, haus))
+    res.check(not bad, f"(n) finding 5: every deduction covers its exact 110 ft strip (to "
+                       f"0.001 ft) and lies within 0.5 ft of the segment's 110 ft buffer "
+                       f"({bad or 'all'})")
 
 
 def main(argv: list[str] | None = None, environ: Any = os.environ) -> int:
