@@ -1,0 +1,383 @@
+{
+  "_comment": "Registry edits for the OPERATOR to apply by hand to rules_sources.json (human-owned; the agent never edits it), then commit. Written by the reviews/24_rules_local_files change and validated only on a throwaway copy (tests/test_rules_local_files.py, RegistryPatchTests). How to apply: see 00_design.md 'Registry patch'. Every new local_file source ships enabled:false with '<OPERATOR: ...>' placeholders: the tool refuses an enabled local_file whose title, obtained_from or obtained_on is a placeholder. Before enabling, drop the file into rules_inbox/ at the given path, fill the placeholders, and re-derive every start/end marker, label and column header from the actual file (the ones given are the mirror's and may not match official text).",
+  "base_registry_sha256": "e1fe19831fe7013237b1edfcc0569fdf8f89ffe0cf55df8f94c9bc76317bc638",
+  "disable_sources": [
+    "sf_ch4_mirror",
+    "sf_ch2_mirror",
+    "fairburn_ch2_mirror",
+    "atl_i1_mirror",
+    "atl_i2_mirror",
+    "ep_ch3_mirror",
+    "hap_chart_mirror",
+    "cp_ch3_mirror"
+  ],
+  "set_hosts": {
+    "www.zoneomics.com": {
+      "terms_url": "https://www.zoneomics.com/terms-of-use",
+      "terms_reviewed_by": null,
+      "terms_reviewed_on": null,
+      "note": "Third-party mirror. Operator finding: the Terms of Use (last revised November 2020) bind every visitor 'whether or not you are a registered user' and prohibit using 'any robot, spider or other automatic device, process or means to access the Website for any purpose' and 'any manual process to monitor or copy any of the material on the Website'; the Subscription Service Agreement bans automated or non-automated scraping of Zoneomics Data. rules_scrape.py blocks this host in code (TERMS_BLOCKED_DOMAINS); review fields cannot lift the block. <OPERATOR SIGNS> if you want the review on record."
+    },
+    "www.fultoncountyga.gov": {
+      "terms_url": null,
+      "terms_reviewed_by": null,
+      "terms_reviewed_on": null,
+      "note": "Official Fulton County site (Zoning Resolution PDFs with a text layer). Proposed review text: 'reviewed: no terms page found; public government document'. NOT CHECKED BY THE AGENT. <OPERATOR SIGNS>: look for a footer 'Terms', 'Terms of Use', 'Disclaimer' or 'Site Policies' link before filling terms_reviewed_by / terms_reviewed_on."
+    },
+    "www.unioncityga.gov": {
+      "terms_url": null,
+      "terms_reviewed_by": null,
+      "terms_reviewed_on": null,
+      "note": "Official Union City site, behind Akamai (403 to the survey on 2026-11-05). Proposed review text: 'reviewed: no terms page found; public government document'. NOT CHECKED BY THE AGENT. <OPERATOR SIGNS>: look for a footer 'Terms', 'Disclaimer' or 'Site Policies' link (Granicus/OpenCities sites often carry one) and any Akamai bot policy before filling terms_reviewed_by / terms_reviewed_on."
+    }
+  },
+  "set_jurisdiction_notes": {
+    "south_fulton": "Official UDO text from a local file the operator obtained (rules_inbox/south_fulton/). The mirror source is disabled: its terms prohibit automated access.",
+    "fairburn": "Official Chapter 80 text from a local file the operator obtained (rules_inbox/fairburn/). The official code is on Municode (never fetched); the mirror source is disabled: its terms prohibit automated access.",
+    "atlanta": "Out of scope (operator decision): no source; stays draft. The mirror sources are disabled: its terms prohibit automated access.",
+    "east_point": "No source: the mirror source is disabled (its terms prohibit automated access). Values in zoning_rules.json stay mirror-cited until a human re-cites them.",
+    "hapeville": "No source: the mirror source is disabled (its terms prohibit automated access). Values in zoning_rules.json stay mirror-cited until a human re-cites them.",
+    "college_park": "No source: the mirror source stays disabled (its terms prohibit automated access)."
+  },
+  "add_sources": {
+    "south_fulton": [
+      {
+        "key": "sf_udo_table41_local",
+        "kind": "local_file",
+        "enabled": false,
+        "path": "south_fulton/udo.html",
+        "format": "html",
+        "source_class": "official",
+        "parser": "district_grid",
+        "title": "<OPERATOR: document title, e.g. City of South Fulton Unified Development Ordinance, supplement or adoption date>",
+        "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
+        "obtained_on": "<OPERATOR: YYYY-MM-DD>",
+        "sha256": "record on first use",
+        "note": "Sec. 403 / Table 4-1. Starting point: the mirror's markers and column headers. Re-derive start/end and the header paths from the official file before enabling. If the file is a PDF, a merged-header table like this one is not read deterministically: register it as format pdf with parser llm_prose (or an --assisted records file) instead.",
+        "sections": [
+          {
+            "id": "table_4_1",
+            "label": "Sec. 403 / Table 4-1 (Area Regulations for Lots and Principal Buildings)",
+            "start": "Table 4-1 Area Regulations for Lots and Principal Buildings",
+            "end": "Sec. 404.01. - R-5 single-family district.",
+            "pick": "last",
+            "districts": [
+              "M-1",
+              "M-2",
+              "AG-1"
+            ],
+            "config": {
+              "header_rows": 3,
+              "district_header": "Zoning District",
+              "columns": [
+                {
+                  "header": "Lot Area (minimum acres or square feet)",
+                  "field": "min_lot_area_sqft",
+                  "unit": "sqft"
+                },
+                {
+                  "header": "Setbacks (minimum feet) / Front / To lot line",
+                  "field": "front_setback_ft",
+                  "unit": "ft"
+                },
+                {
+                  "header": "Setbacks (minimum feet) / Side",
+                  "field": "side_setback_ft",
+                  "unit": "ft"
+                },
+                {
+                  "header": "Setbacks (minimum feet) / Rear",
+                  "field": "rear_setback_ft",
+                  "unit": "ft"
+                },
+                {
+                  "header": "Lot Width (minimum feet)",
+                  "field": "min_lot_width_ft",
+                  "unit": "ft"
+                },
+                {
+                  "header": "Lot Frontage (minimum feet)",
+                  "field": "min_lot_frontage_ft",
+                  "unit": "ft"
+                },
+                {
+                  "header": "Height (maximum feet)",
+                  "field": "max_height_ft",
+                  "unit": "ft"
+                },
+                {
+                  "header": "Lot Coverage (maximum percent)",
+                  "field": "max_lot_coverage_pct",
+                  "unit": "pct"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "sf_udo_table24_local",
+        "kind": "local_file",
+        "enabled": false,
+        "path": "south_fulton/udo.html",
+        "format": "html",
+        "source_class": "official",
+        "parser": "use_table",
+        "title": "<OPERATOR: document title, e.g. City of South Fulton Unified Development Ordinance, supplement or adoption date>",
+        "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
+        "obtained_on": "<OPERATOR: YYYY-MM-DD>",
+        "sha256": "record on first use",
+        "note": "Sec. 207.06 / Table 2-4. Same file as sf_udo_table41_local. Re-derive the markers, the use header, the row patterns and the legend from the official file. A PDF copy needs llm_prose or --assisted.",
+        "sections": [
+          {
+            "id": "table_2_4",
+            "label": "Sec. 207.06 / Table 2-4 (Principal Use Table: Non-Residential Districts)",
+            "start": "Table 2-4 Principal Use Table: Non-Residential Districts",
+            "end": "Table 2-5 Accessory and Temporary Use Table: Non-Residential Districts",
+            "pick": "last",
+            "districts": [
+              "M-1",
+              "M-2",
+              "AG-1"
+            ],
+            "config": {
+              "use_header": "Principal Uses",
+              "row_patterns": [
+                "Distribution Center",
+                "General Warehousing and Indoor Storage"
+              ],
+              "legend": {
+                "A": "permitted_by_right",
+                "S": "special_use_permit",
+                "": "not_permitted"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "key": "sf_udo_prose_local",
+        "kind": "local_file",
+        "enabled": false,
+        "path": "south_fulton/udo.html",
+        "format": "html",
+        "source_class": "official",
+        "parser": "llm_prose",
+        "title": "<OPERATOR: document title, e.g. City of South Fulton Unified Development Ordinance, supplement or adoption date>",
+        "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
+        "obtained_on": "<OPERATOR: YYYY-MM-DD>",
+        "sha256": "record on first use",
+        "note": "Prose sections: --llm or an --assisted records file. Markers and fields are placeholders; set them from the file.",
+        "sections": [
+          {
+            "id": "sec_405",
+            "label": "Sec. 405 (landscape strips and buffers, referenced from Table 4-1)",
+            "start": "<OPERATOR: re-derive from the file>",
+            "end": "<OPERATOR: re-derive from the file>",
+            "config": {
+              "fields": [
+                "side_setback_ft",
+                "rear_setback_ft"
+              ]
+            },
+            "districts": [
+              "M-1",
+              "M-2"
+            ]
+          },
+          {
+            "id": "sec_510",
+            "label": "Sec. 510 (as listed in the survey)",
+            "start": "<OPERATOR: re-derive from the file>",
+            "end": "<OPERATOR: re-derive from the file>",
+            "config": {
+              "fields": [
+                "side_setback_ft",
+                "rear_setback_ft",
+                "max_height_ft"
+              ]
+            },
+            "districts": [
+              "M-1",
+              "M-2"
+            ]
+          }
+        ]
+      }
+    ],
+    "fairburn": [
+      {
+        "key": "fairburn_ch80_standards_local",
+        "kind": "local_file",
+        "enabled": false,
+        "path": "fairburn/chapter80.html",
+        "format": "html",
+        "source_class": "official",
+        "parser": "label_value",
+        "title": "<OPERATOR: document title, e.g. City of Fairburn Code of Ordinances, Chapter 80 Zoning, supplement date>",
+        "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
+        "obtained_on": "<OPERATOR: YYYY-MM-DD>",
+        "sha256": "record on first use",
+        "note": "Sec. 80-85 (f)-(g) and Sec. 80-86 (f)-(g). Starting point: the mirror's markers and labels. Official text may punctuate headings differently ('Sec. 80-85. - ...' in a Municode export); re-derive start/end and labels from the file before enabling. A PDF copy works with label_value when each label and its value sit on one line.",
+        "sections": [
+          {
+            "id": "m1_standards",
+            "label": "Sec. 80-85(f)-(g) (M-1 development standards, building height and form)",
+            "start": [
+              "Sec. 80-85. - M-1—Light Industrial Zoning District.",
+              "M-1—Development standards."
+            ],
+            "end": "M-1—Design standards.",
+            "district": "M-1",
+            "config": {
+              "labels": [
+                {
+                  "label": "Minimum front yard setback",
+                  "field": "front_setback_ft"
+                },
+                {
+                  "label": "Minimum side yard setback",
+                  "field": "side_setback_ft"
+                },
+                {
+                  "label": "Minimum rear yard setback",
+                  "field": "rear_setback_ft"
+                },
+                {
+                  "label": "Minimum lot area",
+                  "field": "min_lot_area_sqft"
+                },
+                {
+                  "label": "Minimum width of lot frontage or width at building line",
+                  "field": "min_lot_frontage_ft"
+                },
+                {
+                  "label": "Maximum height",
+                  "field": "max_height_ft"
+                },
+                {
+                  "label": "Maximum lot coverage",
+                  "field": "max_lot_coverage_pct"
+                }
+              ]
+            }
+          },
+          {
+            "id": "m2_standards",
+            "label": "Sec. 80-86(f)-(g) (M-2 development standards, building height and form)",
+            "start": [
+              "Sec. 80-86. - M-2—Heavy Industrial Zoning District.",
+              "M-2—Development standards."
+            ],
+            "end": "M-2—Design standards.",
+            "district": "M-2",
+            "config": {
+              "labels": [
+                {
+                  "label": "Minimum front yard setback",
+                  "field": "front_setback_ft"
+                },
+                {
+                  "label": "Minimum side yard setback",
+                  "field": "side_setback_ft"
+                },
+                {
+                  "label": "Minimum rear yard setback",
+                  "field": "rear_setback_ft"
+                },
+                {
+                  "label": "Minimum lot area",
+                  "field": "min_lot_area_sqft"
+                },
+                {
+                  "label": "Minimum width of lot frontage or width at building line",
+                  "field": "min_lot_frontage_ft"
+                },
+                {
+                  "label": "Maximum height",
+                  "field": "max_height_ft"
+                },
+                {
+                  "label": "Maximum lot coverage",
+                  "field": "max_lot_coverage_pct"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "fairburn_ch80_prose_local",
+        "kind": "local_file",
+        "enabled": false,
+        "path": "fairburn/chapter80.html",
+        "format": "html",
+        "source_class": "official",
+        "parser": "llm_prose",
+        "title": "<OPERATOR: document title, e.g. City of Fairburn Code of Ordinances, Chapter 80 Zoning, supplement date>",
+        "obtained_from": "<OPERATOR: channel, e.g. City Clerk certified copy, or Municode export downloaded by operator>",
+        "obtained_on": "<OPERATOR: YYYY-MM-DD>",
+        "sha256": "record on first use",
+        "note": "Prose sections: --llm or an --assisted records file. Markers and fields are placeholders; set them from the file.",
+        "sections": [
+          {
+            "id": "sec_80_337",
+            "label": "Sec. 80-337 (as listed in the survey)",
+            "start": "<OPERATOR: re-derive from the file>",
+            "end": "<OPERATOR: re-derive from the file>",
+            "config": {
+              "fields": [
+                "side_setback_ft",
+                "rear_setback_ft"
+              ]
+            },
+            "districts": [
+              "M-1",
+              "M-2"
+            ]
+          },
+          {
+            "id": "sec_80_367",
+            "label": "Sec. 80-367 (as listed in the survey)",
+            "start": "<OPERATOR: re-derive from the file>",
+            "end": "<OPERATOR: re-derive from the file>",
+            "config": {
+              "fields": [
+                "side_setback_ft",
+                "rear_setback_ft"
+              ]
+            },
+            "districts": [
+              "M-1",
+              "M-2"
+            ]
+          },
+          {
+            "id": "sec_80_372",
+            "label": "Sec. 80-372 (as listed in the survey)",
+            "start": "<OPERATOR: re-derive from the file>",
+            "end": "<OPERATOR: re-derive from the file>",
+            "config": {
+              "fields": [
+                "side_setback_ft",
+                "rear_setback_ft"
+              ]
+            },
+            "districts": [
+              "M-1",
+              "M-2"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "optional_disable_change_signals": {
+    "_comment": "Operator's choice (LF-24): Atlanta is out of scope; these three layers cost about 17 requests to gis.atlantaga.gov per --watch/--flags run.",
+    "keys": [
+      "atl_rezoning_cases",
+      "atl_special_use_permits",
+      "atl_zoning_layer"
+    ]
+  }
+}
