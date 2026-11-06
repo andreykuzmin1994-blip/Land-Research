@@ -585,7 +585,8 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
     within: dict[tuple[str, float], int] = {}
     deductions: list[tuple[int, float]] = []
     c = {"sides": 0, "same_district": 0, "unknown": 0, "class_unknown": 0,
-         "other_unknown": 0, "applied": 0, "within_setback": 0, "other_industrial": 0}
+         "other_unknown": 0, "applied": 0, "within_setback": 0, "other_industrial": 0,
+         RESIDENTIAL: 0, AGRICULTURAL: 0, OTHER_DISTRICT: 0, "split": int(split)}
     class_why: dict[str, int] = {}
     rear_used = False
     for r in rows:
@@ -611,11 +612,13 @@ def plan_parcel(parcel_id: str, stored: tuple[Any, Any] | None, rows: Sequence[R
                 c["other_unknown"] += 1
             else:
                 classes.add(OTHER_DISTRICT)
+                c[OTHER_DISTRICT] += 1
                 c["other_industrial"] += int(_looks_industrial_class(ids))
             if needed & {RESIDENTIAL, AGRICULTURAL}:
                 ncls, why = classify_neighbour(ids)
                 if ncls in (RESIDENTIAL, AGRICULTURAL):
                     classes.add(ncls)
+                    c[ncls] += 1
                 elif ncls is None:
                     c["class_unknown"] += 1
                     class_why[why] = class_why.get(why, 0) + 1

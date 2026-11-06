@@ -257,6 +257,7 @@ class PlanTests(unittest.TestCase):
         self.assertIn("residential 110 ft on 1 side", p.summary)
         self.assertIn(adj.REAR_APPLIED, p.lines)
         self.assertEqual(p.counts["same_district"], 1)
+        self.assertEqual((p.counts["residential"], p.counts["other_district"]), (1, 1))
         p = plan(SF, [row(3, district="AG-1")], 40.0, SF_CLASSES)
         self.assertEqual(p.deductions, ((3, 110.0),))
         self.assertIn("agricultural 110 ft on 1 side", p.summary)

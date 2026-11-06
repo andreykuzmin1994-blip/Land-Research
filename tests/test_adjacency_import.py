@@ -209,6 +209,15 @@ class FetchTests(unittest.TestCase):
         self.assertEqual(d.features, [])
         self.assertLessEqual(len(f.data_calls()), ai.MAX_REQUESTS_PER_SOURCE)
 
+    def test_mapserver_oid_field_by_type(self):
+        self.assertEqual(ai._oid_field({"objectIdField": "OBJECTID"}), "OBJECTID")
+        self.assertEqual(ai._oid_field({"fields": [{"name": "FID", "type": "esriFieldTypeOID"},
+                                                   {"name": "Z", "type": "esriFieldTypeString"}]}),
+                         "FID")
+        self.assertIsNone(ai._oid_field({"fields": [{"name": "Z"}]}))
+        self.assertIsNone(ai._oid_field({"fields": [{"name": "A", "type": "esriFieldTypeOID"},
+                                                    {"name": "B", "type": "esriFieldTypeOID"}]}))
+
     def test_join_layer_without_geometry_is_skipped_unknown(self):
         f, _, _ = fetcher(Layer(n=5, geometry=False, field="ZoningCurr"))
         d = ai.fetch_source(f, src("join", JOIN_URL, "ZoningCurr", "join_zoning"), BOXES)

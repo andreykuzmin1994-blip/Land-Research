@@ -250,6 +250,17 @@ def _in_area(rings: Any) -> bool:
     return True
 
 
+def _oid_field(meta: Mapping[str, Any]) -> str | None:
+    """The layer's object-id field: ``objectIdField`` (FeatureServer), else
+    the one field typed esriFieldTypeOID (MapServer layers list it only so)."""
+    oid = meta.get("objectIdField")
+    if isinstance(oid, str) and oid:
+        return oid
+    typed = [f.get("name") for f in meta.get("fields") or []
+             if isinstance(f, dict) and f.get("type") == "esriFieldTypeOID"]
+    return typed[0] if len(typed) == 1 and isinstance(typed[0], str) else None
+
+
 def fetch_source(f: AdjacencyFetcher, src: "zoning_import.ZoningSource",
                  bboxes: Sequence[Sequence[float]]) -> SourceData:
     """Every polygon of ``src`` around the parcels, or a failed/skipped source."""
@@ -267,7 +278,7 @@ def fetch_source(f: AdjacencyFetcher, src: "zoning_import.ZoningSource",
                 data.requests = b.used()
                 return data
             raise SourceError(f"{host}: not a polygon layer")
-        oid_field = meta.get("objectIdField")
+        oid_field = _oid_field(meta)
         if not (isinstance(oid_field, str) and zoning_import._FIELD_RE.match(oid_field)):
             raise SourceError(f"{host}: layer has no object-id field")
         mrc = meta.get("maxRecordCount")
