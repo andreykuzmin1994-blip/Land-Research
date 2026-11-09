@@ -146,7 +146,8 @@ HUMAN_OWNED = ("zoning_rules.json", "building_prototypes.json", "sources.json",
 PROTECTED_MODULES = ("prepare.py", "research.py", "runner.py", "costar_ingest.py",
                      "costar_import.py", "reporting.py", "pipeline_common.py", "zoning.py",
                      "zoning_import.py", "site_fit.py", "rules_scrape.py", "cli.py",
-                     "connector_harness.py")
+                     "connector_harness.py", "hazards.py", "hazards_import.py",
+                     "adjacency.py", "adjacency_import.py")
 
 # --- HTTP identity and politeness (SR-11, RS-05) ---------------------------
 USER_AGENT = ("Land-Research-RulesScrape/1.0 (between-runs zoning-code reader; "

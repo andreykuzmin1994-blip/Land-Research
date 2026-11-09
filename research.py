@@ -17,7 +17,11 @@ Python file the agent edits while the experiment loop is active. The agent:
     - never modifies :mod:`site_fit`, never reads or writes the human-owned
       ``building_prototypes.json``, and gets building projections only from
       ``site_fit.project_parcel`` / ``project_parcels`` and tests them only
-      with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit).
+      with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit),
+    - never modifies :mod:`hazards` or ``hazards_import.py``, holds no flood
+      or wetland threshold, zone list or hazard SQL of its own, and gets the
+      H4/H6 verdicts only from ``hazards.assess_parcels`` behind
+      ``hazards.enabled()`` (reviews/26_flood_wetlands).
 
 ============================================================================
 WHAT LIVES HERE (post-split experiment surface)
@@ -127,6 +131,7 @@ import prepare  # noqa: F401 — re-exported intentionally for the agent.
 import connector_harness
 import zoning  # protected: rules facts + classifier (reviews/21_zoning)
 import site_fit  # protected: building projections (reviews/22_site_fit)
+import hazards  # protected: flood/wetland facts + H4/H6 decision (reviews/26_flood_wetlands)
 from pipeline_common import (
     _COSTAR_BASE_DIR,  # noqa: F401 — re-exported for backwards compatibility.
     _REPO_ROOT,
@@ -696,7 +701,14 @@ def _h3_flag(
 def _h4_flag(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H4 flood is unjoined — emit data_gap flag, parcel passes (R-23). Replace body in Phase 5+; preserve signature."""
+    """H4 flood is unjoined — emit data_gap flag, parcel passes (R-23). Replace body in Phase 5+; preserve signature.
+
+    reviews/26_flood_wetlands (FW-02): once a human enables the hazard table,
+    H4 is decided at SCORING (gate 4, protected hazards module), where the
+    metric reads; discovery then emits nothing for H4.
+    """
+    if hazards.enabled():
+        return _FilterResult("pass", "H4", "")
     return _FilterResult(
         "flag", "H4",
         "H4 flood unjoined: pending FEMA NFIP wiring (Phase 5+)",
@@ -716,7 +728,14 @@ def _h5_filter(
 def _h6_filter(
     parcel: Mapping[str, Any], conn: Any, params: Mapping[str, Any]
 ) -> _FilterResult:
-    """H6 wetlands is unjoined — emit data_gap flag, parcel passes (Phase 4 stub). Eventual implementation will read params['hard_filters']['wetlands_max_pct_of_parcel'] (default 20) and compute ST_Area(ST_Intersection(parcel,wetland))/ST_Area(parcel) against USGS NWI; replace body in Phase 5+, preserve signature."""
+    """H6 wetlands is unjoined — emit data_gap flag, parcel passes (Phase 4 stub); replace body in Phase 5+, preserve signature.
+
+    reviews/26_flood_wetlands (FW-02): once a human enables the hazard table,
+    H6 is decided at SCORING (gate 4, protected hazards module, threshold
+    from parameters.json); discovery then emits nothing for H6.
+    """
+    if hazards.enabled():
+        return _FilterResult("pass", "H6", "")
     return _FilterResult(
         "flag", "H6",
         "H6 wetlands unjoined: pending USGS NWI mapper wiring (Phase 5+)",
@@ -2169,6 +2188,20 @@ def _fetch_projection(
     return site_fit.project_parcel(conn, parcel_id)
 
 
+def _fetch_hazards(
+    conn: Any, parcel_id: str, *, cache: "_CycleCache | None" = None,
+) -> Any:
+    """reviews/26_flood_wetlands: the parcel's H4/H6 assessment, or None
+    while the hazard table is not enabled (no SQL then). Same logic on the
+    per-parcel and the cycle path (FW-02)."""
+    if not hazards.enabled():
+        return None
+    if cache is not None and cache.hazard_assessments is not None \
+            and parcel_id in cache.hazard_assessments:
+        return cache.hazard_assessments[parcel_id]
+    return hazards.assess_parcels(conn, [parcel_id]).get(parcel_id)
+
+
 def _fetch_stored_zoning(
     conn: Any, parcel_id: str, *, cache: "_CycleCache | None" = None,
 ) -> tuple[Any, Any] | None:
@@ -2402,6 +2435,9 @@ class _CycleCache:
     # reviews/22_site_fit: site_fit projections, prefetched ONLY for parcels
     # whose zoning jurisdiction is verified; None = not prefetched.
     projection: Mapping[str, Any] | None = None
+    # reviews/26_flood_wetlands: H4/H6 assessments, prefetched ONLY while the
+    # hazard table is enabled; None = not prefetched.
+    hazard_assessments: Mapping[str, Any] | None = None
 
 
 def _prefetch_cycle_cache(
@@ -2460,11 +2496,16 @@ def _prefetch_cycle_cache(
             if row[1] is not None:
                 actionability_block[row[0]] = str(row[1])
 
+    # reviews/26_flood_wetlands (FW-02, FW-03): one hazard read per cycle,
+    # ONLY while the hazard table is enabled (no SQL otherwise).
+    hazard = hazards.assess_parcels(conn, pid_list) if hazards.enabled() else None
+
     # reviews/21_zoning: zoning reads happen ONLY while at least one
     # jurisdiction's rules are verified; with all rules draft this cycle
     # issues exactly the queries it issued before zoning existed (Z-03).
     if not zoning.any_verified():
-        return _CycleCache(market_context, land_median, actionability_block)
+        return _CycleCache(market_context, land_median, actionability_block,
+                           hazard_assessments=hazard)
     stored_zoning: dict[str, tuple] = {}
     with conn.cursor() as cur:
         cur.execute(_SQL_STORED_ZONING_BATCH, (pid_list,))
@@ -2486,7 +2527,7 @@ def _prefetch_cycle_cache(
     projection = site_fit.project_parcels(conn, verified_ids) if verified_ids else {}
     return _CycleCache(market_context, land_median, actionability_block,
                        stored_zoning=stored_zoning, precedent=precedent,
-                       projection=projection)
+                       projection=projection, hazard_assessments=hazard)
 
 
 # ---------------------------------------------------------------------------
@@ -2883,11 +2924,16 @@ def _gate_strategy(strategy_fit: Mapping[str, str]) -> tuple[bool, str | None]:
     return False, "no strategy rated STRONG or MODERATE"
 
 
-def _gate_deal_killer(flag_block: str | None) -> tuple[bool, str | None]:
+def _gate_deal_killer(
+    flag_block: str | None, hazard_block: str | None = None,
+) -> tuple[bool, str | None]:
     """Gate 4 — no deal-killers (R-533). Default-PASS unless an open
-    actionability_block flag mentions a non-entitlement blocker."""
+    actionability_block flag mentions a non-entitlement blocker, or the
+    protected hazards module blocks H4/H6 (reviews/26_flood_wetlands)."""
     if flag_block and "entitlement" not in flag_block.lower():
         return False, f"actionability_block: {flag_block[:160]}"
+    if hazard_block:
+        return False, hazard_block
     return True, None
 
 
@@ -2923,6 +2969,7 @@ def _run_actionability_screen(
     sub_scores: Mapping[str, int | None],
     strategy_fit: Mapping[str, str],
     flag_block: str | None,
+    hazard_block: str | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Apply the 4 gates in order; return (verdict, blockers_dict).
 
@@ -2948,7 +2995,7 @@ def _run_actionability_screen(
         blockers["strategy"] = blocker
         return _ACTIONABILITY_FAIL_STRATEGY, blockers
 
-    ok, blocker = _gate_deal_killer(flag_block)
+    ok, blocker = _gate_deal_killer(flag_block, hazard_block)
     if not ok:
         blockers["deal_killer"] = blocker
         return _ACTIONABILITY_FAIL_DEAL_KILLER, blockers
@@ -3122,8 +3169,12 @@ def score_parcel(
         # R-533: synthetic deal-killer evidence from flagged_items.
         # R-1310: served from the per-cycle prefetch when cache is present.
         flag_block = _fetch_actionability_block(conn, parcel_id, cache=cache)
+        # reviews/26_flood_wetlands (FW-02): H4/H6 enforced where the metric
+        # reads, through gate 4; None (no SQL) while not enabled.
+        hazard = _fetch_hazards(conn, parcel_id, cache=cache)
         actionability, blockers = _run_actionability_screen(
             sub_scores, strategy_fit, flag_block,
+            hazard.blocker if hazard is not None else None,
         )
 
         notes = (
@@ -3198,6 +3249,21 @@ def score_parcel(
                             "between runs (reviews/22_site_fit)",
                             open_gaps, written,
                         )
+                # reviews/26_flood_wetlands (FW-04, FW-17): missing or stale
+                # hazard data is a data_gap; a review is its own flag type
+                # (no gate reads it), written once while it stays open.
+                if hazard is not None:
+                    for text in hazard.data_gaps:
+                        _flag_data_gap_once(
+                            conn, cycle_id, parcel_id, market_name, text,
+                            hazards.GAP_RESOLUTION, open_gaps, written,
+                        )
+                    for text in hazard.reviews:
+                        if text not in hazard.open_reviews:
+                            _flag(
+                                conn, cycle_id, parcel_id, market_name,
+                                hazards.REVIEW_FLAG_TYPE, text, hazards.REVIEW_RESOLUTION,
+                            )
                 # R-514: market_context staleness flag (informational only).
                 # The description names the as_of date, not the age in days,
                 # so the same stale row is one open flag, not one per day.

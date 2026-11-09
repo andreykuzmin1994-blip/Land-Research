@@ -24,6 +24,7 @@ on:
       - 'tests/test_postgis_smoke.py'
       - 'tests/live_txn_check.py'
       - 'tests/live_submarket_check.py'
+      - 'tests/live_building_comps_check.py'
       - 'costar_import.py'
       - 'zoning.py'
       - 'zoning_import.py'
@@ -32,6 +33,12 @@ on:
       - 'site_fit.py'
       - 'building_prototypes.json'
       - 'tests/live_site_fit_check.py'
+      - 'hazards.py'
+      - 'hazards_import.py'
+      - 'tests/live_hazards_check.py'
+      - 'adjacency.py'
+      - 'adjacency_import.py'
+      - 'tests/live_adjacency_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -48,6 +55,7 @@ on:
       - 'tests/test_postgis_smoke.py'
       - 'tests/live_txn_check.py'
       - 'tests/live_submarket_check.py'
+      - 'tests/live_building_comps_check.py'
       - 'costar_import.py'
       - 'zoning.py'
       - 'zoning_import.py'
@@ -56,6 +64,12 @@ on:
       - 'site_fit.py'
       - 'building_prototypes.json'
       - 'tests/live_site_fit_check.py'
+      - 'hazards.py'
+      - 'hazards_import.py'
+      - 'tests/live_hazards_check.py'
+      - 'adjacency.py'
+      - 'adjacency_import.py'
+      - 'tests/live_adjacency_check.py'
       - 'tests/fixtures/discovery/**'
       - 'requirements.txt'
       - '.github/workflows/discovery-fulton.yml'
@@ -138,6 +152,12 @@ jobs:
       - name: Run live submarket resolution check
         run: python tests/live_submarket_check.py
 
+      # reviews/28_building_comps: building sale and lease comps (memo only):
+      # scores equal before and after an import, DELETE scoping, dedupe,
+      # resolver agreement, windows, rollback, SAVEPOINT. Own market, cleans up.
+      - name: Run live building-comps check
+        run: python tests/live_building_comps_check.py
+
       # reviews/21_zoning: the S9 precedent SQL (metres, self-match, index)
       # and zoning_import's PostGIS overlay + UPDATE against real PostGIS.
       # No network. Own database, created and dropped by the check.
@@ -149,3 +169,18 @@ jobs:
       # and the SiteFit export. No network. Own database, created and dropped.
       - name: Run live site-fit check
         run: python tests/live_site_fit_check.py
+
+      # reviews/26_flood_wetlands: the proposed parcel_hazards DDL (own
+      # database only), the shapefile import's PostGIS areas (SRID 2240),
+      # rings, overlaps, LOMR, noise floor, idempotency, the site-fit
+      # deduction and the scoring read. No network. Created and dropped.
+      - name: Run live hazards check
+        run: python tests/live_hazards_check.py
+
+      # reviews/27_site_fit_buffers: the proposed parcel_adjacency DDL (own
+      # database only), the import's per-edge outward bands (SRID 2240),
+      # slivers, misalignment, unknown sides, the site-fit buffers (analytic
+      # areas, envelope distances), staleness, idempotency, the 2x2
+      # hazards/adjacency matrix and the runner audit. No network.
+      - name: Run live adjacency check
+        run: python tests/live_adjacency_check.py

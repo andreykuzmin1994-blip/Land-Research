@@ -910,9 +910,17 @@ class BoundaryTests(unittest.TestCase):
                 mods |= {a.name.split(".")[0] for a in node.names}
             elif isinstance(node, ast.ImportFrom):
                 mods.add((node.module or "").split(".")[0])
+        # reviews/26_flood_wetlands (FW-26): "hazards" added deliberately,
+        # imported once under the alias _hz (the host ban below still holds).
+        # reviews/27_site_fit_buffers (BUF-22): "adjacency" added deliberately,
+        # imported once under the alias _adj; never adjacency_import.
         allowed = {"__future__", "hashlib", "json", "math", "re", "subprocess", "types",
-                   "weakref", "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning"}
+                   "weakref", "bisect", "dataclasses", "datetime", "pathlib", "typing", "zoning",
+                   "hazards", "adjacency"}
         self.assertEqual(mods - allowed, set())
+        self.assertIn("import hazards as _hz\n", self.SRC)
+        self.assertIn("import adjacency as _adj\n", self.SRC)
+        self.assertNotIn("adjacency_import", self.SRC)
 
     def test_requirements_unchanged(self):
         self.assertEqual((REPO_ROOT / "requirements.txt").read_text(encoding="utf-8").split(),
@@ -927,9 +935,16 @@ class BoundaryTests(unittest.TestCase):
         self.assertNotRegex(self.SRC.lower(), r"fema\.gov|fws\.gov|hazards\.|wetlands\.")
         sqls = [v for k, v in vars(site_fit).items() if k.startswith("_SQL_")]
         self.assertTrue(sqls)
+        # reviews/27_site_fit_buffers (review finding 6): the one allowed
+        # proximity test compares an applied segment's end with the OTHER
+        # applied segments of the same parcel (where two abutting parts meet),
+        # never another parcel.
+        same_parcel = ("FROM ad_lines o WHERE o.parcel_id = l.parcel_id "
+                       "AND (o.adjacency_id <> l.adjacency_id OR o.part <> l.part) "
+                       "AND ST_DWithin(o.line, dp.geom, 0.01)")
         for sql in sqls:
             for fn in ("ST_Touches", "ST_DWithin", "ST_Intersects", "JOIN parcels p2"):
-                self.assertNotIn(fn, sql)
+                self.assertNotIn(fn, sql.replace(same_parcel, ""))
             self.assertNotIn("{", sql)
         self.assertIn("ST_Transform(g, 2240)", site_fit._SQL_BUFFERED_FOR_FIT)
         self.assertIn("-1.0 * %s::float8", site_fit._SQL_BUFFERED_FOR_FIT)

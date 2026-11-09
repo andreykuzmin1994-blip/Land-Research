@@ -315,7 +315,7 @@ mirror-restore:  ## Disaster recovery: rebuild a MISSING experiment_log.tsv from
 # CoStar Excel import (reviews/19_costar_import) -- between runs only
 # ---------------------------------------------------------------------
 .PHONY: costar-import
-costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas + industrial land comps. Between runs, before make baseline (refuses after it). FILE=path
+costar-import:  ## Import a CoStar .xlsx: stats CSV + submarket areas + industrial land comps + building sale/lease comps (memo only). Between runs, before make baseline (refuses after it). FILE=path
 	@if [ -z "$(FILE)" ]; then echo "==> usage: make costar-import FILE=path/to/export.xlsx"; exit 1; fi
 	@python costar_import.py "$(FILE)"
 
@@ -341,6 +341,24 @@ rules-scrape:  ## Read the sources in rules_sources.json (URLs, and local offici
 .PHONY: rules-watch
 rules-watch:  ## Re-fetch the registered sources, report what changed (sections, Ord. No. dates, GIS edits). Never applies anything.
 	@python rules_scrape.py --watch $(ARGS)
+
+# ---------------------------------------------------------------------
+# Flood / wetlands import (reviews/26_flood_wetlands) -- between runs only.
+# Refuses until a human applies the parcel_hazards proposal to prepare.py.
+# ---------------------------------------------------------------------
+.PHONY: hazards-import
+hazards-import:  ## Write parcel_hazards (FEMA NFHL flood zones, USFWS NWI wetlands) from the files in the gitignored hazards_inbox/ (ARGS='--mode rest' tries the public services, robots.txt permitting). Between runs, before make baseline (refuses after it).
+	@python hazards_import.py $(ARGS)
+
+# ---------------------------------------------------------------------
+# Adjacency import (reviews/27_site_fit_buffers) -- between runs only.
+# Refuses until a human applies the parcel_adjacency proposal to prepare.py.
+# Exit codes: 0 imported, 1 refused, 2 database, 3 run has its baseline,
+# 4 a zoning source failed (named; its territory reads as adjacency unknown).
+# ---------------------------------------------------------------------
+.PHONY: adjacency-import
+adjacency-import:  ## Write parcel_adjacency (which boundary parts face which neighbour zoning) from the zoning layers in sources.json, robots.txt permitting. Between runs, before make baseline (refuses after it).
+	@python adjacency_import.py $(ARGS)
 
 # ---------------------------------------------------------------------
 # Higher-level recipes

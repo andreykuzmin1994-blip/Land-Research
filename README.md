@@ -26,6 +26,20 @@ Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop r
 - The metric is **run-scoped** (`prepare-mutation`): `parcel_scores` rows carry `run_tag` + `experiment_id`, the metric counts only the active run's rows, and the runner purges a discarded experiment's rows so the data ratchet mirrors the git ratchet. Pre-mutation metric values are not comparable to post-mutation values; the next run starts fresh.
 - The review process is **tiered** (`STANDING_RISKS.md`): tests+CI for low-risk changes, one independent fresh-context reviewer for ordinary logic, the full three-agent workflow for metric/contract-touching work.
 
+2026-11-06: flood (H4) and wetlands (H6) are built (`hazards.py`,
+`make hazards-import`, `reviews/26_flood_wetlands/`) but **inert**: they
+need a new table that only a human adds to `prepare.py` (the proposal is
+`reviews/26_flood_wetlands/01_prepare_mutation_proposal.md`). Until then H4/H6
+stay data_gap passes and every score is unchanged. See "Flood and wetlands".
+
+2026-11-06: site-fit adjacency buffers (residential, other-district, ROW) are
+built (`adjacency.py`, `make adjacency-import`, `reviews/27_site_fit_buffers/`)
+but **inert**: they need a new table that only a human adds to `prepare.py`
+(`reviews/27_site_fit_buffers/01_prepare_mutation_proposal.md`) and, for
+residential buffers, a human-written neighbour-class table in
+`zoning_rules.json`. Until then every projection and score is unchanged. See
+"Adjacency buffers".
+
 For live repo state, run `make status` (setup checks + last TSV rows) — prose snapshots of state in documents go stale; the command does not.
 
 ## Quick Start (Operator)
@@ -240,6 +254,92 @@ setback on every edge and the fitted building, to open in SiteFit
 (Studies > Open file…) and refine by hand. Keep the SiteFit tool file itself out of the repo
 (`SiteFit.html` is gitignored).
 
+## Building comps: market rent and exit value (memo only)
+
+`costar_import.py` also takes a CoStar industrial building **Sale Comps**
+sheet and a **Lease Comps** sheet (`reviews/28_building_comps/`;
+which searches and columns to export: `COSTAR_EXPORTS_README.md`). It keeps
+comparable sales (sold in the last 36 months, warehouse/distribution,
+100,000-1,000,000 SF, built in the last 15 years, no portfolio, partial
+interest, leaseback, distressed or similar sale conditions) and signed NNN
+starting rents (signed in the last 24 months, 100,000-1,000,000 SF leased,
+no subleases or renewals), and writes them to `sales_comps`
+(`comp_type = 'building'`) and `leasing_comps`. The snapshot's Market
+Context and a memo section then show, per parcel's resolved submarket (or
+the labelled market-wide value when the submarket has fewer than 5 comps),
+the median signed NNN rent, sale $/SF and cap rate with counts and date
+windows, and an **exit-value estimate** for the projected building (rent x
+SF / cap rate, or sale $/SF x SF; never a default cap rate), labelled with
+the projection's rules (draft or verified). These are **no scoring input**:
+the metric is unchanged. With no such rows the memo and snapshot are
+exactly as before. Import between runs only, like every CoStar workbook.
+
+## Flood and wetlands (H4/H6, operator, between runs)
+
+`hazards.py` and `hazards_import.py` (`reviews/26_flood_wetlands/`)
+implement program.md's H4 ("not in FEMA Zone A or AE"; Zone AE that lies
+wholly within a LOMR passes with a review flag, while a LOMR elsewhere on
+the lot relaxes nothing; a floodway always blocks;
+LOMA is never checked) and H6 ("no NWI-mapped wetlands covering more than
+20% of the parcel", from `parameters.json`), mirroring the operator's
+SiteFit categories (floodway, SFHA, 0.2% zone). Shares are computed in
+PostGIS (SRID 2240, feet) over the same parcel geometry as site fit. They
+are enforced at scoring, through gate 4: a block or fail makes the parcel
+`FAIL:deal_killer` with blocker text `H4: ...` / `H6: ...`. Once enabled,
+`runner.evaluate` re-checks every parcel the metric would count, outside
+the agent sandbox, and discards an experiment that counted an H4/H6
+failure. Review flags
+use `flagged_items.flag_type = 'review'`, which no gate reads. Site fit
+then deducts the SFHA (floodway included) and NWI wetland area from the
+buildable area; the 0.2% zone, fill and stream/state-waters buffers are
+not considered (stated on every projection).
+
+Nothing of this is active until a human:
+
+1. applies `reviews/26_flood_wetlands/01_prepare_mutation_proposal.md` to
+   `prepare.py` between runs (`make db-check`, which runs `python prepare.py`, then creates `parcel_hazards`);
+2. downloads, in a browser, the FEMA NFHL county package for Fulton
+   (13121C, Map Service Center) and the USFWS NWI Georgia shapefile, and
+   unpacks them as `hazards_inbox/nfhl/S_FLD_HAZ_AR.*` (+ `S_LOMR.*`) and
+   `hazards_inbox/nwi/<name>.shp` (+ .dbf, .prj; if the state package
+   unpacks several shapefiles, the `*_Wetlands.shp` one is read);
+3. runs `make hazards-import` (counts only on the console; exit 4 names a
+   failed source and keeps its previous data), then starts a new run and
+   baseline: the first populated import is a metric change.
+
+`ARGS='--mode rest'` reads the public NFHL/NWI services instead, through
+the scraper's robots.txt policy; on 2026-11-06 both hosts' robots.txt deny
+those queries, so it fails both sources without a data request. The data
+is screening only: not an official flood determination (the effective FIRM
+governs) and not a jurisdictional wetland delineation.
+
+## Adjacency buffers (site fit, operator, between runs)
+
+`adjacency.py` and `adjacency_import.py` (`reviews/27_site_fit_buffers/`)
+apply the zoning buffers each district's rules list (South Fulton / FID
+residential side 50 / rear 100 ft plus a 10 ft improvement setback, Union
+City 75 ft plus a 20 ft setback from it, Fairburn 50 ft from residential and
+from any other district, Atlanta 20 ft transitional yards) per side, where
+the neighbour's zoning is known. The import reads the zoning layers already
+registered in `sources.json` (robots.txt permitting, 1 request/second per
+host) and stores, per candidate parcel, which boundary parts face which raw
+neighbour district code, or that nothing is known there. Site fit then
+buffers each fresh, applicable part by max(uniform setback, buffer); it
+never relaxes the uniform setback. Frontage is unknown, so the rear value is
+applied to every abutting side; side parts with no zoning polygon read
+"adjacency unknown" (never ROW, never "no neighbour"); every projection
+says what was applied and what was not.
+
+Nothing of this is active until a human:
+
+1. applies `reviews/27_site_fit_buffers/01_prepare_mutation_proposal.md` to
+   `prepare.py` between runs (`make db-check` then creates `parcel_adjacency`);
+2. for residential/agricultural buffers, adds a cited `neighbour_classes`
+   table per jurisdiction to `zoning_rules.json` (same proposal document);
+3. runs `make adjacency-import` (counts only; exit 4 names a failed source,
+   whose territory then reads as adjacency unknown), then, once any
+   jurisdiction is verified, starts a new run and baseline.
+
 ## Zoning-code scraper (operator, between runs)
 
 `make rules-scrape` (`rules_scrape.py`, `reviews/23_rules_scraper/`) reads
@@ -363,11 +463,16 @@ land-site-selector/
 ├── costar_ingest.py                   — IMMUTABLE during run: CoStar export ETL
 ├── reporting.py                       — Snapshot + strategy memo rendering
 ├── pipeline_common.py                 — Shared paths/helpers/SQL for the pipeline modules
-├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import (operator, between runs)
+├── costar_import.py                   — IMMUTABLE during run: CoStar Excel import: stats, areas, land, building and lease comps (operator, between runs)
 ├── zoning.py                          — IMMUTABLE during run: loads + freezes zoning_rules.json, classifies districts
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings
 ├── rules_scrape.py                    — IMMUTABLE during run: zoning-code scraper, writes a CANDIDATE only (operator, between runs)
+├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (inert until the parcel_hazards proposal is applied)
+├── hazards_import.py                  — IMMUTABLE during run: writes parcel_hazards from hazards_inbox/ files (operator, between runs)
+├── hazards_inbox/                     — gitignored: NFHL county package + NWI state shapefile the operator downloads by hand
+├── adjacency.py                       — IMMUTABLE during run: neighbour adjacency facts, buffer-key allow-list, per-side buffer plan (inert until the parcel_adjacency proposal is applied)
+├── adjacency_import.py                — IMMUTABLE during run: writes parcel_adjacency from the registered zoning layers (operator, between runs)
 ├── connector_harness.py               — Connector validation framework
 ├── cli.py                             — Operator CLI (argparse; --json output)
 ├── Makefile                           — Operator targets (make help)
