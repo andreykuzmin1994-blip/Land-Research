@@ -599,3 +599,205 @@ Standing risks:
 - SR-10: stdlib + shapely only.
 - SR-11: no new requests; the small-neighbour fetch is deferred to phase 2.
 - SR-15 / SR-16 analogs: the eval boundary is unchanged. Cluster facts stay in a `run.main` local until after scoring, and the human read of `exp:` diffs is the backstop.
+
+---
+
+## F6 — Constraint-aware fit (largest open-ground part + a copied rotated envelope fitter)
+
+**Requirement (as relayed):**
+- `largest_open_acres`: the largest contiguous open-ground polygon after the flood, wetland, water, easement, protected and steep subtraction (`checks.map_checks` keeps `p["_open_ground"]`).
+- A rotated-rectangle fitter COPIED (not imported; CLAUDE.md scope note) from root `site_fit.fit_lengths`, using the real prototypes from `building_prototypes.json` (read-only).
+- Report the largest prototype whose envelope fits on open ground, as a brief fact and a `ranked.csv` column AFTER scoring. It is not a screen.
+
+The operator answers recorded at the top of this document apply unchanged. F6 is a screener human edit. It changes no eval file, so there is no new eval baseline. It is reviewed at Tier 1 (one independent reviewer after the code). It touches no root file. `building_prototypes.json` and `site_fit.py` stay byte-identical (SR-1; the root invariant forbids any edit to the prototypes file).
+
+### Verified facts this section relies on
+
+| # | Fact | Evidence |
+|---|---|---|
+| Y1 | Envelope depth = `W + sides × (court + trailer)`, with sides = 2 for `cross`, else 1. **front** and **rear**: 260 + 130 + 55 = **445 ft**. **cross**: 520 + 2 × (130 + 55) = **890 ft**. Lengths step by `step_ft` = 40 from `min_length_ft` up to `L`. front/rear: 400, 440, …, 640 (7 lengths, 104,000–166,400 SF). cross: 600, 640, …, 1000 (11 lengths, 312,000–520,000 SF). front and rear share one depth, so root fits them as one spec. The relayed numbers are correct. | `building_prototypes.json`; `site_fit.envelope_depth`, `_lattice`, `_fits_for` |
+| Y2 | Root fits the envelope inside the **setback-buffered** buildable area (`default_setback_ft` = 25, or the zoning setback), capped by any coverage cap. Car parking, drives, detention and circulation are not modelled (`fit_rule`). The fit is a **lower bound**: a fixed 2° angle grid plus the 32 longest edges (≥ 30 ft), vertex-event and 64-step y positions, and exact even-odd containment with `TOL_FT` = 0.01. "No fit found" is therefore not proof that nothing fits. | `building_prototypes.json` `fit_rule`; `site_fit.py` lines 100-131, 426-616 |
+| Y3 | Root normalises rings before fitting. It uses open rings rounded to 0.01 ft and parts sorted by (outer area desc, first vertex), shifted to a floor-of-min origin (`_rings_from_geojson`, `_fits_for`). It simplifies above 400 vertices (1 ft tolerance, inside an extra 2 × tol inward buffer, so the result stays inside) and refuses to search above `_MAX_FIT_VERTICES` = 600. | `site_fit.py` lines 125-131, 980-1046, 1207-1250 |
+| Y4 | **Steep ground is not geometry in the screener.** `slope_stats` returns histogram shares only. `usable_after_slope` scales acres by `(1 - steep%)`. `_open_ground` = parcel minus the union of flood (`SFHA_TF = 'T'`, floodway included), NWI wetland, NWI water, NCED easement and PAD-US protected polygons. Nothing locates steep pixels, so the requirement's "steep subtraction" cannot be done geometrically with the current data. | `checks.py` lines 82-105, 201-245; `layers.py` line 34 |
+| Y5 | `map_checks` sets `p["_open_ground"] = open_ground if not open_ground.is_empty else g`. A parcel whose constraints cover all of it therefore carries the **whole parcel** as its "open ground". The fallback is detectable: in that case `p["_open_ground"] is p["geometry"]` while `constrained_pct > 0`. With no constraints at all it is also `g`, with `constrained_pct == 0`. | `checks.py` lines 98-105 |
+| Y6 | `g.difference(...)` can return a Polygon, a MultiPolygon or a GeometryCollection that holds slivers, lines or points. Coordinates are WGS84 degrees. `LocalProjection.around(g)` gives metres (equirectangular around the centroid), and `geo.FT_PER_M` and `geo.acres` exist. | `checks.py`; `geo.py` lines 71-96 |
+| Y7 | `_open_ground` and `geometry` are shapely objects on `p` while `scoring.score(p)` runs. Eval records hold `build_eval.FEATURES` only, with no geometry. `rank_problems` refuses `_`-prefixed *attributes*, not public ones (`.area`, `.geoms`) or string subscripts (F8 V2). Today's `rank.py` could therefore already measure open-ground parts on live data only. That exposure **pre-exists** F6. F6 must not widen it. | `build_eval.py` line 80; `evaluate.rank_problems`; probe in F8 V2 |
+| Y8 | The earthwork precedent is the after-scoring pattern this item should copy: a `run.main` local keyed by `id(p)`, attached after scores, flags and the sort. F2 then appends flags in the same post-sort block. `report.RANKED_COLUMNS` already carries `earthwork_cy` and `mean_cut_fill_ft` after `relief_ft`. `rejected.csv` has a fixed seven-column header. | `run.py` lines 179-243; `report.py` lines 14-21, 48-54 |
+| Y9 | Probe, read-only, of root `fit_lengths` on both specs (445 / 890) in feet: the cost is negligible when a full-size envelope fits (early exit). The worst case is a shape where nothing fits, because every angle is then tried. Timings: a 40 ac square with 40 wetland-like holes (921 vertices, 18 rings, no fit) took 0.45 s. A 1,500-vertex jagged ring took 1.9 s. A 300 ft × 3,000 ft wiggly strip (600 vertices, no fit) took 0.8 s. Pure Python is GIL-bound, so a thread pool does not help. | probe in this review (no repo file written) |
+| Y10 | The CLAUDE.md scope note says `screener/` "shares no code, tables or files with the system below". The screener reads no root file today (grep: no `site_fit` or `building_prototypes` reference under `screener/`). The precedent for a copy is `zoning_import.py` line 110 ("copied, not imported, from the screener"). | `CLAUDE.md`; grep |
+
+### HIGH
+
+**F6-1. Live-only leak into `rank.py` (Y7, Y8; F8-1 / F2-1 analog).** A fit result and an open-part acreage are exactly what a learned rank would grab: "a cross-dock fits" is a strong live-only signal, and the eval records carry none of it. The tempting place is `map_checks`, right beside `_open_ground`. **Computing `largest_open_acres` there and putting it on `p` is a no-go**, even though the background analysis proposes it (its integration point 1). Doing so would put a live-only number on `p` before `site_rejects`, `scoring.score` and `screens.flags` run.
+
+*Mitigation (structural):*
+- Compute both facts after the final sort, in the post-sort block where earthwork is attached (`run.py` around line 239). Read `p["_open_ground"]` there.
+- Keep any intermediate (parts, rings, placement) in a `run.main` local or the new module's return value. Never put it on `p`.
+- Attach only the report fields, and only after scores, flags and the sort.
+- Do not change `scoring.py`, `rank.py`, `screens.py`, `snapshot.py` or any eval file.
+- Do not store a parts list or a largest-part geometry on `p` (Y7): that would make the pre-existing geometry exposure easier to use.
+
+*Guard:*
+- (a) **Spy test**, the decisive one. Copy F8 G1 / F2 J1: an offline `run.main` with slope on and with `--no-slope`. Wrap `rank.learned_score`, `scoring.fixed_score`, `screens.site_rejects` and `screens.flags` to record `set(p)`. Assert that no recorded key set holds an F6 key, and that `ranked.csv` then carries the populated columns for the same parcels.
+- (b) **Scores and order unchanged.** Rank, score, `why_site`, `why_seller` and `flags` are identical with the fit on and off (monkeypatch the fit to return nothing). Only the new columns and the brief line differ.
+- (c) **Static defence in depth.** No string constant or name in `rank.py` or `scoring.py` contains the F6 key stems. Define the stems once as constants in the new module and import them into the test. Candidate stems: `largest_open`, `prototype`, `envelope`, and the fit column stem. Do NOT use a bare `fit` or `open`: they are too short and too likely to collide later (`benefit`, `opens`). The docstring states the computed-string limit, as F8's does.
+
+**F6-2. The fallback turns a fully constrained parcel into "all open ground" (Y5).** Read naively, `p["_open_ground"]` is the whole parcel when the constraints cover all of it. Both facts would then report the parcel's full map area and a cross-dock fit on a floodplain. Ranked survivors usually have `usable_acres ≥ min_usable_acres` (4 by default), so the case is rare. But `usable_acres` comes from tax-record `acres`, so a parcel with an acreage mismatch can survive with a map polygon that is fully constrained.
+
+*Mitigation:*
+- Treat `p["_open_ground"] is p["geometry"] and p["constrained_pct"] > 0` as "no open ground": `largest_open_acres = 0.0`, and the fit reads "no fit found (no open ground on the parcel map)".
+- Better still, have the helper take `(geometry, open_ground, constrained_pct)` explicitly, so the rule is stated in one place.
+- Do not change `map_checks`' fallback itself. Slope relies on it (`too_small_for_slope`, `slope_stats`), and changing it would move slope fields and the steep screen.
+
+*Guard:* a fixture parcel fully inside a flood polygon (constraints = 100%) gives 0.0 and "no fit found". A parcel with no constraints gives the whole-parcel part. The slope fields of both are unchanged from base.
+
+**F6-3. Over-claiming what is subtracted and what "fits" means (Y2, Y4).**
+
+Steep ground: the requirement asks for "steep subtraction" in the polygon, which the data cannot give (Y4). A fit on 20 open acres of 25% slope would read as buildable.
+- Do not invent a geometric steep mask, for example by shrinking the polygon by `steep_pct`. A shrunk polygon has no location meaning.
+- The column and the brief say what the open ground excludes: "floodplain (FEMA SFHA), mapped wetlands and water (NWI), conservation easements (NCED) and protected land (PAD-US)". They also say steep ground is NOT located: "slope is applied only as a share (`usable_after_slope`); steep ground may lie inside the open area".
+- A geometric steep mask is a later item. It would need 3DEP sampling through `arcgis.py`, under its own review (SR-11).
+
+Easements: only conservation easements are mapped. Utility, pipeline and access easements are not in any free layer (README). The wording must not say "easements subtracted" without "conservation".
+
+"Fits": the root envelope is building plus truck court plus trailer parking per dock side. There is no car parking, no drive aisles, no detention, no frontage or access check, no coverage cap (the screener has no coverage rules), and no zoning setback beyond the one chosen in F6-4.
+- The wording is "envelope (building + truck court + trailer parking) fits", never "site works", "buildable for" or "supports".
+- The fit is a lower bound (Y2), so its absence reads "no fit found", never "does not fit" or "too small".
+
+*Guard:* a README "Site fit" paragraph with these limits. Brief-line tests pin the "no fit found" wording and the exclusion list. A test asserts the brief never contains "does not fit" (hand-written wording only; no assertion on free-form operator text).
+
+### MEDIUM
+
+**F6-4. Setbacks: the root semantics are inside a setback (Y2).** A fit on raw open ground places the envelope edge on the lot line. That runs 25 ft or more past where root, and the operator's own tool, would place it, and it overstates the result against root's BTS figures for the same parcel.
+
+*Mitigation, either of two (the code writer picks one and states it):*
+- (preferred) Fit on `open_ground ∩ parcel.buffer(-setback)`, with `setback` = a COPIED `default_setback_ft` (25). The setback is measured inward from the lot line only, not from the constraint edges, which matches root (root subtracts hazards from the setback-buffered area). `largest_open_acres` stays the unbuffered open ground, because that is what "open acres" means.
+- Or fit on raw open ground and label it "no setback applied" in the column docs and the brief.
+- Either way, the buffer is done in the projected metre plane (Y6), never in degrees. The brief names the setback used.
+
+*Guard:* a 30 ac square where front-load fits without the setback but not with it, or the reverse at one lattice step. This pins whichever choice was made.
+
+**F6-5. The copy must be faithful, and must stay a copy (Y3, Y10; SR-1 / scope note).**
+- **No import of root** (`site_fit`, `zoning`, `prepare` or anything outside `screener/`) from screener runtime code. A static test asserts that the new module and `run.py` import nothing outside `screener` (except stdlib and shapely).
+- **No runtime read of root `building_prototypes.json`.** The requirement says "read building_prototypes.json read-only". Reading it at run time would make the screener share a file with the root system, contrary to the scope note. It would also break a screener run from an extracted copy.
+  - Copy the needed numbers into the new screener module as constants, with a provenance comment (file, `as_of` 2026-11-05, `source`): per prototype `W`, `L`, `min_length_ft`, `court`, `trailer`, `trailerOn`, `type`, `label`, plus `step_ft` and `default_setback_ft`.
+  - A **drift test** in `screener/tests` reads root `building_prototypes.json` read-only. It is skipped when the file is absent. It asserts that the copied numbers equal it, so an operator edit to the root file fails the screener suite loudly instead of drifting silently.
+  - Do not put the envelope in `settings.toml`. An operator-editable copy would drift by design, and the drift test would then fight legitimate edits. An optional on/off or setback key is fine.
+- **Port only what the fit needs:** `fit_lengths`, `_angles`, `_slab_gaps`, `_probe_chords`, `_bad_prefix`, `_candidate_ys`, `_inside`, `_ring_area`, `envelope_depth` and `_lattice`, with the same constants (`TOL_FT`, `_ANGLE_GRID_DEG`, `_EDGE_ANGLES_MAX`, `_EDGE_ANGLE_MIN_LEN_FT`, `_Y_SAMPLES`, `_PROBE_FT`). Keep root's ring normalisation (Y3): round to 0.01 ft, drop the closing vertex, sort parts by (outer area desc, first vertex), shift to the floor-of-min origin. Results then match root on the same feet-plane rings, and float error stays bounded.
+  - Do not port the cache, the SQL, the coverage-cap logic, the rules or adjacency code, or the dock and trailer counts (unless they are shown in the brief).
+  - Do not "improve" the algorithm in the copy. Changing it would leave two fitters that disagree.
+- **Equivalence evidence.** Golden tests on hand-made rings (square, rotated square, square with a hole, two-part MultiPolygon, L-shape, thin strip) pin the fitted length per depth.
+  - The code writer runs root `fit_lengths` once on the same rings, OUT of the screener tests, and records in the code writer response that the values match.
+  - An optional differential test that imports root `site_fit` is acceptable only if it is skipped when root is unavailable and the suite is green without it. Golden values are the gate.
+
+**F6-6. Cost and determinism (Y3, Y9; F2-5 analog).** Pure-Python fitting is GIL-bound. At about 0.5–2 s per hard parcel, a run with a thousand or more survivors could add many minutes to a run whose re-runs take "a few minutes" (README).
+
+*Mitigation:*
+- Bound the vertex count as root does. Above 400 vertices, simplify inside an extra inward buffer: buffer by -2 × tolerance in metres, then `simplify(tolerance)`, so the result stays inside the original. Above 600 vertices after that, the parcel gets "fit not checked: open-ground shape too complex" plus a counted run note.
+- Drop parts that cannot hold the smallest envelope (a part whose minimum rotated rectangle is under 400 × 445 ft) before fitting. This is the cheap, safe pruning: a part smaller than the smallest envelope cannot contain it.
+- **No wall-clock budget.** A time-based cutoff makes `ranked.csv` depend on machine speed (F2-10 determinism). If a cap is needed, use a deterministic one: an optional `[fit] max_parcels` key that fits the top N by rank, with the others "not checked (outside the top N)". Note the count.
+- Log progress like slope does, every 100 parcels.
+- The same input gives byte-identical columns: no set or dict iteration order in the output path.
+
+*Guard:*
+- A timing test on a synthetic worst case (the 40-hole square, or a 600-vertex no-fit strip) × 50 parcels finishes within a stated bound.
+- A complexity-cap test: a 2,000-vertex ring gives "not checked: too complex" plus the note.
+- A determinism test: two runs give byte-equal `ranked.csv`.
+- If the one allowed live `--limit 30` run happens, its fit wall time is recorded (counts only).
+
+**F6-7. Geometry and units (Y6).**
+- Project with one `LocalProjection.around(geometry)` per parcel, the same projection `map_checks` uses. Convert metres to feet with `geo.FT_PER_M`, never a new literal. Compute acres with `geo.acres` on the projected part.
+- Take Polygon parts only, from Polygon, MultiPolygon or GeometryCollection, with holes kept. Ignore lines and points.
+- `largest_open_acres` = the area of the largest Polygon part (map acres), rounded to 0.1.
+- When `acreage_mismatch` or `too_small_for_slope` applies, the brief adds "parcel map disagrees with the tax record; the fit uses the map shape". Do not skip these parcels silently.
+- A `GEOSException` or other per-parcel geometry fault gives "not checked" plus a counted note. Do not wrap the feature in a broad `except Exception` (F2-5 reasoning: a bug must fail the tests). The fit never calls `stop()`.
+
+*Guard:*
+- A two-part open ground (12 ac + 8 ac) gives 12.0.
+- A GeometryCollection holding a polygon plus a line gives the polygon's area.
+- An east-west strip and a north-south strip of equal feet fit equally (degrees vs feet).
+- A 45°-rotated rectangle fits at its full length (the rotation is exercised).
+- A part with a hole that blocks the envelope gives "no fit found" or a shorter length.
+- A patched GEOS error gives "not checked" plus the note, and the other parcels are unaffected.
+
+**F6-8. Three states must stay distinguishable in the outputs (F8-7 analog).** The outputs must keep apart:
+- *fits* (prototype, length × width, SF);
+- *no fit found* (checked, nothing at the minimum length);
+- *not checked* (fit off, too complex, geometry fault, outside a top-N cap).
+
+An empty cell must never mean "no fit". 0 must never mean "not checked".
+
+*Mitigation:*
+- Use three columns, or an equivalent:
+  - `largest_open_acres` (number; 0.0 when there is no open ground per F6-2; empty only when not computed);
+  - a fit text column: `"cross-dock 800 x 520 ft"`, `"front/rear-load 640 x 260 ft"`, `"none found"`, or empty for not checked;
+  - a numeric building-SF column: empty unless something fits.
+- "Largest prototype" = the largest building SF that fits. Every cross-dock length (≥ 312,000 SF) beats every front-load length (≤ 166,400 SF), so take cross when any cross length fits, else front/rear.
+- Name front and rear together, because they share a depth (Y1).
+- The brief also says that a cross-dock fit implies the front-load fits. Do not claim that every prototype was fitted separately where one depth covers two.
+
+*Guard:* one test per state, through both the CSV cell and the brief.
+
+**F6-9. Output-schema change (F8-8 analog).** New `RANKED_COLUMNS` change the CSV header and the geojson and map properties.
+- Place them together, directly after `usable_after_slope` or after `mean_cut_fill_ft`. The code writer chooses, and the decision note names the placement.
+- `rejected.csv`'s header stays unchanged.
+- The map popup escaping already covers the text cell. One test puts a fit text through `map.html` unchanged.
+- Name the schema change in the decision note and the README `ranked.csv` row.
+
+### LOW
+
+**F6-10. Eval and dependency boundary (SR-10, SR-15 analog).**
+- The new module imports only stdlib, `shapely` and `.geo`.
+- `build_eval.py` and `evaluate.py` do not import it.
+- `requirements.txt` is unchanged: no `lir` (a name trap: `pip install lir` installs an unrelated library), no numba, no opencv.
+- The evaluate output line is identical to the one before the change, and `rank_import_problems() == []`.
+- The diff touches no eval file, nor `rank.py`, `scoring.py`, `screens.py`, `snapshot.py`, `checks.map_checks`' existing keys, `PROGRAM.md`, `building_prototypes.json` or `site_fit.py`.
+- `settings.toml` only gains optional new keys (for example `[fit] enabled` and `max_parcels`), each read with `.get(..., default)` so an old settings file still runs.
+
+**F6-11. No requests (SR-11, SR-6).** The fit reads only geometry already in memory. The offline run's request count per URL is unchanged; assert it in the spy-run test. No new runtime file is written, so `.gitignore` needs nothing.
+
+**F6-12. Not a screen, not a flag-into-score, and the future path.** The background analysis suggests a soft flag ("open ground too fragmented for a N SF building"). A flag is acceptable only if it is appended in the post-sort block, never through `screens.flags`, which is an eval file. Prefer the column and the brief line alone in this round. To make the fit a learned feature or a screen, a human would add it to `build_eval.FEATURES`, rebuild `data/` and take `--new-baseline`. Say that in the README so nobody "just" reads it from `rank.py`. Do NOT edit `PROGRAM.md`.
+
+**F6-13. Pre-existing exposure, recorded and not widened (Y7).** `p["_open_ground"]` and `p["geometry"]` are already readable by `rank.py` through public shapely attributes, with no eval counterpart. That is outside this item, and fixing it would change `checks.py`'s slope path or the eval guard. Record it in the decision note as a residual for a later item (for example, moving `_open_ground` into a `run.main` local, which needs its own review of the slope path). F6 adds no new geometry key to `p`.
+
+**F6-14. Counts-only live evidence (SR-8 analog).** If the one allowed `--limit 30` live run happens, record only:
+- ranked parcels;
+- counts by fit state (cross / front-rear / none found / not checked, with reasons);
+- the median and maximum `largest_open_acres` as rounded numbers;
+- the fit wall time;
+- the identical-evaluate check.
+
+Record no ids, owners or addresses.
+
+### Go / no-go gates for F6 (all must hold before the decision note says go)
+
+| Gate | Condition |
+|---|---|
+| K1 | Spy test: with slope on and `--no-slope`, no key set seen by `rank.learned_score`, `scoring.fixed_score`, `screens.site_rejects` or `screens.flags` holds an F6 key. The expected parcels' CSV cells are populated. Rank, score, `why_site`, `why_seller` and `flags` are identical with the fit on and off (F6-1 a, b). |
+| K2 | Static test: no string constant or name in `rank.py` or `scoring.py` contains the F6 stems (imported from the module; not bare `fit` / `open`), with the computed-string limit stated (F6-1 c). |
+| K3 | Fallback: a fully constrained parcel gives 0.0 open acres and "none found". An unconstrained parcel gives the whole part. Slope fields are unchanged from base on both (F6-2). |
+| K4 | Wording: the exclusion list (with "conservation easements"), "steep ground is not located", "envelope (building + truck court + trailer parking)", "no fit found" (never "does not fit"), and the setback used. A README "Site fit" paragraph covers the F6-3 / F6-4 limits and the future eval path (F6-3, F6-4, F6-12). |
+| K5 | Faithful copy: no screener runtime import of, or file read from, the root system. The prototype constants carry a provenance comment, and a drift test against root `building_prototypes.json` (skipped if absent) is green. Golden lengths are pinned for the F6-5 shapes, with depths 445 / 890 and lattices 400–640 / 600–1000 by 40, and the code writer response records that root `fit_lengths` gives the same values (F6-5, Y1). |
+| K6 | Cost and determinism: vertex simplification stays inside the original. The > 600-vertex case gives "not checked" plus a counted note. The worst-case timing test passes. There is no wall-clock cutoff. Two runs give byte-equal `ranked.csv` (F6-6). |
+| K7 | Geometry and units: the two-part, GeometryCollection, east-west vs north-south, 45° rotation, blocking-hole and GEOS-fault cases, all in projected metres converted with `FT_PER_M` (F6-7). |
+| K8 | Three states, distinguishable in the CSV and the brief. Largest-SF selection (cross before front/rear). `rejected.csv` header unchanged. Column placement named in the decision note (F6-8, F6-9). |
+| K9 | No extra request. `requirements.txt` unchanged. Evaluate output line identical to base, and `rank_import_problems() == []`. The diff stays inside the F6-10 list. Both suites green with counts in the decision note: root about 1744 OK at base, screener 134 at base plus the F8 / F14 / F2 additions. The code writer response lists every existing test whose output changed. The decision note restates the operator answers and the F6-13 residual (F6-10, F6-11, F6-13). |
+
+**No-go triggers:**
+- Any F6 value, part list or placement on `p` before scoring is done, or computed inside `map_checks`.
+- A runtime import of root code, or a runtime read of `building_prototypes.json`.
+- An edit to `building_prototypes.json`, `site_fit.py`, any eval file, `rank.py`, `scoring.py`, `screens.py` or a `settings.toml` default.
+- A change to `map_checks`' `_open_ground` fallback or to any slope field.
+- A geometric "steep subtraction" built from `steep_pct`, or wording that claims steep ground or non-conservation easements were removed.
+- A wall-clock budget, a new dependency or a new request.
+- The fit wired into a score, a screen or a reject.
+
+**Verdict: GO with conditions K1–K9.** The requirement's "steep subtraction" is NOT deliverable geometrically with the current data (Y4). It is replaced by the F6-3 disclosure, and a steep mask is deferred to a later item with its own review.
+
+Standing risks:
+- SR-1: no root file is touched. `building_prototypes.json` is read only by a test, never at run time.
+- SR-6: offline fixtures and hand-made rings only.
+- SR-8 analog: counts-only evidence.
+- SR-10: stdlib + shapely only.
+- SR-11: no new requests.
+- SR-15 / SR-16 analogs: the eval boundary is unchanged. F6 facts are attached after scoring, and the human read of `exp:` diffs is the backstop. The pre-existing geometry exposure (F6-13) is recorded, not widened.
