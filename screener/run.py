@@ -19,12 +19,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import arcgis, checks, layers, report, scoring, screens
+from . import arcgis, checks, layers, report, scoring, screens, snapshot
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
 DECISIONS_FILE = HERE / "inputs" / "decisions.csv"
 DECISIONS_HEADER = ["parcel_id", "decision", "date", "note"]
+# "maybe" is a mark only: no score, flag, sort or screen reacts to it.
+DECISION_VALUES = ("pursue", "pass", "maybe", "listed")
 
 
 def log(msg: str) -> None:
@@ -39,18 +41,20 @@ def stop(what: str, exc: Exception) -> int:
 
 
 def load_decisions() -> dict[str, dict[str, str]]:
-    """Your pursue / pass / listed marks, keyed by parcel id."""
+    """Your pursue / pass / maybe / listed marks, keyed by parcel id (the
+    last row for an id wins). utf-8-sig: a spreadsheet's byte-order mark
+    would otherwise hide the parcel_id column and drop every decision."""
     if not DECISIONS_FILE.exists():
         DECISIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(DECISIONS_FILE, "w", newline="") as fh:
             csv.writer(fh).writerow(DECISIONS_HEADER)
         return {}
     out = {}
-    with open(DECISIONS_FILE, newline="") as fh:
+    with open(DECISIONS_FILE, newline="", encoding="utf-8-sig") as fh:
         for row in csv.DictReader(fh):
             pid = (row.get("parcel_id") or "").strip()
             decision = (row.get("decision") or "").strip().lower()
-            if pid and decision in {"pursue", "pass", "listed"}:
+            if pid and decision in DECISION_VALUES:
                 out[pid] = {"decision": decision, "date": (row.get("date") or "").strip(),
                             "note": (row.get("note") or "").strip()}
     return out
@@ -180,7 +184,8 @@ def main(argv: list[str] | None = None) -> int:
                      "flagged). The map shape is the problem, not a failed check: compare the "
                      "county parcel map with the tax record.")
 
-    if run_cfg.get("slope", True) and not args.no_slope and survivors:
+    slope_on = bool(run_cfg.get("slope", True)) and not args.no_slope
+    if slope_on and survivors:
         log(f"Slope from USGS lidar for {len(survivors):,} parcels")
         estimates = checks.slope_checks(survivors, int(run_cfg.get("workers", 6)),
                                         lambda d, n: log(f"  slope {d:,}/{n:,}"))
@@ -207,6 +212,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         notes.append("slope check skipped: steepness is not in the scores or screens")
 
+    # The feature snapshot (future labels' features) is copied now, before
+    # scoring, and stays in this local variable: nothing is put on p.
+    snap = snapshot.take(survivors, snapshot.run_meta(
+        county.NAME, today, args.limit, slope_on, args.settings.read_bytes()))
+    if snap["meta"]["nonfinite_as_null"]:
+        notes.append(f"{snap['meta']['nonfinite_as_null']} non-finite values (NaN or infinity) "
+                     f"were written as null in {snapshot.FILE_NAME}")
     for p in survivors:
         p.update(scoring.score(p))
         p["flags"] = screens.flags(p)
@@ -246,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = {"county": county.NAME, "run_date": today, "funnel": funnel,
                "reject_reasons": reasons.most_common(), "notes": notes}
     report.write_all(out_dir, survivors, rejected, summary, int(run_cfg.get("briefs", 25)))
+    snapshot.write(out_dir, snap)
     log(f"Done: {len(survivors):,} ranked parcels -> {out_dir}")
     return 0
 

@@ -33,6 +33,7 @@ Results land in `screener/output/fulton-<date>/`:
 | `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps |
 | `rejected.csv` | Every parcel screened out, with the reason |
 | `ranked.geojson` | The same survivors for GIS tools |
+| `features.json` | The evaluation's features for each ranked parcel, kept for your decisions (see Decisions below) |
 
 Map data is cached for 7 days and the county deed file for 30
 (`screener/cache/`), so re-runs take a few minutes. `--refresh` forces
@@ -114,6 +115,38 @@ code, run both versions on the same cache (no `--refresh`, within
 map layers, county parcels and slope answers are kept for 7 days, the deed
 file for 30.
 
+**Decisions and the feature snapshot.** Each run writes
+`features.json` next to `ranked.csv`: for every ranked parcel, its
+`parcel_id`, `lon` / `lat` (the evaluation's spatial blocks need them),
+every field in the evaluation's feature list (`build_eval.FEATURES`,
+imported, so the two can't drift) under `features`, and the fields the
+evaluation blanks (`build_eval.BANNED_AS_NONE`: zoning, utilities, slope,
+jurisdiction and so on) under `live_only`. Its `meta` names the run date
+and time, county, `--limit` (a trial run), whether slope was checked, the
+settings file's SHA-256, the code commit (null if git doesn't answer), the
+record count, and how many NaN or infinite values were written as `null`
+(`summary.md` says so too). It holds no geometry, owner name, mailing
+address, earthwork estimate or decision, and it is copied before scoring,
+so it is what the parcel looked like going in. Rejected parcels are left
+out: their map checks are partial. `python -m screener.decide` copies a
+parcel's record, with the run's `meta`, into
+`screener/inputs/decision_features.jsonl` when you decide, so the features
+outlive the run folder.
+
+Some names mean slightly different things live and in the evaluation:
+`usable_after_slope` is slope-adjusted live but equals `usable_acres` in
+the evaluation; `rail_ft` / `rail_owner` come from the whole live rail
+layer but only main lines and yards in the evaluation; ownership fields
+are as of today live and as of 2016-01-01 in the evaluation.
+
+Neither a decision nor the snapshot is on a parcel while it is scored
+(`tests/test_decisions.py` spies on `rank.learned_score` and
+`scoring.fixed_score`). Turning decisions into evaluation labels (Phase B)
+is a human `--new-baseline` step and has not been done: it must handle
+selection bias (only parcels an earlier ranking put near the top get
+reviewed), the meaning differences above, spatial clustering and privacy
+(the label file stays out of git and holds no notes).
+
 ## Tune it
 
 - `screener/settings.toml`: acreage, which cities to search, and every
@@ -127,9 +160,10 @@ file for 30.
   ASSN INC"), or carry HOA inside a company name with a legal form ("... HOA
   INC"; THE doesn't count, since Hoa and The are also Vietnamese given and
   middle names); ASSOC, ASSOCIATION or POA alone don't count.
-- `screener/inputs/decisions.csv`: mark parcels `pass`, `listed` or
-  `pursue`. Passed and listed parcels drop out of future runs. See
-  `inputs/README.md`.
+- `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
+  `pursue` or `maybe` (by hand or with `python -m screener.decide`).
+  Passed and listed parcels drop out of future runs; `maybe` is a mark
+  only. See `inputs/README.md` and Decisions below.
 - The score has two parts:
   - **`screener/scoring.py`, 35%, set by you:** zoning / future land use
     path, slope, utilities and Opportunity Zone. The answer key can't
