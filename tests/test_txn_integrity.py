@@ -52,6 +52,7 @@ import pipeline_common
 import prepare
 import reporting
 import research
+from hazards_helpers import disabled as hazards_disabled
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LIVE_CHECK_PATH = Path(__file__).resolve().parent / "live_txn_check.py"
@@ -1257,6 +1258,9 @@ _GOLDEN_FINITE_WRITES: list[tuple[str, tuple]] = [
 class TestScoringFiniteOutputUnchanged(unittest.TestCase):
     """G10: finite scoring output is byte-identical to base 29c051e."""
 
+    # Base 29c051e predates the hazard read (gate ON since the operator-
+    # authorized prepare-mutation of 2026-11-09, reviews/33_hazards_enabled).
+    @hazards_disabled()
     def test_finite_writes_match_base_byte_for_byte(self) -> None:
         parcels, geometry, blocks = _golden_scenario()
         conn = PgFake(_scoring_responder(parcels, geometry, blocks))

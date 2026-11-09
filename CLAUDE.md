@@ -55,9 +55,14 @@ or `autoresearch/data/`. The CoStar rule below applies everywhere.
   runs, changes there are Tier 2 (`STANDING_RISKS.md` § "Change tiers").
 - **Flood/wetlands (H4/H6)**: the facts, SQL and decision live in
   `hazards.py`; `hazards_import.py` (between runs only) writes the
-  proposed `parcel_hazards` table. Both stay inert until a human applies
-  the prepare-mutation proposal in `reviews/26_flood_wetlands/`; the first
-  populated import changes the metric and needs a new run + baseline.
+  `parcel_hazards` table. The table was enabled 2026-11-09 by the
+  prepare-mutation in `reviews/26_flood_wetlands/`, which the operator
+  delegated to the agent for that one edit (`reviews/33_hazards_enabled/`;
+  not a precedent: `prepare.py` stays human-only). H4/H6 stay data_gap
+  passes until the first populated `make hazards-import`, which changes
+  the metric and needs a new run + baseline. Run `make db-check` on a
+  database before its next run, or every experiment crashes
+  (`HazardAuditFailed`).
 - **Adjacency buffers (site fit)**: neighbour facts, the buffer-key
   allow-list and the per-side plan live in `adjacency.py`;
   `adjacency_import.py` (between runs only) writes the proposed

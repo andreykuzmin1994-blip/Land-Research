@@ -24,7 +24,7 @@ import site_fit
 import adjacency_golden_case as golden
 import site_fit_golden_case as sg
 from adjacency_helpers import MAX, enabled, with_classes
-from hazards_helpers import enabled as hz_enabled
+from hazards_helpers import disabled as hz_disabled, enabled as hz_enabled, with_prepare_mutation
 from zoning_helpers import REPO_ROOT, patch_rules, stored, verified
 
 BASE = "595aa08"
@@ -32,6 +32,10 @@ RECORD = REPO_ROOT / "reviews" / "27_site_fit_buffers" / "golden_head_595aa08.js
 RESEARCH_SRC = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled),
+# and these fakes/records predate the hazard read, so they run with it OFF.
+@hz_disabled()
 class DifferentialTests(unittest.TestCase):
     """BUF-03: gate off == 595aa08; gate on + empty table changes only the
     adjacency texts and adds one read (tests/adjacency_golden_check.py)."""
@@ -162,6 +166,10 @@ def project(conn, ids=("a", "b"), rules=CLASSES):
         return site_fit.project_parcels(conn, list(ids))
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled),
+# and these fakes/records predate the hazard read, so they run with it OFF.
+@hz_disabled()
 class SiteFitTests(unittest.TestCase):
     """BUF-11: statement choice, named parameters, fallbacks, texts."""
 
@@ -307,6 +315,7 @@ class ComposedSqlTests(unittest.TestCase):
 class ReportingTests(unittest.TestCase):
     """BUF-24: both footnote variants, the highlight clause."""
 
+    @hz_disabled()  # hazards OFF here; its footnote is asserted under hz_enabled
     def test_footnote_variants(self):
         self.assertEqual(reporting._projection_footnote(), reporting._PROJECTION_FOOTNOTE)
         with hz_enabled():
@@ -396,6 +405,10 @@ def run_evaluate(conn):
         return runner.evaluate("atlanta", run_tag="t1", experiment_id="exp-1")
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled),
+# and these fakes/records predate the hazard read, so they run with it OFF.
+@hz_disabled()
 class RunnerAuditTests(unittest.TestCase):
     """BUF-12: a parcel_adjacency change during an experiment crashes it."""
 
@@ -534,6 +547,12 @@ class ProtectionTests(unittest.TestCase):
                                       capture_output=True, check=True).stdout
             except (subprocess.CalledProcessError, OSError):
                 self.skipTest("git history unavailable")
+            if name == "prepare.py":
+                # Re-pinned on the operator decision of 2026-11-09
+                # (reviews/33_hazards_enabled): the base plus exactly the
+                # delegated hazards prepare-mutation, nothing else. Every
+                # other file stays on the base bytes.
+                base = with_prepare_mutation(base)
             self.assertEqual((REPO_ROOT / name).read_bytes(), base, name)
 
     def test_no_pipeline_module_writes_human_owned_files(self):

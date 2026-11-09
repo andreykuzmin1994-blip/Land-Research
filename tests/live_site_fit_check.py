@@ -208,13 +208,19 @@ def synthetic(conn: Any, res: Results) -> None:
     # (c) failing read inside an open transaction, then the same connection
     with conn.cursor() as cur:
         cur.execute(_SQL_ONE)
+    # The hazard gate is ON in the shipped repo since the operator-authorized
+    # prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled): the hazard
+    # statement is read first and falls back to the plain one, so both fail.
     saved = site_fit._SQL_BUFFERED_FOR_FIT
+    saved_hz = site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS
     site_fit._SQL_BUFFERED_FOR_FIT = _SQL_FAILING
+    site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS = _SQL_FAILING
     try:
         site_fit._FIT_CACHE.clear()
         err = site_fit.project_parcel(conn, "ls-SQ")
     finally:
         site_fit._SQL_BUFFERED_FOR_FIT = saved
+        site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS = saved_hz
     with conn.cursor() as cur:
         cur.execute(_SQL_ONE)
         alive = cur.fetchone()[0] == 1

@@ -22,6 +22,12 @@ repo's, is first on sys.path:
       json, site_fit_golden_case as c; assert not hasattr(research, 'site_fit'); \\
       json.dump(c.run_case(research), open('$OLDPWD/reviews/22_site_fit/\\
 golden_scores_head_28d3205.json', 'w'), indent=1, sort_keys=True)")
+
+Since the operator-authorized prepare-mutation of 2026-11-09
+(reviews/33_hazards_enabled) the hazard gate is ON in the shipped repo. This
+record predates the hazard read and records non-hazard behaviour, so the
+case runs with the gate OFF (``hazards_helpers.disabled()``); the shipped
+hazard state is proven by tests/hazards_golden_check.py's enabled mode.
 """
 
 from __future__ import annotations
@@ -41,7 +47,7 @@ import site_fit_golden_case as golden  # noqa: E402
 RECORD = HERE.parent / "reviews" / "22_site_fit" / "golden_scores_head_28d3205.json"
 
 
-def main() -> int:
+def _compare() -> int:
     if zoning.any_verified():
         print("not comparable: some jurisdiction is verified (the record is all-draft)")
         return 2
@@ -80,6 +86,12 @@ def main() -> int:
           "identical to the 28d3205 record (results, inserts, notes; SQL apart from zoning's "
           "own stored-zoning read)")
     return 0
+
+
+def main() -> int:
+    from hazards_helpers import disabled
+    with disabled():
+        return _compare()
 
 
 if __name__ == "__main__":

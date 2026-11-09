@@ -22,7 +22,7 @@ import research
 import site_fit
 import site_fit_golden_case as sg
 import zoning_golden_case as zg
-from hazards_helpers import db_row, enabled, row
+from hazards_helpers import db_row, disabled, enabled, row, with_prepare_mutation
 from static_guards import module_reference_problems, prepare_write_problems
 from zoning_helpers import REPO_ROOT
 
@@ -110,8 +110,13 @@ def flags(rec, flag_type=None):
 
 
 # ---------------------------------------------------------------------------
+@disabled()
 class AbsentTests(unittest.TestCase):
-    """FW-03: with the gate off nothing hazard-related is reachable."""
+    """FW-03: with the gate off nothing hazard-related is reachable. The
+    shipped gate is ON since the operator-authorized prepare-mutation of
+    2026-11-09 (reviews/33_hazards_enabled), so these run under
+    ``disabled()``; the shipped-state inverse is
+    tests/test_hazards_enabled.py."""
 
     def test_no_hazard_sql_and_no_hazard_call(self):
         with mock.patch.object(hazards, "assess_parcels", side_effect=AssertionError("called")):
@@ -380,9 +385,13 @@ class SiteFitTests(unittest.TestCase):
             for st in site_fit.STATUSES:
                 p = site_fit._empty("a", st, "x", None)
                 self.assertIn(hazards.STREAM_BUFFERS, p.constraints, st)
+        with disabled():
+            p = site_fit._empty("a", site_fit.ERROR, "x", None)
+            self.assertNotIn(hazards.STREAM_BUFFERS, p.constraints)
+            self.assertIn(site_fit.FLOOD_WETLANDS, p.constraints)
+        # Shipped state (gate ON since 2026-11-09, reviews/33_hazards_enabled).
         p = site_fit._empty("a", site_fit.ERROR, "x", None)
-        self.assertNotIn(hazards.STREAM_BUFFERS, p.constraints)
-        self.assertIn(site_fit.FLOOD_WETLANDS, p.constraints)
+        self.assertIn(hazards.STREAM_BUFFERS, p.constraints)
 
     def test_hazard_sql_shape(self):
         sql = site_fit._SQL_BUFFERED_FOR_FIT_HAZARDS
@@ -445,7 +454,10 @@ class ReportingTests(unittest.TestCase):
 
 class ProtectionTests(unittest.TestCase):
     """FW-05 / FW-06 / FW-26: every protected-file list names the new
-    modules; the human-owned files are byte-identical to 8ddaf69."""
+    modules; the human-owned files are byte-identical to 8ddaf69, and
+    prepare.py is 8ddaf69's with exactly the operator-authorized hazards
+    prepare-mutation of 2026-11-09 applied (operator decision 2026-11-09,
+    reviews/33_hazards_enabled)."""
 
     def test_docs_name_the_protected_files(self):
         for doc in ("CLAUDE.md", "home_machine/agent_prompt.md", "AUTORESEARCH_MECHANICS.md",
@@ -484,6 +496,12 @@ class ProtectionTests(unittest.TestCase):
                                       capture_output=True, check=True).stdout
             except (subprocess.CalledProcessError, OSError):
                 self.skipTest("git history unavailable")
+            if name == "prepare.py":
+                # Re-pinned on the operator decision of 2026-11-09
+                # (reviews/33_hazards_enabled): the base plus exactly the
+                # delegated prepare-mutation, nothing else. Every other file
+                # stays on the 8ddaf69 bytes.
+                base = with_prepare_mutation(base)
             self.assertEqual((REPO_ROOT / name).read_bytes(), base, name)
 
     def test_no_pipeline_module_writes_human_owned_files(self):
