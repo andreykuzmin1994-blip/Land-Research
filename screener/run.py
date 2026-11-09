@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = args.out or HERE / "output" / f"{run_cfg['county']}-{today}"
     funnel: list[tuple[str, int]] = []
     notes: list[str] = []
+    earthwork: dict[int, dict[str, Any] | None] = {}
 
     log(f"{county.NAME} County: fetching {area['min_acres']}-{area['max_acres']} acre parcels")
     try:
@@ -181,8 +182,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if run_cfg.get("slope", True) and not args.no_slope and survivors:
         log(f"Slope from USGS lidar for {len(survivors):,} parcels")
-        checks.slope_checks(survivors, int(run_cfg.get("workers", 6)),
-                            lambda d, n: log(f"  slope {d:,}/{n:,}"))
+        estimates = checks.slope_checks(survivors, int(run_cfg.get("workers", 6)),
+                                        lambda d, n: log(f"  slope {d:,}/{n:,}"))
+        # Keyed by the parcel object, not its id (ids aren't guaranteed
+        # unique): the estimate stays off p until scoring is done.
+        earthwork = {id(p): e for p, e in zip(survivors, estimates)}
         slope_failed = sum(1 for p in survivors if p.get("slope_error"))
         if slope_failed:
             log(f"  ! slope check failed for {slope_failed:,} of {len(survivors):,} parcels")
@@ -214,6 +218,11 @@ def main(argv: list[str] | None = None) -> int:
     survivors.sort(key=lambda p: (-p["score"], p["parcel_id"]))
     for i, p in enumerate(survivors, 1):
         p["rank"] = i
+    # The cut/fill estimate is a live-only fact the frozen evaluation never
+    # measures, so it is attached only now, after scores, flags and the sort,
+    # for the reports alone (rank.py and scoring.py never see it).
+    for p in survivors:
+        p.update(checks.earthwork_fields(earthwork.get(id(p))))
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)

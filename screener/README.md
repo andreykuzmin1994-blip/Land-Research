@@ -28,7 +28,7 @@ Results land in `screener/output/fulton-<date>/`:
 | File | What it is |
 |---|---|
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate that isn't scored; see Earthwork below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
 | `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps |
 | `rejected.csv` | Every parcel screened out, with the reason |
@@ -60,6 +60,39 @@ floodplain and wetlands come from the tiny shape, so they mean nothing.
 "re-run later". It does so with `--no-slope` too. A thin sliver bigger
 than one pixel can still get an empty answer, and that still counts as a
 failed slope check.
+
+**Earthwork (rough cut/fill).** `ranked.csv` (and `ranked.geojson`)
+carry two columns right after `relief_ft`, and each brief has an
+"Earthwork" line:
+
+- `earthwork_cy`: cubic yards of cut, balanced by the same volume of fill,
+  to level the parcel's open ground to one flat pad at its mean elevation.
+  Rounded to 2 significant figures.
+- `mean_cut_fill_ft`: the average depth of cut or fill over that ground, to
+  0.1 ft.
+
+They come from the lidar elevation histogram the slope check already
+fetches (no extra request): cut = fill = area × mean absolute deviation
+from the mean elevation ÷ 2. This is a rough grading-difficulty signal,
+not a grading plan. It ignores the drainage cross-slope a pad needs,
+leveling only the building or yard footprint, terracing (a single pad
+grossly overstates large or ridged parcels), shrink/swell and compaction,
+topsoil stripping, rock and unsuitable soils, and grading done since the
+2018-19 lidar. There is no dollar figure, and it is in no score, screen,
+flag or "why it ranks here" line. An empty cell (never 0, which means
+flat) means not computed: slope not checked (`--no-slope`, `slope =
+false`), the slope check failed, the open ground is under one lidar pixel,
+or the answer didn't support an estimate (an unreadable histogram, or a
+pixel count that doesn't fit the open-ground area, e.g. a NoData gap). The
+elevation statistics were identical across repeated requests (below), so
+this number is steadier run to run than `steep_pct`.
+
+The frozen evaluation set has no elevation data, so the estimate is
+attached to each parcel only after scoring, flags and the sort, and
+`rank.py` and `scoring.py` never see it (`tests/test_earthwork.py` spies on
+every call). The AutoResearch loop's own `evaluate.py` doesn't run that
+test: it holds because the loop edits only `rank.py` and can't reorder
+`run.py`, and every `exp:` diff gets a human read.
 
 **Public data changes between days.** On 2026-10-28 and 29, the USGS 3DEP
 lidar service returned different slope statistics for 464 of 2,110
@@ -122,7 +155,7 @@ parcels (county GIS, 5-50 ac, chosen cities)
 | Floodplain, floodway | FEMA NFHL (Esri Living Atlas copy) |
 | Wetlands, ponds | USFWS National Wetlands Inventory |
 | Conservation easements, protected land | NCED, USGS PAD-US |
-| Slope, relief | USGS 3DEP lidar (2018–19), resampled to 10 m |
+| Slope, relief, rough cut/fill | USGS 3DEP lidar (2018–19), resampled to 10 m |
 | Contamination | EPA Cleanups in My Community; Georgia EPD Hazardous Site Inventory |
 | Interstate exits | GDOT |
 | Freight rail | BTS North American Rail Network |
