@@ -510,9 +510,14 @@ def _projection_reason(p: Any) -> str:
 
 def _bts_use_text(p: Any, used: bool) -> str:
     """Whether scoring uses this projection for BTS, and how. A verified
-    jurisdiction with a default setback is used but never passes (finding 6)."""
+    jurisdiction with a default setback is used but never passes (finding 6),
+    except a listed district without any setback in the rules (operator
+    decision D3, reviews/29_operator_decisions): used, with the investigate text."""
     if not used:
         return f"no ({p.rules_label})"
+    review = site_fit.bts_review_text(p)
+    if review is not None:
+        return f"yes (default setback; {review})"
     if not p.setback_from_rules:
         return "yes, rated N/A (default setback is not a verified rule)"
     return "yes (verified rules)"
@@ -569,7 +574,9 @@ def _projection_summary(p: Any, used: bool) -> str:
         return "Projected max building: — (projection unavailable)."
     best = site_fit.best_fit(p)
     sb = f"setback {p.setback_ft:g} ft all sides; " if p.setback_ft is not None else ""
+    review = site_fit.bts_review_text(p) if used else None
     use = "no" if not used else ("yes" if p.setback_from_rules
+                                 else f"yes (default setback; {review})" if review
                                  else "yes, rated N/A (default setback)")
     tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "
            f"{site_fit.flood_wetlands_text(p)}; {site_fit.adjacency_text(p)}")

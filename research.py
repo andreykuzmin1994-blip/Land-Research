@@ -17,7 +17,9 @@ Python file the agent edits while the experiment loop is active. The agent:
     - never modifies :mod:`site_fit`, never reads or writes the human-owned
       ``building_prototypes.json``, and gets building projections only from
       ``site_fit.project_parcel`` / ``project_parcels`` and tests them only
-      with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit),
+      with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit); the D3
+      review text comes only from ``site_fit.bts_review_text``
+      (reviews/29_operator_decisions),
     - never modifies :mod:`hazards` or ``hazards_import.py``, holds no flood
       or wetland threshold, zone list or hazard SQL of its own, and gets the
       H4/H6 verdicts only from ``hazards.assess_parcels`` behind
@@ -2728,8 +2730,11 @@ def _assess_strategy_bts(
     reviews/22_site_fit (SF-02): ``projection`` is passed ONLY for a parcel
     whose zoning jurisdiction is verified; then the program.md ">= 150K SF
     footprint" test is the protected site_fit.meets_bts_footprint (a failed
-    or missing projection is N/A, never the acreage proxy). Without a
-    projection the acreage proxy below is unchanged."""
+    or missing projection is N/A, never the acreage proxy). Since operator
+    decision D3 (reviews/29_operator_decisions, 2026-11-09) a listed district
+    without any setback in the rules counts with the 25 ft default and
+    carries site_fit.bts_review_text (a data_gap flag, never a block).
+    Without a projection the acreage proxy below is unchanged."""
     if projection is not None:
         if not site_fit.meets_bts_footprint(projection):
             return "N/A"
@@ -3188,6 +3193,13 @@ def score_parcel(
             f"S9={sub_scores['S9_entitlement_complexity']} "
             f"S10={sub_scores['S10_incentives']}"
         )[:480]
+        # reviews/29_operator_decisions (D3): a verified, listed district
+        # without setbacks counts for BTS with the default; the notes and one
+        # data_gap flag say "investigate further". None for every other
+        # projection, and no projection exists for draft parcels.
+        bts_review = site_fit.bts_review_text(projection) if projection is not None else None
+        if bts_review is not None:
+            notes = f"{notes} | {bts_review}"[:480]
 
         written: list[tuple[str, str]] = []
         market_name = parcel.get("market") or ""
@@ -3249,6 +3261,13 @@ def score_parcel(
                             "between runs (reviews/22_site_fit)",
                             open_gaps, written,
                         )
+                if bts_review is not None:
+                    _flag_data_gap_once(
+                        conn, cycle_id, parcel_id, market_name, bts_review,
+                        "check the district's setbacks in the code by hand; a human adds them "
+                        "to the rules file between runs (reviews/29_operator_decisions)",
+                        open_gaps, written,
+                    )
                 # reviews/26_flood_wetlands (FW-04, FW-17): missing or stale
                 # hazard data is a data_gap; a review is its own flag type
                 # (no gate reads it), written once while it stays open.

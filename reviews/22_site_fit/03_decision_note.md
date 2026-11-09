@@ -218,3 +218,39 @@ and 5 in throwaway copies without touching repo files.
 - Optional, between runs (finding 10): have `runner.evaluate` refuse when
   a protected `.py` file differs from HEAD, and run the static suites from
   autopilot before each experiment.
+
+## Operator decision (2026-11-09): districts without setbacks do not block
+
+Recorded in `reviews/29_operator_decisions/` (decision D3). The operator's
+answer to "Before verifying any jurisdiction: decide whether a default
+setback in a verified jurisdiction should stay BTS N/A" above: **"if no set
+backs do not block, we will just investigate further"**.
+
+- Changed: in a verified jurisdiction, a district LISTED in
+  `zoning_rules.json` whose front/side/rear setbacks are all absent or null
+  (today only Fairburn PD) is projected with the 25 ft default, and that
+  projection now counts for the >= 150K SF BTS footprint test
+  (`meets_bts_footprint`). The projection, the scoring notes and the memo
+  carry "investigate further: no district setbacks in zoning_rules.json;
+  25 ft default used" (`site_fit.bts_review_text`), and scoring writes it
+  once as a `data_gap` flag, never an `actionability_block`.
+- Kept (finding 6 still applies): an UNLISTED district (no dimensions in
+  the rules) and a listed district with a present but unreadable setback
+  value stay BTS N/A. The label `verified jurisdiction, default setback`,
+  the zoning gate, the `_ISSUED` forgery guard and every static guard but
+  one new allowed name (`bts_review_text`) are unchanged.
+- While every jurisdiction is draft, scoring is byte-identical (golden
+  checks). The first jurisdiction verification after this change needs a
+  new run and baseline, as before; it now moves BTS for Fairburn PD too.
+
+**Open for the operator (D3-01, review round 2, 2026-11-09).** The
+operator's words also fit an UNLISTED district in a verified jurisdiction
+(it has no setbacks in `zoning_rules.json` either) and a listed district
+with an unreadable value; both still stay BTS N/A without the investigate
+text. Fact to decide with: the only parcels D3 moves into BTS today are the
+13 Fairburn PD parcels (of 30 projected) that pass the 150K SF test, and
+`zoning_rules.json` lists Fairburn PD `warehouse_distribution` as
+`not_permitted` ("Fairburn PDs are mixed-residential"): they pass S9 only as
+REZONING, the same kind of parcel the listed-only reading was meant to keep
+out. Answer before the first verification; either way the change is
+between runs and needs a new run and baseline.

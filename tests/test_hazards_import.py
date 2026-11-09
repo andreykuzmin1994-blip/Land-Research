@@ -153,8 +153,8 @@ class RobotsTests(unittest.TestCase):
         self.assertIn("robots.txt disallows", out["nwi"].failed)
         self.assertEqual(f.data_calls(), [])
         rb = rules_scrape.Robots(FEMA_ROBOTS)
-        self.assertIsNotNone(hi.robots_verdict(rb, "/arcgis/rest/services/public/NFHL/MapServer/28/query?f=json"))
-        self.assertIsNotNone(hi.robots_verdict(rb, "/arcgis/rest/services/public/NFHL/MapServer"))
+        self.assertIsNotNone(rules_scrape.robots_verdict(rb, "/arcgis/rest/services/public/NFHL/MapServer/28/query?f=json", hi.UA_TOKEN))
+        self.assertIsNotNone(rules_scrape.robots_verdict(rb, "/arcgis/rest/services/public/NFHL/MapServer", hi.UA_TOKEN))
 
     def test_redirect_to_html_off_site_denies(self):
         out, f, _ = self.run_rest(lambda u: text(
@@ -180,11 +180,11 @@ class RobotsTests(unittest.TestCase):
 
     def test_ai_tokens_are_honoured(self):
         rb = rules_scrape.Robots(f"User-agent: {rules_scrape.AI_AGENT_TOKENS[0]}\nDisallow: /\n")
-        self.assertIsNotNone(hi.robots_verdict(rb, "/x"))
+        self.assertIsNotNone(rules_scrape.robots_verdict(rb, "/x", hi.UA_TOKEN))
         rb = rules_scrape.Robots(f"User-agent: {hi.UA_TOKEN}\nDisallow: /\n")
-        self.assertIsNotNone(hi.robots_verdict(rb, "/x"))
-        self.assertIsNone(hi.robots_verdict(rules_scrape.Robots("User-agent: *\nAllow: /\n"),
-                                            "/x?y=1"))
+        self.assertIsNotNone(rules_scrape.robots_verdict(rb, "/x", hi.UA_TOKEN))
+        self.assertIsNone(rules_scrape.robots_verdict(rules_scrape.Robots("User-agent: *\nAllow: /\n"),
+                                                      "/x?y=1", hi.UA_TOKEN))
 
     def test_policy_is_inherited_not_overridden(self):
         self.assertIs(hi.HazardsFetcher.robots_for, rules_scrape.PoliteFetcher.robots_for)

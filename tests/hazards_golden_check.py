@@ -39,6 +39,16 @@ import zoning  # noqa: E402
 import hazards_golden_case as golden  # noqa: E402
 
 RECORD = HERE.parent / "reviews" / "26_flood_wetlands" / "golden_head_8ddaf69.json"
+# The record was taken on this UTC date; discovery_date comes from
+# research.datetime.now, so the check freezes that clock to the record date
+# (reviews/29_operator_decisions round 2, F4). Exit 0 = identical again.
+RECORD_DATE = (2026, 11, 6)
+
+
+class _RecordClock(research.datetime):
+    @classmethod
+    def now(cls, tz=None):  # noqa: D401
+        return cls(*RECORD_DATE, 12, 0, 0, tzinfo=tz)
 
 
 def main() -> int:
@@ -49,7 +59,12 @@ def main() -> int:
         print("not comparable: the hazard table is enabled (the record predates it)")
         return 2
     want = json.loads(RECORD.read_text(encoding="utf-8"))
-    got = json.loads(json.dumps(golden.run_case(research), sort_keys=True, default=str))
+    real = research.datetime
+    research.datetime = _RecordClock
+    try:
+        got = json.loads(json.dumps(golden.run_case(research), sort_keys=True, default=str))
+    finally:
+        research.datetime = real
     bad = []
     for part in ("filters", "process"):
         w, g = want["discovery"][part], got["discovery"][part]

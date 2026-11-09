@@ -280,8 +280,10 @@ class StaticResearchTests(unittest.TestCase):
 
     SRC = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
     TREE = ast.parse(SRC)
+    # reviews/29_operator_decisions (D3-05): bts_review_text is the ONLY
+    # static-guard change of that round.
     ALLOWED = {"project_parcel", "project_parcels", "meets_bts_footprint", "data_gap_text",
-               "verify_prototypes_unchanged"}
+               "verify_prototypes_unchanged", "bts_review_text"}
     FIELDS = {f for cls in (site_fit.Projection, site_fit.PrototypeFit)
               for f in cls.__dataclass_fields__} - {"status", "reason", "label", "key"}
 

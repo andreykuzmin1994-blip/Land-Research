@@ -40,8 +40,11 @@ redirect off the registrable domain denies all. On 2026-11-06 both hosts
 deny the query paths (hazards.fema.gov: ``Disallow: /arcgis`` and
 ``Disallow: /*?*``; fwspublicservices.wim.usgs.gov answers 301 to an HTML
 page on www.fws.gov), so this mode fails both sources with exit 4 and
-makes no data request. It exists for the day the hosts allow it; no code
-path overrides a robots answer.
+makes no data request. It exists for the day the hosts allow it. The robots
+verdict is the ONE shared rules_scrape.robots_verdict; its only exception
+(operator decision D1, reviews/29_operator_decisions, 2026-11-09: an ArcGIS
+Online services host whose robots.txt answers a plain 401/403) never applies
+to a readable robots.txt, so neither FEMA nor USFWS is read.
 
 What it computes (in PostGIS, SRID 2240 US survey feet)
 -------------------------------------------------------
@@ -183,7 +186,10 @@ class HazardsFetcher(rules_scrape.PoliteFetcher):
     """rules_scrape.PoliteFetcher (robots for every token, 1 req/s per host,
     bounded retries, Retry-After capped, manual redirects, no cookies) with
     this tool's User-Agent and robots token. The robots policy itself
-    (``robots_for``) is inherited unchanged; no per-host override exists."""
+    (``robots_for``) is inherited unchanged and the verdict is the shared
+    rules_scrape.robots_verdict (D1); no per-host override exists here."""
+
+    robots_token = UA_TOKEN
 
     def __init__(self, http: Any = None, **kw: Any) -> None:
         kw.setdefault("max_requests", MAX_REQUESTS)
@@ -210,10 +216,10 @@ class HazardsFetcher(rules_scrape.PoliteFetcher):
         if p.scheme != "https" or not p.hostname:
             raise rules_scrape.Unreachable("not an https URL")
         rb = self.robots_for(f"https://{p.netloc}")
-        path = (p.path or "/") + (f"?{p.query}" if p.query else "")
-        why = robots_verdict(rb, path)
+        why = rules_scrape.robots_verdict(rb, rules_scrape.robots_path(url), UA_TOKEN)
         if why:
             raise rules_scrape.Unreachable(why)
+        rules_scrape.note_robots_exception(self, p.hostname, rb)
 
     def data_calls(self) -> list[str]:
         return [u for u in self.calls if not u.endswith("/robots.txt")]
@@ -238,21 +244,9 @@ class HazardsFetcher(rules_scrape.PoliteFetcher):
         return body
 
 
-def robots_verdict(rb: "rules_scrape.Robots", path: str) -> str | None:
-    """rules_scrape.Robots.verdict for this tool's token plus the AI-agent
-    tokens rules_scrape honours (same rules, same order)."""
-    if rb.deny_all:
-        return f"robots unavailable ({rb.reason})"
-    for tok in (UA_TOKEN,) + tuple(rules_scrape.AI_AGENT_TOKENS):
-        if not rb.allowed(path, tok):
-            return f"robots.txt disallows this path for {tok}"
-    if rb.global_signals.get("ai-input") == "no":
-        return "robots.txt Content-Signal ai-input=no"
-    for tok in (UA_TOKEN,) + tuple(rules_scrape.AI_AGENT_TOKENS):
-        for g in rb._groups_for(tok):
-            if g.signals.get("ai-input") == "no":
-                return "robots.txt Content-Signal ai-input=no"
-    return None
+# reviews/29_operator_decisions (D1-01): the robots verdict is the ONE shared
+# rules_scrape.robots_verdict, called with this tool's own token (_check);
+# this module defines no verdict of its own.
 
 
 def tiles_for(bboxes: Iterable[Sequence[float]], step: float = TILE_DEG) -> list[tuple]:
@@ -1172,6 +1166,8 @@ def run(*, mode: str = "files", inbox: Path = INBOX, fetcher: HazardsFetcher | N
     for line in summarise(assess, rows):
         print(line)
     if fetcher is not None:
+        for line in rules_scrape.robots_exception_lines(fetcher):
+            print(line)
         print("requests: " + (", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items()))
                               or "none"))
     print(f"wall time {clock() - started:.0f} s")
