@@ -36,7 +36,7 @@ What it does
    Cloudflare or Akamai block, a 429 without an acceptable Retry-After) is
    "unreachable": no retry, nothing cached. Subresources are never fetched.
    ONE robots verdict serves every tool (``robots_verdict``, also used by
-   adjacency_import and hazards_import). Its only exception is operator
+   adjacency_import, hazards_import and zoning_import). Its only exception is operator
    decision D1 (reviews/29_operator_decisions, 2026-11-09): when robots.txt
    of an ArcGIS Online services host (``services[0-9]*.arcgis.com``, or a
    host in the EMPTY ``OPERATOR_ACCEPTED_ARCGIS_HOSTS``) answered a plain
@@ -1106,7 +1106,7 @@ def arcgis_exception_applies(rb: "Robots", path: str) -> bool:
 
 def robots_verdict(rb: "Robots", path: str, token: str = UA_TOKEN) -> str | None:
     """The robots verdict of every tool (rules_scrape, adjacency_import,
-    hazards_import): None when ``token`` and every AI-agent token may fetch
+    hazards_import, zoning_import): None when ``token`` and every AI-agent token may fetch
     ``path``; else the refusal text. ``token`` is the calling tool's own
     robots token."""
     if rb.deny_all:

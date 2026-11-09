@@ -277,3 +277,7 @@ rules_scrape.PoliteFetcher on the shared robots verdict (code commit 16b5b97,
 offline equivalence proof, operator answer 3 "fix"); pending the post-change
 review in `reviews/32_zoning_import_fetcher/` (02_risk_review.md,
 02_code_writer_response.md, then 03_decision_note.md).
+
+**2026-11-09, D1-11 reviewed:** the post-change review approved it after one
+docstring fix; see `reviews/32_zoning_import_fetcher/03_decision_note.md`.
+Item 4 is closed.
