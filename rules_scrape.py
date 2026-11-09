@@ -123,7 +123,7 @@ from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
-from urllib.parse import parse_qsl, unquote, urlencode, urljoin, urlparse
+from urllib.parse import parse_qsl, unquote, urlencode, urljoin, urlparse, urlsplit
 
 import requests
 
@@ -1124,6 +1124,26 @@ def robots_verdict(rb: "Robots", path: str, token: str = UA_TOKEN) -> str | None
     return None
 
 
+def robots_path(url: str) -> str:
+    """The path robots rules and the D1 path guard see for ``url``: the raw
+    path INCLUDING any ';params' (urlsplit, not urlparse, which would split
+    ';x' off the last segment and hide it from the guard while the request
+    still carries it), plus '?query' as fetched (reviews/29 round 2, F1)."""
+    p = urlsplit(url)
+    return (p.path or "/") + (f"?{p.query}" if p.query else "")
+
+
+def note_robots_exception(fetcher: Any, host: str | None, rb: "Robots") -> None:
+    """Record the D1 exception for ``host`` once a request was actually let
+    through under it (a deny-all Robots whose verdict was None). Never set
+    for a host whose paths were all refused (reviews/29 round 2, F5)."""
+    if not rb.deny_all or not host:
+        return
+    meta = getattr(fetcher, "robots_meta", None)
+    if isinstance(meta, dict) and isinstance(meta.get(host), dict):
+        meta[host]["exception"] = ARCGIS_EXCEPTION_TEXT.format(status=rb.unavailable_status)
+
+
 def robots_exception_lines(fetcher: Any) -> list[str]:
     """One counts-only line per host read under D1 (hostname and the fixed
     text only; no URL, no query, no value) for the tools' outputs (D1-07)."""
@@ -1339,10 +1359,8 @@ class PoliteFetcher:
         self.robots_meta[host] = {"fetched_at": self.now().isoformat(timespec="seconds"),
                                   "deny_all": rb.deny_all, "allow_all": rb.allow_all,
                                   "reason": rb.reason, "crawl_delay": delay}
-        if rb.unavailable_status in (401, 403) and arcgis_exception_host(rb.origin_netloc):
-            # D1-07: deny_all stays True; the exception is named, per host.
-            self.robots_meta[host]["exception"] = ARCGIS_EXCEPTION_TEXT.format(
-                status=rb.unavailable_status)
+        # D1-07: deny_all stays True; the exception is named per host by
+        # note_robots_exception, only once a path was read under it.
         return rb
 
     def _check(self, url: str) -> None:
@@ -1354,10 +1372,10 @@ class PoliteFetcher:
         if url_terms_blocked(url):          # before robots_for: no robots.txt request (LF-03)
             raise Unreachable(TERMS_BLOCKED)
         rb = self.robots_for(f"https://{p.netloc}")
-        path = (p.path or "/") + (f"?{p.query}" if p.query else "")
-        why = robots_verdict(rb, path, self.robots_token)
+        why = robots_verdict(rb, robots_path(url), self.robots_token)
         if why:
             raise Unreachable(why)
+        note_robots_exception(self, p.hostname, rb)
 
     def fetch(self, url: str) -> Fetched:
         """GET one registered URL. Unreachable / BudgetExceeded on refusal."""
@@ -3962,7 +3980,9 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
         res_le = compare_signal(pg[0] if pg else None, g.get("last_edit") if ok else None)
         res_ct = compare_signal(pg[1:] if pg else None,
                                 [g.get("count"), g.get("max_oid")] if ok else None)
-        note = g.get("robots_note") or ""
+        # Round 2 F7: a row READ under the exception says so up front, so it
+        # cannot be mistaken for a refusal ('robots unavailable (HTTP 403)').
+        note = f"read under D1 exception: {g['robots_note']}" if g.get("robots_note") else ""
         rows.append({"kind": "gis lastEditDate", "key": key, "result": res_le,
                      "detail": g.get("reason") or ("; ".join(x for x in (
                          "no editingInfo", note) if x) if g.get("last_edit") is None else note)})

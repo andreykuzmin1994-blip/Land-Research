@@ -386,6 +386,46 @@ class PathTests(unittest.TestCase):
                   lay + "/query?f=json&x", "/y2BJK2GUfoTwH7py/arcgis/rest/services/Z/FeatureServer/١?f=json"):
             self.assertFalse(self.ok(p), p)
 
+    def test_params_on_any_segment_refused_end_to_end(self):
+        # Round 2 F1: urlparse would split ';x' off the last segment and hide
+        # it from the guard while the request still carries it.
+        for url in (LAYER + "/query;x?f=json", LAYER + ";x?f=json",
+                    LAYER + "/query;../../x?f=json", LAYER + "/query;x?" + urlencode(
+                        {"where": "1=1", "returnIdsOnly": "true", "f": "json"})):
+            for cls in FETCHERS:
+                f, http, _ = make(cls, robots_403())
+                with self.assertRaises(rs.Unreachable, msg=f"{cls.__name__} {url}") as cm:
+                    f.fetch(url)
+                self.assertEqual(cm.exception.reason, "robots unavailable (HTTP 403)")
+                self.assertEqual(data_calls(http), [], f"{cls.__name__} {url}")
+                self.assertNotIn("exception", f.robots_meta[SVC], cls.__name__)
+
+    def test_robots_path_keeps_params(self):
+        self.assertEqual(rs.robots_path(LAYER + "/query;x?f=json"),
+                         urlparse(LAYER).path + "/query;x?f=json")
+        self.assertEqual(rs.robots_path(f"https://{SVC}"), "/")
+
+    def test_readable_robots_matches_the_params_path(self):
+        # A ';' path is matched as fetched by ordinary robots rules too.
+        robots = "User-agent: *\nDisallow: /a/b;x\n"
+        for cls in FETCHERS:
+            f, http, _ = make(cls, {"https://gis.county.example/robots.txt": text(200, robots)})
+            with self.assertRaises(rs.Unreachable, msg=cls.__name__):
+                f.fetch("https://gis.county.example/a/b;x?f=json")
+            self.assertEqual(data_calls(http), [], cls.__name__)
+
+    def test_exception_recorded_only_after_a_read(self):
+        # Round 2 F5: a host whose every path was refused is not named.
+        for cls in FETCHERS:
+            f, http, _ = make(cls, robots_403())
+            with self.assertRaises(rs.Unreachable):
+                f.fetch(LAYER + "?f=html")
+            self.assertNotIn("exception", f.robots_meta[SVC], cls.__name__)
+            self.assertEqual(rs.robots_exception_lines(f), [], cls.__name__)
+            f.fetch(META)
+            self.assertEqual(f.robots_meta[SVC]["exception"], EXC, cls.__name__)
+            self.assertEqual(rs.robots_exception_lines(f), [f"robots: {SVC}: {EXC}"])
+
     def test_refused_path_on_an_accepted_host_makes_no_request(self):
         for url in (LAYER + "/applyEdits?f=json", LAYER.rsplit("/", 1)[0] + "?f=json",
                     LAYER + "?f=json&token=x"):
@@ -467,7 +507,8 @@ class OutputTests(unittest.TestCase):
         self.assertEqual(state["robots_exceptions"], {SVC: EXC})
         self.assertEqual(state["gis"]["sf_zoning_layer"], [17, 2, 9])
         report = (self.tmp / "report.md").read_text()
-        self.assertIn(f"| gis count/max id | sf_zoning_layer | unknown | {EXC} |", report)
+        self.assertIn(f"| gis count/max id | sf_zoning_layer | unknown | read under D1 exception: {EXC} |",
+                      report)
         self.assertNotIn("robots unavailable (HTTP 403)", report)
 
     def test_case_layers_still_skipped_while_the_loop_runs(self):
@@ -535,6 +576,34 @@ class OutputTests(unittest.TestCase):
 # D2 / D4 pins (no code change)
 # ---------------------------------------------------------------------------
 class PinTests(unittest.TestCase):
+    # Round 2 F6: zoning_import stays outside the shared robots policy (its
+    # own ZoningSession, D1-11 open item). Pin what makes that acceptable under
+    # D1: every layer it can be pointed at is an ArcGIS REST layer, on an
+    # ArcGIS Online services host or one of the two registered org hosts.
+    ZONING_ORG_HOSTS = frozenset({"gismaps.fultoncountyga.gov", "gis.atlantaga.gov"})
+
+    def test_zoning_import_hosts_are_arcgis_rest_only(self):
+        import zoning_import as zi
+        from urllib.parse import urlsplit
+        snippet = json.loads((REPO_ROOT / "reviews/21_zoning/sources_json_snippet.json")
+                             .read_text(encoding="utf-8"))
+        fulton = json.loads((REPO_ROOT / "sources.json").read_text(encoding="utf-8"))[
+            "county_parcel_data"]["fulton_ga"]
+        srcs = zi.validate_zoning_sources(snippet["zoning_sources"])
+        if "zoning_sources" in fulton:
+            srcs += zi.validate_zoning_sources(fulton["zoning_sources"])
+        urls = [f"{fulton['service_url'].rstrip('/')}/{int(fulton['parcel_layer_id'])}"]
+        urls += [s.url for s in srcs]
+        self.assertGreater(len(urls), 5)
+        for u in urls:
+            p = urlsplit(u)
+            self.assertEqual(p.scheme, "https", u)
+            self.assertFalse(p.query or p.fragment or p.port or "@" in p.netloc, u)
+            self.assertTrue(rs.arcgis_exception_host(p.netloc) is not None
+                            or p.hostname in self.ZONING_ORG_HOSTS, u)
+            self.assertTrue(rs.arcgis_public_rest_path(p.hostname, p.path + "?f=json"), u)
+            self.assertTrue(rs.arcgis_public_rest_path(p.hostname, p.path + "/query?f=json"), u)
+
     def test_flood_thresholds_are_the_human_values(self):
         hf = json.loads((REPO_ROOT / "parameters.json").read_text(encoding="utf-8"))["hard_filters"]
         self.assertEqual(hf["flood_zones_blocked"], ["A", "AE"])

@@ -216,10 +216,10 @@ class HazardsFetcher(rules_scrape.PoliteFetcher):
         if p.scheme != "https" or not p.hostname:
             raise rules_scrape.Unreachable("not an https URL")
         rb = self.robots_for(f"https://{p.netloc}")
-        path = (p.path or "/") + (f"?{p.query}" if p.query else "")
-        why = rules_scrape.robots_verdict(rb, path, UA_TOKEN)
+        why = rules_scrape.robots_verdict(rb, rules_scrape.robots_path(url), UA_TOKEN)
         if why:
             raise rules_scrape.Unreachable(why)
+        rules_scrape.note_robots_exception(self, p.hostname, rb)
 
     def data_calls(self) -> list[str]:
         return [u for u in self.calls if not u.endswith("/robots.txt")]
