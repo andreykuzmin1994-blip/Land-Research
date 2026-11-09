@@ -109,8 +109,9 @@ and each brief has a "Building fit" line:
 - `largest_open_acres`: map acres of the largest contiguous part of the
   open ground, i.e. the parcel minus floodplain (FEMA SFHA, floodway
   included), mapped wetlands and water (NWI), conservation easements
-  (NCED) and protected land (PAD-US). `0.0` means the constraints cover the
-  whole parcel map. Empty means not computed.
+  (NCED) and protected land (PAD-US). `0.0` means no open ground is left
+  on the parcel map (the constraints cover it, or what is left rounds to
+  under 0.05 acres). Empty means not computed.
 - `envelope_fit`: the largest building envelope (building + truck court +
   trailer parking per dock side) found on that open ground inside a 25 ft
   lot-line setback: `cross-dock L x 520 ft` (lengths 600-1000 ft, 890 ft

@@ -100,6 +100,42 @@ class CopyTests(unittest.TestCase):
         self.assertIn("return float(p[\"W\"]) + _sides(p) * (max(0.0, float(p[\"court\"])) + t)",
                       text)
 
+    def test_drift_against_root_search_code(self):
+        # The copied search must stay the root search: compare the function
+        # bodies as parsed text (root is read, never imported). Docstrings,
+        # annotations and the one parameter rename are normalised away.
+        path = ROOT / "site_fit.py"
+        if not path.exists():
+            self.skipTest("root site_fit.py not present")
+
+        def bodies(text):
+            out = {}
+            for node in ast.parse(text).body:
+                if isinstance(node, ast.FunctionDef):
+                    node.returns = None
+                    for a in node.args.args:
+                        a.annotation = None
+                    body = node.body
+                    if body and isinstance(body[0], ast.Expr) and isinstance(
+                            getattr(body[0], "value", None), ast.Constant):
+                        node.body = body[1:]
+                    for n in ast.walk(node):
+                        if isinstance(n, ast.AnnAssign):
+                            n.annotation = ast.Constant(None)
+                    out[node.name] = ast.unparse(node)
+            return out
+        root = bodies(path.read_text())
+        copy_ = bodies((SCREENER / "sitefit.py").read_text())
+        for name in ("_sides", "envelope_depth", "_ring_area", "_inside", "_angles",
+                     "_slab_gaps", "_probe_chords", "_bad_prefix", "_candidate_ys",
+                     "fit_lengths"):
+            with self.subTest(name=name):
+                want = root[name].replace("_Placement", "Placement")
+                got = copy_[name].replace("specs_", "specs")
+                if name == "fit_lengths":     # root annotates one local; the copy doesn't
+                    want = re.sub(r"result: None = ", "result = ", want)
+                self.assertEqual(got, want)
+
     def test_golden_lengths(self):
         # Root site_fit.fit_lengths gave the same lengths AND placements on
         # these rings (run once outside the suite; see 08_f6 response).
@@ -219,6 +255,12 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual(fit(whole).label, "cross-dock")
         f = fit(whole, holed, constrained=1.0)
         self.assertEqual((f.state, f.label, f.length_ft), (sitefit.FITS, "front/rear-load", 640.0))
+        # The drawn envelope (F12) avoids the hole and keeps the lot-line setback.
+        geom, og = in_degrees(whole), in_degrees(holed)
+        proj = geo.LocalProjection.around(geom)
+        env_m = proj(f.envelope)
+        self.assertTrue(env_m.within(proj(og)))
+        self.assertGreater(env_m.distance(proj(geom).exterior) * geo.FT_PER_M, 24.9)
 
     def test_setback_is_applied(self):
         # 480 ft square: 400 x 445 fits on the raw shape, not inside 25 ft.
