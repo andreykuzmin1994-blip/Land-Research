@@ -53,6 +53,15 @@ jus investigate further 4- Keep for now"
    residential parcel with a 25 ft default reach BTS MODERATE and the
    metric. If you want unlisted districts counted too, say so; it is a
    one-line change in the same place, between runs.
+   **Fact to decide with (review round 2, F3):** the 13 parcels D3 moves
+   into BTS today are all Fairburn PD, where `zoning_rules.json` lists
+   `warehouse_distribution` as `not_permitted` ("Fairburn PDs are
+   mixed-residential"); they pass S9 only as REZONING. So the one case the
+   listed-only reading changes is itself a mixed-residential parcel that
+   needs a rezoning, which weakens the reason given above for leaving
+   unlisted districts out. Please answer listed-only vs also-unlisted (and
+   unreadable values, D3-02) with that in hand, before the first
+   verification.
 6. **D3 never blocks and never runs while draft.** The text is a `data_gap`
    flag written once while open and a line in the notes and memo; draft
    parcels get no projection, so nothing changes until a jurisdiction is
@@ -87,8 +96,8 @@ requirements.txt and screener/ are unchanged.
   gate on + empty table as before): its verified default-setback parcels
   fulton-Z03/Z05 are UNLISTED districts, so D3 changes nothing there and no
   expected-diff list was needed; `building_comps_golden_check.py` exit 0.
-  `hazards_golden_check.py` prints "DIFFERS ... 10 case(s)" both at the base
-  commit and after this change: a pre-existing clock artefact
+  `hazards_golden_check.py` printed "DIFFERS ... 10 case(s)" both at the base
+  commit and after this change (fixed in round 2, F4): a pre-existing clock artefact
   (`discovery_date` is today; the record is of 2026-11-06). With
   `research.datetime.now` frozen to 2026-11-06 it is identical: "identical to
   the 8ddaf69 record: 16 discovery runs, 8 filter sets, 22 scored parcels +
@@ -179,8 +188,86 @@ Zoneomics mirror sources skipped by the terms block.
 - The independent post-change adversarial review (Tier 2) — next workflow
   step.
 - D1-11: zoning_import.py redirect/robots residual (decision 4).
-- D3-01: confirm that unlisted districts stay BTS N/A (decision 5).
+- D3-01: confirm that unlisted districts (and unreadable values, D3-02)
+  stay BTS N/A, knowing the only parcels D3 moves today are Fairburn PD
+  where warehouse is not_permitted (decision 5, round 2 F2/F3).
 - Esri / item-owner terms of use remain unverified (D1-09); D1 is the basis.
 - Before verifying any jurisdiction: a new run and baseline (D3 moves BTS
   for Fairburn PD; the adjacency import, once the DDL is applied, moves
   site fit).
+
+## Review round 2 (2026-11-09)
+
+The independent post-change review reported eight findings (three
+should-fix, five nits). This section was written by the implementer; it
+records the dispositions, not a fresh verdict.
+
+| # | Sev | Finding | Verdict | What changed |
+|---|---|---|---|---|
+| F1 | should-fix | `;params` on the last path segment hidden from the robots/D1 path guard by `urlparse` | fixed | `rules_scrape.robots_path` (urlsplit) is the checked path in all three fetchers |
+| F2 | should-fix | D3 narrower than the operator's wording | open for the operator | decision 5 / D3-01 kept, here and in reviews/22 |
+| F3 | should-fix | D3 today moves only Fairburn PD, warehouse not_permitted | recorded | decision 5 and reviews/22 carry the fact |
+| F4 | nit | hazards golden check clock-dependent | fixed | the check freezes `research.datetime` to 2026-11-06 |
+| F5 | nit | exception line written when nothing read under it | fixed | `note_robots_exception` in `_check`, after a let-through only |
+| F6 | nit | zoning_import outside the shared policy | open (D1-11) + pin | `PinTests.test_zoning_import_hosts_are_arcgis_rest_only` |
+| F7 | nit | watch Detail of a read row looked like a refusal | fixed | `read under D1 exception: <exact text>` |
+| F8 | nit | east_point_zoning 232 requests for 0 polygons | not changed | later round: skip tiles outside the layer extent |
+
+Dispositions with tests: `02_risk_review.md` § "Review round 2".
+
+**Commit.** `rules_scrape/adjacency_import/hazards_import: review round 2
+fixes for D1` (code + tests), then this note (docs). Local only, not
+pushed; no protected file in either.
+
+**Evidence.**
+- `python -m unittest discover -s tests`: 1,744 OK (+5: four PathTests,
+  one PinTest; the watch test's expected Detail updated). The five new
+  tests fail on the round-1 code (4 failures, 1 error), checked with the
+  code files stashed. `python -m unittest discover -s screener/tests -t .`:
+  134 OK.
+- Golden checks, unmodified records: zoning, site_fit (also South Fulton
+  verified), adjacency, building_comps and now hazards all exit 0
+  ("identical to the 8ddaf69 record: 16 discovery runs, 8 filter sets, 22
+  scored parcels + the cycle"). All-draft scoring stays byte-identical.
+
+**LIVE re-run after the fixes (counts only).** Same setup as above (the
+clone fast-forwarded to the round-2 commit, its prepare.py/sources.json
+edits kept in the clone only); own database **`adj29r2_79d90b00`** from
+`zoningcheck`, DDL applied there, **dropped afterwards** (`pg_database`
+count 0). `adjacency_import.py --no-open-run-check`: exit 0, 1,561 s, every
+count identical to the round-1 run above (sources 719 / 36 / 6,255 / 4,721
+/ 0 / 702 polygons, 2,857 rows on 1,075 parcels, 35 two-neighbour-district
+parcels, 127 own overhang; the four ArcGIS Online hosts each print the
+exception line once, now because a request was read under it). Per
+jurisdiction, with every jurisdiction verified in memory:
+
+| Jurisdiction | Other-district side | Residential side (no table / illustrative) | Two-neighbour | BTS footprint (of which D3) | Investigate flags |
+|---|---|---|---|---|---|
+| south_fulton | 208 | 0 / 98 | 13 | 56 (0) | 0 |
+| fairburn | 143 | 0 / 58 | 5 | 41 (13) | 30 |
+| union_city | 85 | 0 / 49 | 3 | 4 (0) | 0 |
+| east_point | 0 | 0 / 0 | 0 | 0 (0) | 0 |
+
+Site-fit projections with the gate on: unchanged without readings; with
+the illustrative readings South Fulton 5 and Fairburn 4 parcels lower, 0
+below 150K SF, BTS footprint counts unchanged.
+
+`rules_scrape --watch --flags --local-db-only` (clone, fresh rules_out/):
+all 9 GIS change signals read (count/max id for 9, lastEditDate for 5);
+the ArcGIS Online rows of the five layers (sf_zoning_layer, sf_zoning_cases,
+fairburn_zoning_layer, uc_zoning_layer, ep_zoning_layer) read "read under
+D1 exception: robots unavailable (403): ArcGIS public REST accepted by
+operator 2026-11-09"; `robots_exceptions` names the four hosts; flags as
+before (82 / 22 / 64, 0 case layers not checked). Exit 4 for the same
+pre-existing reason (two PDF hosts without a terms review).
+
+**Behaviour a human will notice.** Watch rows read under D1 now start
+"read under D1 exception:". A host whose robots.txt answers 403 but where
+nothing was read is no longer named in the robots lines. A URL with
+`;params` on an ArcGIS host is refused. `hazards_golden_check.py` exits 0
+on any day.
+
+**Operator steps.** (1) Answer D3-01 (listed-only vs also unlisted and
+unreadable) before verifying any jurisdiction. (2) Schedule the D1-11
+zoning_import round if wanted. (3) Before any verification or populated
+import: new run and baseline.

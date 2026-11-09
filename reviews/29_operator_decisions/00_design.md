@@ -169,3 +169,15 @@ hazards check is identical with the clock frozen at its record date.
 
 The first jurisdiction verification after this change needs a new run and
 baseline (it always did; this change moves BTS for Fairburn PD).
+
+## Review round 2 addendum (2026-11-09)
+
+- The checked robots path is `rules_scrape.robots_path(url)`: `urlsplit`
+  path (keeping `;params`) plus `?query`. All three `_check` methods use it,
+  so robots rules and the D1 path guard see the path as fetched (F1).
+- The per-host exception text is recorded by
+  `rules_scrape.note_robots_exception`, called in each `_check` after a
+  verdict of None on a deny-all Robots, i.e. only once a request was let
+  through under D1 (F5). `robots_for` no longer records it.
+- Watch rows read under D1 carry `read under D1 exception: ` before the
+  exact text (F7).

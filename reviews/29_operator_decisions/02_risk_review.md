@@ -46,10 +46,23 @@
 | D4-01 | nit | Only a dated note appended to reviews/24_rules_local_files/03_decision_note.md; no cache or quote deletion. | `PinTests.test_terms_block_and_denylist_unchanged` (TERMS_BLOCKED_DOMAINS, MIRROR_HOSTS, the Municode regex and host set; zoneomics/municode refused with no request); LF-03/RS-02 tests green |
 | PF-01 | should-fix | Explicit `git add` paths; `git diff --cached --name-only` checked before each commit; two attribution lines only; no push. | `test_zz_human_files_unchanged`; commit list in `03_decision_note.md` |
 
-## Pre-existing artefact (not introduced here)
+## Pre-existing artefact (fixed in review round 2)
 
-`tests/hazards_golden_check.py` compares discovery rows whose
+`tests/hazards_golden_check.py` compared discovery rows whose
 `discovery_date` is today's UTC date with a record taken on 2026-11-06, so
-on any later day it prints "DIFFERS ... 10 case(s)" for the discovery
-`process` cases at HEAD as well. Freezing `research.datetime` to the record
-date makes it identical. The check itself was left unchanged.
+on any later day it printed "DIFFERS ... 10 case(s)" at HEAD as well. Round
+2 (F4) freezes `research.datetime` to the record date inside the check;
+it now exits 0.
+
+## Review round 2 (post-change adversarial review, 2026-11-09)
+
+| # | Sev | Finding | Disposition | Pinned by |
+|---|---|---|---|---|
+| F1 | should-fix | `;params` on the last path segment were split off by `urlparse` before the robots/D1 path check, while the request carried them | Fixed: `rules_scrape.robots_path(url)` (urlsplit, keeps `;params`) is the checked path in all three `_check` methods | `PathTests.test_params_on_any_segment_refused_end_to_end` (`.../query;x?f=json`, `.../0;x?f=json`, `.../query;../../x`, all three fetchers, zero data requests), `test_robots_path_keeps_params`, `test_readable_robots_matches_the_params_path` |
+| F2 | should-fix | D3 narrower than the operator's wording (unlisted / unreadable stay N/A) | No code change; open item D3-01 kept in reviews/22 and 03 for the operator's explicit answer | `test_site_fit.test_d3_unlisted_district_stays_bts_na`, `test_d3_unreadable_setback_value_stays_bts_na` (unchanged) |
+| F3 | should-fix | The only parcels D3 moves today are Fairburn PD, where warehouse is `not_permitted` | Recorded in 03 decision 5 / D3-01 and reviews/22 | doc only |
+| F4 | nit | hazards golden check depends on the clock | Fixed (record-date clock inside the check) | `python tests/hazards_golden_check.py` exit 0 |
+| F5 | nit | Per-host exception line written even when nothing was read under it | Fixed: `note_robots_exception` records it in `_check` only after a verdict of None on a deny-all Robots | `PathTests.test_exception_recorded_only_after_a_read` (f=html refused: no line; then a read: one line), `test_params_...` (no line) |
+| F6 | nit | zoning_import outside the shared policy, follows redirects | Kept as the D1-11 open Tier 2 item; pin added | `PinTests.test_zoning_import_hosts_are_arcgis_rest_only` |
+| F7 | nit | Watch Detail of a READ row looked like a refusal | Fixed: `read under D1 exception: <exact text>` | `OutputTests.test_watch_reads_and_names_the_exception_once_per_host` |
+| F8 | nit | east_point_zoning 232 requests for 0 polygons | Not changed (reviews/27 design); later round: skip tiles outside the layer extent | none |

@@ -242,3 +242,15 @@ backs do not block, we will just investigate further"**.
 - While every jurisdiction is draft, scoring is byte-identical (golden
   checks). The first jurisdiction verification after this change needs a
   new run and baseline, as before; it now moves BTS for Fairburn PD too.
+
+**Open for the operator (D3-01, review round 2, 2026-11-09).** The
+operator's words also fit an UNLISTED district in a verified jurisdiction
+(it has no setbacks in `zoning_rules.json` either) and a listed district
+with an unreadable value; both still stay BTS N/A without the investigate
+text. Fact to decide with: the only parcels D3 moves into BTS today are the
+13 Fairburn PD parcels (of 30 projected) that pass the 150K SF test, and
+`zoning_rules.json` lists Fairburn PD `warehouse_distribution` as
+`not_permitted` ("Fairburn PDs are mixed-residential"): they pass S9 only as
+REZONING, the same kind of parcel the listed-only reading was meant to keep
+out. Answer before the first verification; either way the change is
+between runs and needs a new run and baseline.
