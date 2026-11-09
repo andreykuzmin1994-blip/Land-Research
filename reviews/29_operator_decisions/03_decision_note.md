@@ -198,6 +198,8 @@ Zoneomics mirror sources skipped by the terms block.
 - D3-01: confirm that unlisted districts (and unreadable values, D3-02)
   stay BTS N/A, knowing the only parcels D3 moves today are Fairburn PD
   where warehouse is not_permitted (decision 5, round 2 F2/F3).
+  **Closed** (operator, 2026-11-09, "count them"): both count, flagged;
+  implemented in `reviews/30_d3_count_unlisted/`.
 - Esri / item-owner terms of use remain unverified (D1-09); D1 is the basis.
 - Before verifying any jurisdiction: a new run and baseline (D3 moves BTS
   for Fairburn PD; the adjacency import, once the DDL is applied, moves

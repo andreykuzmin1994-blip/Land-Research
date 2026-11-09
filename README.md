@@ -225,8 +225,13 @@ the district's rules list is named), height (the clear height is stated,
 with the district maximum when the rules have one), stormwater detention
 (SiteFit's default pond is 400 x 200 ft, about 1.8 ac, and is not
 placed), car parking, truck drives, flood (H4) and wetlands (H6). A
-setback that is the 25 ft default is never a BTS input, even in a verified
-jurisdiction ("verified jurisdiction, default setback": BTS N/A). Very
+setback that is the 25 ft default is a BTS input only in a verified
+jurisdiction and only for a resolved district: one listed without any
+setback (reviews/29_operator_decisions, D3), one not listed in its table, or
+one listed with unreadable setbacks (reviews/30_d3_count_unlisted). Each
+counts with the default, never blocks and carries an "investigate further"
+`data_gap` flag naming the case. No district rule at all (no stored zoning,
+jurisdiction not in the rules) and rules unavailable stay BTS N/A. Very
 complex buffered outlines are simplified in PostGIS inside a slightly
 deeper buffer (stated on the projection); beyond 600 vertices the
 projection is an error rather than a slow search.
