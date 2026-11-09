@@ -887,6 +887,9 @@ class D3UUnreadableScoringTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        hz = hazards_disabled()     # hazards is not the subject here (reviews/33_hazards_enabled, R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
         with d3_fixture():
             with patch_rules(verified("fairburn", mutate=_pd_unreadable)):
                 site_fit._FIT_CACHE.clear()
@@ -933,6 +936,9 @@ class Review1PartialUnreadableScoringTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        hz = hazards_disabled()     # hazards is not the subject here (reviews/33_hazards_enabled, R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
         with d3_fixture():
             with patch_rules(verified("fairburn", mutate=_pd_partial)):
                 site_fit._FIT_CACHE.clear()
