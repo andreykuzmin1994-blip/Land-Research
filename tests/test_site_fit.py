@@ -21,7 +21,7 @@ import tempfile
 import time
 import types
 import unittest
-from contextlib import redirect_stdout
+from contextlib import nullcontext, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -613,6 +613,12 @@ class RulesTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 SF_M1 = stored("south_fulton", "south_fulton_zoning", "M-1")
 FB_M1 = stored("fairburn", "fairburn_zoning", "M-1")
+# reviews/30_d3_count_unlisted: the two new kinds' texts (literal on purpose).
+UNLISTED = ("investigate further: district not listed in zoning_rules.json; "
+            "25 ft default setback used")
+UNREADABLE = ("investigate further: district setbacks unreadable in zoning_rules.json; "
+              "25 ft default setback used")
+ALL_JURISDICTIONS = ("south_fulton", "fairburn", "atlanta", "union_city", "east_point", "fid")
 INVESTIGATE = ("investigate further: no district setbacks in zoning_rules.json; "
                "25 ft default used")
 
@@ -751,21 +757,43 @@ class ProjectionTests(unittest.TestCase):
         self.assertFalse(site_fit.meets_bts_footprint(None))
 
     def test_bts_threshold_boundary(self):
-        def proj(sf, issue=True, from_rules=True, default_listed=False, verified_=True):
+        def proj(sf, issue=True, from_rules=True, default_listed=False, verified_=True,
+                 kind=None):
             f = site_fit.PrototypeFit("front", "front-load", sf is not None, False, 600.0, 260.0,
                                       445.0, sf, 41, 50, 10.0, "geometry", 0.0)
             p = site_fit.Projection("a", "ok", "projected", "verified rules", verified_, 25.0, "",
                                     10 ** 6, 10 ** 6, None, (f,), (),
                                     setback_from_rules=from_rules,
-                                    setback_default_listed=default_listed)
+                                    setback_default_listed=default_listed,
+                                    setback_default_kind=kind)
             return site_fit._issue(p) if issue else p
         self.assertTrue(site_fit.meets_bts_footprint(proj(150_000)))
         self.assertFalse(site_fit.meets_bts_footprint(proj(149_999)))
         self.assertFalse(site_fit.meets_bts_footprint(proj(None)))
         self.assertEqual(site_fit.BTS_MIN_FOOTPRINT_SF, 150_000)
-        # Finding 6 (kept for an unlisted district or an unreadable value):
-        # a plain default setback is not a BTS input.
+        # Finding 6 (kept for a default with no district rule at all, rules
+        # unavailable, or any kind not named): a plain default setback is not
+        # a BTS input.
         self.assertFalse(site_fit.meets_bts_footprint(proj(520_000, from_rules=False)))
+        self.assertFalse(site_fit.meets_bts_footprint(proj(520_000, from_rules=False,
+                                                           kind="listed")))
+        self.assertIsNone(site_fit.bts_review_text(proj(520_000, from_rules=False,
+                                                        kind="other")))
+        # reviews/30_d3_count_unlisted (deliberately inverted, operator answer
+        # to D3-01/D3-02): an unlisted district and unreadable setbacks count
+        # with the default, each flagged whatever the size; never while draft.
+        for kind, text in (("unlisted", UNLISTED), ("unreadable", UNREADABLE)):
+            k = proj(520_000, from_rules=False, kind=kind)
+            self.assertTrue(site_fit.meets_bts_footprint(k), kind)
+            self.assertEqual(site_fit.bts_review_text(k), text)
+            ks = proj(149_999, from_rules=False, kind=kind)
+            self.assertFalse(site_fit.meets_bts_footprint(ks), kind)
+            self.assertEqual(site_fit.bts_review_text(ks), text)
+            kd = proj(520_000, from_rules=False, kind=kind, verified_=False)
+            self.assertFalse(site_fit.meets_bts_footprint(kd), kind)
+            self.assertIsNone(site_fit.bts_review_text(kd))
+            self.assertFalse(site_fit.meets_bts_footprint(proj(520_000, issue=False,
+                                                               from_rules=False, kind=kind)))
         # Operator decision D3 (reviews/29_operator_decisions, deliberately
         # inverted): a listed district without any setback counts with the
         # default, and is flagged whatever the size.
@@ -821,6 +849,21 @@ class ProjectionTests(unittest.TestCase):
         draft = site_fit._issue(dataclasses.replace(forged, rules_verified=False))
         self.assertFalse(site_fit.meets_bts_footprint(draft))
         self.assertIsNone(site_fit.bts_review_text(draft))
+        # reviews/30_d3_count_unlisted (D3U-08): the same guard for each new kind.
+        for kind in (site_fit.DEFAULT_UNLISTED, site_fit.DEFAULT_UNREADABLE):
+            fk = dataclasses.replace(forged, setback_default_listed=False,
+                                     setback_default_kind=kind)
+            self.assertFalse(site_fit.meets_bts_footprint(fk), kind)
+            self.assertIsNone(site_fit.bts_review_text(fk))
+            rk = site_fit._issue(dataclasses.replace(fk))
+            self.assertTrue(site_fit.meets_bts_footprint(rk), kind)
+            for fake in (copy.copy(rk), dataclasses.replace(rk), type(rk)(*[
+                    getattr(rk, k) for k in site_fit.Projection.__dataclass_fields__])):
+                self.assertFalse(site_fit.meets_bts_footprint(fake), kind)
+                self.assertIsNone(site_fit.bts_review_text(fake))
+            dk = site_fit._issue(dataclasses.replace(fk, rules_verified=False))
+            self.assertFalse(site_fit.meets_bts_footprint(dk), kind)
+            self.assertIsNone(site_fit.bts_review_text(dk))
 
     def test_verified_listed_district_without_setbacks_counts_with_the_review_text(self):
         # Review finding 6, reversed by operator decision D3 (2026-11-09,
@@ -865,37 +908,68 @@ class ProjectionTests(unittest.TestCase):
             site_fit._FIT_CACHE.clear()
             return site_fit.project_parcel(conn, "a")
 
-    def test_d3_unlisted_district_stays_bts_na(self):
-        # D3-01: an unlisted district (dimensions None) in a verified
-        # jurisdiction keeps finding 6: default setback, BTS N/A, no review text.
+    def test_d3u_unlisted_district_counts_with_its_review_text(self):
+        # Was test_d3_unlisted_district_stays_bts_na. Deliberately inverted by
+        # the operator's answer to D3-01 (2026-11-09, "count them";
+        # reviews/30_d3_count_unlisted): an unlisted district in a verified
+        # jurisdiction counts with the 25 ft default and carries its own text.
         p = self._fairburn("R-1")
         self.assertEqual((p.status, p.rules_verified, p.setback_from_rules,
-                          p.setback_default_listed), ("ok", True, False, False))
-        self.assertIn("not listed in the rules", p.setback_source)
+                          p.setback_default_listed, p.setback_default_kind),
+                         ("ok", True, False, False, "unlisted"))
+        self.assertEqual(p.setback_source, "default (district fairburn R-1 not listed in the rules)")
+        self.assertEqual(p.rules_label, "verified jurisdiction, default setback")
         self.assertEqual(site_fit.max_building_sf(p), 520_000)
-        self.assertFalse(site_fit.meets_bts_footprint(p))
-        self.assertIsNone(site_fit.bts_review_text(p))
+        self.assertTrue(site_fit.meets_bts_footprint(p))
+        self.assertEqual(site_fit.bts_review_text(p), UNLISTED)
+        self.assertEqual(p.constraints.count(UNLISTED), 1)
+        self.assertEqual(p.constraints[1], UNLISTED)      # right after the setback line
         self.assertNotIn(INVESTIGATE, p.constraints)
+        self.assertNotIn(UNREADABLE, p.constraints)
+        self.assertIn("no lot coverage cap in the rules", p.constraints)   # D3U-14
+        # Draft: inert (D3U-02).
+        site_fit._FIT_CACHE.clear()
+        code = stored("fairburn", "fairburn_zoning", "R-1")
+        conn = FakeConn({"a": code}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+        d = site_fit.project_parcel(conn, "a")
+        self.assertEqual((d.rules_label, d.setback_default_kind), ("draft rules", None))
+        self.assertFalse(site_fit.meets_bts_footprint(d))
+        self.assertIsNone(site_fit.bts_review_text(d))
+        self.assertFalse([c for c in d.constraints if "investigate" in c])
 
-    def test_d3_unreadable_setback_value_stays_bts_na(self):
-        # D3-02: a present-but-unusable value is a data error, not an absent
-        # rule: BTS N/A plus the existing note. All three null: counts.
+    def test_d3u_unreadable_setback_value_counts_with_its_review_text(self):
+        # Was test_d3_unreadable_setback_value_stays_bts_na. Deliberately
+        # inverted by the operator's answer to D3-02 (2026-11-09;
+        # reviews/30_d3_count_unlisted): no readable value and at least one
+        # present-but-unusable one counts with the default, its own text, and
+        # the existing "not a number" note. All three null: the D3 text.
         def see_table(data):
             data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"][
                 "front_setback_ft"] = {"value": "see table", "cite": "x"}
         p = self._fairburn("PD", see_table)
-        self.assertEqual((p.setback_from_rules, p.setback_default_listed), (False, False))
+        self.assertEqual((p.setback_from_rules, p.setback_default_listed, p.setback_default_kind),
+                         (False, False, "unreadable"))
         self.assertIn("front_setback_ft of fairburn PD is not a number: not applied",
                       p.constraints)
-        self.assertFalse(site_fit.meets_bts_footprint(p))
-        self.assertIsNone(site_fit.bts_review_text(p))
+        self.assertTrue(site_fit.meets_bts_footprint(p))
+        self.assertEqual(site_fit.bts_review_text(p), UNREADABLE)
+        self.assertEqual(p.constraints.count(UNREADABLE), 1)
+        self.assertNotIn(INVESTIGATE, p.constraints)
 
         def negative(data):
             data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"][
                 "side_setback_ft"] = -5
         n = self._fairburn("PD", negative)
-        self.assertFalse(site_fit.meets_bts_footprint(n))
-        self.assertIsNone(site_fit.bts_review_text(n))
+        self.assertTrue(site_fit.meets_bts_footprint(n))
+        self.assertEqual(site_fit.bts_review_text(n), UNREADABLE)
+        for bad in ("40", True, float("nan"), [40]):
+            def mut(data, bad=bad):
+                data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"][
+                    "rear_setback_ft"] = bad
+            b = self._fairburn("PD", mut)      # string, bool, NaN, list: all unreadable
+            self.assertEqual((b.setback_ft, b.setback_from_rules, b.setback_default_kind),
+                             (25.0, False, "unreadable"), bad)
+            self.assertEqual(site_fit.bts_review_text(b), UNREADABLE, bad)
 
         def all_null(data):
             dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
@@ -904,6 +978,109 @@ class ProjectionTests(unittest.TestCase):
         a = self._fairburn("PD", all_null)
         self.assertTrue(site_fit.meets_bts_footprint(a))
         self.assertEqual(site_fit.bts_review_text(a), INVESTIGATE)
+
+    def test_d3u_listed_district_without_dimensions_is_unreadable_not_unlisted(self):
+        # D3U-06: zoning.District.listed tells a listed district without a
+        # usable dimensions mapping from an unlisted one.
+        def no_dims(data):
+            del data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+
+        def str_dims(data):
+            data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"] = "see table"
+        for mut in (no_dims, str_dims):
+            p = self._fairburn("PD", mut)
+            self.assertEqual((p.setback_default_listed, p.setback_default_kind),
+                             (False, "unreadable"), mut.__name__)
+            self.assertEqual(p.setback_source,
+                             "default (district fairburn PD has no usable dimensions in the rules)")
+            self.assertTrue(site_fit.meets_bts_footprint(p))
+            self.assertEqual(site_fit.bts_review_text(p), UNREADABLE)
+            self.assertNotIn("not listed", p.setback_source)
+
+    def test_d3u_partial_unreadable_is_unchanged(self):
+        # D3U-07 (residual, not this round): some values readable, one not:
+        # the max of the readable ones counts from the rules, as before; no
+        # kind and no investigate text.
+        def partial(data):
+            dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+            dims["front_setback_ft"] = 40
+            dims["side_setback_ft"] = {"value": "see table", "cite": "x"}
+        p = self._fairburn("PD", partial)
+        self.assertEqual((p.setback_ft, p.setback_from_rules, p.setback_default_listed,
+                          p.setback_default_kind), (40, True, False, None))
+        self.assertIn("side_setback_ft of fairburn PD is not a number: not applied",
+                      p.constraints)
+        self.assertTrue(site_fit.meets_bts_footprint(p))
+        self.assertIsNone(site_fit.bts_review_text(p))
+        self.assertFalse([c for c in p.constraints if "investigate" in c])
+
+    def test_d3u_no_district_rule_never_counts(self):
+        # D3U-01: with EVERY jurisdiction verified, each "no district rule"
+        # path and rules-unavailable keeps finding 6: default, BTS N/A, no text.
+        # A missing governing jurisdiction is refused by the rules schema, so
+        # district_for_stored's None for it is reached through a mock below.
+        def gov_missing(data):
+            data["jurisdictions"]["fid"]["governing_jurisdiction"] = "nowhere"
+        with self.assertRaises(zoning.ZoningRulesError):
+            patch_rules(verified(*ALL_JURISDICTIONS, mutate=gov_missing))
+        cases = (
+            ("no provenance", ("M-1", None), False),
+            ("jurisdiction not in the rules", stored("college_park", "cp_zoning", "M-1"), False),
+            ("district not resolved (governing jurisdiction missing)", FB_M1, True),
+            ("no machine-readable district", stored("fairburn", "fairburn_zoning", "-"), False),
+        )
+        for name, code, unresolved in cases:
+            conn = FakeConn({"a": code}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+            with patch_rules(verified(*ALL_JURISDICTIONS)), \
+                    mock.patch.object(zoning, "district_for_stored",
+                                      return_value=None) if unresolved else nullcontext():
+                site_fit._FIT_CACHE.clear()
+                p = site_fit.project_parcel(conn, "a")
+            self.assertEqual((p.status, p.setback_ft, p.rules_verified, p.setback_default_kind),
+                             ("ok", 25.0, False, None), name)
+            self.assertEqual(site_fit.max_building_sf(p), 520_000, name)
+            self.assertFalse(site_fit.meets_bts_footprint(p), name)
+            self.assertIsNone(site_fit.bts_review_text(p), name)
+            self.assertFalse([c for c in p.constraints if "investigate" in c], name)
+        conn = FakeConn({"a": FB_M1}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+        with patch_rules(problem="zoning_rules.json schema: verified_by missing"):
+            site_fit._FIT_CACHE.clear()
+            u = site_fit.project_parcel(conn, "a")
+        self.assertEqual((u.rules_label, u.setback_default_kind), ("zoning rules unavailable", None))
+        self.assertFalse(site_fit.meets_bts_footprint(u))
+        self.assertIsNone(site_fit.bts_review_text(u))
+
+    def test_d3u_fid_needs_the_governing_table_verified(self):
+        # D3U-02: an unlisted FID district (resolved to South Fulton's table)
+        # counts only when FID AND South Fulton are verified.
+        code = stored("fid", "fulton_layer34_zoning", "R-3")
+        conn = FakeConn({"a": code}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+        with patch_rules(verified("fid")):
+            site_fit._FIT_CACHE.clear()
+            half = site_fit.project_parcel(conn, "a")
+        self.assertEqual((half.rules_verified, half.setback_default_kind), (False, None))
+        self.assertFalse(site_fit.meets_bts_footprint(half))
+        self.assertIsNone(site_fit.bts_review_text(half))
+        self.assertFalse([c for c in half.constraints if "investigate" in c])
+        with patch_rules(verified("fid", "south_fulton")):
+            site_fit._FIT_CACHE.clear()
+            both = site_fit.project_parcel(conn, "a")
+        self.assertEqual((both.rules_verified, both.setback_default_kind), (True, "unlisted"))
+        self.assertTrue(site_fit.meets_bts_footprint(both))
+        self.assertEqual(site_fit.bts_review_text(both), UNLISTED)
+
+    def test_d3u_empty_and_error_projections_carry_the_text_but_no_review(self):
+        # The constraint line is on every projection of a verified default
+        # kind; bts_review_text (the flag) only on status ok, and BTS never.
+        code = stored("fairburn", "fairburn_zoning", "R-1")
+        conn = FakeConn({"a": code}, {"a": (2_000_000, None, 0.0)})
+        with patch_rules(verified("fairburn")):
+            site_fit._FIT_CACHE.clear()
+            e = site_fit.project_parcel(conn, "a")
+        self.assertEqual((e.status, e.setback_default_kind), (site_fit.EMPTY, "unlisted"))
+        self.assertEqual(e.constraints.count(UNLISTED), 1)
+        self.assertFalse(site_fit.meets_bts_footprint(e))
+        self.assertIsNone(site_fit.bts_review_text(e))
 
     def test_too_complex_ring_is_an_error_not_an_unbounded_search(self):
         # Review finding 5: a 1,000-vertex strip 440 ft wide (nothing fits,

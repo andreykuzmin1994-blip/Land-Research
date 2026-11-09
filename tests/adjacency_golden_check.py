@@ -7,7 +7,10 @@ draft), to a frozen record of the same three modules at commit 595aa08
 (before the adjacency module existed): scoring (results, every executed
 statement and parameter, parcel_scores inserts, research_log notes),
 projections (every field, ring text included, and the statements) and the
-memo/snapshot lines. Two states: the gate OFF (prepare.py carries no
+memo/snapshot lines, with the explicit expected diff of
+reviews/30_d3_count_unlisted applied to the record (``D3U_EXPECTED_DIFF`` in
+adjacency_golden_case: two unlisted parcels gain the investigate text; the
+record is never regenerated). Two states: the gate OFF (prepare.py carries no
 ``_DDL_PARCEL_ADJACENCY``: everything identical) and the gate ON with an
 empty table (scores identical; the only new statement is the adjacency
 read; only the adjacency texts change). The suite carries the same
@@ -57,13 +60,23 @@ def main() -> int:
     if zoning.any_verified() or adjacency.enabled():
         print("not comparable: the shipped state must be all-draft with the gate off")
         return 2
-    want = json.loads(RECORD.read_text(encoding="utf-8"))
-    bad = golden.differences_off(want, current())
+    raw = json.loads(RECORD.read_text(encoding="utf-8"))
+    # reviews/30_d3_count_unlisted (D3U-12): the record plus the explicit
+    # expected diff (two unlisted parcels gain the investigate text); the
+    # record itself is never regenerated.
+    want = golden.expected_after_d3u(raw)
+    got = current()
+    bad = golden.differences_off(want, got)
     if bad:
-        print(f"gate OFF DIFFERS from the 595aa08 record: {len(bad)} case(s): {', '.join(bad)}")
+        print(f"gate OFF DIFFERS from the 595aa08 record + the reviews/30 expected diff: "
+              f"{len(bad)} case(s): {', '.join(bad)}")
+        return 1
+    if golden.differences_off(raw, got) != ["verified.memo", "verified.projections"]:
+        print("gate off: the reviews/30 expected diff is not where the change is")
         return 1
     print("gate off: identical to the 595aa08 record (scoring with every fixture jurisdiction "
-          "verified, projections and memo lines verified and draft)")
+          "verified, projections and memo lines verified and draft) apart from the "
+          f"{len(golden.D3U_EXPECTED_DIFF)} listed reviews/30 expected-diff entries")
     with enabled():
         got = current()
     bad = golden.differences_on_empty(want, got, site_fit, adjacency)

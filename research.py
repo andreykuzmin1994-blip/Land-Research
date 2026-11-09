@@ -19,7 +19,7 @@ Python file the agent edits while the experiment loop is active. The agent:
       ``site_fit.project_parcel`` / ``project_parcels`` and tests them only
       with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit); the D3
       review text comes only from ``site_fit.bts_review_text``
-      (reviews/29_operator_decisions),
+      (reviews/29_operator_decisions, reviews/30_d3_count_unlisted),
     - never modifies :mod:`hazards` or ``hazards_import.py``, holds no flood
       or wetland threshold, zone list or hazard SQL of its own, and gets the
       H4/H6 verdicts only from ``hazards.assess_parcels`` behind
@@ -2733,7 +2733,10 @@ def _assess_strategy_bts(
     or missing projection is N/A, never the acreage proxy). Since operator
     decision D3 (reviews/29_operator_decisions, 2026-11-09) a listed district
     without any setback in the rules counts with the 25 ft default and
-    carries site_fit.bts_review_text (a data_gap flag, never a block).
+    carries site_fit.bts_review_text (a data_gap flag, never a block); since
+    the operator's answer to D3-01/D3-02 (reviews/30_d3_count_unlisted) an
+    unlisted district and a listed one with unreadable setbacks do too, each
+    with its own text.
     Without a projection the acreage proxy below is unchanged."""
     if projection is not None:
         if not site_fit.meets_bts_footprint(projection):
@@ -3193,10 +3196,11 @@ def score_parcel(
             f"S9={sub_scores['S9_entitlement_complexity']} "
             f"S10={sub_scores['S10_incentives']}"
         )[:480]
-        # reviews/29_operator_decisions (D3): a verified, listed district
-        # without setbacks counts for BTS with the default; the notes and one
-        # data_gap flag say "investigate further". None for every other
-        # projection, and no projection exists for draft parcels.
+        # reviews/29_operator_decisions (D3) and reviews/30_d3_count_unlisted:
+        # a verified district that is listed without setbacks, not listed, or
+        # listed with unreadable setbacks counts for BTS with the default; the
+        # notes and one data_gap flag say "investigate further". None for every
+        # other projection, and no projection exists for draft parcels.
         bts_review = site_fit.bts_review_text(projection) if projection is not None else None
         if bts_review is not None:
             notes = f"{notes} | {bts_review}"[:480]
@@ -3264,8 +3268,9 @@ def score_parcel(
                 if bts_review is not None:
                     _flag_data_gap_once(
                         conn, cycle_id, parcel_id, market_name, bts_review,
-                        "check the district's setbacks in the code by hand; a human adds them "
-                        "to the rules file between runs (reviews/29_operator_decisions)",
+                        "check the district and its setbacks in the code by hand; a human "
+                        "adds the district or its setback values to the rules file between "
+                        "runs (reviews/29_operator_decisions, reviews/30_d3_count_unlisted)",
                         open_gaps, written,
                     )
                 # reviews/26_flood_wetlands (FW-04, FW-17): missing or stale

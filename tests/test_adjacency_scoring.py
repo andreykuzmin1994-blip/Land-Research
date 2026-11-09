@@ -38,7 +38,10 @@ class DifferentialTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.want = json.loads(RECORD.read_text(encoding="utf-8"))
+        cls.raw = json.loads(RECORD.read_text(encoding="utf-8"))
+        # reviews/30_d3_count_unlisted (D3U-12): the record + the explicit
+        # expected diff, never a regenerated record.
+        cls.want = golden.expected_after_d3u(cls.raw)
 
     def current(self):
         return json.loads(json.dumps(golden.run_case(research, site_fit, reporting),
@@ -55,6 +58,26 @@ class DifferentialTests(unittest.TestCase):
         reads = [e for e in got["verified"]["executed"]
                  if e[0] == adjacency._SQL_ADJACENCY_FOR_PARCELS]
         self.assertEqual(len(reads), 1)       # one batched read, = ANY(%s)
+
+    def test_d3u_expected_diff_is_exactly_the_change(self):
+        # reviews/30_d3_count_unlisted: against the raw record only the two
+        # listed sections differ, on exactly the listed parcels and fields.
+        got = self.current()
+        self.assertEqual(golden.differences_off(self.raw, got),
+                         ["verified.memo", "verified.projections"])
+        changed = set()
+        for sec in ("projections", "memo"):
+            for pid, a in self.raw["verified"][sec].items():
+                for k, v in a.items():
+                    if got["verified"][sec][pid][k] != v:
+                        changed.add(("verified", sec, pid, k))
+        self.assertEqual(changed, {e[:4] for e in golden.D3U_EXPECTED_DIFF})
+        self.assertEqual(len(golden.D3U_EXPECTED_DIFF), 6)
+        self.assertEqual(self.raw["draft"], got["draft"])
+        self.assertEqual(self.raw["verified"]["scoring"], got["verified"]["scoring"])
+        # The edit refuses a record that is not the expected base.
+        with self.assertRaises(AssertionError):
+            golden.expected_after_d3u(self.want)
 
     def test_record_is_the_base(self):
         try:

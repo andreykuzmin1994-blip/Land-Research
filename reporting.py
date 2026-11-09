@@ -510,9 +510,11 @@ def _projection_reason(p: Any) -> str:
 
 def _bts_use_text(p: Any, used: bool) -> str:
     """Whether scoring uses this projection for BTS, and how. A verified
-    jurisdiction with a default setback is used but never passes (finding 6),
-    except a listed district without any setback in the rules (operator
-    decision D3, reviews/29_operator_decisions): used, with the investigate text."""
+    jurisdiction with a default setback is used, with the investigate text,
+    when the district is listed without any setback (operator decision D3,
+    reviews/29_operator_decisions), not listed, or listed with unreadable
+    setbacks (reviews/30_d3_count_unlisted). The "rated N/A" branch is the
+    fail-closed fallback for a used projection without one (finding 6)."""
     if not used:
         return f"no ({p.rules_label})"
     review = site_fit.bts_review_text(p)

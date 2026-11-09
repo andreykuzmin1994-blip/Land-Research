@@ -42,6 +42,14 @@ LAYER = f"https://{SVC}/y2BJK2GUfoTwH7py/arcgis/rest/services/Zoning/FeatureServ
 META = LAYER + "?f=json"
 QUERY = LAYER + "/query?" + urlencode({"where": "1=1", "returnIdsOnly": "true", "f": "json"})
 EXC = "robots unavailable (403): ArcGIS public REST accepted by operator 2026-11-09"
+# reviews/30_d3_count_unlisted: the new kinds' texts and the one resolution.
+UNLISTED = ("investigate further: district not listed in zoning_rules.json; "
+            "25 ft default setback used")
+UNREADABLE = ("investigate further: district setbacks unreadable in zoning_rules.json; "
+              "25 ft default setback used")
+RESOLUTION = ("check the district and its setbacks in the code by hand; a human adds the "
+              "district or its setback values to the rules file between runs "
+              "(reviews/29_operator_decisions, reviews/30_d3_count_unlisted)")
 INVESTIGATE = ("investigate further: no district setbacks in zoning_rules.json; "
                "25 ft default used")
 FEMA_ROBOTS = ("User-agent: *\nDisallow: /*?*\nDisallow: /arcgis\nDisallow: /nri/report/viewer\n"
@@ -698,16 +706,44 @@ class D3ScoringTests(unittest.TestCase):
         cyc = {x["parcel_id"]: x["strategy_fit"] for x in self.ver["cycle"]["summary"]["parcels"]}
         self.assertEqual(cyc["fulton-D01"]["bts"], self.bts(self.ver, "fulton-D01"))
 
-    def test_unlisted_district_stays_na(self):
-        # D3-01: R-1 is unlisted in Fairburn; with unlisted_districts
-        # 'not_permitted' it reaches the projection, and stays BTS N/A.
+    def test_unlisted_district_counts_with_its_flag(self):
+        # Was test_unlisted_district_stays_na. Deliberately inverted by the
+        # operator's answer to D3-01 (2026-11-09, "count them";
+        # reviews/30_d3_count_unlisted): R-1 is unlisted in Fairburn; with
+        # unlisted_districts 'not_permitted' it reaches the projection and now
+        # counts with the default, flagged once on both paths, never a block.
         p = self.proj["fulton-D02"]
         self.assertEqual(site_fit.max_building_sf(p), 520_000)
-        self.assertFalse(site_fit.meets_bts_footprint(p))
-        self.assertIsNone(site_fit.bts_review_text(p))
-        self.assertEqual(self.bts(self.ver, "fulton-D02"), "N/A")
-        self.assertFalse([f for f in _flags(self.ver["per_parcel"]["fulton-D02"])
-                          if INVESTIGATE in f[3]])
+        self.assertTrue(site_fit.meets_bts_footprint(p))
+        self.assertEqual(site_fit.bts_review_text(p), UNLISTED)
+        self.assertNotEqual(self.bts(self.ver, "fulton-D02"), "N/A")
+        cyc = {x["parcel_id"]: x["strategy_fit"] for x in self.ver["cycle"]["summary"]["parcels"]}
+        self.assertEqual(cyc["fulton-D02"]["bts"], self.bts(self.ver, "fulton-D02"))
+        for rec in (self.ver["per_parcel"]["fulton-D02"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D02") if "investigate" in f[3]]
+            self.assertEqual(len(mine), 1)
+            self.assertEqual(mine[0][0], "data_gap")
+            self.assertTrue(mine[0][3].endswith("; " + UNLISTED))
+            self.assertEqual(mine[0][4], RESOLUTION)
+            self.assertFalse([f for f in _flags(rec) if f[0] == "actionability_block"])
+        notes = self.ver["per_parcel"]["fulton-D02"]["research_log_notes"]
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0].count(UNLISTED), 1)
+        self.assertNotIn(INVESTIGATE, notes[0])
+        # The cycle also scores the golden fixture's own unlisted Fairburn
+        # parcel (fulton-Z05, R-2, now past the S9 gate with not_permitted):
+        # one note per flagged parcel.
+        cyc = self.ver["cycle"]
+        self.assertEqual(len([n for n in cyc["research_log_notes"] if UNLISTED in n]),
+                         len([f for f in _flags(cyc) if UNLISTED in f[3]]))
+        self.assertEqual({f[1] for f in _flags(cyc) if UNLISTED in f[3]},
+                         {"fulton-D02", "fulton-Z05"})
+
+    def test_resolution_text_covers_every_kind(self):
+        # D3U-09: one resolution (not part of the dedup key) for all kinds.
+        for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D01") if INVESTIGATE in f[3]]
+            self.assertEqual(mine[0][4], RESOLUTION)
 
     def test_flag_once_data_gap_never_a_block_on_both_paths(self):
         for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
@@ -725,6 +761,10 @@ class D3ScoringTests(unittest.TestCase):
     def test_not_rewritten_while_open(self):
         for rec in (self.again["per_parcel"]["fulton-D01"], self.again["cycle"]):
             self.assertFalse([f for f in _flags(rec, "fulton-D01") if INVESTIGATE in f[3]])
+        # D3U-05: the open PD flag dedups on the unchanged text; the other
+        # parcel's own (unlisted) flag is a different key and is written.
+        for rec in (self.again["per_parcel"]["fulton-D02"], self.again["cycle"]):
+            self.assertEqual(len([f for f in _flags(rec, "fulton-D02") if UNLISTED in f[3]]), 1)
         self.assertEqual(self.bts(self.again, "fulton-D01"), self.bts(self.ver, "fulton-D01"))
 
     def test_draft_is_unchanged(self):
@@ -740,11 +780,22 @@ class D3ScoringTests(unittest.TestCase):
         want = f"yes (default setback; {INVESTIGATE})"
         self.assertEqual(reporting._bts_use_text(p, True), want)
         self.assertIn(f"used for BTS: {want};", reporting._projection_summary(p, True))
+        # reviews/30_d3_count_unlisted (deliberately inverted): the unlisted
+        # district is used with its own text.
         u = self.proj["fulton-D02"]
-        self.assertEqual(reporting._bts_use_text(u, True),
+        self.assertEqual(reporting._bts_use_text(u, True), f"yes (default setback; {UNLISTED})")
+        self.assertIn(f"used for BTS: yes (default setback; {UNLISTED});",
+                      reporting._projection_summary(u, True))
+        # D3U-13: the "rated N/A" branch stays as the fail-closed fallback for
+        # a used projection without a kind (no district rule).
+        conn = golden.zg.AnswerConn(golden.responder(research))
+        with mock.patch.object(zoning, "district_for_stored", return_value=None):
+            site_fit._FIT_CACHE.clear()
+            n = site_fit.project_parcels(conn, ["fulton-D02"])["fulton-D02"]
+        self.assertEqual(reporting._bts_use_text(n, True),
                          "yes, rated N/A (default setback is not a verified rule)")
         self.assertIn("used for BTS: yes, rated N/A (default setback);",
-                      reporting._projection_summary(u, True))
+                      reporting._projection_summary(n, True))
         with d3_fixture():
             conn = golden.zg.AnswerConn(golden.responder(research))
             site_fit._FIT_CACHE.clear()
@@ -752,6 +803,50 @@ class D3ScoringTests(unittest.TestCase):
         self.assertEqual(reporting._bts_use_text(d, False), "no (draft rules)")
         self.assertNotIn("investigate", reporting._projection_summary(d, False))
         self.assertNotIn("investigate", " ".join(d.constraints))
+
+
+def _pd_unreadable(data):
+    _unlisted_not_permitted(data)
+    data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"][
+        "front_setback_ft"] = {"value": "see table", "cite": "x"}
+
+
+class D3UUnreadableScoringTests(unittest.TestCase):
+    """reviews/30_d3_count_unlisted (operator answer to D3-02): a listed
+    district whose setbacks are all unreadable counts with the default and its
+    own flag, on both scoring paths; draft inert."""
+
+    @classmethod
+    def setUpClass(cls):
+        with d3_fixture():
+            with patch_rules(verified("fairburn", mutate=_pd_unreadable)):
+                site_fit._FIT_CACHE.clear()
+                cls.ver = _canon(golden.run_case(research))
+            with patch_rules(verified(mutate=_pd_unreadable)):     # every jurisdiction draft
+                site_fit._FIT_CACHE.clear()
+                cls.draft = _canon(golden.run_case(research))
+
+    def test_flag_once_data_gap_on_both_paths(self):
+        for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D01") if "investigate" in f[3]]
+            self.assertEqual(len(mine), 1)
+            self.assertEqual(mine[0][0], "data_gap")
+            self.assertTrue(mine[0][3].endswith("; " + UNREADABLE))
+            self.assertEqual(mine[0][4], RESOLUTION)
+            self.assertFalse([f for f in _flags(rec) if f[0] == "actionability_block"])
+        self.assertNotEqual(
+            self.ver["per_parcel"]["fulton-D01"]["result"]["strategy_fit"]["bts"], "N/A")
+        notes = self.ver["per_parcel"]["fulton-D01"]["research_log_notes"]
+        self.assertEqual(notes[0].count(UNREADABLE), 1)
+        self.assertNotIn(INVESTIGATE, notes[0])
+
+    def test_draft_is_inert(self):
+        for pid in D3_PARCELS:
+            rec = self.draft["per_parcel"][pid]
+            self.assertFalse([f for f in _flags(rec) if "investigate" in f[3]], pid)
+            self.assertFalse([n for n in rec["research_log_notes"] if "investigate" in n], pid)
+        self.assertFalse([n for n in self.draft["cycle"]["research_log_notes"]
+                          if "investigate" in n])
 
 
 if __name__ == "__main__":
