@@ -346,7 +346,10 @@ class ZoningSession(rules_scrape.PoliteFetcher):
     def total_requests(self) -> int:
         """Data requests (robots.txt GETs excluded, ZI-08), retries and
         redirect hops included: what MAX_REQUESTS_PER_SOURCE counts. A
-        robots.txt redirect hop counts as data (tighter, never looser)."""
+        request is excluded by its URL ending in ``/robots.txt``, so a
+        robots.txt redirect hop that lands on another ``.../robots.txt`` is
+        excluded too (at most MAX_REDIRECTS per host); the global
+        PoliteFetcher budget still counts every request."""
         for u in self.calls[self._scanned:]:
             if u.endswith("/robots.txt"):
                 self._robots_seen += 1

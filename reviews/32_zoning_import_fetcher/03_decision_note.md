@@ -126,3 +126,37 @@ immutable-during-run modules. The new coupling is named: a future
 is reviewed for all four tools. SR-8: messages carry hosts, statuses and
 counts only, and the ArcGIS error message never prints. SR-10: no new
 dependency. SR-11: stricter than before.
+
+## Post-change adversarial review round 1
+
+The operator's 2026-11-09 answers above still bind this round: D3 counts
+unlisted districts and unreadable setback values, D2 stays as already
+implemented (no flood-rule change), the null-beats-low question is
+unanswered (no new root sub-score), the research.py fixes and this fetcher
+round are wanted ("fix"), and the reviews/26 hazards prepare-mutation is
+authorised ("can you add this yourself"). Two findings, both minor, both
+documentation only. Each was checked against the code.
+
+- **R1-1 — AUTORESEARCH_MECHANICS.md tool inventory (accepted, fixed).** The
+  `zoning_import.py` entry did not say that the tool now goes through
+  rules_scrape's shared fetcher and robots policy, but the `adjacency_import.py`
+  entry did. The entry now says "through rules_scrape's shared fetcher and
+  robots policy at 1 req/s per host", names the once-per-host D1 ArcGIS
+  exception line, and points to this directory. No behaviour change.
+- **R1-2 — robots.txt redirect hop in the per-source count (accepted, fixed in
+  the docs; the code is kept).** The `ZoningSession.total_requests()`
+  docstring and the ZI-08 disposition in `02_code_writer_response.md` both
+  said a robots.txt redirect hop "counts as data". The code excludes every
+  request whose URL ends in `/robots.txt`. A robots redirect normally lands on
+  another `.../robots.txt`, so that hop is excluded. The behaviour is kept:
+  the effect is at most `MAX_REDIRECTS` hops per host, and the global
+  PoliteFetcher budget still counts every request. The docstring now
+  describes the suffix rule exactly. The ZI-08 sentence in the response is
+  superseded by this entry; the response file is left as written, as a
+  record. New test `test_robots_redirect_hop_is_not_a_data_request`: a
+  `robots.txt` that answers 301 to `www.<host>/robots.txt`, then one data
+  GET. `total_requests()` is 1 and `calls` holds all 3 requests.
+
+Not run in this round: `tests/zoning_golden_check.py`. It needs the local
+corridor DB, which does not exist here. No code path changed, so the
+offline equivalence proof from the main round stands.

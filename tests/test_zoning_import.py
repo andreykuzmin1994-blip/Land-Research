@@ -718,6 +718,32 @@ class HttpEtiquetteTests(unittest.TestCase):
         self.assertEqual(s.requests, {"a.test": 4, "b.test": 2})
         self.assertEqual(s.total_requests(), 4)                # data requests only (ZI-08)
 
+    def test_robots_redirect_hop_is_not_a_data_request(self):
+        # Post-change review round 1: a robots.txt redirect onto another
+        # .../robots.txt is excluded by the URL-suffix rule, as the
+        # docstring now states; the global count still sees every hop.
+        now, sleeps, sleep = self._clocked()
+
+        class Http:
+            def __init__(self):
+                self.raw = []
+
+            def get(self, url, params=None, timeout=None, **kw):
+                self.raw.append(url)
+                if url == "https://a.test/robots.txt":
+                    return _Resp(None, 301, {"Location": "https://www.a.test/robots.txt"})
+                if url.endswith("/robots.txt"):
+                    return ROBOTS_404
+                return _Resp({})
+        http = Http()
+        s = zi.ZoningSession(http=http, clock=lambda: now[0], sleep=sleep)
+        s.get_json("https://a.test/x", {"f": "json"})
+        self.assertEqual(http.raw, ["https://a.test/robots.txt",
+                                    "https://www.a.test/robots.txt",
+                                    "https://a.test/x?f=json"])
+        self.assertEqual(s.total_requests(), 1)
+        self.assertEqual(len(s.calls), 3)
+
     def test_429_without_acceptable_retry_after_is_refused_at_once(self):
         # Changed (ZI-07): 4fe8080 retried 4 times sleeping min(3600, 30).
         for ra in ("3600", None, "x"):
