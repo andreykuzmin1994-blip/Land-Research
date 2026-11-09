@@ -117,3 +117,15 @@ encoding so fixtures can carry em dashes.
   deterministically. It is reported as "label found, no separator or value
   after it on its line"; the run exits 4 only if no value at all is read
   from that section, otherwise it exits 0, so read the report.
+
+## Operator decision (2026-11-09): keep the Zoneomics cache and quotes
+
+Recorded in `reviews/29_operator_decisions/` (decision D4): **"Keep for
+now"**. The old Zoneomics entries in `rules_cache/` (gitignored) and the
+quotes committed under `reviews/23_rules_scraper/` stay as they are; step 8
+above ("Optional: delete the old Zoneomics entries") is not done. Nothing is
+deleted. The terms block itself is unchanged: `TERMS_BLOCKED_DOMAINS` is
+`{"zoneomics.com"}`, `MIRROR_HOSTS` and the Municode denylist are as before,
+and no tool contacts zoneomics.com (pinned by
+`tests/test_operator_decisions.py` `PinTests.test_terms_block_and_denylist_unchanged`
+and the LF-03 / RS-02 tests).

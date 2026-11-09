@@ -279,3 +279,30 @@ After a populated import (the metric change):
   The real hazard counts listed under LIVE come from that import.
 - Whether boundary slivers need a parameters.json tolerance, after seeing
   the real SFHA bands.
+
+## Operator decisions (2026-11-09)
+
+Recorded in `reviews/29_operator_decisions/` (decision D2): **"Flag, don't
+block"**. Finding 7 ("Open question for the human") is **answered**: keep the
+current behaviour. No code change; `hazards.py` and `hazards_import.py`'s
+flood logic are unchanged and `parameters.json` stays as the human wrote it
+(`flood_zones_blocked` `["A","AE"]`, `flood_zones_flag_for_review`
+`["AE_with_LOMR"]`).
+
+- Zone AE wholly covered by a LOMR passes H4 with a review flag (a LOMR
+  covering only part of the AE area still blocks).
+- The other 1% annual-chance SFHA zones pass H4 with a review flag: AH, AO,
+  A99, AR, and also **V and VE**, which the code treats the same way although
+  the operator's answer named only AH/AO/A99/AR. The 1% future-conditions
+  zone, the levee-reduced-risk zone and open water are review flags too.
+- Review flags never change actionability. Pins:
+  `tests/test_hazards.py` `test_ae_with_lomr_is_a_review_pass`,
+  `test_other_sfha_zones_are_reviews_not_blocks` (AH, AO, A99, AR, V, VE),
+  `test_future_conditions_levee_open_water_are_reviews`;
+  `tests/test_hazards_scoring.py` `test_review_flags_never_change_actionability`;
+  `tests/test_operator_decisions.py`
+  `PinTests.test_flood_thresholds_are_the_human_values` (read-only check of
+  the two parameters.json keys).
+- If the operator later wants V/VE blocked, that is option (a) above
+  (extend `flood_zones_blocked`, human edit between runs, new run and
+  baseline).
