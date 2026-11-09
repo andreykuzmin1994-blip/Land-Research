@@ -149,7 +149,10 @@ step 2 as done by the agent under the delegation.
     schema remains.
 - **G7 CI**: `validate-phase1.yml` offline (`tests.test_prepare`, 31 OK)
   and live (prepare.py's four lines, values 0 and 0.0) are reproduced by
-  G6. `discovery-fulton.yml`: `tests.test_discovery` OK offline, and its
+  G6. `discovery-fulton.yml`: `tests.test_discovery` OK offline (as first
+  written this was false for the workflow's own dotted command, which hit
+  ModuleNotFoundError on `hazards_helpers`; fixed and re-run, 513 OK, see
+  03_decision_note.md "Post-change adversarial review round 2"), and its
   live steps (smoke plus the seven live checks) are reproduced above,
   once W-01 is fixed. `offline-tests.yml`: G4.
 - **G8 drift pins**: `DriftPinTests` (7 tests).

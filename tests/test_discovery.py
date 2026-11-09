@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -40,7 +41,18 @@ import costar_ingest
 # whose fakes predate the hazard read (or the runner's extra audit
 # connection), or that pin the pre-hazard H4/H6 stubs, run under
 # hazards_disabled(); the shipped-state inverse is test_hazards_enabled.
-from hazards_helpers import disabled as hazards_disabled
+#
+# CI runs this module DOTTED (discovery-fulton.yml offline-tests:
+# ``python -m unittest tests.test_discovery``), where tests/ is NOT on
+# sys.path; only ``discover -s tests`` puts it there. Append tests/ (append,
+# not prepend, so no tests/ file can shadow a repo-root module) so the bare
+# helper import resolves to the same single ``hazards_helpers`` module under
+# both invocation styles (post-change adversarial review round 2,
+# reviews/33_hazards_enabled; pinned by tests/test_ci_module_imports.py).
+_TESTS_DIR = str(Path(__file__).resolve().parent)
+if _TESTS_DIR not in sys.path:
+    sys.path.append(_TESTS_DIR)
+from hazards_helpers import disabled as hazards_disabled  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "discovery"
 COSTAR_FIXTURES_DIR = Path(__file__).parent / "fixtures" / "costar"

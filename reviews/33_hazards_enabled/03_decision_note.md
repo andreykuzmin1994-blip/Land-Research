@@ -206,3 +206,46 @@ Operator answers stand as recorded above (2026-11-09). D3: count unlisted
 districts and districts with unreadable setback values. D2: "just review",
 with no flood-rule change and no new root sub-score. Item 3: "fix". Item 4:
 "can you add this yourself", the delegation this change used.
+
+## Post-change adversarial review round 2
+
+A second independent reviewer re-ran each workflow's own command rather
+than the full-suite discovery. It found one blocker. It is verified and
+fixed. No code outside the tests changes, and no score changes.
+
+| ID | Sev | Finding | Disposition |
+|---|---|---|---|
+| A2-01 | blocker | `tests/test_discovery.py` gained a bare `from hazards_helpers import ...`. `discovery-fulton.yml`'s offline job runs `python -m unittest tests.test_discovery -v` from the repo root, where `tests/` is not on sys.path, so the module failed to import (`ModuleNotFoundError`, `errors=1`). The live-postgis job `needs: offline-tests`, so it and every live check, `live_hazards_check` included, would have been skipped. `discover -s tests` puts `tests/` on sys.path and hid it. The code writer response's G7 line ("`tests.test_discovery` OK offline") was wrong for that command. | Verified: at HEAD the exact CI command gave `FAILED (errors=1)`; at base 4fe8080 it gave 513 OK. Fixed: `tests/test_discovery.py` appends `tests/` to sys.path before the helper import (append, not prepend, so no `tests/` file can shadow a repo-root module), so the one `hazards_helpers` module is used under both invocation styles. The exact CI command now gives 513 OK. The G7 line in 02_code_writer_response.md is corrected in place. |
+
+Regression guard, new: `tests/test_ci_module_imports.py`. It collects every
+dotted `python -m unittest tests.<module>` invocation from
+`.github/workflows/*.yml` and the Makefile (today `tests.test_discovery` and
+`tests.test_prepare`; a test asserts both are found, so a parsing slip
+cannot pass vacuously). It runs each exact command from the repo root in a
+child process with PYTHONPATH and DATABASE_URL removed and the mirror kill
+switch set. A third test builds a throwaway package with a bare sibling
+import and confirms the dotted run fails with ModuleNotFoundError, which is
+the failure mode the guard exists for. With the test_discovery fix
+reverted, the guard fails (1 failure); with it, 3 OK.
+
+Not changed, by scope: other test modules (`test_hazards`,
+`test_site_fit`, `test_adjacency_scoring` and others) also use bare sibling
+imports and cannot be run dotted. No workflow or Makefile target runs them
+that way. Several did so already at base (`adjacency_golden_case`,
+`site_fit_golden_case`). The guard will fail if a workflow starts to.
+
+Re-run, counts only:
+
+- `python -m unittest tests.test_discovery -v` (discovery-fulton.yml
+  offline job, exact): 513 OK.
+- `python -m unittest tests.test_prepare -v` and
+  `python -c "import prepare"` (validate-phase1.yml offline job, exact):
+  31 OK; import ok.
+- `python -m unittest discover -s tests`: 1769 OK (1766 before the round,
+  plus the 3 guard tests).
+- `python -m unittest discover -s screener/tests -t .`: 134 OK.
+
+Operator answers stand as recorded above (2026-11-09). D3: count unlisted
+districts and districts with unreadable setback values. D2: "just review",
+with no flood-rule change and no new root sub-score. Item 3: "fix". Item 4:
+"can you add this yourself", the delegation the prepare-mutation used.
