@@ -121,6 +121,23 @@ class EarthworkMathTests(unittest.TestCase):
         self.assertEqual(checks._round_sig(0.4), 0)
         self.assertEqual(checks._round_sig(0), 0)
 
+    def test_rounding_below_ten_rounds_not_truncates(self):
+        # Under 10**digits the result is the nearest whole number, never the
+        # fraction cut off (post-change round 1, finding 1).
+        for x, want in ((0.6, 1), (0.96, 1), (1.5, 2), (1.4, 1), (4.6, 5), (9.6, 10),
+                        (12.4, 12), (99.6, 100), (0.2, 0)):
+            with self.subTest(x=x):
+                self.assertEqual(checks._round_sig(x), want)
+                self.assertIsInstance(checks._round_sig(x), int)
+
+    def test_near_flat_sub_yard_estimate_is_not_zero(self):
+        area = 6000.0
+        # MAD 0.0002 m over 6,000 m2: 0.6 m3, about 0.78 cubic yard.
+        hist = {"min": 250.0, "max": 250.0008, "counts": [30, 30]}
+        cut_m3, _ = checks._balanced_cut(hist, area, 100.0)
+        self.assertGreater(cut_m3 / checks.M3_PER_CY, 0.5)
+        self.assertEqual(checks._hist_balanced_earthwork(hist, area, 100.0)["earthwork_cy"], 1)
+
     def test_nominal_pixel(self):
         self.assertAlmostEqual(PIXEL_A, 100 * math.cos(math.radians(33.6013)) ** 2, places=2)
         self.assertIsNone(checks._nominal_pixel_m2(Polygon()))
@@ -174,6 +191,17 @@ class EarthworkNeverRaisesTests(unittest.TestCase):
         self.assertIsNone(checks._hist_balanced_earthwork(good, 2999.0, 100.0))      # too many
         # GOOD_SLOPE's 60 pixels on a 20-acre square: a NoData gap, not an estimate.
         self.assertIsNone(checks._hist_balanced_earthwork(good, AREA_A, PIXEL_A))
+
+    def test_partial_coverage_extrapolates_to_full_area(self):
+        # Inside the band the volume is taken over the whole open ground: a
+        # 40% NoData gap gives the full-area volume from the pixels seen
+        # (post-change round 1, finding 2; documented in the README).
+        good = band1()                                  # 60 pixels
+        full = checks._balanced_cut(good, 6000.0, 100.0)    # 100% covered
+        gap = checks._balanced_cut(good, 10000.0, 100.0)    # 60% covered
+        self.assertIsNotNone(gap)
+        self.assertAlmostEqual(gap[1], full[1])              # same MAD
+        self.assertAlmostEqual(gap[0], full[0] * 10000.0 / 6000.0)  # scaled to area
 
 
 class EarthworkSlopeCheckTests(Offline):
@@ -370,17 +398,25 @@ class EarthworkRunTests(RunHarness):
         for pid, r in self.rows().items():
             self.assertEqual(r["earthwork_cy"], "")
             self.assertIn("not computed (slope not checked)", self.earthwork_line(pid))
+        self.assert_never_seen_by_scoring()
 
     def test_scores_and_order_do_not_depend_on_the_estimate(self):
+        # run.main attaches the estimate to the parcel dicts it was given, and
+        # this harness hands both runs the same dicts; a real run fetches
+        # fresh ones. Give the second run fresh parcels so it is a clean
+        # "no estimate" run and the spy check covers it.
+        fresh = copy.deepcopy(self.parcels)
         self.main()
         with_estimate = {pid: (r["rank"], r["score"], r["flags"], r["why_site"])
                          for pid, r in self.rows().items()}
         self.patch(checks, "_hist_balanced_earthwork", lambda *a: None)
+        self.parcels[:] = fresh
         self.main()
         without = {pid: (r["rank"], r["score"], r["flags"], r["why_site"])
                    for pid, r in self.rows().items()}
         self.assertEqual(with_estimate, without)
         self.assertTrue(all(r["earthwork_cy"] == "" for r in self.rows().values()))
+        self.assert_never_seen_by_scoring()
 
     def test_columns_and_brief(self):
         self.main()
@@ -437,6 +473,7 @@ class EarthworkRunTests(RunHarness):
             self.assertEqual((r["earthwork_cy"], r["mean_cut_fill_ft"]), ("", ""))
             self.assertIn("not computed (the lidar answer didn't support an estimate)",
                           self.earthwork_line(pid))
+        self.assert_never_seen_by_scoring()
 
     def test_flat_ground_reads_zero_not_empty(self):
         flat = copy.deepcopy(EARTH_SLOPE)

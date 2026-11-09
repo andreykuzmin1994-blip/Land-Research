@@ -32,7 +32,7 @@
 | Check | Result |
 |---|---|
 | Files changed | `screener/checks.py`, `run.py`, `report.py`, `README.md`, new `tests/test_earthwork.py`, this folder. `git diff --stat 4fe8080` over `screens.py`, `autoresearch/`, `settings.toml`, `rank.py`, `scoring.py`, `CLAUDE.md`, `prepare.py` is empty. No human-owned or eval file changed. |
-| Leak into scoring (F8-1, G1) | Structural guard holds. `slope_checks` returns the estimates in input order from `pool.map` (no worker writes shared state). `run.main` keeps them in a dict keyed by `id(p)`, which is stable because every survivor object stays referenced (in `kept` or `rejected`) for the whole run. They are attached only after the score/flag loop, the sort and the rank. The spy tests wrap `learned_score`, `fixed_score`, `site_rejects` and `flags`, and assert that all four ran and that none saw an earthwork key. They run with slope on, `--no-slope`, a failed check and the helper returning None. |
+| Leak into scoring (F8-1, G1) | Structural guard holds. `slope_checks` returns the estimates in input order from `pool.map` (no worker writes shared state). `run.main` keeps them in a dict keyed by `id(p)`, which is stable because every survivor object stays referenced (in `kept` or `rejected`) for the whole run. They are attached only after the score/flag loop, the sort and the rank. The spy tests wrap `learned_score`, `fixed_score`, `site_rejects` and `flags`, and assert that all four ran and that none saw an earthwork key. They run with slope on, `--no-slope` and a failed check (as first written; post-change round 1 below added the helper-None, `slope = false` and score-independence runs). |
 | Helper never raises (F8-2, G3) | `_slope_from` / `_slope_problem` are byte-identical to base. The earthwork call sits after `_slope_from` inside a `try` over the same exception tuple plus `ZeroDivisionError` / `OverflowError`. `slope_area_m2(geom)` can't add a new crash: `too_small_for_slope` has already called it on the same geometry in `work()`. 18 unreadable-histogram cases and 8 bad area/pixel cases return None. |
 | Maths (F8-4..6, G4) | I re-derived the `GOOD_SLOPE` value by hand: mean 256 m and MAD 2.5 m give 1.25 m³/m² and 8.2 ft. Cut = fill at the histogram mean. The value is linear in area. 1 yd³ = 0.9144³ m³ exactly. `FT_PER_M` is reused from `geo`. The nominal pixel area is 100·cos²(lat). The coverage band [0.5, 2] rejected no parcel in the writer's live sample. |
 | Null paths (F8-7, G5) | Each of skipped, failed, `--no-slope`, `slope = false` and helper None gives an empty cell and a brief that reads "not computed (reason)". Flat ground gives `0` / `0.0`, not empty. The brief's fallback order matches `_slope_problem`, which refuses a None `steep_pct`, so "slope not checked" can't mislabel a computed slope. |
@@ -90,3 +90,41 @@ Standing risks:
 - SR-11: no new requests.
 - SR-15 / SR-16 analogs: the eval boundary, and the after-scoring
   attachment plus the human read of `exp:` diffs.
+
+## Post-change adversarial review round 1
+
+Operator answers (2026-11-09, recorded as given): D3 counts unlisted
+districts and unreadable setback values; D2 flood scope "just review" (no
+flood-rule change); the null-beats-low question is not answered, so no new
+root sub-score; "fix" the `research.py` ArcGIS error-envelope and audit-path
+bugs and do the D1-11 `zoning_import` round; the agent may apply the
+reviews/26 hazards prepare-mutation; build the screener quick wins. None of
+the fixes below touches an eval file, `rank.py`, `scoring.py`,
+`settings.toml` or `requirements.txt`.
+
+| # | Finding | Verdict | What changed |
+|---|---|---|---|
+| 1 | `_round_sig` truncates below the units place (0.96 gives 0, 1.5 gives 1), so a sub-yard estimate reads `0` and contradicts "0 means flat" | Real. Confirmed: `_round_sig(0.6)` and `_round_sig(0.96)` both gave 0. | `_round_sig` now caps the rounding position at the units place, so below 100 it rounds to the nearest whole yard (0.96 gives 1, 1.5 gives 2, 0.4 still 0). New tests `test_rounding_below_ten_rounds_not_truncates` (nine values from 0.2 to 99.6, int type) and `test_near_flat_sub_yard_estimate_is_not_zero` (0.78 cy gives 1). The README now says `0` means at most half a cubic yard. |
+| 1b | `earthwork_cy` 4 next to `mean_cut_fill_ft` 0.0 | Real, but not a bug: the two columns measure different things. A few cubic yards over many acres is a depth of hundredths of an inch, which rounds to 0.0 ft. The finding's histogram (250.00 to 250.02 m, two equal bins, MAD 0.005 m) on 6,000 m² reads 20 cy / 0.0 ft, before and after the fix; the 4 cy in the finding comes from a smaller area. | README explains that `0.0` ft can sit next to a few cubic yards on a large near-flat parcel. No code change. |
+| 2 | The coverage band [0.5, 2.0] lets up to half the open ground be NoData, and the volume is still taken over the full area, while the README implies a shown number covers the whole parcel | Real as a documentation gap. The behaviour is kept: the band is wide on purpose, because the nominal Web Mercator pixel area is approximate and edge pixels on small parcels count in full, so a tighter band would blank good small parcels. | The constant's comment, the `_balanced_cut` docstring and the README now say that a gap of up to half the open ground is filled by assuming it is like the ground seen, and that the estimate can miss a pit or mound in the gap. New test `test_partial_coverage_extrapolates_to_full_area` pins it: at 60% coverage the MAD is unchanged and the volume scales to the full area. |
+| 3 | This document's G1 row overstated the spy coverage (helper-None runs never asserted the spy) | Real. | The row is corrected above. `assert_never_seen_by_scoring()` is now also called in `test_helper_none_is_empty_not_zero`, `test_slope_off_in_settings` and `test_scores_and_order_do_not_depend_on_the_estimate`. |
+
+Adding the spy to the score-independence test exposed a harness artefact,
+not a production leak: the test harness hands both `run.main` calls the same
+parcel dicts, and the first run had already attached the estimate to them,
+so the second run's `site_rejects` saw `mean_cut_fill_ft`. A real run calls
+`fulton.fetch_parcels`, which builds fresh dicts every time, and runs
+`main` once per process. The test now gives the second run a deep copy of
+the original parcels, so it is a clean "no estimate" run. The failure also
+shows the spy catches a key that reaches scoring.
+
+Tests after round 1:
+
+- Root: `python -m unittest discover -s tests` gives **1744 OK**.
+- Screener: `python -m unittest discover -s screener/tests -t .` gives
+  **165 OK** (162 before round 1, +3).
+
+No live run was repeated: the fixes change only rounding below 100 cy,
+comments, README text and tests.
+
+**Round 1 decision: APPROVED after fixes.**

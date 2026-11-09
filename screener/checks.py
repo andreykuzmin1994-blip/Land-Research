@@ -233,7 +233,11 @@ M3_PER_CY = 0.764554857984
 SLOPE_PIXEL_UNITS = 10.0
 # The histogram's pixels times the nominal pixel area must be within this
 # factor of the open-ground area, or the answer and the shape disagree (a
-# NoData gap, or a mismatched geometry) and no earthwork is given.
+# NoData gap, or a mismatched geometry) and no earthwork is given. Inside the
+# band the volume is still taken over the whole open-ground area: a gap of up
+# to half that ground is filled by assuming it is like the ground the
+# pixels do cover (the band is wide because the nominal pixel area is only
+# approximate and edge pixels on small parcels count in full).
 EARTHWORK_COVERAGE = (0.5, 2.0)
 _EARTHWORK_ERRORS = (AttributeError, IndexError, KeyError, TypeError, ValueError,
                      ZeroDivisionError, OverflowError)
@@ -255,10 +259,14 @@ def _finite_number(v: Any) -> bool:
 
 
 def _round_sig(x: float, digits: int = 2) -> int:
-    """x rounded to `digits` significant figures, as a whole number."""
+    """x rounded to `digits` significant figures, as a whole number. Below
+    10**digits the whole-number step is coarser than `digits` figures, so x
+    is rounded to the nearest whole number (0.96 gives 1, 1.5 gives 2, 0.4
+    gives 0): never truncated."""
     if x == 0:
         return 0
-    return int(round(x, digits - 1 - int(math.floor(math.log10(abs(x))))))
+    nd = min(0, digits - 1 - int(math.floor(math.log10(abs(x)))))
+    return int(round(x, nd))
 
 
 def _hist_balanced_earthwork(hist: Any, area_m2: Any, pixel_m2: Any = None) -> dict[str, Any] | None:
@@ -295,6 +303,11 @@ def _balanced_cut(hist: Any, area_m2: Any, pixel_m2: Any) -> tuple[float, float]
     no pixels; the area is not positive; the pixel count times pixel_m2 is
     outside EARTHWORK_COVERAGE times the area (pixel_m2 must be given); or
     any result is non-finite.
+
+    Inside the coverage band the volume uses the full area_m2, not the
+    pixel-covered area: a parcel whose pixels cover only half (or 60%) of
+    the open ground gets the full-area volume extrapolated from the pixels
+    it has.
 
     Not a grading plan: it ignores drainage cross-slope, building-pad-only
     leveling, terracing, shrink/swell, topsoil and rock.

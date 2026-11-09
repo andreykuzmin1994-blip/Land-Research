@@ -67,9 +67,12 @@ carry two columns right after `relief_ft`, and each brief has an
 
 - `earthwork_cy`: cubic yards of cut, balanced by the same volume of fill,
   to level the parcel's open ground to one flat pad at its mean elevation.
-  Rounded to 2 significant figures.
+  Rounded to 2 significant figures, and to the nearest whole cubic yard
+  below 100 (so `0` means at most half a cubic yard).
 - `mean_cut_fill_ft`: the average depth of cut or fill over that ground, to
-  0.1 ft.
+  0.1 ft. On a large, near-flat parcel it can read `0.0` while
+  `earthwork_cy` reads a few cubic yards: a few hundredths of an inch
+  spread over many acres.
 
 They come from the lidar elevation histogram the slope check already
 fetches (no extra request): cut = fill = area × mean absolute deviation
@@ -80,10 +83,14 @@ grossly overstates large or ridged parcels), shrink/swell and compaction,
 topsoil stripping, rock and unsuitable soils, and grading done since the
 2018-19 lidar. There is no dollar figure, and it is in no score, screen,
 flag or "why it ranks here" line. An empty cell (never 0, which means
-flat) means not computed: slope not checked (`--no-slope`, `slope =
+flat to within half a cubic yard) means not computed: slope not checked (`--no-slope`, `slope =
 false`), the slope check failed, the open ground is under one lidar pixel,
 or the answer didn't support an estimate (an unreadable histogram, or a
-pixel count that doesn't fit the open-ground area, e.g. a NoData gap). The
+pixel count that doesn't fit the open-ground area: under half or over
+twice it, e.g. a large NoData gap). A number that is shown covers the
+whole open ground, but not every pixel of it was seen: a smaller gap (up
+to half the open ground) is filled by assuming the missing ground is like
+the rest, so the estimate can miss a pit or mound hidden in the gap. The
 elevation statistics were identical across repeated requests (below), so
 this number is steadier run to run than `steep_pct`.
 
