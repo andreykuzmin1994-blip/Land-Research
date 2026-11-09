@@ -28,11 +28,12 @@ Results land in `screener/output/fulton-<date>/`:
 | File | What it is |
 |---|---|
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate that isn't scored; see Earthwork below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
 | `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps |
 | `rejected.csv` | Every parcel screened out, with the reason |
 | `ranked.geojson` | The same survivors for GIS tools |
+| `features.json` | The evaluation's features for each ranked parcel, kept for your decisions (see Decisions below) |
 
 Map data is cached for 7 days and the county deed file for 30
 (`screener/cache/`), so re-runs take a few minutes. `--refresh` forces
@@ -61,6 +62,46 @@ floodplain and wetlands come from the tiny shape, so they mean nothing.
 than one pixel can still get an empty answer, and that still counts as a
 failed slope check.
 
+**Earthwork (rough cut/fill).** `ranked.csv` (and `ranked.geojson`)
+carry two columns right after `relief_ft`, and each brief has an
+"Earthwork" line:
+
+- `earthwork_cy`: cubic yards of cut, balanced by the same volume of fill,
+  to level the parcel's open ground to one flat pad at its mean elevation.
+  Rounded to 2 significant figures, and to the nearest whole cubic yard
+  below 100 (so `0` means at most half a cubic yard).
+- `mean_cut_fill_ft`: the average depth of cut or fill over that ground, to
+  0.1 ft. On a large, near-flat parcel it can read `0.0` while
+  `earthwork_cy` reads a few cubic yards: a few hundredths of an inch
+  spread over many acres.
+
+They come from the lidar elevation histogram the slope check already
+fetches (no extra request): cut = fill = area × mean absolute deviation
+from the mean elevation ÷ 2. This is a rough grading-difficulty signal,
+not a grading plan. It ignores the drainage cross-slope a pad needs,
+leveling only the building or yard footprint, terracing (a single pad
+grossly overstates large or ridged parcels), shrink/swell and compaction,
+topsoil stripping, rock and unsuitable soils, and grading done since the
+2018-19 lidar. There is no dollar figure, and it is in no score, screen,
+flag or "why it ranks here" line. An empty cell (never 0, which means
+flat to within half a cubic yard) means not computed: slope not checked (`--no-slope`, `slope =
+false`), the slope check failed, the open ground is under one lidar pixel,
+or the answer didn't support an estimate (an unreadable histogram, or a
+pixel count that doesn't fit the open-ground area: under half or over
+twice it, e.g. a large NoData gap). A number that is shown covers the
+whole open ground, but not every pixel of it was seen: a smaller gap (up
+to half the open ground) is filled by assuming the missing ground is like
+the rest, so the estimate can miss a pit or mound hidden in the gap. The
+elevation statistics were identical across repeated requests (below), so
+this number is steadier run to run than `steep_pct`.
+
+The frozen evaluation set has no elevation data, so the estimate is
+attached to each parcel only after scoring, flags and the sort, and
+`rank.py` and `scoring.py` never see it (`tests/test_earthwork.py` spies on
+every call). The AutoResearch loop's own `evaluate.py` doesn't run that
+test: it holds because the loop edits only `rank.py` and can't reorder
+`run.py`, and every `exp:` diff gets a human read.
+
 **Public data changes between days.** On 2026-10-28 and 29, the USGS 3DEP
 lidar service returned different slope statistics for 464 of 2,110
 identical requests (about 22%), while the elevation statistics were
@@ -73,6 +114,41 @@ code, run both versions on the same cache (no `--refresh`, within
 `cache_days`), after checking that every source you compare was cached:
 map layers, county parcels and slope answers are kept for 7 days, the deed
 file for 30.
+
+**Decisions and the feature snapshot.** Each run writes
+`features.json` next to `ranked.csv`: for every ranked parcel, its
+`parcel_id`, `lon` / `lat` (the evaluation's spatial blocks need them),
+every field in the evaluation's feature list (`build_eval.FEATURES`,
+imported, so the two can't drift) under `features`, and the fields the
+evaluation blanks (`build_eval.BANNED_AS_NONE`: zoning, utilities, slope,
+jurisdiction and so on) under `live_only`. Its `meta` names the run date
+and time, county, `--limit` (a trial run), whether slope was checked, the
+settings file's SHA-256, the code commit (null if git doesn't answer), the
+record count, and how many NaN or infinite values were written as `null`
+(`summary.md` says so too). It holds no geometry, owner name, mailing
+address, earthwork estimate or decision, and it is copied before scoring,
+so it is what the parcel looked like going in. A re-run into the same
+folder deletes the old `features.json` before it rewrites the reports, so a
+run that fails part-way never leaves one run's features next to another
+run's `ranked.csv`. Rejected parcels are left
+out: their map checks are partial. `python -m screener.decide` copies a
+parcel's record, with the run's `meta`, into
+`screener/inputs/decision_features.jsonl` when you decide, so the features
+outlive the run folder.
+
+Some names mean slightly different things live and in the evaluation:
+`usable_after_slope` is slope-adjusted live but equals `usable_acres` in
+the evaluation; `rail_ft` / `rail_owner` come from the whole live rail
+layer but only main lines and yards in the evaluation; ownership fields
+are as of today live and as of 2016-01-01 in the evaluation.
+
+Neither a decision nor the snapshot is on a parcel while it is scored
+(`tests/test_decisions.py` spies on `rank.learned_score` and
+`scoring.fixed_score`). Turning decisions into evaluation labels (Phase B)
+is a human `--new-baseline` step and has not been done: it must handle
+selection bias (only parcels an earlier ranking put near the top get
+reviewed), the meaning differences above, spatial clustering and privacy
+(the label file stays out of git and holds no notes).
 
 ## Tune it
 
@@ -87,9 +163,12 @@ file for 30.
   ASSN INC"), or carry HOA inside a company name with a legal form ("... HOA
   INC"; THE doesn't count, since Hoa and The are also Vietnamese given and
   middle names); ASSOC, ASSOCIATION or POA alone don't count.
-- `screener/inputs/decisions.csv`: mark parcels `pass`, `listed` or
-  `pursue`. Passed and listed parcels drop out of future runs. See
-  `inputs/README.md`.
+  `[owners] adjacency_gap_ft` sets how close two same-owner parcels must be
+  to count as adjacent (see Owner clusters below; flags only).
+- `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
+  `pursue` or `maybe` (by hand or with `python -m screener.decide`).
+  Passed and listed parcels drop out of future runs; `maybe` is a mark
+  only. See `inputs/README.md` and Decisions below.
 - The score has two parts:
   - **`screener/scoring.py`, 35%, set by you:** zoning / future land use
     path, slope, utilities and Opportunity Zone. The answer key can't
@@ -122,7 +201,7 @@ parcels (county GIS, 5-50 ac, chosen cities)
 | Floodplain, floodway | FEMA NFHL (Esri Living Atlas copy) |
 | Wetlands, ponds | USFWS National Wetlands Inventory |
 | Conservation easements, protected land | NCED, USGS PAD-US |
-| Slope, relief | USGS 3DEP lidar (2018–19), resampled to 10 m |
+| Slope, relief, rough cut/fill | USGS 3DEP lidar (2018–19), resampled to 10 m |
 | Contamination | EPA Cleanups in My Community; Georgia EPD Hazardous Site Inventory |
 | Interstate exits | GDOT |
 | Freight rail | BTS North American Rail Network |
@@ -148,6 +227,53 @@ parcels (county GIS, 5-50 ac, chosen cities)
   Georgia Secretary of State lookup.
 - Distances are straight-line to the nearest exit with local access
   (freeway-to-freeway interchanges are skipped), not drive time.
+
+### Owner clusters
+
+Each ranked parcel's watch-outs say when the exact same tax-roll owner
+name AND mailing address is on other parcels in the run
+(`screener/owner_clusters.py`), and which of them touch it or lie within
+`[owners] adjacency_gap_ft` (10 ft by default) on the county parcel map,
+directly or in a chain. A chain of two or more that adds up to the
+`[area]` acreage band is flagged as a possible assemblage; a bigger one as
+"larger than the search band". Every sibling is listed (up to five) with
+its status in this run: ranked, screened out and why, or not screened in
+a `--limit` trial. Limits:
+
+- **Only the run's band and area.** The groups are built from the parcels
+  the run fetched (5-50 ac in the chosen jurisdictions), before any screen
+  and before `--limit`. The owner may hold more elsewhere, and small
+  neighbours under 5 ac that would make a site with this one are not seen
+  (a wider fetch is a later phase, with its own review).
+- **Exact match only.** Names are matched after upper-casing, turning
+  commas and periods into spaces, collapsing runs of spaces and joining
+  spaced legal forms ("L.L.C." = "LLC"). Nothing else is normalised:
+  hyphens, apostrophes, "&" and "#" are kept with their spacing, so
+  "SMITH-JONES" and "SMITH JONES", "O'NEAL" and "ONEAL", "A&B" and
+  "A & B", or "#200" and "# 200" do NOT join. Addresses get the same
+  treatment, with a ZIP+4 (hyphen, space or no separator) cut to five
+  digits. Legal forms, numbers and suites are kept, so "FUND I" and "FUND
+  II", or suite 100 and suite 200, stay apart. Different spellings,
+  addresses or per-site LLCs of one owner are NOT joined. A blank or
+  placeholder name, or a mailing address with no numbered street line,
+  joins nothing. These are not the looser deed-matching rules in
+  `owners.py`.
+- **The gap.** 10 ft bridges digitizing slivers, not a road right-of-way
+  (40-80 ft): parcels across a road are not "adjacent". A shared corner
+  point counts as touching, which is not usable frontage; check the shared
+  boundary on the map. Acres are the tax record's.
+- **It cannot widen the developer exclusion.** The owner type comes from
+  the name alone, so a recognised developer's other parcels are already
+  screened out under the same name. What the groups add is the siblings
+  screened out for other reasons (built on, exempt, passed, steep).
+- **Not a score or a screen.** The groups are built in a local variable and
+  added to the flags only after scoring and the sort; `rank.py` and
+  `scoring.py` never see them (tests pin this). The evaluation has no such
+  fact. Putting portfolio size or assemblage acres in the score would be a
+  human evaluation step: build the same exact-key groups on the 2016
+  snapshot in `build_eval.py` (owner and mailing address exist there), add
+  a FEATURES entry, and rebuild with `--new-baseline`. Do not read the
+  flag text from `rank.py`.
 
 ## AutoResearch
 

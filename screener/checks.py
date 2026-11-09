@@ -198,9 +198,14 @@ def _hist_share_above(hist: dict[str, Any], threshold: float) -> float | None:
     return 100.0 * above / total
 
 
-def slope_stats(geom) -> dict[str, Any]:
-    """Relief and steepness from USGS 3DEP lidar at ~10 m (about 1-5 s per parcel).
+def slope_stats(geom) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """Relief and steepness from USGS 3DEP lidar at ~10 m (about 1-5 s per
+    parcel), and a rough balanced cut/fill estimate from the same answer.
 
+    Returns (slope fields, earthwork or None). The earthwork comes from the
+    elevation histogram already fetched (no extra request) and never decides
+    whether the answer is usable: it is None when it can't be read. Callers
+    must keep it off the parcel until after scoring (slope_checks, run.main).
     An answer without usable histograms raises arcgis.BadAnswer.
     """
     data = arcgis.request_json(SLOPE_URL, {
@@ -211,7 +216,144 @@ def slope_stats(geom) -> dict[str, Any]:
         # read as "steep" and overstate grading by 2-3x; relief is unchanged.
         "pixelSize": SLOPE_PIXEL,
     }, check=_slope_problem)
-    return _slope_from(data)
+    out = _slope_from(data)
+    earthwork = None
+    try:
+        hist = (data.get("histograms") or [None])[0]
+        earthwork = _hist_balanced_earthwork(hist, slope_area_m2(geom), _nominal_pixel_m2(geom))
+    except _EARTHWORK_ERRORS:
+        earthwork = None
+    return out, earthwork
+
+
+# Exactly 1 cubic yard in cubic metres (0.9144 m cubed).
+M3_PER_CY = 0.764554857984
+# The 3DEP request asks for 10 x 10 Web Mercator units (SLOPE_PIXEL); on the
+# ground that is 10 cos(lat) m a side.
+SLOPE_PIXEL_UNITS = 10.0
+# The histogram's pixels times the nominal pixel area must be within this
+# factor of the open-ground area, or the answer and the shape disagree (a
+# NoData gap, or a mismatched geometry) and no earthwork is given. Inside the
+# band the volume is still taken over the whole open-ground area: a gap of up
+# to half that ground is filled by assuming it is like the ground the
+# pixels do cover (the band is wide because the nominal pixel area is only
+# approximate and edge pixels on small parcels count in full).
+EARTHWORK_COVERAGE = (0.5, 2.0)
+_EARTHWORK_ERRORS = (AttributeError, IndexError, KeyError, TypeError, ValueError,
+                     ZeroDivisionError, OverflowError)
+
+
+def _nominal_pixel_m2(geom) -> float | None:
+    """Ground area (m²) of one requested 10 m Web Mercator pixel at geom's latitude."""
+    try:
+        lat = (geom.bounds[1] + geom.bounds[3]) / 2
+        side = SLOPE_PIXEL_UNITS * math.cos(math.radians(lat))
+    except _EARTHWORK_ERRORS:
+        return None
+    m2 = side * side
+    return m2 if math.isfinite(m2) and m2 > 0 else None
+
+
+def _finite_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+
+def _round_sig(x: float, digits: int = 2) -> int:
+    """x rounded to `digits` significant figures, as a whole number. Below
+    10**digits the whole-number step is coarser than `digits` figures, so x
+    is rounded to the nearest whole number (0.96 gives 1, 1.5 gives 2, 0.4
+    gives 0): never truncated."""
+    if x == 0:
+        return 0
+    nd = min(0, digits - 1 - int(math.floor(math.log10(abs(x)))))
+    return int(round(x, nd))
+
+
+def _hist_balanced_earthwork(hist: Any, area_m2: Any, pixel_m2: Any = None) -> dict[str, Any] | None:
+    """The rounded report fields of _balanced_cut (see there), or None."""
+    raw = _balanced_cut(hist, area_m2, pixel_m2)
+    if raw is None:
+        return None
+    cut_m3, mad = raw
+    try:
+        cy, ft = cut_m3 / M3_PER_CY, mad * FT_PER_M
+        if not (math.isfinite(cy) and math.isfinite(ft)):
+            return None
+        return {"earthwork_cy": _round_sig(cy, 2), "mean_cut_fill_ft": round(ft, 1)}
+    except _EARTHWORK_ERRORS:
+        return None
+
+
+def _balanced_cut(hist: Any, area_m2: Any, pixel_m2: Any) -> tuple[float, float] | None:
+    """Rough balanced cut/fill to level the open ground to one flat pad at its
+    mean elevation, from the band-1 (elevation, metres) histogram.
+
+    Balance elevation = the histogram mean over bin centres, so cut equals
+    fill by construction. With MAD the mean absolute deviation from it,
+    cut = fill = area x MAD / 2 (per-pixel area = area / pixel count, so the
+    volume does not depend on the pixel size). Bin centres put each pixel at
+    most half a bin width off, so MAD is off by at most (max-min)/(2 bins):
+    negligible for a real 3DEP histogram.
+
+    Returns (cut m³, MAD m), unrounded; _hist_balanced_earthwork turns them
+    into {"earthwork_cy", "mean_cut_fill_ft"} (cut volume in cubic yards to 2
+    significant figures; MAD in feet, to 0.1). None, never raising, when:
+    the histogram or its counts can't be read; a count is negative, None,
+    non-finite or not a number; "size" disagrees with the counts; max < min;
+    no pixels; the area is not positive; the pixel count times pixel_m2 is
+    outside EARTHWORK_COVERAGE times the area (pixel_m2 must be given); or
+    any result is non-finite.
+
+    Inside the coverage band the volume uses the full area_m2, not the
+    pixel-covered area: a parcel whose pixels cover only half (or 60%) of
+    the open ground gets the full-area volume extrapolated from the pixels
+    it has.
+
+    Not a grading plan: it ignores drainage cross-slope, building-pad-only
+    leveling, terracing, shrink/swell, topsoil and rock.
+    """
+    try:
+        if not isinstance(hist, dict):
+            return None
+        counts, lo, hi = hist.get("counts"), hist.get("min"), hist.get("max")
+        if not isinstance(counts, list) or not counts:
+            return None
+        if not all(_finite_number(n) and n >= 0 for n in counts):
+            return None
+        if "size" in hist and hist["size"] != len(counts):
+            return None
+        if not (_finite_number(lo) and _finite_number(hi)) or hi < lo:
+            return None
+        if not (_finite_number(area_m2) and area_m2 > 0):
+            return None
+        if not (_finite_number(pixel_m2) and pixel_m2 > 0):
+            return None
+        total = float(sum(counts))
+        if not (math.isfinite(total) and total > 0):
+            return None
+        lo_f, hi_f = EARTHWORK_COVERAGE
+        if not lo_f * area_m2 <= total * pixel_m2 <= hi_f * area_m2:
+            return None
+        width = (hi - lo) / len(counts)
+        centres = [lo + (i + 0.5) * width for i in range(len(counts))]
+        mean = sum(n * c for n, c in zip(counts, centres)) / total
+        mad = sum(n * abs(c - mean) for n, c in zip(counts, centres)) / total
+        cut_m3 = area_m2 * mad / 2
+        if not (math.isfinite(mean) and math.isfinite(mad) and math.isfinite(cut_m3)):
+            return None
+        return cut_m3, mad
+    except _EARTHWORK_ERRORS:
+        return None
+
+
+EARTHWORK_KEYS = ("earthwork_cy", "mean_cut_fill_ft")
+
+
+def earthwork_fields(earthwork: dict[str, Any] | None) -> dict[str, Any]:
+    """The ranked-output earthwork columns (None when not computed). run.main
+    attaches these only after scoring, flags and the sort."""
+    e = earthwork or {}
+    return {k: e.get(k) for k in EARTHWORK_KEYS}
 
 
 def _slope_problem(data: dict[str, Any]) -> str | None:
@@ -258,25 +400,34 @@ def too_small_for_slope(p: dict[str, Any]) -> bool:
 
 
 def slope_checks(parcels: list[dict[str, Any]], workers: int,
-                 progress: Callable[[int, int], None] | None = None) -> None:
+                 progress: Callable[[int, int], None] | None = None) -> list[dict[str, Any] | None]:
+    """Fill each parcel's slope fields. Returns the earthwork estimates, one
+    per parcel in input order (None when not computed); they are NOT put on
+    the parcels, so scoring and rank.py can't read them (run.main attaches
+    them after scoring)."""
     def work(p):
         if too_small_for_slope(p):
             p.update({"relief_ft": None, "steep_pct": None, "mean_slope_pct": None,
                       "slope_skipped": SLOPE_SKIPPED})
-            return p
+            return None
         try:
-            p.update(slope_stats(p.get("_open_ground") or p["geometry"]))
+            fields, earthwork = slope_stats(p.get("_open_ground") or p["geometry"])
         except arcgis.ArcGISError as exc:
             p.update({"relief_ft": None, "steep_pct": None, "mean_slope_pct": None,
                       "slope_error": str(exc)[:200]})
-        return p
+            return None
+        p.update(fields)
+        return earthwork
 
     done = 0
+    out: list[dict[str, Any] | None] = []
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        for _ in pool.map(work, parcels):
+        for earthwork in pool.map(work, parcels):
+            out.append(earthwork)
             done += 1
             if progress and (done % 100 == 0 or done == len(parcels)):
                 progress(done, len(parcels))
+    return out
 
 
 def zoning_checks(parcels: list[dict[str, Any]], sources: list[dict[str, Any]],

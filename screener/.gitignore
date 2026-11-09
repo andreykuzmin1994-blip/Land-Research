@@ -3,5 +3,9 @@
 cache/
 output/
 autoresearch/experiments.tsv
-inputs/decisions.csv
+# Everything in inputs/ but its README: decisions.csv, the decision-side
+# feature store (decision_features.jsonl) and any temp or backup copy a
+# spreadsheet leaves there. evaluate --decide refuses on untracked files.
+inputs/*
+!inputs/README.md
 autoresearch/best_ranking.json

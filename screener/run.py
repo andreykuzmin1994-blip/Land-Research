@@ -19,12 +19,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import arcgis, checks, layers, report, scoring, screens
+from . import arcgis, checks, layers, owner_clusters, report, scoring, screens, snapshot
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
 DECISIONS_FILE = HERE / "inputs" / "decisions.csv"
 DECISIONS_HEADER = ["parcel_id", "decision", "date", "note"]
+# "maybe" is a mark only: no score, flag, sort or screen reacts to it.
+DECISION_VALUES = ("pursue", "pass", "maybe", "listed")
 
 
 def log(msg: str) -> None:
@@ -39,18 +41,26 @@ def stop(what: str, exc: Exception) -> int:
 
 
 def load_decisions() -> dict[str, dict[str, str]]:
-    """Your pursue / pass / listed marks, keyed by parcel id."""
+    """Your pursue / pass / maybe / listed marks, keyed by parcel id (the
+    last row for an id wins). utf-8-sig: a spreadsheet's byte-order mark
+    would otherwise hide the parcel_id column and drop every decision.
+    Header names are stripped, as decide.py strips them when it checks and
+    appends, so a hand-edited "parcel_id, decision, date, note" is read
+    rather than silently ignored."""
     if not DECISIONS_FILE.exists():
         DECISIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(DECISIONS_FILE, "w", newline="") as fh:
             csv.writer(fh).writerow(DECISIONS_HEADER)
         return {}
     out = {}
-    with open(DECISIONS_FILE, newline="") as fh:
-        for row in csv.DictReader(fh):
+    with open(DECISIONS_FILE, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        if reader.fieldnames:
+            reader.fieldnames = [(h or "").strip() for h in reader.fieldnames]
+        for row in reader:
             pid = (row.get("parcel_id") or "").strip()
             decision = (row.get("decision") or "").strip().lower()
-            if pid and decision in {"pursue", "pass", "listed"}:
+            if pid and decision in DECISION_VALUES:
                 out[pid] = {"decision": decision, "date": (row.get("date") or "").strip(),
                             "note": (row.get("note") or "").strip()}
     return out
@@ -75,12 +85,17 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = tomllib.loads(args.settings.read_text())
     run_cfg, area, scr = cfg["run"], cfg["area"], cfg["screens"]
+    try:
+        gap_ft = owner_clusters.gap_ft_setting(cfg)
+    except ValueError as exc:
+        ap.error(f"{args.settings}: {exc}")
     arcgis.cache_days = 0 if args.refresh else float(run_cfg.get("cache_days", 7))
     county = importlib.import_module(f"screener.{run_cfg['county']}")
     today = date.today().isoformat()
     out_dir = args.out or HERE / "output" / f"{run_cfg['county']}-{today}"
     funnel: list[tuple[str, int]] = []
     notes: list[str] = []
+    earthwork: dict[int, dict[str, Any] | None] = {}
 
     log(f"{county.NAME} County: fetching {area['min_acres']}-{area['max_acres']} acre parcels")
     try:
@@ -89,6 +104,15 @@ def main(argv: list[str] | None = None) -> int:
     except arcgis.ArcGISError as exc:
         return stop("the county parcel layer", exc)
     parcels.sort(key=lambda p: p["parcel_id"])
+    # Same-owner groups over every fetched parcel, before any screen and
+    # before the trial limit, so a trial run gives the same counts. The
+    # result stays in this local variable: nothing goes on p until the
+    # parcels are scored and sorted (the evaluation never measures it).
+    started = time.monotonic()
+    owner_groups = owner_clusters.build(parcels, gap_ft, area["min_acres"], area["max_acres"])
+    log(f"  same-owner groups: {len(owner_groups.groups):,} "
+        f"({time.monotonic() - started:.1f} s)")
+    notes.extend(owner_clusters.summary_notes(owner_groups))
     if args.limit:
         parcels = parcels[:args.limit]
         notes.append(f"trial run limited to {args.limit} parcels")
@@ -179,10 +203,14 @@ def main(argv: list[str] | None = None) -> int:
                      "flagged). The map shape is the problem, not a failed check: compare the "
                      "county parcel map with the tax record.")
 
-    if run_cfg.get("slope", True) and not args.no_slope and survivors:
+    slope_on = bool(run_cfg.get("slope", True)) and not args.no_slope
+    if slope_on and survivors:
         log(f"Slope from USGS lidar for {len(survivors):,} parcels")
-        checks.slope_checks(survivors, int(run_cfg.get("workers", 6)),
-                            lambda d, n: log(f"  slope {d:,}/{n:,}"))
+        estimates = checks.slope_checks(survivors, int(run_cfg.get("workers", 6)),
+                                        lambda d, n: log(f"  slope {d:,}/{n:,}"))
+        # Keyed by the parcel object, not its id (ids aren't guaranteed
+        # unique): the estimate stays off p until scoring is done.
+        earthwork = {id(p): e for p, e in zip(survivors, estimates)}
         slope_failed = sum(1 for p in survivors if p.get("slope_error"))
         if slope_failed:
             log(f"  ! slope check failed for {slope_failed:,} of {len(survivors):,} parcels")
@@ -203,6 +231,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         notes.append("slope check skipped: steepness is not in the scores or screens")
 
+    # The feature snapshot (future labels' features) is copied now, before
+    # scoring, and stays in this local variable: nothing is put on p.
+    snap = snapshot.take(survivors, snapshot.run_meta(
+        county.NAME, today, args.limit, slope_on, args.settings.read_bytes()))
+    if snap["meta"]["nonfinite_as_null"]:
+        notes.append(f"{snap['meta']['nonfinite_as_null']} non-finite values (NaN or infinity) "
+                     f"were written as null in {snapshot.FILE_NAME}")
     for p in survivors:
         p.update(scoring.score(p))
         p["flags"] = screens.flags(p)
@@ -214,6 +249,26 @@ def main(argv: list[str] | None = None) -> int:
     survivors.sort(key=lambda p: (-p["score"], p["parcel_id"]))
     for i, p in enumerate(survivors, 1):
         p["rank"] = i
+    # The cut/fill estimate is a live-only fact the frozen evaluation never
+    # measures, so it is attached only now, after scores, flags and the sort,
+    # for the reports alone (rank.py and scoring.py never see it).
+    for p in survivors:
+        p.update(checks.earthwork_fields(earthwork.get(id(p))))
+    # Same-owner lines, now that every sibling's final status is known.
+    # Only p["flags"] (reports) gains them; scores and order are done.
+    ranked_at = {p["parcel_id"]: p["rank"] for p in survivors}
+    out_why = {p["parcel_id"]: reason_key(p["reject_reasons"][0]) for p in rejected}
+    mismatch = {p["parcel_id"] for p in survivors + rejected if p.get("acreage_mismatch")}
+
+    def status_of(pid: str) -> str:
+        if pid in ranked_at:
+            return f"ranked #{ranked_at[pid]}"
+        if pid in out_why:
+            return f"screened out: {out_why[pid]}"
+        return "not screened in this trial run"
+    for p in survivors:
+        p["flags"].extend(owner_clusters.describe(p["parcel_id"], owner_groups, status_of,
+                                                  mismatch.__contains__))
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)
@@ -236,7 +291,9 @@ def main(argv: list[str] | None = None) -> int:
                  "and forested wetlands; floodplain from FEMA NFHL (Mar 2026 snapshot)")
     summary = {"county": county.NAME, "run_date": today, "funnel": funnel,
                "reject_reasons": reasons.most_common(), "notes": notes}
+    snapshot.clear(out_dir)  # never pair a new ranked.csv with an old snapshot
     report.write_all(out_dir, survivors, rejected, summary, int(run_cfg.get("briefs", 25)))
+    snapshot.write(out_dir, snap)
     log(f"Done: {len(survivors):,} ranked parcels -> {out_dir}")
     return 0
 

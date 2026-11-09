@@ -15,7 +15,7 @@ RANKED_COLUMNS = [
     "rank", "score", "fixed_score", "learned_score", "motivation_score", "parcel_id", "jurisdiction",
     "site_address", "acres", "usable_after_slope", "entitlement", "zoning", "flu",
     "exit_label", "exit_miles", "rail_ft", "industrial_within_1mi", "flood_pct",
-    "wetland_pct", "steep_pct", "relief_ft", "owner", "owner_type", "owner_mailing",
+    "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft", "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
 ]
@@ -112,6 +112,7 @@ def brief(p: dict[str, Any]) -> str:
         f"ponds/streams {p.get('water_pct', 0):.0f}%",
         f"- Slope: {_fmt(p.get('steep_pct'))}% of the open ground steeper than 15%; "
         f"relief about {_fmt(p.get('relief_ft'))} ft (USGS lidar 2018-19, 10 m grid)",
+        _earthwork_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
         "",
@@ -140,6 +141,27 @@ def brief(p: dict[str, Any]) -> str:
         "GA EPD, GDOT). Not a survey, title search or environmental assessment._",
     ]
     return "\n".join(lines) + "\n"
+
+
+EARTHWORK_CAVEAT = ("one flat pad at the mean elevation of the open ground, not a grading "
+                    "plan: ignores drainage slope, terracing, shrink/swell, topsoil and rock")
+
+
+def _earthwork_line(p: dict[str, Any]) -> str:
+    cy, ft = p.get("earthwork_cy"), p.get("mean_cut_fill_ft")
+    if cy is not None and ft is not None:
+        return (f"- Earthwork (rough): about {cy:,} cubic yards of cut balanced by the same "
+                f"fill, {ft:.1f} ft average cut or fill, to level the open ground (USGS lidar "
+                f"2018-19, 10 m grid); {EARTHWORK_CAVEAT}")
+    if p.get("slope_skipped"):
+        why = "open ground under one lidar pixel"
+    elif p.get("slope_error"):
+        why = "slope check failed"
+    elif p.get("steep_pct") is None:
+        why = "slope not checked"
+    else:
+        why = "the lidar answer didn't support an estimate"
+    return f"- Earthwork: not computed ({why})"
 
 
 def _planning_office(jurisdiction: str) -> str:
