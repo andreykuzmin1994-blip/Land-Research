@@ -27,10 +27,35 @@ Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop r
 - The review process is **tiered** (`STANDING_RISKS.md`): tests+CI for low-risk changes, one independent fresh-context reviewer for ordinary logic, the full three-agent workflow for metric/contract-touching work.
 
 2026-11-06: flood (H4) and wetlands (H6) are built (`hazards.py`,
-`make hazards-import`, `reviews/26_flood_wetlands/`) but **inert**: they
-need a new table that only a human adds to `prepare.py` (the proposal is
-`reviews/26_flood_wetlands/01_prepare_mutation_proposal.md`). Until then H4/H6
-stay data_gap passes and every score is unchanged. See "Flood and wetlands".
+`make hazards-import`, `reviews/26_flood_wetlands/`).
+**2026-11-09: the `parcel_hazards` table is enabled** (operator-authorized
+prepare-mutation, `reviews/33_hazards_enabled/`), but it is empty: H4/H6
+stay data_gap passes and every score is unchanged until the first
+populated import. Operator next steps, between runs, in order:
+
+1. Merge to `main` (halt any active loop first: `make halt`).
+2. `make db-check` on the REAL database, BEFORE any `make verify`,
+   `make baseline` or `make daily`. It creates the empty table. Skipped,
+   every experiment (the baseline included) ends `crash` with
+   `HazardAuditFailed: hazard audit: parcel_hazards unreadable (...)`.
+3. Browser downloads into the gitignored `hazards_inbox/` (both hosts'
+   robots.txt deny automated queries), unpacked FLAT (no subfolders):
+   FEMA NFHL Fulton county package `13121C` (msc.fema.gov) ->
+   `hazards_inbox/nfhl/S_FLD_HAZ_AR.shp`, `.dbf`, `.prj` (required) plus
+   `S_LOMR.shp`, `.dbf`, `.prj` if present; USFWS NWI Georgia shapefile
+   (fws.gov Wetlands Mapper, state download) -> `hazards_inbox/nwi/`,
+   exactly one `.shp` or one `*_Wetlands.shp` (e.g. `GA_Wetlands.shp`)
+   with its `.dbf` and `.prj` (NAD83 or WGS84 geographic, or NAD83 Conus
+   Albers; Web Mercator is refused).
+4. `make hazards-import`: exit 0 written; 4 a source failed (its old data
+   kept); 2 after "source(s) ... committed" partial (re-run); 3 the run
+   has its baseline (start a new run first); 1 refused (not merged, or no
+   table: step 2).
+5. New run + baseline: the first populated import IS the metric change.
+6. Optional: resolve the old open "H4 flood unjoined" / "H6 wetlands
+   unjoined" flags.
+
+See "Flood and wetlands".
 
 2026-11-06: site-fit adjacency buffers (residential, other-district, ROW) are
 built (`adjacency.py`, `make adjacency-import`, `reviews/27_site_fit_buffers/`)
@@ -294,10 +319,16 @@ then deducts the SFHA (floodway included) and NWI wetland area from the
 buildable area; the 0.2% zone, fill and stream/state-waters buffers are
 not considered (stated on every projection).
 
-Nothing of this is active until a human:
+The `parcel_hazards` table is enabled in `prepare.py` since 2026-11-09
+(operator-authorized prepare-mutation, `reviews/33_hazards_enabled/`). While
+it is empty nothing is scored differently: H4/H6 are data_gap passes
+("no hazards import for this parcel"), discovery no longer writes the old
+"unjoined" stub flags, and projections and the memo say flood/wetlands
+were not deducted. To make it active, between runs (full steps in Status
+above):
 
-1. applies `reviews/26_flood_wetlands/01_prepare_mutation_proposal.md` to
-   `prepare.py` between runs (`make db-check`, which runs `python prepare.py`, then creates `parcel_hazards`);
+1. `make db-check` (runs `python prepare.py`) on the real database, before
+   any verify, baseline or daily run, so the table exists;
 2. downloads, in a browser, the FEMA NFHL county package for Fulton
    (13121C, Map Service Center) and the USFWS NWI Georgia shapefile, and
    unpacks them as `hazards_inbox/nfhl/S_FLD_HAZ_AR.*` (+ `S_LOMR.*`) and
@@ -468,7 +499,7 @@ land-site-selector/
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings
 ├── rules_scrape.py                    — IMMUTABLE during run: zoning-code scraper, writes a CANDIDATE only (operator, between runs)
-├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (inert until the parcel_hazards proposal is applied)
+├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (table enabled 2026-11-09; inert until the first populated import)
 ├── hazards_import.py                  — IMMUTABLE during run: writes parcel_hazards from hazards_inbox/ files (operator, between runs)
 ├── hazards_inbox/                     — gitignored: NFHL county package + NWI state shapefile the operator downloads by hand
 ├── adjacency.py                       — IMMUTABLE during run: neighbour adjacency facts, buffer-key allow-list, per-side buffer plan (inert until the parcel_adjacency proposal is applied)

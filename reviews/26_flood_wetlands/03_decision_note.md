@@ -249,7 +249,10 @@ After a populated import (the metric change):
    (decision 3: keep the token, or remove it so AE always blocks), and the
    other SFHA zones (finding 7: keep, or extend `flood_zones_blocked`). Any
    parameters.json edit follows the prepare-mutation protocol.
-2. Apply `01_prepare_mutation_proposal.md` to prepare.py: the
+2. **DONE 2026-11-09 by the agent under the operator's delegation, without
+   the optional exclusion (see "Operator decisions (2026-11-09, item 4)"
+   below; reviews/33_hazards_enabled).** Apply
+   `01_prepare_mutation_proposal.md` to prepare.py: the
    `_DDL_PARCEL_HAZARDS` string literal at module level (the gate reads the
    file's text) and the index tuple, both in `_ALL_DDL`. Mirror the DDL in
    STORAGE_ARCHITECTURE.md. Optionally add the prepare-side metric
@@ -275,7 +278,8 @@ After a populated import (the metric change):
 ## Not done / for the human
 
 - The two questions in operator step 1.
-- Applying the proposal (step 2) and the real-data import (steps 4-5).
+- The real-data import (steps 4-5). Applying the proposal (step 2) was
+  done 2026-11-09 under the operator's delegation (reviews/33_hazards_enabled).
   The real hazard counts listed under LIVE come from that import.
 - Whether boundary slivers need a parameters.json tolerance, after seeing
   the real SFHA bands.
@@ -306,3 +310,67 @@ flood logic are unchanged and `parameters.json` stays as the human wrote it
 - If the operator later wants V/VE blocked, that is option (a) above
   (extend `flood_zones_blocked`, human edit between runs, new run and
   baseline).
+
+## Operator decisions (2026-11-09, item 4): table enabled by the agent
+
+The operator's chat message of 2026-11-09, verbatim, as relayed by the
+workflow harness:
+
+> 1 - Count them, jsut review, 3 - fix 4 - can you add this yourself. Start
+> building what you proposed keeping my answers in mind
+
+Item 4 of the recommended sequence was "Operator prepare-mutation for
+hazards (reviews/26)". "can you add this yourself" delegates that one edit
+to the agent, acting for the human between runs. The delegation covers the
+two constants and the `_ALL_DDL` entries of `01_prepare_mutation_proposal.md`,
+one provenance comment, and the SQL mirror in STORAGE_ARCHITECTURE.md. It
+does not cover the optional metric-SQL exclusion (not applied), any other
+prepare.py change, or any human-owned file. The other answers are carried
+out elsewhere and do not change this folder's flood rules. "Count them" is
+D3. "jsut review" is D2: V/VE stay review-only, a floodway still blocks, no
+flood-rule change, and no new root sub-score, because the null-beats-low
+question is not answered. "fix" covers the research.py and zoning_import
+fixes. Step 2 is the screener quick wins. Record, register, dispositions
+and evidence: `reviews/33_hazards_enabled/`.
+
+**Operator step 2 above is DONE, by the agent, under this delegation**
+(commit subject `prepare-mutation: ...`, on the work branch; the
+operator's merge to `main` is the protocol's commit-to-main step). Without
+the optional exclusion. Step 1's two questions were answered on 2026-11-09
+(D2, the section above). The operator steps that remain, between runs, in
+this order:
+
+1. Merge to `main` (halt any active loop first: `make halt`).
+2. `make db-check` (`python prepare.py`) on the REAL database, BEFORE any
+   `make verify`, `make baseline` or `make daily`. Otherwise every
+   experiment, the baseline included, ends `crash` with
+   `HazardAuditFailed: hazard audit: parcel_hazards unreadable (...)`.
+   With the table empty, nothing is scored differently.
+3. Browser downloads, unpacked FLAT:
+   - into `hazards_inbox/nfhl/`, the FEMA NFHL Fulton package `13121C`:
+     `S_FLD_HAZ_AR.shp`, `.dbf` and `.prj`, plus optional `S_LOMR.*`;
+   - into `hazards_inbox/nwi/`, the USFWS NWI Georgia shapefile: one
+     `.shp`, or one `*_Wetlands.shp`, with its `.dbf` and `.prj`. The `.prj`
+     must be NAD83 or WGS84 geographic, or NAD83 Conus Albers.
+
+   Details: `reviews/33_hazards_enabled/02_code_writer_response.md`.
+4. `make hazards-import`. Exit codes: 0 written; 4 a source failed (its
+   data kept); 2 after "committed" partial (re-run); 3 the run has its
+   baseline (start a new run first); 1 refused (not merged, or no table).
+5. A new run + baseline. The first populated import IS the metric change.
+6. Optional: resolve the old open "H4 flood unjoined" / "H6 wetlands
+   unjoined" flags.
+
+What moved with the table empty, against the 8ddaf69 record: scores,
+inserts and notes are identical for 22/22 parcels and the cycle.
+Discovery H4/H6 changed `flag` -> `pass`, and the two stub flagged_items
+INSERTs per parcel are gone. Scoring adds one hazard read per path and two
+"no hazards import for this parcel" data_gap INSERTs per parcel. Tests that
+predate the hazard read run under `tests/hazards_helpers.disabled()`: 25
+rewiring uses, 32 in all, never suite-wide.
+
+Merge order with the sibling 2026-11-09 changes (the D3 counting, the
+research.py and zoning_import fixes, and the screener) does not matter.
+Whichever lands second rebases, then re-runs both suites and the five
+golden checks. A conflict must not drop a `disabled()` wrap or delete a
+test.
