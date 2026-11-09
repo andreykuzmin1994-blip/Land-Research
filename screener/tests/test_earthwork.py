@@ -447,6 +447,23 @@ class EarthworkRunTests(RunHarness):
             self.assertEqual((r["earthwork_cy"], r["mean_cut_fill_ft"]), ("0", "0.0"))
 
 
+def named_estimate(tree: ast.AST) -> list[str]:
+    """Every string constant, name or attribute in tree that mentions the
+    estimate (the static guard's one rule, shared by its self-test)."""
+    hits = []
+    for node in ast.walk(tree):
+        text = None
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value
+        elif isinstance(node, ast.Name):
+            text = node.id
+        elif isinstance(node, ast.Attribute):
+            text = node.attr
+        if text is not None and any(w in text.lower() for w in EARTH_WORDS):
+            hits.append(text)
+    return hits
+
+
 class EarthworkStaticGuardTests(unittest.TestCase):
     """G2, backstop only: no string constant or name in rank.py or scoring.py
     mentions the estimate. A string built at runtime ("earth" + "work_cy")
@@ -455,26 +472,21 @@ class EarthworkStaticGuardTests(unittest.TestCase):
 
     def test_rank_and_scoring_never_name_the_estimate(self):
         for name in ("rank.py", "scoring.py"):
-            tree = ast.parse((SCREENER / name).read_text())
-            for node in ast.walk(tree):
-                text = None
-                if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                    text = node.value
-                elif isinstance(node, ast.Name):
-                    text = node.id
-                elif isinstance(node, ast.Attribute):
-                    text = node.attr
-                if text is None:
-                    continue
-                with self.subTest(file=name, line=getattr(node, "lineno", None)):
-                    self.assertFalse(any(w in text.lower() for w in EARTH_WORDS), text)
+            with self.subTest(file=name):
+                self.assertEqual(named_estimate(ast.parse((SCREENER / name).read_text())), [])
 
     def test_the_guard_catches_a_named_read(self):
-        bad = ast.parse('def learned_score(p):\n    return p.get("earthwork_cy", 0)\n')
-        hits = [n.value for n in ast.walk(bad)
-                if isinstance(n, ast.Constant) and isinstance(n.value, str)
-                and any(w in n.value for w in EARTH_WORDS)]
-        self.assertEqual(hits, ["earthwork_cy"])
+        cases = {
+            'def learned_score(p):\n    return p.get("earthwork_cy", 0)\n': ["earthwork_cy"],
+            'def learned_score(p):\n    return p["Mean_Cut_Fill_ft"]\n': ["Mean_Cut_Fill_ft"],
+            'def learned_score(p):\n    return checks.EARTHWORK_KEYS\n': ["EARTHWORK_KEYS"],
+            'def learned_score(p):\n    earthwork = 1\n    return earthwork\n':
+                ["earthwork", "earthwork"],
+            'def learned_score(p):\n    return p.get("earth" + "work_cy", 0)\n': [],
+        }
+        for src, hits in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(named_estimate(ast.parse(src)), hits)
 
 
 if __name__ == "__main__":
