@@ -100,3 +100,38 @@ Standing risks:
 - SR-11: no new request (request lists compared on and off).
 - SR-15 / SR-16 analogs: the eval boundary is unchanged; the groups stay in
   a `run.main` local until after scoring and the sort.
+
+## Post-change adversarial review round 1
+
+Operator answers (2026-11-09, recorded as given): D3 counts unlisted
+districts and districts with unreadable setback values; D2 flood scope
+"just review" (V/VE stays review-only, floodway still blocks; no flood-rule
+change); the null-beats-low question is not answered, so no new root
+sub-score; "fix" the `research.py` ArcGIS error-envelope and audit-path
+bugs and do the D1-11 `zoning_import` round; the agent may apply the
+reviews/26 hazards prepare-mutation to `prepare.py`; build the screener
+quick wins. The fix below touches no eval file, `rank.py`, `scoring.py`,
+`screens.py`, `settings.toml` or `requirements.txt`; `evaluate.fingerprint()`
+and `EVAL_FILES` are unchanged.
+
+The round raised one finding.
+
+| # | Finding | Verdict | What changed |
+|---|---|---|---|
+| 1 (minor) | The README's "Exact match only" bullet says names and addresses match after "punctuation and spacing", but only commas and periods are normalised (plus case, runs of spaces and spaced legal forms): hyphens, apostrophes, `&` and `#` keep their spacing. It also says ZIP+4 is "cut to five digits", while a ZIP+4 written with a space gave no address key at all, so that parcel joined nothing | Real. I confirmed every example offline: `SMITH-JONES` / `SMITH JONES`, `O'NEAL` / `ONEAL`, `A&B` / `A & B`, `#200` / `# 200` give different keys, and `... GA 30303 1234` gave `None`. The code under-merges, so no false assemblage was possible; the defect was a doc promise the code did not keep, and a silently keyless parcel. | Two parts. (a) Code, ZIP only: `_ZIP_END_RE` now takes the +4 after a hyphen, a space or nothing, so a space ZIP+4 is cut to ZIP5 as the README always said. This adds joins only between addresses that already agree to the last character apart from the +4, and the name must still match exactly; a lone trailing four-digit number is still no ZIP. (b) Docs: the README bullet now lists exactly what is normalised and names the four pairs that do NOT join. I did not widen the name normalisation for hyphens, apostrophes or `&`: each would add merges the phase 1 risk review did not weigh (for example `A&B` vs `AB`), and under-merging is the safe side for a flag. That stays a phase 2 question. New tests: `test_space_separated_zip4_is_cut_not_dropped` (space, double space, hyphen and no separator all equal the ZIP5 key; a lone four-digit tail is no key; different ZIP5s stay apart; it fails with the old pattern) and `test_documented_limits_of_normalisation` (pins the README's examples, joined and not joined). Module and `address_key` docstrings updated. |
+
+The earlier "Accepted under-merge" open item is corrected accordingly: a
+ZIP+4 written with a space is now joined; `&` spacing, hyphens, apostrophes
+and `#` spacing remain accepted under-merge and are now stated in the
+README.
+
+Tests after round 1:
+
+- Root: `python -m unittest discover -s tests` gives **1744 OK**.
+- Screener: `python -m unittest discover -s screener/tests -t .` gives
+  **256 OK** (254 before round 1, +2).
+
+No live run was repeated: the change is a key-normalisation rule tested
+offline, and it adds no request.
+
+**Round 1 decision: APPROVED after fixes.**

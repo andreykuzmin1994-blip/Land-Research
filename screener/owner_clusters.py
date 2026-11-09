@@ -9,7 +9,7 @@ sorted (reviews/34_screener_quick_wins, F2).
 
 Matching is exact on two keys, with no fuzzy step: the normalised owner name
 (legal forms, numbers and suites kept) AND the normalised mailing address
-(ZIP+4 cut to ZIP5). A parcel without both keys joins nothing. This is NOT
+(a ZIP+4 cut to ZIP5). A parcel without both keys joins nothing. This is NOT
 owners.same_owner, whose loose name-only rules suit a deed grantor check,
 not a claim about who holds what.
 
@@ -44,7 +44,8 @@ PLACEHOLDER_NAMES = frozenset({
 # Spaced legal forms, longest first ("L L L P" before "L L P" before "L P").
 _LEGAL_FORMS = ((re.compile(r"\bL L L P\b"), "LLLP"), (re.compile(r"\bL L P\b"), "LLP"),
                 (re.compile(r"\bL L C\b"), "LLC"), (re.compile(r"\bL P\b"), "LP"))
-_ZIP_END_RE = re.compile(r"\b(\d{5})(?:-?\d{4})?$")
+# ZIP5, optionally +4 written with a hyphen, a space or nothing between.
+_ZIP_END_RE = re.compile(r"\b(\d{5})(?:[- ]?\d{4})?$")
 
 
 def name_key(owner: str | None) -> str | None:
@@ -59,10 +60,10 @@ def name_key(owner: str | None) -> str | None:
 
 
 def address_key(mailing: str | None) -> str | None:
-    """The whole mailing address normalised like the name, ZIP+4 cut to
-    ZIP5; suite and unit numbers are kept. fulton.py joins the street line
-    and the city line with ", ", so a key needs that join, a street line
-    with a number in it ("9 OAK AVE", "PO BOX 12") and a ZIP at the end.
+    """The whole mailing address normalised like the name, ZIP+4 (hyphen,
+    space or no separator) cut to ZIP5; suite and unit numbers are kept.
+    fulton.py joins the street line and the city line with ", ", so a key
+    needs that join, a street line with a number in it ("9 OAK AVE", "PO BOX 12") and a ZIP at the end.
     None otherwise: "ATLANTA, GA 30310" alone says only which city."""
     text = (mailing or "").strip()
     street = text.split(", ", 1)[0] if ", " in text else ""

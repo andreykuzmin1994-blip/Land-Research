@@ -85,6 +85,32 @@ class KeyTests(unittest.TestCase):
         self.assertNotEqual(oc.address_key("9 OAK AVE, ATLANTA GA 30310"),
                             oc.address_key("9 OAK AVE, ATLANTA GA 30311"))
 
+    def test_space_separated_zip4_is_cut_not_dropped(self):
+        five = oc.address_key("9 OAK AVE, ATLANTA GA 30303")
+        self.assertIsNotNone(five)
+        for mailing in ("9 OAK AVE, ATLANTA GA 30303 1234", "9 OAK AVE, ATLANTA GA 30303  1234",
+                        "9 OAK AVE, ATLANTA GA 30303-1234", "9 OAK AVE, ATLANTA GA 303031234"):
+            with self.subTest(mailing=mailing):
+                self.assertEqual(oc.address_key(mailing), five)
+        # A trailing four-digit number with no ZIP5 before it is still no ZIP.
+        self.assertIsNone(oc.address_key("9 OAK AVE, ATLANTA GA 1234"))
+        # Two different ZIP5s stay apart whatever the +4.
+        self.assertNotEqual(oc.address_key("9 OAK AVE, ATLANTA GA 30303 1234"),
+                            oc.address_key("9 OAK AVE, ATLANTA GA 30304 1234"))
+
+    def test_documented_limits_of_normalisation(self):
+        """The README's 'Exact match only' bullet: only commas, periods,
+        case and runs of spaces are normalised (plus spaced legal forms).
+        Hyphens, apostrophes, '&' and '#' are kept with their spacing, so
+        these pairs do NOT join (accepted under-merge, never a false join)."""
+        self.assertEqual(oc.name_key("Smith,  Jones L.L.C."), oc.name_key("SMITH JONES LLC"))
+        for a, b in (("SMITH-JONES LLC", "SMITH JONES LLC"), ("O'NEAL FARMS", "ONEAL FARMS"),
+                     ("A&B LAND LLC", "A & B LAND LLC")):
+            with self.subTest(a=a, b=b):
+                self.assertNotEqual(oc.name_key(a), oc.name_key(b))
+        self.assertNotEqual(oc.address_key("9 OAK AVE #200, ATLANTA GA 30303"),
+                            oc.address_key("9 OAK AVE # 200, ATLANTA GA 30303"))
+
     def test_no_street_line_or_no_zip_has_no_key(self):
         for mailing in (None, "", "ATLANTA GA 30310", "9 OAK AVE", "9 OAK AVE, ATLANTA GA",
                         ", ATLANTA GA 30310"):

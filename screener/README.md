@@ -245,8 +245,13 @@ a `--limit` trial. Limits:
   and before `--limit`. The owner may hold more elsewhere, and small
   neighbours under 5 ac that would make a site with this one are not seen
   (a wider fetch is a later phase, with its own review).
-- **Exact match only.** Names are matched after upper-casing, punctuation
-  and spacing ("L.L.C." = "LLC"); addresses likewise, with ZIP+4 cut to five
+- **Exact match only.** Names are matched after upper-casing, turning
+  commas and periods into spaces, collapsing runs of spaces and joining
+  spaced legal forms ("L.L.C." = "LLC"). Nothing else is normalised:
+  hyphens, apostrophes, "&" and "#" are kept with their spacing, so
+  "SMITH-JONES" and "SMITH JONES", "O'NEAL" and "ONEAL", "A&B" and
+  "A & B", or "#200" and "# 200" do NOT join. Addresses get the same
+  treatment, with a ZIP+4 (hyphen, space or no separator) cut to five
   digits. Legal forms, numbers and suites are kept, so "FUND I" and "FUND
   II", or suite 100 and suite 200, stay apart. Different spellings,
   addresses or per-site LLCs of one owner are NOT joined. A blank or
