@@ -7119,6 +7119,38 @@ class TestArcgisEnvelopeCorridor(unittest.TestCase):
         self.assertIn(f"corridor={first}", aborts[0][4])
         self.assertEqual(_log_rows(fake, "discovery_empty"), [])
 
+    def test_every_corridor_enveloped_pins_documented_residual(self) -> None:
+        # reviews/31 post-change round 1 (residual, pinned on purpose): when
+        # every corridor gets an envelope the county is NOT aborted and the
+        # TSV reads discovery_fulton=0, the same as the transport-error path.
+        # The failure is loud elsewhere: one abort row and one partial-
+        # corridor data_gap flag per corridor, and no discovery_empty row.
+        # A later change that marks this county shape must update this test.
+        sess = _RouteSession([_envelope(400)])
+        with fake_connection_context() as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()), \
+                mock.patch.object(research, "_DiscoverySession", return_value=sess), \
+                mock.patch.object(
+                    research.connector_harness, "run_harness_for_county",
+                    return_value=_load_fixture("harness_healthy.json"),
+                ):
+            summary = research.run_discovery_cycle("atlanta")
+        n = len(research._FULTON_CORRIDORS)
+        fulton = summary["per_county"]["fulton"]
+        self.assertFalse(fulton["aborted"])
+        self.assertEqual(fulton["totals"]["discovery"], 0)
+        self.assertEqual(sess.query_calls, n)  # one request per corridor, no retry
+        self.assertEqual(len(_log_rows(fake, "abort")), n)
+        self.assertEqual(_log_rows(fake, "discovery_empty"), [])
+        flags = [t for t in _flag_texts(fake) if t.startswith("partial corridor")]
+        self.assertEqual(len(flags), n)
+        self.assertEqual(runner._discovery_count(fulton), 0)
+        desc = runner._format_loop_description(
+            {"market": "atlanta", "sub_summaries": {"discovery": summary}}, "t")
+        self.assertIn("discovery_fulton=0", desc)
+
 
 class TestArcgisEnvelopeSchemaCheck(unittest.TestCase):
     """reviews/31 G3: an envelope at the schema check is a county abort with

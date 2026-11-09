@@ -104,3 +104,50 @@ for features on page 2 or later of a corridor.
 - The corridor abort note's "network error" label now also covers
   envelopes. A wording change would touch the handler and is left for a
   later change.
+
+## Post-change adversarial review round 1
+
+One finding (minor). Verified against the code. Accepted as a residual, not
+a bug. No code change; one pinning test added.
+
+**F-1: an all-envelope county reads `discovery_fulton=0` in the TSV.** If
+every corridor gets an error envelope, each corridor writes its abort row
+and its partial-corridor data_gap flag. `_discover_fulton` still returns
+`{"aborted": False, ..., "totals": {"discovery": 0, ...}}`, so
+`runner._discovery_count` returns 0. The TSV then shows the same token as
+a genuinely empty county.
+
+- **Verified.** `_discover_fulton_corridor` catches `ArcGISErrorEnvelope`
+  (a `RequestException` subclass) in the existing network handler and
+  returns zero counts. `per_corridor` carries no abort field.
+  `_discover_fulton` sums the totals with `aborted` False.
+  `_discovery_count` returns `None` only for an aborted or skipped county.
+- **Why not fixed here.** This is the transport-error path's existing
+  shape. R-1 mirrors it on purpose: an all-`ConnectionError` county gives
+  the same `discovery_fulton=0` at base. The 0 is not silent. The cycle
+  writes one `abort` research_log row and one `partial corridor` data_gap
+  flag per corridor, and no `discovery_empty` row. That is how an operator
+  tells this case from a real empty county. Marking the county shape
+  would change the runner's TSV token for the transport path too. It is a
+  metric-adjacent change that belongs in its own reviewed change, not in
+  this fix.
+- **Test.** `TestArcgisEnvelopeCorridor.test_every_corridor_enveloped_pins_documented_residual`
+  pins today's behaviour. It checks: county not aborted, totals 0, one
+  request per corridor (no retry), N abort rows, N partial-corridor flags,
+  no discovery_empty row, and `discovery_fulton=0` in the description. A
+  later change that marks this shape must update the test on purpose.
+- **Residual added** (below): an all-corridor failure, envelope or
+  transport, is not marked in the per-county summary or the TSV.
+  Follow-up: add a per-corridor `aborted` marker. Have `_discovery_count`
+  return `None`, or a distinct token, when every corridor aborted.
+
+Re-run after this round: `python -m unittest discover -s tests` 1770 OK;
+`python -m unittest discover -s screener/tests -t .` 134 OK; git status
+clean apart from the committed change.
+
+### Residual added by round 1
+
+- An all-corridor failure (envelope or transport) leaves the county
+  `aborted` False. The TSV reads `discovery_fulton=0`, which matches a
+  genuinely empty county. The abort rows and partial-corridor flags are the
+  only marker. Pinned by the test above.
