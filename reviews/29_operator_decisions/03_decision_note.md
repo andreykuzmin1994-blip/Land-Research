@@ -62,6 +62,13 @@ jus investigate further 4- Keep for now"
    unlisted districts out. Please answer listed-only vs also-unlisted (and
    unreadable values, D3-02) with that in hand, before the first
    verification.
+   **Answered (operator, in chat, 2026-11-09): "Count them".** Unlisted
+   districts AND listed districts whose setback values are unreadable also
+   count with the default setback, never block, and carry their own
+   investigate text. D3-01 and D3-02 are CLOSED by
+   `reviews/30_d3_count_unlisted/` (dist-is-None and rules-unavailable still
+   never count; Fairburn PD's text is unchanged). The first verification
+   after that change needs a new run and baseline.
 6. **D3 never blocks and never runs while draft.** The text is a `data_gap`
    flag written once while open and a line in the notes and memo; draft
    parcels get no projection, so nothing changes until a jurisdiction is

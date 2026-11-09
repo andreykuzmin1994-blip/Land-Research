@@ -254,3 +254,15 @@ text. Fact to decide with: the only parcels D3 moves into BTS today are the
 REZONING, the same kind of parcel the listed-only reading was meant to keep
 out. Answer before the first verification; either way the change is
 between runs and needs a new run and baseline.
+
+**Answered (operator, in chat, 2026-11-09): "Count them" (D3-01 and D3-02
+CLOSED, `reviews/30_d3_count_unlisted/`).** In a verified jurisdiction an
+UNLISTED district and a listed district with no readable front/side/rear
+value now also count for the >= 150K SF test with the 25 ft default, never
+block, and carry "investigate further: district not listed in
+zoning_rules.json; 25 ft default setback used" or "investigate further:
+district setbacks unreadable in zoning_rules.json; 25 ft default setback
+used", written once as a `data_gap`. Finding 6 still holds for a parcel with
+no district rule at all (no stored zoning, jurisdiction not in the rules) and
+for rules unavailable. The first verification after this change needs a new
+run and baseline.
