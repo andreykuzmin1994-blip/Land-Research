@@ -77,7 +77,9 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
         # and writes nothing on p (plan.py).
         svg, why = plan.render(p)
         if svg is not None:
-            svg_path.write_text(svg)
+            svg_path.write_text(svg, encoding="utf-8")
+        else:
+            svg_path.unlink(missing_ok=True)    # no stale plan from an earlier run
         path.write_text(brief(p, plan_file=svg_path.name if svg is not None else None,
                               plan_note=why or None))
 

@@ -21,6 +21,8 @@ same bytes.
 from __future__ import annotations
 
 import math
+import re
+import textwrap
 from html import escape
 from typing import Any
 
@@ -29,15 +31,16 @@ from shapely.errors import GEOSException
 from shapely.geometry import Polygon
 
 from . import sitefit
-from .geo import FT_PER_M, SQM_PER_ACRE, LocalProjection, acres
+from .geo import FT_PER_M, LocalProjection, acres
 
 SIZE = 600          # plan square, px
 MARGIN = 20
 LINE = 18           # legend line height, px
-LEGEND_LINES = 5
+WRAP = 84           # legend characters per line (12 px sans-serif fits the width)
+SCALE_GAP = 24      # px between the plan square and the legend, holds the scale bar
 WIDTH = SIZE + 2 * MARGIN
-HEIGHT = SIZE + 2 * MARGIN + LEGEND_LINES * LINE + 8
 MIN_SPAN_FT = 10.0
+_XML_BAD = re.compile("[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 
 PARCEL_FILL, OPEN_FILL, CONSTRAINED_FILL = "#f4f1ea", "#cfe8c4", "#9cc3e0"
 ENVELOPE_FILL, ENVELOPE_STROKE, INK = "#f2c9a0", "#b5534a", "#222222"
@@ -98,7 +101,13 @@ def _shape(d: str, fill: str, stroke: str = "none", width: float = 0.0,
 def _text(x: float, y: float, s: str, size: int = 12, anchor: str = "start",
           weight: str = "normal") -> str:
     return (f'<text x="{_n(x)}" y="{_n(y)}" font-size="{size}" text-anchor="{anchor}" '
-            f'font-weight="{weight}">{escape(s, quote=True)}</text>')
+            f'font-weight="{weight}">{_esc(s)}</text>')
+
+
+def _esc(s: str) -> str:
+    """XML-escaped, with characters XML 1.0 cannot hold (control bytes,
+    lone surrogates) replaced by "?" so the file always parses."""
+    return escape(_XML_BAD.sub("?", s), quote=True)
 
 
 def _swatch(y: float, fill: str, stroke: str = INK) -> str:
@@ -141,28 +150,27 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
 
     has_open = "_open_ground" in p and p["_open_ground"] is not None
     og = p.get("_open_ground")
-    constrained, largest = [], []
+    constrained, largest, largest_ac = [], [], 0.0
     if has_open:
         whole = og is g and (p.get("constrained_pct") or 0) > 0   # map_checks' fallback
         if whole:
             constrained = parcel
         else:
             og_ft = _feet(og, proj)
-            open_ft = sitefit.polygon_parts(og_ft)
             constrained = sitefit.polygon_parts(_feet(g, proj).difference(og_ft))
-            if open_ft:
-                largest = [max(open_ft, key=lambda q: (q.area, q.bounds))]
+            # Measured in metres, as sitefit does, so the legend matches the brief.
+            open_m = sitefit.polygon_parts(proj(og))
+            if open_m:
+                big = max(open_m, key=lambda q: (q.area, q.bounds))
+                largest = sitefit.polygon_parts(shapely.transform(big, lambda c: c * FT_PER_M))
+                largest_ac = acres(big)
 
     f: sitefit.Fit | None = p.get("_envelope_detail")
     env = p.get(sitefit.ENVELOPE_KEY)
     env_parts = sitefit.polygon_parts(_feet(env, proj)) if env is not None else []
 
     title = f"Site plan #{p.get('rank', '')} parcel {p.get('parcel_id', '')}"
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}" '
-           f'viewBox="0 0 {WIDTH} {HEIGHT}" font-family="sans-serif">',
-           f"<title>{escape(title, quote=True)}</title>",
-           f'<rect x="0" y="0" width="{WIDTH}" height="{HEIGHT}" fill="#ffffff"/>',
-           _shape(fr.path(parcel), PARCEL_FILL, cls="parcel-fill"),
+    out = [_shape(fr.path(parcel), PARCEL_FILL, cls="parcel-fill"),
            _shape(fr.path(largest), OPEN_FILL, cls="largest-open"),
            _shape(fr.path(constrained), CONSTRAINED_FILL, opacity=0.8, cls="constrained")]
     for q in env_parts:
@@ -171,21 +179,26 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
     if f is not None and f.state == sitefit.FITS and env_parts:
         c = env_parts[0].centroid
         cx, cy = (float(v) for v in fr.xy(c.x, c.y).split(","))
-        out.append(_text(cx, cy + 4, f"{f.label} {f.building_sf:,} SF", 11, "middle", "bold"))
+        label = f"{f.label} {f.building_sf:,} SF"
+        half = len(label) * 3.5                     # about half the width at 11 px bold
+        cx = min(max(cx, MARGIN + half), WIDTH - MARGIN - half)
+        out.append(_text(cx, cy + 4, label, 11, "middle", "bold"))
 
     # North arrow (the local plane is north up) and a scale bar.
     ax, ay = WIDTH - MARGIN - 12, MARGIN + 6
+    out.append(f'<rect x="{_n(ax - 14)}" y="{_n(ay - 4)}" width="28" height="48" '
+               f'fill="#ffffff" fill-opacity="0.8"/>')
     out.append(f'<path class="north" d="M{_n(ax)},{_n(ay)} L{_n(ax + 8)},{_n(ay + 26)} '
                f'L{_n(ax)},{_n(ay + 20)} L{_n(ax - 8)},{_n(ay + 26)} Z" fill="{INK}"/>')
     out.append(_text(ax, ay + 40, "N", 12, "middle", "bold"))
     bar_ft = _scale_ft(fr.span)
-    bx, by, blen = MARGIN, MARGIN + SIZE - 6, bar_ft * fr.s
+    bx, by, blen = MARGIN, MARGIN + SIZE + SCALE_GAP - 6, bar_ft * fr.s
     out.append(f'<path class="scale" d="M{_n(bx)},{_n(by - 5)} L{_n(bx)},{_n(by)} '
                f'L{_n(bx + blen)},{_n(by)} L{_n(bx + blen)},{_n(by - 5)}" fill="none" '
                f'stroke="{INK}" stroke-width="2.0"/>')
     out.append(_text(bx + blen + 6, by, f"{bar_ft:,.0f} ft", 11))
 
-    y = MARGIN * 2 + SIZE + 6
+    y = MARGIN * 2 + SIZE + SCALE_GAP + 6
     gis = acres(proj(g))
     rows = [(PARCEL_FILL, f"Parcel (county map) {gis:,.1f} ac")]
     if not has_open:
@@ -195,16 +208,21 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
         rows.append((CONSTRAINED_FILL, f"Constrained {pct:.0f}%: floodplain, wetlands and "
                                        "water, easements, protected land"))
     if largest:
-        rows.append((OPEN_FILL, f"Largest open part {largest[0].area / FT_PER_M ** 2 / SQM_PER_ACRE:,.1f} ac"))
+        rows.append((OPEN_FILL, f"Largest open part {largest_ac:,.1f} ac"))
     else:
         rows.append((OPEN_FILL, "Largest open part: none" if has_open else
                      "Largest open part: not checked"))
     rows.append((ENVELOPE_FILL, _fit_text(f)))
-    for i, (fill, label) in enumerate(rows):
-        yy = y + i * LINE
-        out.append(_swatch(yy, fill, ENVELOPE_STROKE if fill == ENVELOPE_FILL else INK))
-        out.append(_text(MARGIN + 20, yy, label))
-    out.append(_text(MARGIN, y + len(rows) * LINE,
+    for fill, label in rows:
+        out.append(_swatch(y, fill, ENVELOPE_STROKE if fill == ENVELOPE_FILL else INK))
+        for line in textwrap.wrap(label, WRAP) or [""]:
+            out.append(_text(MARGIN + 20, y, line))
+            y += LINE
+    out.append(_text(MARGIN, y,
                      "North up. Steep ground not shown. A screening sketch, not a survey.", 11))
-    out.append("</svg>")
-    return "\n".join(x for x in out if x) + "\n", ""
+    height = int(y + MARGIN)
+    head = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{height}" '
+            f'viewBox="0 0 {WIDTH} {height}" font-family="sans-serif">',
+            f"<title>{_esc(title)}</title>",
+            f'<rect x="0" y="0" width="{WIDTH}" height="{height}" fill="#ffffff"/>']
+    return "\n".join(x for x in head + out + ["</svg>"] if x) + "\n", ""

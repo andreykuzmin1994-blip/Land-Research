@@ -58,7 +58,7 @@ class RenderTests(unittest.TestCase):
         svg, why = plan.render(fitted())
         self.assertEqual(why, "")
         root, paths = parse(svg)
-        self.assertEqual(root.get("viewBox"), f"0 0 {plan.WIDTH} {plan.HEIGHT}")
+        self.assertEqual(root.get("viewBox"), f"0 0 {plan.WIDTH} {root.get('height')}")
         for cls in ("parcel-fill", "parcel", "constrained", "largest-open", "envelope",
                     "north", "scale"):
             self.assertIn(cls, paths)
@@ -88,7 +88,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(plan.render(copy.deepcopy(p))[0], svg)
         self.assertEqual(plan.render(fitted())[0], svg)
         self.assertNotIn("-0.0", svg)
-        self.assertEqual(hashlib.sha256(svg.encode()).hexdigest()[:16], "fda795c791e9e4d7")
+        self.assertEqual(hashlib.sha256(svg.encode()).hexdigest()[:16], "40af15d63e7dcbf7")
 
     def test_render_writes_nothing_on_the_parcel(self):
         p = fitted()
@@ -115,6 +115,31 @@ class RenderTests(unittest.TestCase):
         self.assertIn('Building fit: not checked (geometry fault (<a href="x">&</a>))',
                       texts(root))
         self.assertIn('parcel 14<F>&"1\'', root.find(f"{NS}title").text)
+
+    def test_long_legend_lines_wrap_inside_the_width(self):
+        p = fitted()
+        p["_envelope_detail"] = sitefit.not_checked("short")
+        short = ET.fromstring(plan.render(p)[0])
+        p["_envelope_detail"] = sitefit.not_checked("geometry fault (" + "x " * 40 + ")")
+        root = ET.fromstring(plan.render(p)[0])
+        self.assertTrue(all(len(t) <= plan.WRAP for t in texts(root)))
+        self.assertGreater(int(root.get("height")), int(short.get("height")))
+        footer = next(t for t in root.iter(f"{NS}text") if "not a survey" in t.text)
+        self.assertLess(float(footer.get("y")), int(root.get("height")))
+
+    def test_legend_largest_open_matches_the_fit(self):
+        p = fitted()
+        want = f"Largest open part {p['_envelope_detail'].largest_open_acres:,.1f} ac"
+        self.assertIn(want, texts(ET.fromstring(plan.render(p)[0])))
+
+    def test_scale_bar_sits_below_the_plan_square(self):
+        _, paths = parse(plan.render(fitted())[0])
+        self.assertGreater(min(ys(paths["scale"])), plan.MARGIN + plan.SIZE)
+
+    def test_control_characters_still_parse(self):
+        svg = plan.render(fitted(parcel_id="14\x01F\x0b2\ud800"))[0]
+        root = ET.fromstring(svg)
+        self.assertIn("14?F?2?", root.find(f"{NS}title").text)
 
     def test_missing_geometry_draws_nothing(self):
         for g in (None, Polygon(), GeometryCollection([LineString([(0, 0), (1, 1)])])):
@@ -184,7 +209,8 @@ class RenderTests(unittest.TestCase):
                 for a in n.names}
         mods |= {n.module.split(".")[0] for n in ast.walk(tree)
                  if isinstance(n, ast.ImportFrom) and n.module and n.level == 0}
-        self.assertEqual(mods - {"__future__", "math", "html", "typing"}, {"shapely"})
+        self.assertEqual(mods - {"__future__", "math", "html", "re", "textwrap", "typing"},
+                         {"shapely"})
 
 
 class StaticGuardTests(unittest.TestCase):
@@ -275,6 +301,16 @@ class PlanRunTests(RunHarness):
         self.assertFalse([f for f in briefs if f.suffix == ".svg"])
         for f in briefs:
             self.assertIn("## Site plan\n- Not drawn (patched off)", f.read_text())
+
+    def test_stale_plan_is_removed_when_not_drawn(self):
+        fresh = copy.deepcopy(self.parcels)
+        self.main()
+        self.assertTrue(list((self.out / "briefs").glob("*.svg")))
+        self.patch(plan, "render", lambda p: (None, "patched off"))
+        self.parcels[:] = fresh
+        shutil.rmtree(self.tmp / "http", ignore_errors=True)
+        self.main()                                    # same output folder, kept
+        self.assertFalse(list((self.out / "briefs").glob("*.svg")))
 
     def test_svg_bytes_are_deterministic_across_runs(self):
         fresh = copy.deepcopy(self.parcels)
