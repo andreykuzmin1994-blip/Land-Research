@@ -144,7 +144,10 @@ make zoning-import          # off a run branch, add ARGS=--no-open-run-check onl
 
 What it does: finds each parcel's city from its TaxDist on the Fulton
 parcel layer, fetches each zoning source's features around the parcels
-(1 request/second per host, no cache), and assigns a district by parcel id
+(through the shared fetcher of rules_scrape, adjacency_import and
+hazards_import: robots.txt honoured with the D1 ArcGIS exception, whose
+`robots:` line prints once per host; 1 request/second per host; redirects
+only to https on the same site; no cookies, no cache), and assigns a district by parcel id
 (join) or largest polygon overlap in PostGIS (overlay). It updates only
 those two columns, in one transaction; a parcel without a match keeps its
 value; a source that fails or comes back truncated is skipped whole.

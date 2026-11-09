@@ -34,6 +34,7 @@ import research
 import rules_scrape as rs
 import site_fit
 import zoning
+import zoning_import as zi
 import site_fit_golden_case as golden
 from zoning_helpers import REPO_ROOT, patch_rules, verified
 
@@ -102,7 +103,7 @@ class Http:
         return r
 
 
-FETCHERS = (rs.PoliteFetcher, ai.AdjacencyFetcher, hi.HazardsFetcher)
+FETCHERS = (rs.PoliteFetcher, ai.AdjacencyFetcher, hi.HazardsFetcher, zi.ZoningSession)
 
 
 def make(cls, routes):
@@ -144,7 +145,10 @@ class SharedVerdictTests(unittest.TestCase):
             self.assertNotIn("exception", f.robots_meta["gis.county.example"])
 
     def test_tools_define_no_verdict_of_their_own(self):
-        for mod in ("adjacency_import.py", "hazards_import.py"):
+        # zoning_import (reviews/32, D1-11): no _check of its own either, so
+        # it calls robots_verdict zero times; the inherited _check calls it.
+        for mod, n_calls in (("adjacency_import.py", 1), ("hazards_import.py", 1),
+                             ("zoning_import.py", 0)):
             tree = ast.parse((REPO_ROOT / mod).read_text(encoding="utf-8"))
             defs = [n.name for n in ast.walk(tree)
                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
@@ -155,11 +159,14 @@ class SharedVerdictTests(unittest.TestCase):
             self.assertNotIn("robots_verdict", names, mod)
             calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                      and isinstance(n.func, ast.Attribute) and n.func.attr == "robots_verdict"]
-            self.assertEqual(len(calls), 1, mod)
-            self.assertEqual(calls[0].func.value.id, "rules_scrape", mod)
+            self.assertEqual(len(calls), n_calls, mod)
+            self.assertTrue(all(c.func.value.id == "rules_scrape" for c in calls), mod)
             self.assertNotIn("arcgis_exception", (REPO_ROOT / mod).read_text(), mod)
         self.assertIs(ai.AdjacencyFetcher.robots_for, rs.PoliteFetcher.robots_for)
         self.assertIs(hi.HazardsFetcher.robots_for, rs.PoliteFetcher.robots_for)
+        self.assertIs(zi.ZoningSession.robots_for, rs.PoliteFetcher.robots_for)
+        self.assertIs(zi.ZoningSession._check, rs.PoliteFetcher._check)
+        self.assertEqual(zi.ZoningSession.robots_token, zi.UA_TOKEN)
         self.assertEqual(ai.AdjacencyFetcher.robots_token, ai.UA_TOKEN)
         self.assertEqual(hi.HazardsFetcher.robots_token, hi.UA_TOKEN)
 
@@ -448,6 +455,16 @@ class SpacingTests(unittest.TestCase):
         self.assertEqual(len(http.calls), 6)
         self.assertTrue(all(g >= 1.0 for g in gaps), gaps)
 
+    def test_zoning_session_shares_the_arcgis_key(self):
+        # reviews/32, ZI-11: services3 then services8 through get_json.
+        l8 = "https://services8.arcgis.com/Zv/arcgis/rest/services/Z/FeatureServer/0"
+        f, http, c = make(zi.ZoningSession, {**robots_403(), **robots_403("services8.arcgis.com")})
+        for u in (LAYER, l8, LAYER, l8):
+            f.get_json(u, {"f": "pjson"})
+        gaps = [b - a for a, b in zip(http.at, http.at[1:])]
+        self.assertEqual(len(http.calls), 6)
+        self.assertTrue(all(g >= 1.0 for g in gaps), gaps)
+
     def test_other_hosts_keep_their_own_key(self):
         f, http, c = make(rs.PoliteFetcher, {})
         for h in ("a.example", "b.example"):
@@ -557,6 +574,47 @@ class OutputTests(unittest.TestCase):
         self.assertNotIn(tai.SECRET_PID, out)
         self.assertEqual(rc, ai.EXIT_OK)
 
+    def test_zoning_import_names_the_exception_once_per_host(self):
+        # reviews/32 (D1-11): zoning_import on the shared fetcher prints the
+        # D1 line once per host read under it, without URL or query; a
+        # readable FEMA-style disallow and a non-ArcGIS 403 refuse with no
+        # data request.
+        import test_zoning_import as tzi
+        svc8 = "services8.arcgis.com"
+        entries = tzi._entries()
+        entries[2]["url"] = f"https://{SVC}/Org1/arcgis/rest/services/FB_Zoning/FeatureServer/0"
+        entries.insert(3, dict(entries[2], key="fb2", name="Fairburn 2",
+                               url=f"https://{svc8}/Org8/arcgis/rest/services/FB/FeatureServer/0"))
+        r403 = tzi._Resp(b"Invalid URL", 403, {"Content-Type": "text/plain"})
+        conn = tzi.StoreConn(tzi._parcels(), overlay=tzi._sf_overlay())
+        code, out, http = tzi._run(conn, tzi.World(), sources=tzi._sources(entries),
+                                   robots={SVC: r403, svc8: r403})
+        self.assertEqual(code, 0, out)
+        for h in (SVC, svc8):
+            self.assertEqual(out.count(f"robots: {h}: {EXC}"), 1, out)
+        rob = [l for l in out.splitlines() if l.startswith("robots:")]
+        self.assertEqual(len(rob), 2)
+        self.assertNotIn("?", "".join(rob))
+        lines = out.splitlines()
+        self.assertLess(max(lines.index(l) for l in rob),
+                        [i for i, l in enumerate(lines) if l.startswith("requests: ")][0])
+        self.assertGreater(min(lines.index(l) for l in rob),
+                           [i for i, l in enumerate(lines) if l.startswith("written: ")][0])
+        self.assertEqual(conn.committed["fulton-P3"][0], "M-2")
+        for host, robots, reason in (
+                (SVC, tzi._Resp(FEMA_ROBOTS.encode(), 200, {"Content-Type": "text/plain"}),
+                 "robots.txt disallows this path for Land-Research-ZoningImport"),
+                ("gis.county.example", r403, "robots unavailable (HTTP 403)")):
+            ents = tzi._entries()
+            ents[2]["url"] = f"https://{host}/arcgis/rest/services/FB/FeatureServer/0"
+            conn = tzi.StoreConn(tzi._parcels(), overlay=tzi._sf_overlay())
+            code, out, http = tzi._run(conn, tzi.World(), sources=tzi._sources(ents),
+                                       robots={host: robots})
+            self.assertEqual(code, 4, out)
+            self.assertIn(f"source fb: FAILED, nothing used: {host}: {reason}", out)
+            self.assertFalse([c for c in http.calls if host in c[0]], host)
+            self.assertNotIn("robots: ", out)
+
     def test_hazards_import_names_the_exception(self):
         import test_hazards_import as thi
         from hazards_helpers import enabled
@@ -576,10 +634,12 @@ class OutputTests(unittest.TestCase):
 # D2 / D4 pins (no code change)
 # ---------------------------------------------------------------------------
 class PinTests(unittest.TestCase):
-    # Round 2 F6: zoning_import stays outside the shared robots policy (its
-    # own ZoningSession, D1-11 open item). Pin what makes that acceptable under
-    # D1: every layer it can be pointed at is an ArcGIS REST layer, on an
-    # ArcGIS Online services host or one of the two registered org hosts.
+    # Round 2 F6 pinned zoning_import's hosts while it stayed outside the
+    # shared robots policy. D1-11 is closed (reviews/32_zoning_import_fetcher):
+    # ZoningSession is a PoliteFetcher in FETCHERS above. The pin is kept:
+    # every layer it can be pointed at is an ArcGIS REST layer, on an ArcGIS
+    # Online services host or one of the two registered org hosts, so the D1
+    # path guard admits each request it makes.
     ZONING_ORG_HOSTS = frozenset({"gismaps.fultoncountyga.gov", "gis.atlantaga.gov"})
 
     def test_zoning_import_hosts_are_arcgis_rest_only(self):

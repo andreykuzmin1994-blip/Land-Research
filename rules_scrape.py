@@ -97,7 +97,10 @@ sections lost since its previous run); 5 the request budget was exhausted
 (nothing written).
 
 Imports prepare, zoning and zoning_import (its run-state guard and geometry
-helpers) -- never research (the agent's sandbox) or runner.
+helpers) -- never research (the agent's sandbox) or runner. zoning_import is
+imported inside the two functions that use it (case_features, run), never
+at module top: zoning_import builds its fetcher on PoliteFetcher and imports
+this module at its top (reviews/32_zoning_import_fetcher, ZI-01).
 """
 
 from __future__ import annotations
@@ -129,7 +132,6 @@ import requests
 
 import prepare
 import zoning
-import zoning_import
 
 TOOL_VERSION = "rules_scrape 1"
 REPO_ROOT = Path(__file__).resolve().parent
@@ -1197,6 +1199,10 @@ class PoliteFetcher:
     set ``robots_token``; the verdict is the shared ``robots_verdict``."""
 
     robots_token = UA_TOKEN
+    # The User-Agent of every request, robots.txt included. Subclasses set
+    # their own (zoning_import.ZoningSession, ZI-03); rules_scrape's is
+    # unchanged.
+    user_agent = USER_AGENT
 
     def __init__(self, http: Any = None, *, clock: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep,
@@ -1208,7 +1214,7 @@ class PoliteFetcher:
         self.http = http
         if hasattr(self.http, "headers"):
             self.http.headers.clear()
-            self.http.headers.update({"User-Agent": USER_AGENT, "Accept": "*/*",
+            self.http.headers.update({"User-Agent": self.user_agent, "Accept": "*/*",
                                       "Accept-Encoding": "gzip, deflate"})
         self.clock, self.sleep, self.now = clock, sleep, now
         self.max_requests = max_requests
@@ -1258,7 +1264,7 @@ class PoliteFetcher:
         self.requests[host] = self.requests.get(host, 0) + 1
         self.calls.append(url)
         return self.http.get(url, timeout=HTTP_TIMEOUT_S, allow_redirects=False, stream=True,
-                             headers={"User-Agent": USER_AGENT})
+                             headers={"User-Agent": self.user_agent})
 
     def _get(self, url: str) -> tuple[Any, bytes]:
         """One URL with bounded retries (5xx / connection errors; 429 only
@@ -4047,6 +4053,7 @@ def case_features(fetcher: PoliteFetcher, sig: SignalDef,
                   bboxes: Sequence[Sequence[float]]) -> list[dict[str, Any]]:
     """Case polygons near the parcels: object ids per tile, then pages with
     the whitelisted outFields only (case id, status) and geometry."""
+    import zoning_import    # call-time import: no cycle (ZI-01)
     fields = [f for f in (sig.case_id_field, sig.status_field) if f]
     oids: set[int] = set()
     for env in zoning_import.tiles_for(bboxes):
@@ -4248,6 +4255,7 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
         connect: Callable[[], Any] | None = None, today: date | None = None,
         registry_path: Path = REGISTRY_PATH, log_path: Path = EXPERIMENT_LOG,
         loop_lock: Path | None = None, inbox: LocalInbox | None = None) -> int:
+    import zoning_import    # call-time import: no cycle (ZI-01)
     today = today or date.today()
     try:
         reg = load_registry(registry_path)
