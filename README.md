@@ -231,7 +231,10 @@ setback (reviews/29_operator_decisions, D3), one not listed in its table, or
 one listed with unreadable setbacks (reviews/30_d3_count_unlisted). Each
 counts with the default, never blocks and carries an "investigate further"
 `data_gap` flag naming the case. No district rule at all (no stored zoning,
-jurisdiction not in the rules) and rules unavailable stay BTS N/A. Very
+jurisdiction not in the rules) and rules unavailable stay BTS N/A. A
+district setback with some unreadable front/side/rear values keeps the max
+of the readable ones (BTS unchanged) and carries its own "investigate
+further" flag. Very
 complex buffered outlines are simplified in PostGIS inside a slightly
 deeper buffer (stated on the projection); beyond 600 vertices the
 projection is an error rather than a slow search.

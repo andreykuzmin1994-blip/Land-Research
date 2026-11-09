@@ -48,6 +48,11 @@ readable front/side/rear value ("... district setbacks unreadable in
 zoning_rules.json ..."). Each counts for the >= 150K SF test, never blocks
 and carries its text (``bts_review_text``). No district rule (no stored
 zoning, jurisdiction not in the rules) and rules unavailable never count.
+A listed district with no ``dimensions`` (absent or null) is the D3 case. A
+district setback with SOME unreadable front/side/rear values keeps the max of
+the readable ones (BTS unchanged) and carries "investigate further: some
+district setbacks unreadable in zoning_rules.json; max of the readable
+setbacks used" (reviews/30, post-change adversarial review round 1).
 Adjacency buffers (residential or other-district neighbours)
 are NOT applied while the proposed adjacency table is not enabled: the
 database stores only candidate parcels, so neighbour zoning is incomplete;
@@ -669,6 +674,11 @@ class _Rules:
     # or no usable dimensions mapping). None for every other case, including
     # no district rule at all and rules unavailable (never counted).
     default_kind: str | None = None
+    # reviews/30_d3_count_unlisted, post-change adversarial review round 1:
+    # the setback IS from the rules (max of the readable front/side/rear) but
+    # at least one of those values is present and unreadable. Flag only: the
+    # BTS result is unchanged (from_rules already counts).
+    partial_unreadable: bool = False
 
 
 VERIFIED_LABEL = "verified rules"
@@ -693,6 +703,11 @@ BTS_REVIEW_TEMPLATES = types.MappingProxyType({
     DEFAULT_UNREADABLE: ("investigate further: district setbacks unreadable in "
                          "zoning_rules.json; {setback} ft default setback used"),
 })
+# reviews/30_d3_count_unlisted, post-change adversarial review round 1: the
+# investigate text for a verified district with SOME unreadable setback values
+# (the max of the readable ones is used). Stable: no district, no number.
+BTS_PARTIAL_REVIEW_TEXT = ("investigate further: some district setbacks unreadable in "
+                           "zoning_rules.json; max of the readable setbacks used")
 NO_RULE_LABEL = "no district rule"
 RULES_UNAVAILABLE_LABEL = "zoning rules unavailable"
 
@@ -749,7 +764,13 @@ def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
     if dims is None:
         label = VERIFIED_DEFAULT_LABEL if dist.verified else DRAFT_LABEL
         # reviews/30_d3_count_unlisted (D3U-06): a listed district without a
-        # usable dimensions mapping is unreadable, not unlisted.
+        # usable dimensions mapping is unreadable, not unlisted. A listed
+        # district with no dimensions key or dimensions null states no
+        # setbacks at all: the D3 case (post-change review round 1).
+        if dist.listed and dist.dimensions_absent:
+            return _Rules(default, f"default (district {where} has no dimensions in the rules)",
+                          None, "no lot coverage cap in the rules", dist.verified, label,
+                          (_height_note(data, None),), default_listed=True)
         if dist.listed:
             source = f"default (district {where} has no usable dimensions in the rules)"
             kind = DEFAULT_UNREADABLE
@@ -760,6 +781,7 @@ def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
                       "no lot coverage cap in the rules", dist.verified, label,
                       (_height_note(data, None),), default_kind=kind)
     vals = []
+    unreadable = False
     keys = ("front_setback_ft", "side_setback_ft", "rear_setback_ft")
     # D3 (reviews/29_operator_decisions): every key absent or null, nothing
     # present that the code could not read.
@@ -771,6 +793,7 @@ def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
         v = _num(raw)
         if v is None or v < 0:
             notes.append(f"{key} of {where} is not a number: not applied")
+            unreadable = True
         else:
             vals.append(v)
     if vals:
@@ -807,7 +830,7 @@ def _rules_for(stored: tuple[Any, Any] | None, parcel_id: str,
     # those is used, from_rules) stay as before (D3U-07).
     kind = DEFAULT_UNREADABLE if not from_rules and not absent else None
     return _Rules(setback, source, cap_pct, cap_text, dist.verified, label, tuple(notes),
-                  from_rules, absent and not from_rules, kind)
+                  from_rules, absent and not from_rules, kind, from_rules and unreadable)
 
 
 # ---------------------------------------------------------------------------
@@ -856,6 +879,9 @@ class Projection:
     # reviews/30_d3_count_unlisted: DEFAULT_UNLISTED / DEFAULT_UNREADABLE for a
     # verified jurisdiction only (see _Rules.default_kind); None otherwise.
     setback_default_kind: str | None = None
+    # reviews/30_d3_count_unlisted, post-change review round 1: verified,
+    # setback from the rules, some setback value unreadable (flag only).
+    setback_partial_unreadable: bool = False
     _origin: tuple[float, float] | None = None
     _geometry: str | None = field(default=None, repr=False, compare=False)
 
@@ -905,7 +931,15 @@ def _review_for(listed: bool, kind: str | None, setback: float) -> str | None:
     return None
 
 
+def _verified_partial(rules: _Rules | None) -> bool:
+    """Verified, setback from the rules, some value unreadable; never draft."""
+    return bool(rules is not None and rules.verified and rules.from_rules
+                and rules.partial_unreadable)
+
+
 def _rules_review_text(rules: _Rules) -> str | None:
+    if _verified_partial(rules):
+        return BTS_PARTIAL_REVIEW_TEXT
     return _review_for(bool(rules.verified and rules.default_listed), _verified_kind(rules),
                        rules.setback_ft)
 
@@ -979,7 +1013,8 @@ def _empty(pid: str, status: str, reason: str, rules: _Rules | None,
         flood_wetlands=_flood_text(flood),
         adjacency=_adj_summary(adj) if _adj.enabled() else _adj.ADJ_OFF,
         setback_default_listed=bool(rules and rules.verified and rules.default_listed),
-        setback_default_kind=_verified_kind(rules)))
+        setback_default_kind=_verified_kind(rules),
+        setback_partial_unreadable=_verified_partial(rules)))
 
 
 def max_building_sf(p: Any) -> int | None:
@@ -1016,14 +1051,20 @@ def bts_review_text(p: Any) -> str | None:
     status ok, verified rules, default setback used because the district is
     listed without any front/side/rear setback (BTS_REVIEW_TEMPLATE,
     unchanged), not listed, or listed with unreadable setbacks
-    (BTS_REVIEW_TEMPLATES); None otherwise (draft, no district rule, rules
-    unavailable, district setbacks, forged). Never a block: research.py
-    writes it as one idempotent data_gap flag."""
+    (BTS_REVIEW_TEMPLATES); BTS_PARTIAL_REVIEW_TEXT when the setback is the
+    district's own but some front/side/rear value was unreadable (post-change
+    review round 1; flag only, BTS unchanged); None otherwise (draft, no
+    district rule, rules unavailable, fully readable district setbacks,
+    forged). Never a block: research.py writes it as one idempotent data_gap
+    flag."""
     if type(p) is not Projection or _ISSUED.get(id(p)) is not p:
         return None
-    if p.status != OK or not p.rules_verified or p.setback_from_rules \
-            or p.setback_ft is None:
+    if p.status != OK or not p.rules_verified or p.setback_ft is None:
         return None
+    if p.setback_from_rules:
+        # Post-change review round 1: the setback is from the rules but some
+        # value was unreadable; flag only, BTS unchanged.
+        return BTS_PARTIAL_REVIEW_TEXT if p.setback_partial_unreadable else None
     return _review_for(p.setback_default_listed, p.setback_default_kind, p.setback_ft)
 
 
@@ -1442,6 +1483,7 @@ def _project_row(pid: str, rules: _Rules, row: Sequence[Any] | None,
         adjacency=_adj_summary(adj) if _adj.enabled() else _adj.ADJ_OFF,
         setback_default_listed=rules.verified and rules.default_listed,
         setback_default_kind=_verified_kind(rules),
+        setback_partial_unreadable=_verified_partial(rules),
         _origin=origin, _geometry=str(row[4])))
 
 

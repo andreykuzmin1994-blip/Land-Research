@@ -50,6 +50,8 @@ UNREADABLE = ("investigate further: district setbacks unreadable in zoning_rules
 RESOLUTION = ("check the district and its setbacks in the code by hand; a human adds the "
               "district or its setback values to the rules file between runs "
               "(reviews/29_operator_decisions, reviews/30_d3_count_unlisted)")
+PARTIAL = ("investigate further: some district setbacks unreadable in zoning_rules.json; "
+           "max of the readable setbacks used")
 INVESTIGATE = ("investigate further: no district setbacks in zoning_rules.json; "
                "25 ft default used")
 FEMA_ROBOTS = ("User-agent: *\nDisallow: /*?*\nDisallow: /arcgis\nDisallow: /nri/report/viewer\n"
@@ -845,6 +847,78 @@ class D3UUnreadableScoringTests(unittest.TestCase):
             rec = self.draft["per_parcel"][pid]
             self.assertFalse([f for f in _flags(rec) if "investigate" in f[3]], pid)
             self.assertFalse([n for n in rec["research_log_notes"] if "investigate" in n], pid)
+        self.assertFalse([n for n in self.draft["cycle"]["research_log_notes"]
+                          if "investigate" in n])
+
+
+def _pd_partial(data):
+    _unlisted_not_permitted(data)
+    dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+    dims["front_setback_ft"] = 40
+    dims["side_setback_ft"] = {"value": "see table", "cite": "x"}
+
+
+class Review1PartialUnreadableScoringTests(unittest.TestCase):
+    """reviews/30_d3_count_unlisted, post-change adversarial review round 1
+    (finding 1): a verified district with SOME unreadable setback values keeps
+    its from-the-rules setback and BTS exactly, and now carries one
+    investigate data_gap flag on both scoring paths; draft inert."""
+
+    @classmethod
+    def setUpClass(cls):
+        with d3_fixture():
+            with patch_rules(verified("fairburn", mutate=_pd_partial)):
+                site_fit._FIT_CACHE.clear()
+                cls.ver = _canon(golden.run_case(research))
+                conn = golden.zg.AnswerConn(golden.responder(research))
+                site_fit._FIT_CACHE.clear()
+                cls.proj = site_fit.project_parcels(conn, ["fulton-D01"])["fulton-D01"]
+            with patch_rules(verified("fairburn", mutate=lambda d: (
+                    _unlisted_not_permitted(d),
+                    d["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"].update(
+                        front_setback_ft=40)))):
+                site_fit._FIT_CACHE.clear()
+                cls.readable = _canon(golden.run_case(research))
+            with patch_rules(verified(mutate=_pd_partial)):        # every jurisdiction draft
+                site_fit._FIT_CACHE.clear()
+                cls.draft = _canon(golden.run_case(research))
+
+    def test_flag_once_data_gap_on_both_paths(self):
+        for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D01") if "investigate" in f[3]]
+            self.assertEqual(len(mine), 1)
+            self.assertEqual(mine[0][0], "data_gap")
+            self.assertTrue(mine[0][3].endswith("; " + PARTIAL))
+            self.assertEqual(mine[0][4], RESOLUTION)
+            self.assertFalse([f for f in _flags(rec) if f[0] == "actionability_block"])
+        notes = self.ver["per_parcel"]["fulton-D01"]["research_log_notes"]
+        self.assertEqual(notes[0].count(PARTIAL), 1)
+        for t in (INVESTIGATE, UNLISTED, UNREADABLE):
+            self.assertNotIn(t, notes[0])
+
+    def test_bts_and_scores_unchanged_against_the_fully_readable_district(self):
+        # Same setback (40 ft from the rules) with and without the unreadable
+        # side value: the strategy result is identical; only the flag differs.
+        for path in ("per_parcel", "cycle"):
+            got = self.ver[path] if path == "cycle" else self.ver[path]["fulton-D01"]
+            ref = self.readable[path] if path == "cycle" else self.readable[path]["fulton-D01"]
+            if "result" in got:
+                self.assertEqual(got["result"]["strategy_fit"], ref["result"]["strategy_fit"])
+        self.assertNotEqual(
+            self.ver["per_parcel"]["fulton-D01"]["result"]["strategy_fit"]["bts"], "N/A")
+        for rec in (self.readable["per_parcel"]["fulton-D01"], self.readable["cycle"]):
+            self.assertFalse([f for f in _flags(rec, "fulton-D01") if "investigate" in f[3]])
+
+    def test_memo_lines(self):
+        p = self.proj
+        self.assertEqual(reporting._bts_use_text(p, True), f"yes (verified rules; {PARTIAL})")
+        self.assertIn(f"used for BTS: yes ({PARTIAL});", reporting._projection_summary(p, True))
+        self.assertNotIn("default setback", reporting._bts_use_text(p, True))
+
+    def test_draft_is_inert(self):
+        rec = self.draft["per_parcel"]["fulton-D01"]
+        self.assertFalse([f for f in _flags(rec) if "investigate" in f[3]])
+        self.assertFalse([n for n in rec["research_log_notes"] if "investigate" in n])
         self.assertFalse([n for n in self.draft["cycle"]["research_log_notes"]
                           if "investigate" in n])
 

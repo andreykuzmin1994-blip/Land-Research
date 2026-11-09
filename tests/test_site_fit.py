@@ -619,6 +619,8 @@ UNLISTED = ("investigate further: district not listed in zoning_rules.json; "
 UNREADABLE = ("investigate further: district setbacks unreadable in zoning_rules.json; "
               "25 ft default setback used")
 ALL_JURISDICTIONS = ("south_fulton", "fairburn", "atlanta", "union_city", "east_point", "fid")
+PARTIAL = ("investigate further: some district setbacks unreadable in zoning_rules.json; "
+           "max of the readable setbacks used")
 INVESTIGATE = ("investigate further: no district setbacks in zoning_rules.json; "
                "25 ft default used")
 
@@ -981,13 +983,14 @@ class ProjectionTests(unittest.TestCase):
 
     def test_d3u_listed_district_without_dimensions_is_unreadable_not_unlisted(self):
         # D3U-06: zoning.District.listed tells a listed district without a
-        # usable dimensions mapping from an unlisted one.
-        def no_dims(data):
-            del data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
-
+        # usable dimensions mapping from an unlisted one. Post-change review
+        # round 1: a dimensions value present but not a mapping is unreadable.
         def str_dims(data):
             data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"] = "see table"
-        for mut in (no_dims, str_dims):
+
+        def list_dims(data):
+            data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"] = [25]
+        for mut in (str_dims, list_dims):
             p = self._fairburn("PD", mut)
             self.assertEqual((p.setback_default_listed, p.setback_default_kind),
                              (False, "unreadable"), mut.__name__)
@@ -996,23 +999,126 @@ class ProjectionTests(unittest.TestCase):
             self.assertTrue(site_fit.meets_bts_footprint(p))
             self.assertEqual(site_fit.bts_review_text(p), UNREADABLE)
             self.assertNotIn("not listed", p.setback_source)
+            self.assertNotIn(INVESTIGATE, p.constraints)
 
-    def test_d3u_partial_unreadable_is_unchanged(self):
-        # D3U-07 (residual, not this round): some values readable, one not:
-        # the max of the readable ones counts from the rules, as before; no
-        # kind and no investigate text.
+    def test_review1_listed_district_stating_no_dimensions_gets_the_d3_text(self):
+        # Post-change adversarial review round 1, finding 2: a listed district
+        # with no dimensions key, or dimensions: null, states no setbacks: the
+        # D3 case and text ("no district setbacks"), not "unreadable".
+        def no_dims(data):
+            del data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+
+        def null_dims(data):
+            data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"] = None
+        for mut in (no_dims, null_dims):
+            p = self._fairburn("PD", mut)
+            self.assertEqual((p.status, p.rules_verified, p.setback_from_rules,
+                              p.setback_default_listed, p.setback_default_kind,
+                              p.setback_partial_unreadable),
+                             ("ok", True, False, True, None, False), mut.__name__)
+            self.assertEqual(p.setback_ft, 25)
+            self.assertEqual(p.setback_source,
+                             "default (district fairburn PD has no dimensions in the rules)")
+            self.assertEqual(p.rules_label, "verified jurisdiction, default setback")
+            self.assertTrue(site_fit.meets_bts_footprint(p))
+            self.assertEqual(site_fit.bts_review_text(p), INVESTIGATE)
+            self.assertEqual(p.constraints.count(INVESTIGATE), 1)
+            self.assertNotIn(UNREADABLE, p.constraints)
+            self.assertNotIn(UNLISTED, p.constraints)
+            # Draft: inert, as every D3 case.
+            site_fit._FIT_CACHE.clear()
+            code = stored("fairburn", "fairburn_zoning", "PD")
+            conn = FakeConn({"a": code}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+            with patch_rules(verified(mutate=mut)):
+                d = site_fit.project_parcel(conn, "a")
+            self.assertEqual((d.rules_label, d.setback_default_listed, d.setback_default_kind),
+                             ("draft rules", False, None))
+            self.assertFalse(site_fit.meets_bts_footprint(d))
+            self.assertIsNone(site_fit.bts_review_text(d))
+
+    def test_zoning_district_dimensions_absent_field(self):
+        # Post-change review round 1: zoning.District.dimensions_absent is True
+        # only for a listed entry with no dimensions key or dimensions null.
+        def set_dims(value):
+            def m(data):
+                d = data["jurisdictions"]["fairburn"]["districts"]["PD"]
+                if value is KeyError:
+                    del d["dimensions"]
+                else:
+                    d["dimensions"] = value
+            return m
+        code = stored("fairburn", "fairburn_zoning", "PD")
+        for value, absent, has_dims in ((KeyError, True, False), (None, True, False),
+                                        ("see table", False, False), ({}, False, True)):
+            with patch_rules(verified("fairburn", mutate=set_dims(value))):
+                dist = zoning.district_for_stored(code[0], code[1], "a")
+            self.assertEqual((dist.listed, dist.dimensions_absent, dist.dimensions is not None),
+                             (True, absent, has_dims), repr(value))
+        with patch_rules(verified("fairburn")):
+            r1 = stored("fairburn", "fairburn_zoning", "R-1")
+            dist = zoning.district_for_stored(r1[0], r1[1], "a")
+        self.assertEqual((dist.listed, dist.dimensions_absent, dist.dimensions), (False, False, None))
+
+    def test_review1_partial_unreadable_is_flagged_bts_unchanged(self):
+        # Was test_d3u_partial_unreadable_is_unchanged (D3U-07 residual).
+        # Post-change adversarial review round 1, finding 1 (operator answer:
+        # districts with unreadable setback values are flagged for
+        # investigation): some values readable, one not. The max of the
+        # readable ones still counts from the rules (setback and BTS exactly
+        # as before); the projection now carries one investigate flag.
         def partial(data):
             dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
             dims["front_setback_ft"] = 40
             dims["side_setback_ft"] = {"value": "see table", "cite": "x"}
-        p = self._fairburn("PD", partial)
-        self.assertEqual((p.setback_ft, p.setback_from_rules, p.setback_default_listed,
-                          p.setback_default_kind), (40, True, False, None))
-        self.assertIn("side_setback_ft of fairburn PD is not a number: not applied",
-                      p.constraints)
-        self.assertTrue(site_fit.meets_bts_footprint(p))
+
+        def partial_zero(data):
+            dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+            dims["front_setback_ft"] = {"value": "see table", "cite": "x"}
+            dims["side_setback_ft"] = 0
+            dims["rear_setback_ft"] = 0
+        for mut, setback in ((partial, 40), (partial_zero, 0)):
+            p = self._fairburn("PD", mut)
+            self.assertEqual((p.setback_ft, p.setback_from_rules, p.setback_default_listed,
+                              p.setback_default_kind, p.setback_partial_unreadable),
+                             (setback, True, False, None, True), mut.__name__)
+            self.assertEqual(p.rules_label, "verified rules")
+            self.assertTrue(site_fit.meets_bts_footprint(p))
+            self.assertEqual(site_fit.bts_review_text(p), PARTIAL)
+            self.assertEqual(p.constraints.count(PARTIAL), 1)
+            self.assertEqual(p.constraints[1], PARTIAL)       # right after the setback line
+            self.assertTrue(any("is not a number: not applied" in c for c in p.constraints))
+            for t in (INVESTIGATE, UNLISTED, UNREADABLE):
+                self.assertNotIn(t, p.constraints)
+            self.assertNotIn("default", PARTIAL)
+            # Draft: no flag, setback and BTS N/A exactly as before.
+            site_fit._FIT_CACHE.clear()
+            code = stored("fairburn", "fairburn_zoning", "PD")
+            conn = FakeConn({"a": code}, {"a": (2_000_000, inner_rect(1300, 1100), 1_400_000.0)})
+            with patch_rules(verified(mutate=mut)):
+                d = site_fit.project_parcel(conn, "a")
+            self.assertEqual((d.rules_label, d.setback_ft, d.setback_partial_unreadable),
+                             ("draft rules", setback, False))
+            self.assertIsNone(site_fit.bts_review_text(d))
+            self.assertFalse([c for c in d.constraints if "investigate" in c])
+
+    def test_review1_fully_readable_district_carries_no_partial_flag(self):
+        def readable(data):
+            dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+            dims["front_setback_ft"] = 40
+            dims["side_setback_ft"] = 10
+        p = self._fairburn("PD", readable)
+        self.assertEqual((p.setback_ft, p.setback_from_rules, p.setback_partial_unreadable),
+                         (40, True, False))
         self.assertIsNone(site_fit.bts_review_text(p))
         self.assertFalse([c for c in p.constraints if "investigate" in c])
+
+    def test_review1_forged_partial_projection_has_no_text(self):
+        p = self._fairburn("PD", lambda data: data["jurisdictions"]["fairburn"]["districts"]
+                           ["PD"]["dimensions"].update(front_setback_ft=40,
+                                                       side_setback_ft="see table"))
+        self.assertEqual(site_fit.bts_review_text(p), PARTIAL)
+        import dataclasses
+        self.assertIsNone(site_fit.bts_review_text(dataclasses.replace(p)))
 
     def test_d3u_no_district_rule_never_counts(self):
         # D3U-01: with EVERY jurisdiction verified, each "no district rule"

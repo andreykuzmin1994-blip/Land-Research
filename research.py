@@ -3199,8 +3199,10 @@ def score_parcel(
         # reviews/29_operator_decisions (D3) and reviews/30_d3_count_unlisted:
         # a verified district that is listed without setbacks, not listed, or
         # listed with unreadable setbacks counts for BTS with the default; the
-        # notes and one data_gap flag say "investigate further". None for every
-        # other projection, and no projection exists for draft parcels.
+        # notes and one data_gap flag say "investigate further". A district
+        # setback with SOME unreadable values (post-change review round 1)
+        # gets the same flag, BTS unchanged. None for every other projection,
+        # and no projection exists for draft parcels.
         bts_review = site_fit.bts_review_text(projection) if projection is not None else None
         if bts_review is not None:
             notes = f"{notes} | {bts_review}"[:480]

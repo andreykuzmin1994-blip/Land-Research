@@ -518,11 +518,13 @@ def _bts_use_text(p: Any, used: bool) -> str:
     if not used:
         return f"no ({p.rules_label})"
     review = site_fit.bts_review_text(p)
+    if p.setback_from_rules:
+        # reviews/30 post-change review round 1: a district setback with some
+        # values unreadable is still "verified rules", plus the flag text.
+        return f"yes (verified rules; {review})" if review is not None else "yes (verified rules)"
     if review is not None:
         return f"yes (default setback; {review})"
-    if not p.setback_from_rules:
-        return "yes, rated N/A (default setback is not a verified rule)"
-    return "yes (verified rules)"
+    return "yes, rated N/A (default setback is not a verified rule)"
 
 
 # One footnote under the memo highlights (review finding 8): what no
@@ -577,7 +579,8 @@ def _projection_summary(p: Any, used: bool) -> str:
     best = site_fit.best_fit(p)
     sb = f"setback {p.setback_ft:g} ft all sides; " if p.setback_ft is not None else ""
     review = site_fit.bts_review_text(p) if used else None
-    use = "no" if not used else ("yes" if p.setback_from_rules
+    use = "no" if not used else (("yes" if review is None else f"yes ({review})")
+                                 if p.setback_from_rules
                                  else f"yes (default setback; {review})" if review
                                  else "yes, rated N/A (default setback)")
     tag = (f"{p.rules_label}; {sb}used for BTS: {use}; "

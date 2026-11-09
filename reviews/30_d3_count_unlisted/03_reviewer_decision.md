@@ -89,15 +89,12 @@ changed" table; recorded rather than back-filled.
 
 ## Residuals for the operator
 
-- **D3U-07, partial unreadable values.** A district with some readable and
-  some unreadable setbacks (e.g. front 40, side "see table") still counts
-  from the rules with the max of the readable values, with a "not a number:
-  not applied" note and no flag. The setback used may understate the real
-  one. A flag-only follow-up would not move BTS; not done, as the operator
-  was asked only about the all-default cases.
-- **`"dimensions": null` on a listed district** is classed unreadable (not
-  the D3 "no setbacks" text). Both count with the default; only the text
-  differs. No such entry exists today.
+- **D3U-07, partial unreadable values.** Closed by the post-change
+  adversarial review round 1 below (flag added, BTS unchanged). The setback
+  used is still the max of the readable values and may understate the real
+  one; the flag is what tells the operator to check it.
+- **`"dimensions": null` on a listed district.** Closed by round 1 below
+  (now the D3 "no district setbacks" text).
 - **Metric movement.** With the shipped rules (`unlisted_districts`
   "unknown" everywhere, no unreadable value) nothing moves even with every
   jurisdiction verified. It moves once a human sets `unlisted_districts:
@@ -128,3 +125,53 @@ guard kept.
 ## Decision
 
 **APPROVED after small doc fixes** (README, reviews/29 "Not done" pointer).
+
+## Post-change adversarial review round 1
+
+Operator answers this round implements (2026-11-09, recorded again here):
+D3-01/D3-02 "count them": unlisted districts AND districts with unreadable
+setback values count with the default and are flagged for investigation.
+D2 flood scope: "just review", no flood-rule change. The null-beats-low
+question is not answered, so no new root sub-score.
+
+Two minor findings. Both were checked against the code and both are real.
+
+| # | Finding | Verified | Disposition |
+|---|---|---|---|
+| R1-1 | A listed district with SOME unreadable setback values (e.g. front "see table", side 0, rear 0) counts from the rules with the max of the readable values (possibly 0 ft) and gets no investigate flag. That is the one reading of "unreadable setback values" without one. | Yes. In `_rules_for`, a non-empty `vals` gives `from_rules` True and `kind` None. `bts_review_text` returned None for every `from_rules` projection. Disclosed as D3U-07. | **Fixed, flag only.** `_Rules.partial_unreadable` and `Projection.setback_partial_unreadable` are set only in a verified jurisdiction (never draft). They are True when the setback is the district's own and at least one front/side/rear value is present but unusable. The flag text is `BTS_PARTIAL_REVIEW_TEXT`, "investigate further: some district setbacks unreadable in zoning_rules.json; max of the readable setbacks used". It is stable, with no district name and no number, so it works as the data_gap dedup key. It does not say "default", because the setback is not the default. It appears right after the setback line in the constraints, in the research notes and as one data_gap flag (same resolution text). The memo reads "yes (verified rules; ...)" and the highlight line "yes (...)", never "default setback". The setback value, `meets_bts_footprint` and every score are unchanged. The default is NOT substituted for the readable values: the operator answered for districts where the default is the only number. Swapping it in here would change BTS on a case nobody was asked about. |
+| R1-2 | A listed district with no `dimensions` key, or `dimensions: null`, states no setbacks but got the "district setbacks unreadable" text instead of the D3 "no district setbacks" text. A non-mapping district entry is classed "unlisted". | Partly. The dimensions-absent/null case is real. The non-mapping-entry case cannot be reached: `zoning._validate` rejects any district entry that is not an object ("not an object"), so loaded rules never contain one. | **Fixed for the reachable case.** `zoning.District` gains `dimensions_absent` (default False, so existing constructors are unchanged). It is True for a listed mapping entry whose `dimensions` is absent or null. `_rules_for` sends that case down the D3 path: `default_listed` True, the D3 text, source "default (district X has no dimensions in the rules)". A `dimensions` value that is present but not a mapping (string, list) stays UNREADABLE. `listed` keeps its meaning. `adjacency.py` and `adjacency_import.py` read only `dimensions`/`table_jurisdiction`/`district`, so they are unaffected. No code change for the non-mapping entry (schema-refused). |
+
+Tests added or changed (root):
+
+- `test_site_fit.test_review1_partial_unreadable_is_flagged_bts_unchanged`
+  replaces `test_d3u_partial_unreadable_is_unchanged`; the inversion is
+  deliberate. It covers front 40 / side "see table" and front "see table" /
+  side 0 / rear 0. Setback and BTS are as before, the flag appears once, and
+  draft stays inert.
+- `test_site_fit.test_review1_fully_readable_district_carries_no_partial_flag`
+- `test_site_fit.test_review1_forged_partial_projection_has_no_text`
+  (`_ISSUED` guard).
+- `test_site_fit.test_review1_listed_district_stating_no_dimensions_gets_the_d3_text`
+  (absent and null; draft inert).
+- `test_site_fit.test_zoning_district_dimensions_absent_field`
+- `test_site_fit.test_d3u_listed_district_without_dimensions_is_unreadable_not_unlisted`
+  now covers a string and a list `dimensions` (the absent case moved to the
+  D3 test above).
+- `test_operator_decisions.Review1PartialUnreadableScoringTests`: one
+  data_gap flag on both scoring paths. `strategy_fit` is identical to the
+  fully readable district with the same 40 ft setback. Also covers the memo
+  lines and draft staying inert.
+
+Golden checks: all five exit 0, with no expected-diff change. The shipped
+`zoning_rules.json` has no listed district with partially unreadable
+setbacks and none without a `dimensions` mapping. The scan found every
+listed district with a mapping (Fairburn PD = `{}`), so nothing moves on
+today's data. The new-run + baseline requirement above still applies
+unchanged.
+
+Suites after round 1: root `Ran 1761 tests`, `OK`; screener `Ran 134
+tests`, `OK`.
+
+Round 1 decision: **APPROVED**. Both findings fixed with tests, no human-owned
+file touched. `zoning.py` (protected) gains one defaulted field, and the
+zoning golden check is unchanged.
