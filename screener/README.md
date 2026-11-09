@@ -28,9 +28,9 @@ Results land in `screener/output/fulton-<date>/`:
 | File | What it is |
 |---|---|
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate that isn't scored; see Earthwork below) |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate and a building-fit check that aren't scored; see Earthwork and Site fit below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
-| `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps |
+| `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name) |
 | `rejected.csv` | Every parcel screened out, with the reason |
 | `ranked.geojson` | The same survivors for GIS tools |
 | `features.json` | The evaluation's features for each ranked parcel, kept for your decisions (see Decisions below) |
@@ -102,6 +102,60 @@ every call). The AutoResearch loop's own `evaluate.py` doesn't run that
 test: it holds because the loop edits only `rank.py` and can't reorder
 `run.py`, and every `exp:` diff gets a human read.
 
+**Site fit (largest open part and a building envelope).** `ranked.csv`
+(and `ranked.geojson`) carry three columns right after `mean_cut_fill_ft`,
+and each brief has a "Building fit" line:
+
+- `largest_open_acres`: map acres of the largest contiguous part of the
+  open ground, i.e. the parcel minus floodplain (FEMA SFHA, floodway
+  included), mapped wetlands and water (NWI), conservation easements
+  (NCED) and protected land (PAD-US). `0.0` means no open ground is left
+  on the parcel map (the constraints cover it, or what is left rounds to
+  under 0.05 acres). Empty means not computed.
+- `envelope_fit`: the largest building envelope (building + truck court +
+  trailer parking per dock side) found on that open ground inside a 25 ft
+  lot-line setback: `cross-dock L x 520 ft` (lengths 600-1000 ft, 890 ft
+  deep envelope) or `front/rear-load L x 260 ft` (lengths 400-640 ft, 445
+  ft deep; front and rear share a depth, so they are one check). Lengths
+  step by 40 ft. A cross-dock fit means the front/rear envelope fits too.
+  `none found` means it was checked and nothing fit at the minimum length;
+  `not checked: <why>` means it wasn't (`[fit] enabled = false`, outside
+  `[fit] max_parcels`, a shape over 600 vertices after a 1 ft simplify, or
+  a geometry fault; each is counted in `summary.md`).
+- `envelope_building_sf`: the fitted building's square feet, empty unless
+  something fits.
+
+The prototypes and the rotated-rectangle search are copied (not imported)
+from the repo root's `building_prototypes.json` and `site_fit.py`;
+`tests/test_sitefit.py` fails if the root file changes and the copy
+doesn't. The search is a lower bound (a 2 degree angle grid plus edge
+directions), so `none found` is not proof that nothing fits. Limits:
+**steep ground is not located** (the slope check gives only a share, so
+steep ground may sit inside the open area); utility, pipeline and access
+easements are not mapped; car parking, drives, detention, frontage and
+access, coverage caps and zoning setbacks beyond the 25 ft are not
+modelled. When the parcel map disagrees with the tax record the fit uses
+the map shape and the brief says so. Most parcels take well under a
+second, but the measured worst case is about 4 to 5 seconds per parcel: open
+ground just under the 600-vertex cap (for example about 100 small wetland or
+flood pockets) where nothing fits, so every angle is tried. `[fit]
+max_parcels` caps it to the top N by rank. Like earthwork, it is computed only after scoring, flags
+and the sort, and is in no score, screen or flag. To make it a learned
+feature or a screen, a human would add it to `build_eval.FEATURES`,
+rebuild `data/` and take `--new-baseline`; reading it from `rank.py` is
+not the way.
+
+**Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
+the county parcel map in the same flat local plane as the fit, north up,
+with a scale bar: the parcel outline, the constrained ground (floodplain,
+mapped wetlands and water, conservation easements, protected land), the
+largest open part and the fitted envelope with its prototype and SF. Steep
+ground is not shown. Without a map shape the brief says "Not drawn"; a
+parcel whose map checks or fit didn't run gets the outline with "not
+checked". The file holds no owner, mailing or site address. It is drawn by
+`report.write_all` after scoring and adds nothing to `ranked.csv` or any
+score (`tests/test_plan.py`).
+
 **Public data changes between days.** On 2026-10-28 and 29, the USGS 3DEP
 lidar service returned different slope statistics for 464 of 2,110
 identical requests (about 22%), while the elevation statistics were
@@ -165,6 +219,8 @@ reviewed), the meaning differences above, spatial clustering and privacy
   middle names); ASSOC, ASSOCIATION or POA alone don't count.
   `[owners] adjacency_gap_ft` sets how close two same-owner parcels must be
   to count as adjacent (see Owner clusters below; flags only).
+  `[fit] enabled` and `max_parcels` switch the building-fit check off or
+  limit it to the top N ranked parcels (see Site fit; report only).
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark

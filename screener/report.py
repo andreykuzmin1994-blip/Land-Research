@@ -9,13 +9,15 @@ import re
 from pathlib import Path
 from typing import Any
 
+from . import plan, sitefit
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
     "rank", "score", "fixed_score", "learned_score", "motivation_score", "parcel_id", "jurisdiction",
     "site_address", "acres", "usable_after_slope", "entitlement", "zoning", "flu",
     "exit_label", "exit_miles", "rail_ft", "industrial_within_1mi", "flood_pct",
-    "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft", "owner", "owner_type", "owner_mailing",
+    "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft",
+    "largest_open_acres", "envelope_fit", "envelope_building_sf", "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
 ]
@@ -66,10 +68,20 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
     briefs = out_dir / "briefs"
     briefs.mkdir(exist_ok=True)
     for p in ranked[:top_n]:
-        path = briefs / f"{p['rank']:03d}_{_safe_name(p['parcel_id'])}.md"
-        if path.resolve().parent != briefs.resolve():
-            raise ValueError(f"brief file name escapes {briefs}: {path.name!r}")
-        path.write_text(brief(p))
+        stem = f"{p['rank']:03d}_{_safe_name(p['parcel_id'])}"
+        path, svg_path = briefs / f"{stem}.md", briefs / f"{stem}.svg"
+        for f in (path, svg_path):
+            if f.resolve().parent != briefs.resolve():
+                raise ValueError(f"brief file name escapes {briefs}: {f.name!r}")
+        # F12: the site plan is drawn here, after scores, flags and the sort,
+        # and writes nothing on p (plan.py).
+        svg, why = plan.render(p)
+        if svg is not None:
+            svg_path.write_text(svg, encoding="utf-8")
+        else:
+            svg_path.unlink(missing_ok=True)    # no stale plan from an earlier run
+        path.write_text(brief(p, plan_file=svg_path.name if svg is not None else None,
+                              plan_note=why or None))
 
     (out_dir / "summary.md").write_text(_summary_md(summary, ranked[:10]))
 
@@ -84,7 +96,21 @@ def _money(v: Any) -> str:
     return f"${v:,.0f}" if isinstance(v, (int, float)) and v else "n/a"
 
 
-def brief(p: dict[str, Any]) -> str:
+PLAN_CAPTION = ("_North up, drawn from the county parcel map: shaded blue is floodplain, "
+                "mapped wetlands and water, conservation easements and protected land; green "
+                "is the largest open part; the outlined block is the fitted building envelope. "
+                "Steep ground is not shown. A screening sketch, not a survey._")
+
+
+def _plan_section(plan_file: str | None, plan_note: str | None) -> list[str]:
+    if plan_file:
+        return ["", "## Site plan", f"![Site plan]({plan_file})", "", PLAN_CAPTION]
+    if plan_note:
+        return ["", "## Site plan", f"- Not drawn ({plan_note})"]
+    return []
+
+
+def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None = None) -> str:
     lines = [
         f"# #{p['rank']} — {p.get('site_address') or 'no site address'} ({p['jurisdiction']})",
         "",
@@ -113,8 +139,10 @@ def brief(p: dict[str, Any]) -> str:
         f"- Slope: {_fmt(p.get('steep_pct'))}% of the open ground steeper than 15%; "
         f"relief about {_fmt(p.get('relief_ft'))} ft (USGS lidar 2018-19, 10 m grid)",
         _earthwork_line(p),
+        sitefit.brief_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
+        *_plan_section(plan_file, plan_note),
         "",
         "## The owner",
         f"- {p.get('owner') or 'unknown'} ({p.get('owner_type')})",

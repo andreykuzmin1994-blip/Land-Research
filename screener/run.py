@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import arcgis, checks, layers, owner_clusters, report, scoring, screens, snapshot
+from . import arcgis, checks, layers, owner_clusters, report, scoring, screens, sitefit, snapshot
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -74,6 +74,47 @@ def reason_key(reason: str) -> str:
     return key.split(" (")[0]
 
 
+def fit_settings(cfg: dict[str, Any]) -> tuple[bool, int]:
+    """[fit] enabled (default true) and max_parcels (default 0 = no cap; the
+    top N by rank are fitted, the rest read "not checked"). Deterministic:
+    there is no time budget."""
+    fit = cfg.get("fit", {}) or {}
+    enabled = fit.get("enabled", True)
+    cap = fit.get("max_parcels", 0)
+    if not isinstance(enabled, bool):
+        raise ValueError("[fit] enabled must be true or false")
+    if isinstance(cap, bool) or not isinstance(cap, int) or cap < 0:
+        raise ValueError("[fit] max_parcels must be a whole number, 0 or more")
+    return enabled, cap
+
+
+def attach_fits(ranked: list[dict[str, Any]], enabled: bool, cap: int,
+                notes: list[str]) -> None:
+    """Fit each ranked parcel (in rank order) and attach the report fields.
+    Called only after scores, flags and the sort."""
+    reasons: collections.Counter = collections.Counter()
+    started = time.monotonic()
+    if enabled and ranked:
+        log(f"Building fit for {len(ranked) if not cap else min(cap, len(ranked)):,} parcels")
+    for i, p in enumerate(ranked, 1):
+        if not enabled:
+            f = sitefit.not_checked("fit switched off in settings")
+        elif cap and i > cap:
+            f = sitefit.not_checked(f"outside the top {cap} ([fit] max_parcels)")
+        else:
+            f = sitefit.fit_parcel(p["geometry"], p.get("_open_ground"), p.get("constrained_pct"))
+            if i % 100 == 0:
+                log(f"  fit {i:,}/{len(ranked) if not cap else min(cap, len(ranked)):,}")
+        f.map_mismatch = bool(p.get("acreage_mismatch") or checks.too_small_for_slope(p))
+        if f.state == sitefit.NOT_CHECKED:
+            reasons[f.reason.split(" (")[0]] += 1
+        p.update(f.fields())
+    if enabled and ranked:
+        log(f"  fit done ({time.monotonic() - started:.1f} s)")
+    for why, n in sorted(reasons.items()):
+        notes.append(f"Building fit not checked for {n} of {len(ranked)} ranked parcels: {why}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--settings", type=Path, default=HERE / "settings.toml")
@@ -96,6 +137,10 @@ def main(argv: list[str] | None = None) -> int:
     funnel: list[tuple[str, int]] = []
     notes: list[str] = []
     earthwork: dict[int, dict[str, Any] | None] = {}
+    try:
+        fit_on, fit_max = fit_settings(cfg)
+    except ValueError as exc:
+        ap.error(f"{args.settings}: {exc}")
 
     log(f"{county.NAME} County: fetching {area['min_acres']}-{area['max_acres']} acre parcels")
     try:
@@ -254,6 +299,9 @@ def main(argv: list[str] | None = None) -> int:
     # for the reports alone (rank.py and scoring.py never see it).
     for p in survivors:
         p.update(checks.earthwork_fields(earthwork.get(id(p))))
+    # The building fit is live-only too: computed only now, after the sort,
+    # and attached for the reports alone (sitefit.py).
+    attach_fits(survivors, fit_on, fit_max, notes)
     # Same-owner lines, now that every sibling's final status is known.
     # Only p["flags"] (reports) gains them; scores and order are done.
     ranked_at = {p["parcel_id"]: p["rank"] for p in survivors}

@@ -43,3 +43,9 @@ exclude_hard_entitlement = false  # drop parcels zoned AND planned residential /
 # group members this close on the county parcel map count as adjacent. The
 # default bridges digitizing slivers, not a road right-of-way (40-80 ft).
 adjacency_gap_ft = 10
+
+[fit]
+# Building fit on the open ground (a report fact only; not a score or a
+# screen). The copied prototype envelopes are fixed in sitefit.py.
+enabled = true
+max_parcels = 0      # fit only the top N ranked parcels (0 = all)
