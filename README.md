@@ -41,7 +41,8 @@ populated import. Operator next steps, between runs, in order:
 3. Browser downloads into the gitignored `hazards_inbox/` (both hosts'
    robots.txt deny automated queries), unpacked FLAT (no subfolders):
    FEMA NFHL Fulton county package `13121C` (msc.fema.gov) ->
-   `hazards_inbox/nfhl/S_FLD_HAZ_AR.shp`, `.dbf`, `.prj` (required) plus
+   `hazards_inbox/nfhl/S_FLD_HAZ_AR.shp` (exact name, lowercase `.shp`),
+   `.dbf`, `.prj` (required) plus
    `S_LOMR.shp`, `.dbf`, `.prj` if present; USFWS NWI Georgia shapefile
    (fws.gov Wetlands Mapper, state download) -> `hazards_inbox/nwi/`,
    exactly one `.shp` or one `*_Wetlands.shp` (e.g. `GA_Wetlands.shp`)

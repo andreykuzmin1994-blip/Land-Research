@@ -330,7 +330,9 @@ out elsewhere and do not change this folder's flood rules. "Count them" is
 D3. "jsut review" is D2: V/VE stay review-only, a floodway still blocks, no
 flood-rule change, and no new root sub-score, because the null-beats-low
 question is not answered. "fix" covers the research.py and zoning_import
-fixes. Step 2 is the screener quick wins. Record, register, dispositions
+fixes (the ArcGIS error-envelope and audit-path bugs) and the D1-11
+zoning_import fetcher round. "Start building what you proposed" (step 2
+of that sequence) is the screener quick wins. Record, register, dispositions
 and evidence: `reviews/33_hazards_enabled/`.
 
 **Operator step 2 above is DONE, by the agent, under this delegation**
