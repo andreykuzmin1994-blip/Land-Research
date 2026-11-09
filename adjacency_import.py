@@ -32,11 +32,16 @@ missing field or a spent budget fails the WHOLE source (nothing of it is
 used; exit 4, named on the last line). Zoneomics, Municode and listing
 sites are never contacted (rules_scrape's denylist).
 
-HTTP: rules_scrape's PoliteFetcher and robots.txt policy UNCHANGED (robots
-for this tool's own token and the AI-agent tokens, checked before any query;
-404/410 allows all, anything that is not a clean text 2xx denies all), 1
-request/second per host, bounded retries, Retry-After honoured and capped,
-generic User-Agent with no personal contact (SR-11, BUF-19).
+HTTP: rules_scrape's PoliteFetcher and its ONE shared robots verdict
+(``rules_scrape.robots_verdict``: robots for this tool's own token and the
+AI-agent tokens, checked before any query; 404/410 allows all, anything that
+is not a clean text 2xx denies all), 1 request/second per host, bounded
+retries, Retry-After honoured and capped, generic User-Agent with no personal
+contact (SR-11, BUF-19). The only exception is the shared one of operator
+decision D1 (reviews/29_operator_decisions, 2026-11-09): an ArcGIS Online
+services host whose robots.txt answers a plain 401/403 may serve its public
+REST layer metadata and /query paths; those hosts share one 1 req/s spacing
+key, and the output names the exception per host.
 
 What it computes (in PostGIS, SRID 2240 US survey feet, ONE transaction)
 ------------------------------------------------------------------------
@@ -134,7 +139,10 @@ class AdjacencyFetcher(rules_scrape.PoliteFetcher):
     """rules_scrape.PoliteFetcher (robots for every token, 1 req/s per host,
     bounded retries, Retry-After capped, manual redirects, no cookies) with
     this tool's User-Agent and robots token. ``robots_for`` is inherited
-    unchanged; no per-host override exists."""
+    unchanged; the verdict is the shared rules_scrape.robots_verdict (D1,
+    reviews/29_operator_decisions); no per-host override exists here."""
+
+    robots_token = UA_TOKEN
 
     def __init__(self, http: Any = None, **kw: Any) -> None:
         kw.setdefault("max_requests", MAX_REQUESTS)
@@ -162,7 +170,7 @@ class AdjacencyFetcher(rules_scrape.PoliteFetcher):
             raise rules_scrape.Unreachable("not an https URL")
         rb = self.robots_for(f"https://{p.netloc}")
         path = (p.path or "/") + (f"?{p.query}" if p.query else "")
-        why = robots_verdict(rb, path)
+        why = rules_scrape.robots_verdict(rb, path, UA_TOKEN)
         if why:
             raise rules_scrape.Unreachable(why)
 
@@ -189,21 +197,9 @@ class AdjacencyFetcher(rules_scrape.PoliteFetcher):
         return body
 
 
-def robots_verdict(rb: "rules_scrape.Robots", path: str) -> str | None:
-    """rules_scrape.Robots.verdict for this tool's token plus the AI-agent
-    tokens rules_scrape honours (hazards_import's rule, same order)."""
-    if rb.deny_all:
-        return f"robots unavailable ({rb.reason})"
-    for tok in (UA_TOKEN,) + tuple(rules_scrape.AI_AGENT_TOKENS):
-        if not rb.allowed(path, tok):
-            return f"robots.txt disallows this path for {tok}"
-    if rb.global_signals.get("ai-input") == "no":
-        return "robots.txt Content-Signal ai-input=no"
-    for tok in (UA_TOKEN,) + tuple(rules_scrape.AI_AGENT_TOKENS):
-        for g in rb._groups_for(tok):
-            if g.signals.get("ai-input") == "no":
-                return "robots.txt Content-Signal ai-input=no"
-    return None
+# reviews/29_operator_decisions (D1-01): the robots verdict is the ONE shared
+# rules_scrape.robots_verdict, called with this tool's own token (_check);
+# this module defines no verdict of its own.
 
 
 # ---------------------------------------------------------------------------
@@ -227,6 +223,7 @@ class SourceData:
     rejected_outside: int = 0
     no_district: int = 0
     requests: int = 0
+    copyright: bool = False        # D1-09: layer metadata carries a copyrightText (counted only)
 
 
 class _Budget:
@@ -293,6 +290,7 @@ def fetch_source(f: AdjacencyFetcher, src: "zoning_import.ZoningSource",
         page = max(1, min(OID_CHUNK, int(mrc))) if isinstance(mrc, int) and mrc > 0 \
             else OID_CHUNK
         data.as_of = _as_of(meta)
+        data.copyright = bool(str(meta.get("copyrightText") or "").strip())
         padded = [(x0 - PAD_DEG, y0 - PAD_DEG, x1 + PAD_DEG, y1 + PAD_DEG)
                   for x0, y0, x1, y1 in bboxes]
         oids: set[int] = set()
@@ -867,6 +865,10 @@ def run(*, sources_path: Path = SOURCES_PATH, fetcher: AdjacencyFetcher | None =
           "neighbour's side (own coverage reads as the same district)")
     for line in summarise(stored, res.summary):
         print(line)
+    for line in rules_scrape.robots_exception_lines(fetcher):
+        print(line)
+    print(f"layers with a non-empty copyrightText: {sum(1 for d in gathered if d.copyright)} "
+          f"of {len(gathered)} (item owner terms apply; reviews/29_operator_decisions)")
     print("requests: " + (", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items()))
                           or "none"))
     print(f"wall time {clock() - started:.0f} s")

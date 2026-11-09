@@ -35,6 +35,15 @@ What it does
    User-Agent, a request budget. A challenge or WAF page (401/403/407, a
    Cloudflare or Akamai block, a 429 without an acceptable Retry-After) is
    "unreachable": no retry, nothing cached. Subresources are never fetched.
+   ONE robots verdict serves every tool (``robots_verdict``, also used by
+   adjacency_import and hazards_import). Its only exception is operator
+   decision D1 (reviews/29_operator_decisions, 2026-11-09): when robots.txt
+   of an ArcGIS Online services host (``services[0-9]*.arcgis.com``, or a
+   host in the EMPTY ``OPERATOR_ACCEPTED_ARCGIS_HOSTS``) answered a plain
+   401/403 on hop 0, its public REST layer metadata (``?f=json``) and
+   ``/query`` paths are read; a readable robots.txt always wins, every
+   other rule above is unchanged, those hosts share one 1 req/s key, and
+   the output names the exception per host.
 2. Caches raw bytes under ``rules_cache/`` (gitignored): file name =
    sha256(url), a metadata file per entry, atomic writes. ``--offline``
    replays the cache and refuses an entry whose bytes no longer hash to the
@@ -114,7 +123,7 @@ from datetime import date, datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
-from urllib.parse import unquote, urlencode, urljoin, urlparse
+from urllib.parse import parse_qsl, unquote, urlencode, urljoin, urlparse
 
 import requests
 
@@ -233,12 +242,16 @@ class BudgetExceeded(Exception):
 
 
 class Unreachable(Exception):
-    """A URL that must be treated as unreachable. ``reason`` is tool text."""
+    """A URL that must be treated as unreachable. ``reason`` is tool text.
+    ``plain_refusal`` is True ONLY when ``_get`` saw a plain HTTP 401/403
+    with no challenge or WAF marker (reviews/29_operator_decisions, D1-02);
+    every other refusal leaves it False."""
 
-    def __init__(self, reason: str, status: Any = None) -> None:
+    def __init__(self, reason: str, status: Any = None, *, plain_refusal: bool = False) -> None:
         super().__init__(reason)
         self.reason = reason
         self.status = status
+        self.plain_refusal = plain_refusal
 
 
 # ---------------------------------------------------------------------------
@@ -922,8 +935,14 @@ class Robots:
     404/410 -> allow all; anything not a clean text 2xx -> deny all."""
 
     def __init__(self, text: str = "", *, allow_all: bool = False, deny_all: bool = False,
-                 reason: str = "") -> None:
+                 reason: str = "", unavailable_status: int | None = None,
+                 origin_netloc: str = "") -> None:
         self.allow_all, self.deny_all, self.reason = allow_all, deny_all, reason
+        # reviews/29_operator_decisions (D1-02): set ONLY by robots_for when
+        # this origin's own robots.txt answered a plain 401/403 on hop 0 (no
+        # challenge marker); the origin it belongs to (D1-04).
+        self.unavailable_status = unavailable_status if deny_all else None
+        self.origin_netloc = origin_netloc
         self.groups: list[_Group] = []
         self.global_signals: dict[str, str] = {}    # Content-Signal outside any group
         if text:
@@ -991,18 +1010,7 @@ class Robots:
 
     def verdict(self, path: str) -> str | None:
         """None when every token may fetch ``path``; else the refusal text."""
-        if self.deny_all:
-            return f"robots unavailable ({self.reason})"
-        for tok in (UA_TOKEN,) + AI_AGENT_TOKENS:
-            if not self.allowed(path, tok):
-                return f"robots.txt disallows this path for {tok}"
-        if self.global_signals.get("ai-input") == "no":
-            return "robots.txt Content-Signal ai-input=no"
-        for tok in (UA_TOKEN,) + AI_AGENT_TOKENS:
-            for g in self._groups_for(tok):
-                if g.signals.get("ai-input") == "no":
-                    return "robots.txt Content-Signal ai-input=no"
-        return None
+        return robots_verdict(self, path, UA_TOKEN)
 
     def crawl_delay(self) -> float:
         d = 0.0
@@ -1010,6 +1018,118 @@ class Robots:
             for g in self._groups_for(tok):
                 d = max(d, g.crawl_delay or 0.0)
         return d
+
+
+# ---------------------------------------------------------------------------
+# The ONE robots verdict of every tool (reviews/29_operator_decisions, D1)
+# ---------------------------------------------------------------------------
+# Operator decision D1 (2026-11-09): the ArcGIS Online feature-service hosts
+# answer robots.txt with a plain HTTP 403 (a block of the robots.txt path,
+# not an opt-out); the operator accepts their public REST layer metadata and
+# query endpoints as permitted public use. The exception is consulted ONLY
+# when robots.txt of that exact origin was unavailable with a plain 401/403
+# on hop 0 (``Robots.unavailable_status``); a readable robots.txt always
+# wins, and 404/410 is allow-all as before.
+ARCGIS_EXCEPTION_TEXT = ("robots unavailable ({status}): ArcGIS public REST accepted by "
+                         "operator 2026-11-09")
+_ARCGIS_ONLINE_HOST_RE = re.compile(r"services[0-9]*\.arcgis\.com", re.ASCII)
+# Org-hosted ArcGIS REST hosts the operator accepted under D1. EMPTY by
+# design (D1-06): gis.atlantaga.gov and gismaps.fultoncountyga.gov answered
+# robots.txt 404 (allow-all) on 2026-11-09 and need no exception. A host is
+# added here (exact lower-case hostname, no wildcard) only with dated
+# evidence of a plain 401/403 robots answer, recorded in reviews/.
+OPERATOR_ACCEPTED_ARCGIS_HOSTS: frozenset[str] = frozenset()
+ARCGIS_SPACING_KEY = "arcgis.com"
+_SEG = r"[A-Za-z0-9_-]+"
+_ARCGIS_ONLINE_PATH_RE = re.compile(
+    rf"/[A-Za-z0-9]+/arcgis/rest/services/(?:{_SEG}/){{1,2}}(?:FeatureServer|MapServer)"
+    r"/[0-9]+(/query)?", re.ASCII)
+_ARCGIS_ORG_PATH_RE = re.compile(
+    rf"/(?:{_SEG}/)?rest/services/(?:{_SEG}/){{1,2}}(?:FeatureServer|MapServer)"
+    r"/[0-9]+(/query)?", re.ASCII)
+_ARCGIS_META_FORMATS = frozenset({"json", "pjson"})
+_ARCGIS_QUERY_FORMATS = frozenset({"json", "pjson", "geojson"})
+
+
+def arcgis_exception_host(netloc: str | None) -> str | None:
+    """The normalised hostname when ``netloc`` is an ArcGIS host D1 covers,
+    else None. No userinfo, no percent-escape, no port other than 443 (D1-04)."""
+    n = str(netloc or "")
+    if not n or "@" in n or "%" in n or "\\" in n or n.startswith("["):
+        return None
+    host, sep, port = n.rpartition(":") if ":" in n else (n, "", "")
+    if sep and port != "443":
+        return None
+    h = norm_host(host)
+    if not h or h != h.strip() or any(c.isspace() for c in host):
+        return None
+    if _ARCGIS_ONLINE_HOST_RE.fullmatch(h) or h in OPERATOR_ACCEPTED_ARCGIS_HOSTS:
+        return h
+    return None
+
+
+def arcgis_public_rest_path(host: str, path: str) -> bool:
+    """Is ``path`` (path plus '?query' as fetched) an ArcGIS REST layer
+    metadata (``?f=json|pjson``) or ``/query`` (``f=json|pjson|geojson``)
+    request? Strict on the raw path: no '%', '..', '//' or backslash (D1-05)."""
+    raw, _q, query = path.partition("?")
+    if not raw or any(t in raw for t in ("%", "..", "//", "\\", ";")):
+        return False
+    rx = _ARCGIS_ONLINE_PATH_RE if _ARCGIS_ONLINE_HOST_RE.fullmatch(host) else _ARCGIS_ORG_PATH_RE
+    m = rx.fullmatch(raw)
+    if m is None:
+        return False
+    try:
+        pairs = parse_qsl(query, keep_blank_values=True, strict_parsing=bool(query))
+    except ValueError:
+        return False
+    keys = [k.lower() for k, _v in pairs]
+    if "token" in keys:
+        return False
+    fs = [v for k, v in pairs if k.lower() == "f"]
+    if len(fs) != 1:
+        return False
+    return fs[0] in (_ARCGIS_QUERY_FORMATS if m.group(1) else _ARCGIS_META_FORMATS)
+
+
+def arcgis_exception_applies(rb: "Robots", path: str) -> bool:
+    """D1: True only for a deny-all Robots that carries a plain 401/403
+    status of its own origin, an ArcGIS host D1 covers, and a public REST
+    metadata/query path. Never consulted for a parsed robots file."""
+    if not rb.deny_all or rb.unavailable_status not in (401, 403):
+        return False
+    host = arcgis_exception_host(rb.origin_netloc)
+    return host is not None and arcgis_public_rest_path(host, path)
+
+
+def robots_verdict(rb: "Robots", path: str, token: str = UA_TOKEN) -> str | None:
+    """The robots verdict of every tool (rules_scrape, adjacency_import,
+    hazards_import): None when ``token`` and every AI-agent token may fetch
+    ``path``; else the refusal text. ``token`` is the calling tool's own
+    robots token."""
+    if rb.deny_all:
+        if arcgis_exception_applies(rb, path):
+            return None
+        return f"robots unavailable ({rb.reason})"
+    tokens = (token,) + tuple(t for t in AI_AGENT_TOKENS if t != token)
+    for tok in tokens:
+        if not rb.allowed(path, tok):
+            return f"robots.txt disallows this path for {tok}"
+    if rb.global_signals.get("ai-input") == "no":
+        return "robots.txt Content-Signal ai-input=no"
+    for tok in tokens:
+        for g in rb._groups_for(tok):
+            if g.signals.get("ai-input") == "no":
+                return "robots.txt Content-Signal ai-input=no"
+    return None
+
+
+def robots_exception_lines(fetcher: Any) -> list[str]:
+    """One counts-only line per host read under D1 (hostname and the fixed
+    text only; no URL, no query, no value) for the tools' outputs (D1-07)."""
+    meta = getattr(fetcher, "robots_meta", {}) or {}
+    return [f"robots: {h}: {m['exception']}" for h, m in sorted(meta.items())
+            if isinstance(m, Mapping) and m.get("exception")]
 
 
 def classify_block(status: int, headers: Mapping[str, str], body: bytes) -> str | None:
@@ -1053,7 +1173,10 @@ class Fetched:
 class PoliteFetcher:
     """GET-only fetcher: denylist, robots for every token, 1 req/s per host
     (Crawl-delay when larger), manual redirects, no cookies, fixed UA,
-    challenge pages unreachable without retry, request budget."""
+    challenge pages unreachable without retry, request budget. Subclasses
+    set ``robots_token``; the verdict is the shared ``robots_verdict``."""
+
+    robots_token = UA_TOKEN
 
     def __init__(self, http: Any = None, *, clock: Callable[[], float] = time.monotonic,
                  sleep: Callable[[float], None] = time.sleep,
@@ -1082,11 +1205,14 @@ class PoliteFetcher:
 
     def _space(self, host: str) -> None:
         interval = max(REQUEST_INTERVAL_S, self._delay.get(host, 0.0))
+        # D1-08: the ArcGIS hosts D1 covers (services, servicesN, ...) are one
+        # Esri front door: spaced 1 s apart in total, on one shared key.
+        key = ARCGIS_SPACING_KEY if arcgis_exception_host(host) else host
         with self._lock:
             now = self.clock()
-            last = self._last.get(host)
+            last = self._last.get(key)
             wait = 0.0 if last is None else max(0.0, interval - (now - last))
-            self._last[host] = now + wait
+            self._last[key] = now + wait
         if wait > 0:
             self.sleep(wait)
 
@@ -1127,9 +1253,14 @@ class PoliteFetcher:
             else:
                 status = resp.status_code
                 body = _read_capped(resp)
-                why = classify_block(status, getattr(resp, "headers", {}) or {}, body)
+                hdrs = getattr(resp, "headers", {}) or {}
+                why = classify_block(status, hdrs, body)
                 if why:
-                    raise Unreachable(why, status)
+                    # D1-02: plain only when nothing but the status refused:
+                    # no Akamai/Cloudflare server, no challenge header or page.
+                    plain = (status in (401, 403) and why == f"HTTP {status}"
+                             and classify_block(200, hdrs, body) is None)
+                    raise Unreachable(why, status, plain_refusal=plain)
                 if status == 429:
                     ra = _retry_after(resp)
                     if ra is None or ra > RETRY_AFTER_CAP_S or attempt == MAX_RETRIES:
@@ -1162,8 +1293,8 @@ class PoliteFetcher:
             rb = Robots(deny_all=True, reason=TERMS_BLOCKED)
             self._robots[scheme_host] = rb
             return rb
+        hops = 0
         try:
-            hops = 0
             cur = url
             while True:
                 resp, body = self._get(cur)
@@ -1193,7 +1324,12 @@ class PoliteFetcher:
                     rb = Robots(deny_all=True, reason=f"HTTP {st}")
                 break
         except Unreachable as exc:
-            rb = Robots(deny_all=True, reason=exc.reason)
+            # D1-02: the status is kept only for this origin's own robots.txt
+            # (hop 0) refused with a plain 401/403; never after a redirect.
+            st_ok = hops == 0 and exc.plain_refusal and exc.status in (401, 403)
+            rb = Robots(deny_all=True, reason=exc.reason,
+                        unavailable_status=exc.status if st_ok else None,
+                        origin_netloc=urlparse(scheme_host).netloc)
         delay = rb.crawl_delay()
         if delay > MAX_CRAWL_DELAY_S:
             rb = Robots(deny_all=True, reason=f"Crawl-delay {delay:g}s above the cap")
@@ -1203,6 +1339,10 @@ class PoliteFetcher:
         self.robots_meta[host] = {"fetched_at": self.now().isoformat(timespec="seconds"),
                                   "deny_all": rb.deny_all, "allow_all": rb.allow_all,
                                   "reason": rb.reason, "crawl_delay": delay}
+        if rb.unavailable_status in (401, 403) and arcgis_exception_host(rb.origin_netloc):
+            # D1-07: deny_all stays True; the exception is named, per host.
+            self.robots_meta[host]["exception"] = ARCGIS_EXCEPTION_TEXT.format(
+                status=rb.unavailable_status)
         return rb
 
     def _check(self, url: str) -> None:
@@ -1215,7 +1355,7 @@ class PoliteFetcher:
             raise Unreachable(TERMS_BLOCKED)
         rb = self.robots_for(f"https://{p.netloc}")
         path = (p.path or "/") + (f"?{p.query}" if p.query else "")
-        why = rb.verdict(path)
+        why = robots_verdict(rb, path, self.robots_token)
         if why:
             raise Unreachable(why)
 
@@ -3716,6 +3856,10 @@ def gis_signal(fetcher: PoliteFetcher, sig: SignalDef) -> dict[str, Any]:
         if isinstance(ids, list):
             out["count"] = len(ids)
             out["max_oid"] = max((int(i) for i in ids), default=0)
+        # D1-07: a layer read under the operator's ArcGIS exception says so.
+        meta_h = (getattr(fetcher, "robots_meta", {}) or {}).get(urlparse(sig.url).hostname or "")
+        if isinstance(meta_h, Mapping) and meta_h.get("exception"):
+            out["robots_note"] = str(meta_h["exception"])
     except Unreachable as exc:
         out["reason"] = exc.reason
     except (ValueError, TypeError, AttributeError):
@@ -3818,11 +3962,12 @@ def watch_compare(prev_state: Mapping[str, Any] | None, res: ScrapeResult,
         res_le = compare_signal(pg[0] if pg else None, g.get("last_edit") if ok else None)
         res_ct = compare_signal(pg[1:] if pg else None,
                                 [g.get("count"), g.get("max_oid")] if ok else None)
+        note = g.get("robots_note") or ""
         rows.append({"kind": "gis lastEditDate", "key": key, "result": res_le,
-                     "detail": g.get("reason") or ("no editingInfo" if g.get("last_edit") is None
-                                                   else "")})
+                     "detail": g.get("reason") or ("; ".join(x for x in (
+                         "no editingInfo", note) if x) if g.get("last_edit") is None else note)})
         rows.append({"kind": "gis count/max id", "key": key, "result": res_ct,
-                     "detail": g.get("reason") or ""})
+                     "detail": g.get("reason") or note})
     return state, rows
 
 
@@ -4204,9 +4349,18 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
             except (OSError, ValueError):
                 prev = None
             state, wrows = watch_compare(prev, res, gis, reg, today, current)
+            exc_hosts = {h: str(m["exception"]) for h, m in sorted(
+                (getattr(fetcher, "robots_meta", {}) or {}).items())
+                if isinstance(m, Mapping) and m.get("exception")} if fetcher is not None else {}
+            if exc_hosts:
+                # D1-07: per host, hostname and the fixed text only.
+                state["robots_exceptions"] = exc_hosts
             report += "\n## Change watch\n\n| Signal | Key | Result | Detail |\n|---|---|---|---|\n"
             report += "\n".join(f"| {w['kind']} | {w['key']} | {w['result']} | {_md(w['detail'])} |"
                                 for w in wrows) + "\n"
+            if exc_hosts:
+                report += "\n## robots exceptions (operator decision D1)\n\n" + "\n".join(
+                    f"- {_md(h)}: {_md(t)}" for h, t in exc_hosts.items()) + "\n"
             safe_write(state_path, canonical_json(state).encode("utf-8"))
             lost = [w["key"] for w in wrows if w["kind"] == "section"
                     and w["detail"].startswith("section lost")]
@@ -4241,6 +4395,8 @@ def run(args: argparse.Namespace, *, fetcher: PoliteFetcher | None = None,
               f"polygon ({len(flags.low_overlap)} hit(s) under {MIN_CASE_OVERLAP:.0%} overlap), "
               f"{len(flags.layer_failures)} case layer(s) not checked")
     if fetcher is not None and not args.offline:
+        for line in robots_exception_lines(fetcher):
+            print(line)
         print("requests: " + ", ".join(f"{h} {k}" for h, k in sorted(fetcher.requests.items())))
     print(f"wrote candidate and report under {out_path.parent.name}/ (never zoning_rules.json)")
     failed = [o for o in res.outcomes if o.status in ("unreachable", "refused")]
