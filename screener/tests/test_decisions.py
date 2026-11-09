@@ -462,6 +462,35 @@ class DecisionsFileTests(DecisionHarness):
         self.assertEqual(got["14F0001 0001"]["decision"], "pursue")
         self.assertEqual(got["14F0003 0003"]["decision"], "pass")
 
+    def test_padded_header_names_are_read_and_the_pass_honoured(self):
+        # Post-change review round 1: decide.py strips header names when it
+        # checks and appends; load_decisions must read the same file the
+        # same way, or a recorded pass is silently never applied.
+        self.write_decisions("parcel_id, decision, date, note\n"
+                             "14F0003 0003, pursue ,2026-11-01,hi\n")
+        code, out, _ = self.decide("14F0002 0002", "pass", "--no-features")
+        self.assertEqual(code, 0)
+        self.assertIn("dropped from future runs", out)
+        got = self.loaded()
+        self.assertEqual(got["14F0002 0002"]["decision"], "pass")
+        self.assertEqual(got["14F0003 0003"], {"decision": "pursue", "date": "2026-11-01",
+                                               "note": "hi"})
+        self.assertEqual(self.rerun("--no-slope")[0], 0)
+        self.assertIn("14F0002 0002", self.rejected())
+        self.assertNotIn("14F0002 0002", self.ranked())
+        self.assertEqual(self.ranked()["14F0003 0003"]["decision"], "pursue")
+
+    def test_padded_header_with_bom_and_tabs(self):
+        self.write_decisions("\ufeff parcel_id ,\tdecision\t,date,note\n"
+                             "14F0002 0002,pass,2026-11-01,x\n")
+        self.assertEqual(self.loaded()["14F0002 0002"]["decision"], "pass")
+        self.assertEqual(self.decide("14F0001 0001", "maybe")[0], 0)
+        self.assertEqual(set(self.loaded()), {"14F0002 0002", "14F0001 0001"})
+
+    def test_header_only_file_loads_nothing(self):
+        self.write_decisions("parcel_id, decision, date, note\n")
+        self.assertEqual(self.loaded(), {})
+
     def test_headerless_file_is_refused_and_nothing_written(self):
         self.write_decisions("14F0003 0003,pass,2026-11-01,x\n")
         before = run.DECISIONS_FILE.read_bytes()

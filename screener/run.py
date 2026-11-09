@@ -43,7 +43,10 @@ def stop(what: str, exc: Exception) -> int:
 def load_decisions() -> dict[str, dict[str, str]]:
     """Your pursue / pass / maybe / listed marks, keyed by parcel id (the
     last row for an id wins). utf-8-sig: a spreadsheet's byte-order mark
-    would otherwise hide the parcel_id column and drop every decision."""
+    would otherwise hide the parcel_id column and drop every decision.
+    Header names are stripped, as decide.py strips them when it checks and
+    appends, so a hand-edited "parcel_id, decision, date, note" is read
+    rather than silently ignored."""
     if not DECISIONS_FILE.exists():
         DECISIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(DECISIONS_FILE, "w", newline="") as fh:
@@ -51,7 +54,10 @@ def load_decisions() -> dict[str, dict[str, str]]:
         return {}
     out = {}
     with open(DECISIONS_FILE, newline="", encoding="utf-8-sig") as fh:
-        for row in csv.DictReader(fh):
+        reader = csv.DictReader(fh)
+        if reader.fieldnames:
+            reader.fieldnames = [(h or "").strip() for h in reader.fieldnames]
+        for row in reader:
             pid = (row.get("parcel_id") or "").strip()
             decision = (row.get("decision") or "").strip().lower()
             if pid and decision in DECISION_VALUES:

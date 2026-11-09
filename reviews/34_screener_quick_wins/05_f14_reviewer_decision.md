@@ -114,3 +114,39 @@ Standing risks:
 - SR-10 / SR-11: no new dependencies or requests.
 - SR-15 / SR-16 analogs: the eval boundary is unchanged; decisions stay off
   `p` until after scoring; Phase B is the human baseline step.
+
+## Post-change adversarial review round 1
+
+Operator answers (2026-11-09, recorded as given): D3 counts unlisted
+districts and unreadable setback values; D2 flood scope "just review" (no
+flood-rule change); the null-beats-low question is not answered, so no new
+root sub-score; "fix" the `research.py` ArcGIS error-envelope and audit-path
+bugs and do the D1-11 `zoning_import` round; the agent may apply the
+reviews/26 hazards prepare-mutation; build the screener quick wins. The fix
+below touches no eval file, `rank.py`, `scoring.py`, `screens.py`,
+`settings.toml` or `requirements.txt`; `evaluate.fingerprint()` and
+`EVAL_FILES` are unchanged.
+
+The round raised two findings. They describe the same defect, so they are
+one row here.
+
+| # | Finding | Verdict | What changed |
+|---|---|---|---|
+| 1 / 2 | `decide.py` strips header names when it checks and appends, but `run.load_decisions` keys rows by the raw `csv.DictReader` names. A hand-edited `parcel_id, decision, date, note` header passes `decide.py`, which appends the row and prints the pass consequence, but the run reads every row's decision as missing, so the pass (or listed) is silently never applied | Real. Confirmed offline: with the padded header and the run change reverted, the two new tests below fail (the decision is not found). | `load_decisions` now strips the reader's field names before reading rows, so the reader is exactly as lenient as `decide.py`'s check and column alignment. I chose this over making `decide.py` refuse the header, because refusing would still leave the run silently ignoring a file the operator padded in a spreadsheet; stripping makes both readers agree and makes the CLI's printed consequence true. New tests: `test_padded_header_names_are_read_and_the_pass_honoured` (decide records a pass against the padded header, an earlier padded `pursue` row is read with its date and note, and a re-run drops the passed parcel from `ranked.csv`); `test_padded_header_with_bom_and_tabs` (BOM plus space and tab padding); `test_header_only_file_loads_nothing`. `inputs/README.md` now says spaces around a column name are ignored by both. |
+
+Not changed: header names stay case-sensitive in both readers (`Parcel_ID`
+is refused by `decide.py` and ignored by the run, consistently), and a
+header that names a column twice after stripping keeps `csv.DictReader`'s
+last-wins behaviour. Neither was raised, and neither makes the two readers
+disagree.
+
+Tests after round 1:
+
+- Root: `python -m unittest discover -s tests` gives **1744 OK**.
+- Screener: `python -m unittest discover -s screener/tests -t .` gives
+  **208 OK** (205 before round 1, +3).
+
+No live run was repeated: the fix only changes how a local file's header
+names are read.
+
+**Round 1 decision: APPROVED after fixes.**

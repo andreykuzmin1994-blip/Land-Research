@@ -50,7 +50,8 @@ features). It is offline.
 Spreadsheets are fine: a UTF-8 byte-order mark, Windows line endings, a
 last line without a newline, and notes with commas, quotes or line breaks
 are all read correctly (save as CSV). Keep the `parcel_id` and `decision`
-column names. Copy parcel ids exactly as they appear in `ranked.csv`,
+column names (spaces around a column name, as in `parcel_id, decision`,
+are ignored by both `decide.py` and the run). Copy parcel ids exactly as they appear in `ranked.csv`,
 including spaces.
 
 Everything in this folder except this README is kept out of git
