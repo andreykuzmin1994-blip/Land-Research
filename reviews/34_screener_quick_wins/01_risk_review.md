@@ -401,3 +401,201 @@ Standing risks:
 - SR-10: stdlib only.
 - SR-11: no requests.
 - SR-15 / SR-16 analogs: the eval boundary is unchanged. Labels stay off `p` until after scoring, the human read of `exp:` diffs is the backstop, and Phase B is the human baseline step.
+
+---
+
+## F2 — Owner clustering, phase 1 (portfolio and adjacent same-owner holdings)
+
+> Same independent reviewer, appended BEFORE the code, after F14 landed
+> (`698e206`). No code written. Probes were read-only: greps, line reads and
+> the fixture builder. Counts only, no parcel ids or owner names. The
+> operator answers recorded at the top of this document apply unchanged:
+> D3 counts unlisted districts and unreadable setbacks (root D3 round); D2
+> flood scope "just review", no flood-rule change; null-beats-low NOT
+> answered, so no new root sub-score; "fix" the research.py ArcGIS
+> error-envelope and audit-path bugs and do the D1-11 `zoning_import`
+> fetcher round (root); "can you add this yourself" authorizes the agent,
+> acting for the human between runs, to apply the reviews/26 hazards
+> prepare-mutation (root, new run + baseline); step 2 builds these screener
+> quick wins as human-side edits, eval files excluded, no new eval
+> baseline.
+
+**Requirement (as given):**
+- New `screener/owner_clusters.py`, stdlib + shapely only.
+- Cluster owners on the FULL parcel list, before the attribute rejects (`run.py` lines 97-118 today; the requirement's "~99-107").
+- Match on normalised owner name AND normalised mailing address. Do not reuse `owners.same_owner`'s name-only rules.
+- Detect adjacency (touching, or within a few feet) to surface assemblages, meaning one owner/cluster holding adjacent parcels that sum into 5-50 ac, and report portfolio size.
+- Attach as flags / brief lines next to the slope-skipped flag (`run.py` lines 231-233 today; the requirement's "~206-211"), not in `screens.flags` (`screens.py` is an EVAL file).
+- Not a rank feature.
+
+Tier: **Tier 1**, screener human edit. The change adds no evaluator, metric, credential or external service, and (if the X3 scope below is kept) no request. One independent post-change reviewer checks the gates.
+
+### Verified facts this section relies on
+
+| # | Fact | Evidence |
+|---|---|---|
+| X1 | `fulton.fetch_parcels` returns only parcels with `LandAcres` in [min_acres, max_acres] (5-50 by default), and only in the chosen `jurisdictions`: the filter runs inside the fetch loop. Multipart rows are unioned by `ParcelID`, so ids are unique in its output. "The full parcel list" in `run.main` is therefore the 5-50 ac band of the searched jurisdictions, not the county roll. | `fulton.py` `fetch_parcels` (the `where` clause, the `jurisdictions` check, the `by_id` dict) |
+| X2 | `build_eval` builds the eval pool with the same `fulton.fetch_parcels(5, 50, juris, url=SNAP_AS_OF)` and imports `checks`, `layers`, `screens` and `fulton` (and through them `owners`). A behaviour change in `fetch_parcels`, `owners.normalize` or `owners.owner_type` would change the next eval rebuild even though those files are not on the `EVAL_FILES` list. | `autoresearch/build_eval.py` lines 56, 125 |
+| X3 | Every member of a cluster is itself 5-50 ac (X1). An adjacent group of two or more therefore sums to at least 10 ac; "sums into 5-50" here means "at most `max_acres`". Small neighbours (under 5 ac) that together make a site are invisible in phase 1. Seeing them needs a second, wider parcel fetch, which is a new request load on the county server (SR-11). | X1; arithmetic |
+| X4 | `owner` is the raw tax-roll `Owner`. `owner_mailing` is `"<OwnerAddr1>, <OwnerAddr2>"`, with either part dropped when blank, so a parcel with no street line has only "CITY ST ZIP". `owner_type` is a function of the name alone. | `fulton.py` lines 129-149; `owners.owner_type` |
+| X5 | Because `owner_type` depends only on the name, an exact-name cluster has ONE owner type. Clustering before the attribute rejects therefore cannot "widen the developer exclusion" (the background analysis's hope). A recognised developer's siblings are already rejected under the same name. What pre-reject clustering does add is siblings rejected for other reasons: built on, tax-exempt, `pass` / `listed` decisions, and later the site and slope screens. | `owners.py`; `screens.attribute_rejects` |
+| X6 | `scoring.score(p)` passes the live dict to `rank.learned_score(p)` (F8 V1). A private key is not a guard (F8 V2). `rank.py` may import only `__future__`, `math` and `typing` (`RANK_IMPORTS`), so it cannot reach `run.main`'s locals or a new module. A side structure local to `run.main` is out of its reach. | `scoring.py` line 56; `evaluate.py` lines 83, 213-280 |
+| X7 | `p["flags"]` is first created at line 230, after `p.update(scoring.score(p))`, and the slope-skipped flag is appended at lines 231-233. Every reject step (attribute, site, slope) has run by then, so each sibling's final status (ranked, or screened out with its first reason) is known in that loop. Rank numbers are assigned after the sort at lines 236-238. | `run.py` lines 170-238 |
+| X8 | `flags` reaches `ranked.csv` (joined with `"; "` by `report._cell`), `ranked.geojson` / `map.html` properties, and the brief's "## Watch-outs". `rejected.csv` has a fixed seven-column header with no flags column. Nothing reads `flags` back into a score. The F14 snapshot is taken from the `FEATURES` allow-list before scoring, so it never sees flags. | `report.py` lines 14-21, 28-60, 131-132; `snapshot.take` |
+| X9 | The offline fixture `county_parcel()` gives every parcel the same default owner (`TEST OWNER ALPHA`) and the same mailing (`1 TEST ST, ATLANTA GA 30303`), 20.0 acres each. Every multi-parcel offline `run.main` in the existing suite becomes ONE cluster under any name+address rule, and squares placed side by side become adjacent. Existing flag assertions are `assertIn` / `assertNotIn`. Two run-to-run comparisons (`test_earthwork` ~410, `test_decisions` ~174) compare `flags` between two runs that would both carry the same new lines. | `tests/test_integrity.py` `county_parcel`, lines 566-812; grep of `flags` in tests |
+| X10 | Geometries are WGS84 degrees. `geo.LocalProjection` gives flat metres around a centroid, and `geo.FT_PER_M` exists. A distance in degrees is not feet, and one degree of longitude is about 0.83 of a degree of latitude at 33.7°N. | `geo.py` |
+| X11 | `--limit` slices the sorted list at lines 103-104, inside the requirement's "before attribute rejects" window. A cluster computed after the slice depends on the trial size; one computed before it can name siblings that are neither ranked nor rejected in this run. | `run.py` lines 102-105 |
+
+### HIGH
+
+**F2-1. Cluster facts must not reach `rank.py` (X6; F8-1 / F14-1 analog).** Portfolio size and adjacent-holding acres are seller-side signals the loop would love: big holders and land-bankers read as motivated or unmotivated sellers. The eval records carry none of them, so a live `p["portfolio_parcels"]` would be a live/eval split the loop could learn from. The background analysis's integration note says to "`p.update()` the cluster fields" right after the attribute screens. **That shortcut is a no-go.**
+
+*Mitigation (structural):*
+- `owner_clusters` returns a plain structure that lives in a `run.main` local, keyed by `parcel_id`. That key is safe here because `fetch_parcels` dedups by id (X1); still assert uniqueness and exclude duplicates with a counted note if a future county adapter breaks it. Nothing is written to any `p` before scoring.
+- The flag and brief lines are built in the post-score loop (X7), from that local structure plus each sibling's final status, and appended to `p["flags"]` there.
+- If brief-only fields are wanted (e.g. a sibling table), attach them after the sort, in the same place F8 attaches earthwork (`run.py` lines 239-243), under keys the static guard names.
+- No change to `scoring.py`, `rank.py`, `screens.py` or `snapshot.py`.
+
+*Guard (mirrors F8 G1/G2 and F14 H1):*
+- (a) **Behavioural spy test.** An offline `run.main` with a fixture of distinct owners that holds one adjacent same-owner pair, one non-adjacent same-owner pair and singletons. Wrap `rank.learned_score`, `scoring.fixed_score`, `screens.site_rejects` and `screens.flags` to record `set(p)`. Assert that no recorded key set contains a cluster key, AND that `ranked.csv`'s `flags` carry the new lines for exactly the expected parcels. Run it with slope on and `--no-slope`.
+- (b) **Static defence in depth.** No string constant in `rank.py` or `scoring.py` contains `cluster`, `portfolio`, `assembl` or `same_owner_adj` (whatever the chosen key stems are; pin them as constants in `owner_clusters.py` and import them into the test). Today's `rank.py` has `rail-adjacent` in a `why` string, so do NOT use `adjacen` as a stem. The docstring states the computed-string limit, as F8's does.
+- (c) **Scores and order unchanged.** For the same fixture, rank, score, `why_site` and `why_seller` are identical with clustering on and off (monkeypatch the cluster call to return nothing). Only `flags` and the brief differ.
+
+**F2-2. Over-merging unrelated owners makes false "assemblage" claims (X4).** An assemblage flag sends the operator to one seller for a combined site. A wrong merge wastes an approach, and worse, it states a fact about who owns what. Name-only fuzzy rules (`same_owner`'s 29-character truncation prefix rule and its loose people rule) are exactly the wrong tool here, as the requirement says.
+
+*Mitigation:*
+- **Exact equality of two keys**, no fuzzy step, no union-find over pairwise similarity. Clusters are then equivalence classes of `(name_key, address_key)`, so there is nothing to chain.
+- `name_key`: `owners.normalize(owner)` (upper case, commas and periods to spaces, whitespace collapsed), then collapse the spaced legal forms (`L L C` → `LLC`, `L P` → `LP`, `L L L P` → `LLLP`). Do **not** drop legal forms, role words or numbers. `FUND I` / `FUND II` and `X LLC` / `X LP` stay apart.
+- `address_key`: normalize `owner_mailing` the same way, and cut a ZIP+4 to its 5 digits. Keep suite / unit / `STE` numbers. Different suites in one office building are different tenants; the background note's "minus suite/unit" is rejected.
+- **No key, no cluster:** a parcel joins nothing when the name is blank or a placeholder (`UNKNOWN`, `OWNER UNKNOWN`, `NOT AVAILABLE`, `CURRENT OWNER`, and a constant list in the module), or when the mailing has no street line (only "CITY ST ZIP", X4), or no ZIP at all.
+- Do not import or call `same_owner` / `_same_name` from the new module. A test asserts that.
+- Do not edit `owners.py` or `fulton.py` (X2). Reading `owners.normalize` is fine; changing it changes the next eval rebuild.
+
+*Accepted under-merge (document it):* one owner's different spellings, different mailing addresses, and per-site SPE names (`XYZ 1 LLC`, `XYZ 2 LLC` at one address) do not cluster. A weaker "same mailing address, different owner name" line would catch the SPE case, but it is a different claim and needs its own review. It is out of phase 1.
+
+*Guard:* tests for the following.
+- Each normalisation step, case by case: spacing, punctuation, spaced legal forms, ZIP+4.
+- A pair matching on name with different addresses, and a pair matching on address with different names: neither clusters.
+- `FUND I` / `FUND II` at one address: no cluster.
+- Suite 100 / suite 200: no cluster.
+- Blank, placeholder and city-only mailings: singletons.
+- Two `same_owner`-true but key-different names (a truncated name, initials): no cluster. This shows the name-only rules were not reused.
+
+### MEDIUM
+
+**F2-3. "Full parcel list" is narrower than it sounds (X1, X3, X5, X11).** The flag text must not overclaim.
+- Portfolio counts cover only the 5-50 ac band in the searched jurisdictions. The owner may hold far more.
+- Assemblages of small (under 5 ac) parcels are invisible.
+- Pre-reject clustering cannot widen the developer exclusion (X5).
+
+*Mitigation:*
+- **Wording**, in substance: "same owner name and mailing address on the tax roll also holds N other 5-50 ac parcels in the searched area (M ac)". Then: "adjacent to K of them (touching or within F ft): T ac together". Name the band and the area from the run's settings, never "the owner's portfolio" or "the owner owns".
+- **Cluster before the `--limit` slice** (on `parcels` right after the sort at line 102), so trial runs give the same portfolio counts as full runs. A sibling outside the trial reads "not screened in this trial run". A test pins counts equal with and without `--limit`.
+- **No second fetch in phase 1.** Widening to small neighbours is phase 2: a new narrow request (SR-11), a cache entry, its own review. Do not change `fetch_parcels`' `where` or signature (X2).
+- README: a short "Owner clusters" paragraph with these three limits and the X5 point.
+
+**F2-4. Adjacency in the right units, with the right meaning (X10).**
+- Measure in metres. Project each cluster's geometries with one `LocalProjection.around(<union or first member>)` (clusters are local; a county-wide cluster spans under about 60 km, where the equirectangular error is well under 1%), then `a.distance(b) <= gap_m`.
+- Do not compare degree distances to a foot threshold.
+- New settings key with a code default, e.g. `[owners] adjacency_gap_ft = 10`, read with `.get(..., 10)` so an old settings file still runs. The "few feet" bridges digitizing slivers on the county map. It deliberately does NOT bridge a road right-of-way (about 40-80 ft). Say so in the flag ("touching or within 10 ft"). Do not call the group "contiguous" or "one site".
+- A shared corner point is distance 0. Phase 1 counts it, and the wording ("touching") stays true. Note in the README that a corner touch is not usable frontage.
+- Group adjacent members into connected components (union-find or BFS inside a cluster only). Never across clusters.
+- **"Assemblage"** = a component of two or more parcels whose summed tax-record `acres` lie in [`min_acres`, `max_acres`] from the run's `[area]` settings (not a hardcoded 5/50). A component above `max_acres` is reported as an adjacent holding "larger than the search band", not as an assemblage. Sum the tax-record `acres` (the band's own basis), and when any member has `acreage_mismatch`, say "acres from the tax record; the map disagrees for some".
+
+*Guard:* tests for the following.
+- Two squares sharing an edge: adjacent.
+- A 5 ft gap (adjacent) and a 50 ft gap (not), built in metres through `LocalProjection`, and an east-west vs a north-south gap of equal feet giving the same answer.
+- A corner touch.
+- A chain A-B-C where A and C don't touch: one component.
+- A 3 × 20 ac component (60 ac): "larger than the search band". 2 × 20 ac: assemblage.
+- A settings file without `[owners]`.
+
+**F2-5. Cost and failure modes on real data.** Clusters are small except for big public holders, which are rejected later but are clustered first (pre-reject). Pairwise distance inside a cluster of k members is O(k²): k = 500 is about 125 k GEOS calls.
+- Use `shapely.STRtree` within any cluster above a small k (or always). Query with the gap-buffered envelope, then confirm with `distance`.
+- Geometry from `fetch_parcels` is non-empty and `make_valid`'d, but it can be a `GeometryCollection` after a multipart union. `distance` handles that.
+- A `shapely.errors.GEOSException` on one parcel marks that parcel "adjacency not checked". It still counts in the portfolio, and a summary note counts such parcels. Do not wrap the whole feature in a broad `except Exception`: a bug must fail the tests, not vanish.
+- The clustering is informational. If it cannot run at all (e.g. no parcel has a key), the run continues with a note. It never calls `stop()`, which is for required sources.
+
+*Guard:* a synthetic 2,000-parcel single-cluster grid finishes in under a few seconds in the test. One parcel with a deliberately broken geometry (patched `distance` raising `GEOSException`) gives the "not checked" count, and the rest of the cluster still groups.
+
+**F2-6. Flag and brief size and content (X8; SR-8 analog).**
+- A big holder could list hundreds of sibling ids in one `ranked.csv` cell.
+  - Cap the listed sibling ids at 5 per line ("and N more").
+  - Order them deterministically: adjacent first, then by `parcel_id`.
+  - Give counts and acres in full.
+- Each listed sibling shows its status:
+  - ranked `#rank`;
+  - screened out, with its first reason through `run.reason_key`;
+  - "not screened in this trial run".
+  - A sibling the operator marked `pass` / `listed` reads as such: that comes for free from the reject reason.
+- Do not repeat the owner name (it is the same owner, already in the row) and no mailing in the flag. Ids and owner details are already in the gitignored `output/`.
+- Phase 1 needs no new `RANKED_COLUMNS`; the lines go into `flags` and the brief. If columns are added anyway, put them after `flags`, record the schema change in the decision note (F8-8 analog), and keep `rejected.csv`'s header unchanged.
+- Map popups take `flags` already; the existing escaping covers them. Add one test with an id holding `<` / `"` / `;` through `map.html` and the CSV cell.
+
+*Guard:* the cap test (12 siblings give 5 ids + "and 7 more"), the status texts, determinism (two runs give byte-equal `flags`), and the escaping test.
+
+**F2-7. Existing tests change shape silently (X9).** Every multi-parcel fixture run becomes one cluster, often with adjacency, because all fixture parcels share owner and mailing. Most assertions are `assertIn`, so they still pass. The new lines nonetheless appear in every fixture brief, which hides whether a test is exercising what it thinks it is.
+
+*Mitigation:*
+- Do not change `county_parcel`'s defaults: that would rewrite every existing test's premise.
+- Build the F2 tests with explicit distinct owners and mailings.
+- Run the full screener suite and list in the code writer response every existing test whose `flags` or brief output changed, and why each still holds.
+
+### LOW
+
+**F2-8. Eval and dependency boundary (SR-10, SR-15 analog).**
+- `owner_clusters.py` imports only stdlib, `shapely`, `.geo` and (read-only) `.owners.normalize`.
+- `build_eval.py` / `evaluate.py` do not import it.
+- `requirements.txt` is unchanged.
+- `python -m screener.autoresearch.evaluate` gives the same output line before and after, and `rank_import_problems() == []`.
+- `git diff --stat` touches no eval file, nor `rank.py`, `scoring.py`, `screens.py`, `snapshot.py`, `owners.py`, `fulton.py`, `build_eval.py`, `autoresearch/data/` or `PROGRAM.md`.
+- `settings.toml` only gains the new `[owners]` key(s), no default changes.
+
+**F2-9. No requests (SR-11, SR-6).** Phase 1 reads only what `fetch_parcels` returned. The offline run's request count per URL is unchanged; assert it in the spy-run test. No new runtime file is written, so `.gitignore` needs nothing (F14-2 does not apply).
+
+**F2-10. Determinism.** Cluster ids (if exposed at all) come from the sorted member ids, never from dict or set iteration order or `id()`. The same input gives byte-identical `ranked.csv` (already pinned by X9's run-to-run comparisons once both carry the lines).
+
+**F2-11. Not a rank feature, and the future path.** If the operator later wants portfolio or assemblage in the score, the path is a human eval step. `build_eval` would compute the same exact-key clusters on the 2016 snapshot (owner and mailing exist there) and add a FEATURES entry, then rebuild with `--new-baseline`. Say this in the README so nobody "just" reads the flag text from `rank.py`. Do NOT edit `PROGRAM.md` here (F14-10 reasoning).
+
+**F2-12. Counts-only live evidence (SR-8 analog).** If the one allowed `--limit 30` live run happens, record only:
+- parcels fetched;
+- clusters with two or more members, and parcels in them;
+- ranked parcels carrying a portfolio line, and those carrying an assemblage line;
+- components above the band;
+- the largest cluster size (a count);
+- "adjacency not checked" count;
+- clustering wall time;
+- the identical-evaluate check.
+
+No ids, owners or addresses. Clustering runs on the full pre-limit list (F2-3), so the trial run still exercises the whole band, at no extra request cost.
+
+### Go / no-go gates for F2 (all must hold before the decision note says go)
+
+| Gate | Condition |
+|---|---|
+| J1 | Spy test: with slope on and `--no-slope`, no key set seen by `rank.learned_score`, `scoring.fixed_score`, `screens.site_rejects` or `screens.flags` holds a cluster key. The expected parcels' `flags` carry the new lines. Rank, score, `why_site` and `why_seller` are identical with clustering on and off (F2-1 a, c). |
+| J2 | Static test: no string constant in `rank.py` or `scoring.py` contains the cluster key stems (imported from the module, not `adjacen`), with the computed-string limit stated (F2-1 b). |
+| J3 | Exact two-key matching: every F2-2 case, including the no-key singletons and the `same_owner`-true-but-no-cluster pair. The new module does not reference `same_owner`. `owners.py` and `fulton.py` are unchanged (F2-2, X2). |
+| J4 | Adjacency in metres: the edge, 5 ft / 50 ft, east-west vs north-south, corner, chain and band cases. The `[owners]` key is optional with a code default (F2-4). |
+| J5 | Clustering runs on the pre-limit list: portfolio counts are equal with and without `--limit`, and out-of-trial siblings are labelled. The wording names band, area and gap and never says "owns" or "contiguous" (F2-3). |
+| J6 | The 2,000-parcel timing test, the GEOS-error "not checked" path with a counted note, and no `stop()` on clustering failure (F2-5). |
+| J7 | Flag cap, statuses, determinism and escaping. `rejected.csv` header unchanged. Any new `RANKED_COLUMNS` placed after `flags` and named in the decision note (F2-6). |
+| J8 | No extra request; `requirements.txt` unchanged; the evaluate output line is identical to base; `rank_import_problems() == []`; the diff stays inside the F2-8 list (F2-8, F2-9). |
+| J9 | Both suites green, with counts in the decision note: root about 1744 OK at base, screener 134 OK at base plus the F8 and F14 additions. The code writer response lists every existing test whose output changed (F2-7). README "Owner clusters" paragraph per F2-3, F2-4 and F2-11. The decision note restates the operator answers. |
+
+**No-go triggers:**
+- Any cluster, portfolio or assemblage value on `p` before scoring is done.
+- Fuzzy or `same_owner`-based matching, or name-only / address-only clustering.
+- A change to `fetch_parcels`, `owners.py`, any eval file, `rank.py`, `scoring.py`, `screens.py` or a `settings.toml` default.
+- A new request or dependency.
+- The cluster facts wired into a score, a screen, a reject or `screens.flags`.
+- Flag wording that claims ownership beyond the tax-roll name and address, or contiguity beyond the measured gap.
+
+**Verdict: GO with conditions J1–J9.**
+
+Standing risks:
+- SR-6: offline fixtures with distinct owners.
+- SR-8 analog: no owner names in the flags; counts-only evidence.
+- SR-10: stdlib + shapely only.
+- SR-11: no new requests; the small-neighbour fetch is deferred to phase 2.
+- SR-15 / SR-16 analogs: the eval boundary is unchanged. Cluster facts stay in a `run.main` local until after scoring, and the human read of `exp:` diffs is the backstop.
