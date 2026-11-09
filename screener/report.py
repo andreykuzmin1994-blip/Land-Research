@@ -9,13 +9,15 @@ import re
 from pathlib import Path
 from typing import Any
 
+from . import sitefit
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
     "rank", "score", "fixed_score", "learned_score", "motivation_score", "parcel_id", "jurisdiction",
     "site_address", "acres", "usable_after_slope", "entitlement", "zoning", "flu",
     "exit_label", "exit_miles", "rail_ft", "industrial_within_1mi", "flood_pct",
-    "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft", "owner", "owner_type", "owner_mailing",
+    "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft",
+    "largest_open_acres", "envelope_fit", "envelope_building_sf", "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
 ]
@@ -113,6 +115,7 @@ def brief(p: dict[str, Any]) -> str:
         f"- Slope: {_fmt(p.get('steep_pct'))}% of the open ground steeper than 15%; "
         f"relief about {_fmt(p.get('relief_ft'))} ft (USGS lidar 2018-19, 10 m grid)",
         _earthwork_line(p),
+        sitefit.brief_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
         "",
