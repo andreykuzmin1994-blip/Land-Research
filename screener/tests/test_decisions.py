@@ -304,6 +304,29 @@ class SnapshotTests(DecisionHarness):
             r = git("check-ignore", "-q", str(path))
             self.assertEqual(r.returncode, 0, f"{path} would not be ignored under screener/")
 
+    def test_failed_rerun_never_pairs_new_ranked_with_old_snapshot(self):
+        # Reviewer fix: a same-day re-run rewrites ranked.csv in place. If it
+        # then fails before the snapshot lands, the first run's features.json
+        # must not survive next to the new ranked.csv, or decide.py would
+        # store the earlier run's features for a decision made on this one.
+        self.assertEqual(self.rerun("--no-slope")[0], 0)
+        self.assertEqual(self.snap()["records"][0]["features"]["acres"], 20.0)
+        self.fresh[0]["acres"] = 30.0
+        with mock.patch.object(snapshot, "write", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.rerun("--no-slope")
+        self.assertEqual(float(self.ranked()["14F0001 0001"]["acres"]), 30.0)
+        self.assertFalse((self.out / snapshot.FILE_NAME).exists())
+        code, _, err = self.decide("14F0001 0001", "pursue")
+        self.assertEqual(code, 2)
+        self.assertIn("--no-features", err)
+        self.assertEqual(self.store(), [])
+
+    def test_clear_is_a_no_op_without_a_snapshot(self):
+        self.out.mkdir(parents=True)
+        snapshot.clear(self.out)  # no error when nothing is there
+        self.assertEqual(list(self.out.iterdir()), [])
+
 
 class IgnoreTests(unittest.TestCase):
     """H3: every path the new code can write is ignored; the README is tracked."""

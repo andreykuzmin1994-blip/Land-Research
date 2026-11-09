@@ -92,6 +92,15 @@ def take(parcels: list[dict[str, Any]], meta: dict[str, Any]) -> dict[str, Any]:
             "records": records}
 
 
+def clear(out_dir: Path) -> None:
+    """Remove an earlier snapshot from this run folder before the reports
+    are rewritten. A same-day re-run overwrites ranked.csv in place, so if
+    it then fails before write() the old features.json would sit next to
+    the new ranked.csv and decide.py would keep the wrong run's features.
+    With it gone, decide.py refuses (or records with --no-features)."""
+    (out_dir / FILE_NAME).unlink(missing_ok=True)
+
+
 def write(out_dir: Path, snap: dict[str, Any]) -> Path:
     """Write the snapshot atomically (temp name in the same folder, then
     os.replace). Standard JSON only: allow_nan=False."""

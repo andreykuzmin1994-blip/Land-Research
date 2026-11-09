@@ -127,7 +127,10 @@ settings file's SHA-256, the code commit (null if git doesn't answer), the
 record count, and how many NaN or infinite values were written as `null`
 (`summary.md` says so too). It holds no geometry, owner name, mailing
 address, earthwork estimate or decision, and it is copied before scoring,
-so it is what the parcel looked like going in. Rejected parcels are left
+so it is what the parcel looked like going in. A re-run into the same
+folder deletes the old `features.json` before it rewrites the reports, so a
+run that fails part-way never leaves one run's features next to another
+run's `ranked.csv`. Rejected parcels are left
 out: their map checks are partial. `python -m screener.decide` copies a
 parcel's record, with the run's `meta`, into
 `screener/inputs/decision_features.jsonl` when you decide, so the features

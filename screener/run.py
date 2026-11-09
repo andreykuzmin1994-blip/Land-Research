@@ -257,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
                  "and forested wetlands; floodplain from FEMA NFHL (Mar 2026 snapshot)")
     summary = {"county": county.NAME, "run_date": today, "funnel": funnel,
                "reject_reasons": reasons.most_common(), "notes": notes}
+    snapshot.clear(out_dir)  # never pair a new ranked.csv with an old snapshot
     report.write_all(out_dir, survivors, rejected, summary, int(run_cfg.get("briefs", 25)))
     snapshot.write(out_dir, snap)
     log(f"Done: {len(survivors):,} ranked parcels -> {out_dir}")
