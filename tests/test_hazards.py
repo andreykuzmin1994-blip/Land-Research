@@ -12,7 +12,7 @@ from unittest import mock
 import tests  # noqa: F401  (suite guards)
 import hazards
 import prepare
-from hazards_helpers import enabled, row
+from hazards_helpers import disabled, enabled, row
 from zoning_helpers import REPO_ROOT
 
 SRC = (REPO_ROOT / "hazards.py").read_text(encoding="utf-8")
@@ -39,10 +39,15 @@ def zmap(*items):
 class GateTests(unittest.TestCase):
     """FW-03 / FW-06: the gate is a human-owned constant, costing no SQL."""
 
-    def test_off_in_the_shipped_repo(self):
-        self.assertFalse(hasattr(prepare, hazards.GATE_CONSTANT))
-        self.assertFalse(hazards.enabled())
-        self.assertEqual(hazards.schema_problem(), "no hazard table in prepare.py")
+    def test_on_in_the_shipped_repo_off_under_disabled(self):
+        # Operator-authorized prepare-mutation 2026-11-09
+        # (reviews/33_hazards_enabled): the shipped gate is ON.
+        self.assertTrue(hasattr(prepare, hazards.GATE_CONSTANT))
+        self.assertTrue(hazards.enabled())
+        self.assertIsNone(hazards.schema_problem())
+        with disabled():
+            self.assertFalse(hazards.enabled())
+            self.assertEqual(hazards.schema_problem(), "no hazard table in prepare.py")
 
     def test_on_only_with_the_constant(self):
         with enabled():
@@ -51,10 +56,13 @@ class GateTests(unittest.TestCase):
         with enabled("CREATE TABLE IF NOT EXISTS parcel_hazards (parcel_id TEXT)"):
             self.assertTrue(hazards.enabled())
             self.assertIn("lacks", hazards.schema_problem())
-        self.assertFalse(hazards.enabled())
+        self.assertTrue(hazards.enabled())          # the shipped state again
+        with disabled():
+            self.assertFalse(hazards.enabled())
 
+    @disabled()
     def test_runtime_assignment_to_prepare_cannot_switch_the_gate_on(self):
-        # Review finding 2: the probe's in-process monkeypatch.
+        # Review finding 2: the probe's in-process monkeypatch (gate off).
         ddl = "parcel_" + "hazards " + " ".join(hazards.COLUMNS)
         with mock.patch.object(prepare, hazards.GATE_CONSTANT, ddl, create=True):
             self.assertFalse(hazards.enabled())
@@ -92,9 +100,10 @@ class GateTests(unittest.TestCase):
             f.write_text("def (:\n", encoding="utf-8")
             self.assertIsNone(hazards.ddl_from_prepare_source(f))
         self.assertIsNone(hazards.ddl_from_prepare_source(Path("/nonexistent/prepare.py")))
-        # The shipped prepare.py carries no constant.
-        self.assertIsNone(hazards.ddl_from_prepare_source())
-        self.assertIsNone(hazards._SOURCE_DDL)
+        # The shipped prepare.py carries the constant (operator-authorized
+        # prepare-mutation 2026-11-09, reviews/33_hazards_enabled).
+        self.assertEqual(hazards.ddl_from_prepare_source(), prepare._DDL_PARCEL_HAZARDS)
+        self.assertEqual(hazards._SOURCE_DDL, prepare._DDL_PARCEL_HAZARDS)
 
     def test_schema_mismatch_is_a_gap_without_sql(self):
         class Boom:

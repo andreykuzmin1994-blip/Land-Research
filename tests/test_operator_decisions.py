@@ -35,6 +35,7 @@ import rules_scrape as rs
 import site_fit
 import zoning
 import site_fit_golden_case as golden
+from hazards_helpers import disabled as hazards_disabled
 from zoning_helpers import REPO_ROOT, patch_rules, verified
 
 SVC = "services3.arcgis.com"
@@ -670,9 +671,15 @@ def _flags(rec, pid=None):
             and (pid is None or p[1] == pid)]
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled);
+# these fakes/records predate the hazard read, so they run with it OFF.
 class D3ScoringTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        hz = hazards_disabled()     # for setUpClass AND every test (R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
         with d3_fixture():
             site_fit._FIT_CACHE.clear()
             cls.draft = _canon(golden.run_case(research))

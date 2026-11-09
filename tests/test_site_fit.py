@@ -28,6 +28,7 @@ from unittest import mock
 import tests  # noqa: F401 — suite guards (mirror kill switch, committed-file stubs)
 import site_fit
 import zoning
+from hazards_helpers import disabled as hazards_disabled
 from zoning_helpers import REPO_ROOT, patch_rules, stored, verified
 
 PROTOS_PATH = REPO_ROOT / "building_prototypes.json"
@@ -617,6 +618,10 @@ INVESTIGATE = ("investigate further: no district setbacks in zoning_rules.json; 
                "25 ft default used")
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled);
+# these fakes/records predate the hazard read, so they run with it OFF.
+@hazards_disabled()
 class ProjectionTests(unittest.TestCase):
 
     def setUp(self):
@@ -1075,6 +1080,7 @@ class CliTests(unittest.TestCase):
                 rc = cli.main(["site-fit", "--parcel", "a"])
         self.assertEqual(rc, 2)
 
+    @hazards_disabled()  # the FakeConn predates the hazard read
     def test_output_never_carries_owner_or_address_and_files_are_safe(self):
         import cli
         import prepare

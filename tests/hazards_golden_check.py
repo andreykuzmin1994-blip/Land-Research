@@ -1,14 +1,23 @@
 """One-off review artefact (reviews/26_flood_wetlands, FW-03 / FW-25).
 
 NOT part of the unittest suite (the file name does not match test_*.py):
-it compares the CURRENT research.py, with the hazard table NOT enabled (the
-shipped state: prepare.py carries no ``_DDL_PARCEL_HAZARDS``), to a frozen
-record of research.py at commit 8ddaf69 (before the hazards module
-existed): discovery (every hard filter's result and ``_process_parcel``'s
-status and executed statements) and scoring (the site-fit golden case, per
-parcel and cycle). Like the zoning and site-fit golden checks it stops
-being meaningful once an experiment is kept; the suite carries the
-differential version (tests/test_hazards_scoring.py).
+it compares the CURRENT research.py to a frozen record of research.py at
+commit 8ddaf69 (before the hazards module existed): discovery (every hard
+filter's result and ``_process_parcel``'s status and executed statements)
+and scoring (the site-fit golden case, per parcel and cycle). Two modes:
+
+- gate OFF (``hazards_helpers.disabled()``): byte-identical to the record;
+- gate ON with the table EMPTY, the SHIPPED state since the operator-
+  authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled):
+  identical apart from the documented flag-text delta
+  (``hazards_golden_case.differences_on_empty``: discovery H4/H6 flag ->
+  pass and two fewer stub flagged_items INSERTs; scoring one hazard read
+  per path and two "no hazards import" data_gap INSERTs per parcel;
+  results, parcel_scores inserts and research_log notes identical).
+
+Like the zoning and site-fit golden checks it stops being meaningful once
+an experiment is kept; the suite carries the differential versions
+(tests/test_hazards_scoring.py, tests/test_hazards_enabled.py).
 
     python tests/hazards_golden_check.py        # exit 0 = identical
 
@@ -37,6 +46,7 @@ import hazards  # noqa: E402
 import research  # noqa: E402
 import zoning  # noqa: E402
 import hazards_golden_case as golden  # noqa: E402
+from hazards_helpers import disabled  # noqa: E402
 
 RECORD = HERE.parent / "reviews" / "26_flood_wetlands" / "golden_head_8ddaf69.json"
 # The record was taken on this UTC date; discovery_date comes from
@@ -51,20 +61,23 @@ class _RecordClock(research.datetime):
         return cls(*RECORD_DATE, 12, 0, 0, tzinfo=tz)
 
 
+def current() -> dict:
+    real = research.datetime
+    research.datetime = _RecordClock
+    try:
+        return json.loads(json.dumps(golden.run_case(research), sort_keys=True, default=str))
+    finally:
+        research.datetime = real
+
+
 def main() -> int:
     if zoning.any_verified():
         print("not comparable: some jurisdiction is verified (the record is all-draft)")
         return 2
-    if hazards.enabled():
-        print("not comparable: the hazard table is enabled (the record predates it)")
-        return 2
     want = json.loads(RECORD.read_text(encoding="utf-8"))
-    real = research.datetime
-    research.datetime = _RecordClock
-    try:
-        got = json.loads(json.dumps(golden.run_case(research), sort_keys=True, default=str))
-    finally:
-        research.datetime = real
+    shipped_on = hazards.enabled()
+    with disabled():
+        got = current()
     bad = []
     for part in ("filters", "process"):
         w, g = want["discovery"][part], got["discovery"][part]
@@ -77,12 +90,24 @@ def main() -> int:
     if gs["cycle"] != ws["cycle"]:
         bad.append("<scoring cycle>")
     if bad:
-        print(f"DIFFERS from the 8ddaf69 record: {len(bad)} case(s): {', '.join(bad[:20])}")
+        print(f"gate OFF DIFFERS from the 8ddaf69 record: {len(bad)} case(s): "
+              f"{', '.join(bad[:20])}")
         return 1
-    print(f"identical to the 8ddaf69 record: {len(want['discovery']['process'])} discovery "
-          f"runs, {len(want['discovery']['filters'])} filter sets, "
+    print(f"gate off: identical to the 8ddaf69 record: {len(want['discovery']['process'])} "
+          f"discovery runs, {len(want['discovery']['filters'])} filter sets, "
           f"{len(ws['per_parcel'])} scored parcels + the cycle (statements, parameters, "
           "inserts, notes)")
+    if not shipped_on:
+        print("the shipped gate is OFF: the enabled, empty-table mode was not run")
+        return 0
+    bad = golden.differences_on_empty(want, current(), hazards._SQL_HAZARDS_FOR_PARCELS)
+    if bad:
+        print(f"gate ON + empty table DIFFERS: {len(bad)} case(s): {', '.join(bad[:20])}")
+        return 1
+    print("enabled, empty table (the shipped state): parcel_scores inserts, results and "
+          "notes identical; discovery statuses identical, H4/H6 flag -> pass and the two "
+          "stub flagged_items INSERTs gone; scoring adds one hazard read per path and two "
+          "'no hazards import' data_gap INSERTs per parcel, nothing else")
     return 0
 
 

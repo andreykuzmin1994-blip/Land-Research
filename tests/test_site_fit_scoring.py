@@ -26,6 +26,7 @@ import research
 import site_fit
 import site_fit_golden_case as golden
 import zoning
+from hazards_helpers import disabled as hazards_disabled
 from zoning_helpers import REPO_ROOT, patch_rules, stored, verified
 
 PROTOS_PATH = REPO_ROOT / "building_prototypes.json"
@@ -104,12 +105,18 @@ def _verified_sf():
     return patch_rules(verified("south_fulton"))
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled);
+# these fakes/records predate the hazard read, so they run with it OFF.
 class VerifiedBtsTests(unittest.TestCase):
     """SF-02: with South Fulton verified, BTS for its parcels follows the
     projection; every other parcel and every other strategy is unchanged."""
 
     @classmethod
     def setUpClass(cls):
+        hz = hazards_disabled()     # for setUpClass AND every test (R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
         site_fit._FIT_CACHE.clear()
         cls.draft = _canon(golden.run_case(research))
         with _verified_sf():
@@ -471,6 +478,10 @@ class ProtectionTests(unittest.TestCase):
         self.assertIn("building_prototypes.json", zoning_helpers.HUMAN_OWNED)
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled);
+# these fakes/records predate the hazard read, so they run with it OFF.
+@hazards_disabled()
 class ReportingTests(unittest.TestCase):
     """SF-15: snapshot development potential and memo highlight lines."""
 

@@ -22,7 +22,7 @@ import prepare
 import reporting
 import research
 import runner
-from hazards_helpers import db_row, enabled, row
+from hazards_helpers import db_row, disabled, enabled, row
 
 AE = dict(sfha_sf=5000, nfhl_zone_sf={"AE||T": 5000, "X|AREA OF MINIMAL FLOOD HAZARD|F": 95000},
           zones=["AE", "X"])
@@ -108,7 +108,8 @@ def run_evaluate(conn: FakeConn, scoring=None):
 class DisabledTests(unittest.TestCase):
     def test_gate_off_runs_no_hazard_sql(self):
         conn = FakeConn(counted=["fulton-A"], hazard={"fulton-A": AE})
-        result = run_evaluate(conn)
+        with disabled():
+            result = run_evaluate(conn)
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["metric"], 1)
         self.assertNotIn("hazard_audit", result["sub_summaries"])
@@ -116,6 +117,21 @@ class DisabledTests(unittest.TestCase):
             self.assertNotIn("parcel_hazards", sql)
             self.assertNotIn("SELECT parcel_id FROM latest", sql)
         self.assertEqual(conn.connections, 1)   # only the metric block's connection
+
+    def test_shipped_gate_arms_the_audit(self):
+        # The operator-authorized prepare-mutation of 2026-11-09
+        # (reviews/33_hazards_enabled): no enabled() patch, and the audit
+        # runs on its own connection; a counted AE parcel crashes.
+        self.assertTrue(hazards.enabled())
+        conn = FakeConn(counted=["fulton-A"], hazard={"fulton-A": AE})
+        result = run_evaluate(conn)
+        self.assertEqual(result["status"], "crash")
+        self.assertIn("1 counted parcel(s) carry an H4/H6 blocker", result["error"])
+        self.assertEqual(conn.connections, 2)
+        clean = FakeConn(counted=["fulton-A"])
+        result = run_evaluate(clean)
+        self.assertEqual(result["status"], "ok", result["error"])
+        self.assertIn("hazard_audit", result["sub_summaries"])
 
 
 class EnabledTests(unittest.TestCase):

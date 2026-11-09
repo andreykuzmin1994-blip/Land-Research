@@ -35,6 +35,12 @@ import research
 import runner
 import reporting
 import costar_ingest
+# The hazard gate is ON in the shipped repo since the operator-authorized
+# prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled). Tests here
+# whose fakes predate the hazard read (or the runner's extra audit
+# connection), or that pin the pre-hazard H4/H6 stubs, run under
+# hazards_disabled(); the shipped-state inverse is test_hazards_enabled.
+from hazards_helpers import disabled as hazards_disabled
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "discovery"
 COSTAR_FIXTURES_DIR = Path(__file__).parent / "fixtures" / "costar"
@@ -700,6 +706,7 @@ class TestHarnessGate(unittest.TestCase):
 class TestHappyPathDryRun(unittest.TestCase):
     """End-to-end dry-run with mocked harness, mocked HTTP, fake conn."""
 
+    @hazards_disabled()
     def test_two_feature_happy_path(self) -> None:
         sources_payload = {
             "county_parcel_data": {"fulton_ga": {
@@ -1088,6 +1095,7 @@ class TestPhase4HardFilterStubs(unittest.TestCase):
         result = research._h5_filter({}, None, _passing_params())
         self._assert_flag("H5", result, ["EPA", "Envirofacts"])
 
+    @hazards_disabled()
     def test_h6_returns_flag(self) -> None:
         result = research._h6_filter({}, None, _passing_params())
         self._assert_flag("H6", result, ["NWI", "wetlands", "USGS"])
@@ -1113,6 +1121,7 @@ class TestPhase4FilterPipelineEndToEnd(unittest.TestCase):
     """Integration-style test: _process_parcel emits one flagged_items row per
     H5..H10 stub for a happy-path parcel (R-103, R-105)."""
 
+    @hazards_disabled()
     def test_h5_through_h10_emit_flag_rows(self) -> None:
         feature = _load_fixture("arcgis_query_two_features.json")["features"][0]
         mapping = _sources_payload()["county_parcel_data"]["fulton_ga"]["field_mapping"]
@@ -5181,6 +5190,7 @@ class TestPhase10VerifySetupComposite(unittest.TestCase):
             self.assertEqual(out["checks"]["corridor_bbox"]["status"], "skipped")
 
 
+@hazards_disabled()
 class TestPhase10EvaluateMetricRouting(unittest.TestCase):
     """R-701 -- evaluate() routes through prepare.calculate_* exclusively."""
 
@@ -5934,6 +5944,7 @@ class TestPhase13PrefetchCache(unittest.TestCase):
         self.assertNotIn(research._SQL_SUBMARKET_LAND_MEDIAN_BATCH, sqls)
         self.assertEqual(cache.market_context, {})
 
+    @hazards_disabled()
     def test_any_params_passed_as_single_tuple_wrapping_list(self) -> None:
         # R-1316: every ANY(%s) query is called with (list,) — NOT the list
         # spread across placeholders. This is the mistake the fake-conn cannot
@@ -6264,6 +6275,7 @@ class TestScoreParcelRunStamp(unittest.TestCase):
 class TestEvaluateRunThreading(unittest.TestCase):
     """evaluate() threads run_tag + experiment_id into scoring and metric."""
 
+    @hazards_disabled()
     def test_run_tag_and_experiment_id_reach_scoring_and_metric(self) -> None:
         captured: dict[str, Any] = {}
 
@@ -6544,6 +6556,7 @@ class TestHarnessGateTTLCache(unittest.TestCase):
 
 
 class TestApiCallsSignal(unittest.TestCase):
+    @hazards_disabled()
     def test_evaluate_reports_api_call_delta(self) -> None:
         @contextmanager
         def fake_get_connection():
@@ -6825,6 +6838,7 @@ class TestTerminalStatusBreaker(unittest.TestCase):
 class TestStampAudit(unittest.TestCase):
     """F3(b): evaluate counts wrong-stamp rows written during its window."""
 
+    @hazards_disabled()
     def test_violations_surfaced_in_result_and_description(self) -> None:
         class _AuditFake(Phase5FakeConnection):
             pass

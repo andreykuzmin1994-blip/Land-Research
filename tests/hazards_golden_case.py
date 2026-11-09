@@ -87,3 +87,80 @@ def run_discovery(research: Any) -> dict[str, Any]:
 
 def run_case(research: Any) -> dict[str, Any]:
     return {"discovery": run_discovery(research), "scoring": sg.run_case(research)}
+
+
+# ---------------------------------------------------------------------------
+# The gate ON with the table EMPTY (the shipped state since the operator-
+# authorized prepare-mutation of 2026-11-09, reviews/33_hazards_enabled; the
+# fake above answers the hazard read with no rows). Against the 8ddaf69
+# record the ONLY allowed differences are the documented flag-text delta:
+# - discovery: H4/H6 ``flag`` (the "unjoined" stubs) -> ``pass`` with an
+#   empty reason; ``_process_parcel`` statuses identical; its statements
+#   identical apart from the two stub flagged_items INSERTs, now absent;
+# - scoring (per parcel and cycle): results, parcel_scores inserts and
+#   research_log notes identical; statements identical apart from the one
+#   batched hazard read per path and the two "no hazards import for this
+#   parcel" data_gap flagged_items INSERTs per parcel, now present.
+H4_STUB = "H4 flood unjoined: pending FEMA NFIP wiring (Phase 5+)"
+H6_STUB = "H6 wetlands unjoined: pending USGS NWI mapper wiring (Phase 5+)"
+H4_GAP = "H4 flood: no hazards import for this parcel (FEMA NFHL not assessed)"
+H6_GAP = "H6 wetlands: no hazards import for this parcel (USFWS NWI not assessed)"
+
+
+def _flag_ending(entry: Any, endings: tuple[str, ...], flag_type: str) -> bool:
+    sql, params = entry
+    return ("INSERT INTO flagged_items" in sql and len(params) > 3
+            and params[0] == flag_type and str(params[3]).endswith(endings))
+
+
+def differences_on_empty(want: dict[str, Any], got: dict[str, Any],
+                         hazard_read_sql: str) -> list[str]:
+    """The cases where ``got`` (gate on, empty table) differs from ``want``
+    (the 8ddaf69 record) beyond the documented delta. Empty = proven."""
+    bad: list[str] = []
+    wf, gf = want["discovery"]["filters"], got["discovery"]["filters"]
+    if sorted(wf) != sorted(gf):
+        bad.append("<discovery filters keys>")
+    for k, w in wf.items():
+        g = gf.get(k)
+        if not isinstance(w, list) or not w or w[0] == "unmappable":
+            if g != w:
+                bad.append(f"discovery filters {k}")
+            continue
+        expect = [["pass", fid, ""] if fid in ("H4", "H6") and act == "flag" else [act, fid, why]
+                  for act, fid, why in w]
+        if g != expect:
+            bad.append(f"discovery filters {k}")
+    wp, gp = want["discovery"]["process"], got["discovery"]["process"]
+    if sorted(wp) != sorted(gp):
+        bad.append("<discovery process keys>")
+    for k, w in wp.items():
+        g = gp.get(k) or {}
+        stubs = [e for e in w["executed"] if _flag_ending(e, (H4_STUB, H6_STUB), "data_gap")]
+        rest = [e for e in w["executed"] if e not in stubs]
+        if g.get("status") != w["status"] or g.get("executed") != rest \
+                or len(stubs) not in (0, 2):
+            bad.append(f"discovery process {k}")
+    ws, gs = want["scoring"], got["scoring"]
+    if sorted(ws["per_parcel"]) != sorted(gs["per_parcel"]):
+        bad.append("<scoring parcel set>")
+
+    def scoring_same(w: dict[str, Any], g: dict[str, Any], keys: tuple[str, ...],
+                     parcels: int) -> bool:
+        if any(g.get(x) != w[x] for x in keys):
+            return False
+        reads = [e for e in g["executed"] if e[0] == hazard_read_sql]
+        gaps = [e for e in g["executed"] if _flag_ending(e, (H4_GAP, H6_GAP), "data_gap")]
+        rest = [e for e in g["executed"] if e[0] != hazard_read_sql and e not in gaps]
+        return len(reads) == 1 and len(gaps) == 2 * parcels and rest == w["executed"]
+
+    for pid, w in ws["per_parcel"].items():
+        g = gs["per_parcel"].get(pid)
+        if g is None or not scoring_same(
+                w, g, ("result", "parcel_score_inserts", "research_log_notes"), 1):
+            bad.append(f"scoring {pid}")
+    if not scoring_same(ws["cycle"], gs["cycle"],
+                        ("summary", "parcel_score_inserts", "research_log_notes"),
+                        len(ws["per_parcel"])):
+        bad.append("<scoring cycle>")
+    return bad
