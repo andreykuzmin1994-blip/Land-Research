@@ -135,9 +135,11 @@ steep ground may sit inside the open area); utility, pipeline and access
 easements are not mapped; car parking, drives, detention, frontage and
 access, coverage caps and zoning setbacks beyond the 25 ft are not
 modelled. When the parcel map disagrees with the tax record the fit uses
-the map shape and the brief says so. Worst case is under a second per
-parcel (a shape where nothing fits); `[fit] max_parcels` caps it to the
-top N by rank. Like earthwork, it is computed only after scoring, flags
+the map shape and the brief says so. Most parcels take well under a
+second, but the measured worst case is about 4 to 5 seconds per parcel: open
+ground just under the 600-vertex cap (for example about 100 small wetland or
+flood pockets) where nothing fits, so every angle is tried. `[fit]
+max_parcels` caps it to the top N by rank. Like earthwork, it is computed only after scoring, flags
 and the sort, and is in no score, screen or flag. To make it a learned
 feature or a screen, a human would add it to `build_eval.FEATURES`,
 rebuild `data/` and take `--new-baseline`; reading it from `rank.py` is

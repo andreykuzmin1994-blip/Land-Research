@@ -30,3 +30,12 @@ and the actual diff (`git diff 22187d0..b390e3c`), then re-ran checks myself.
 - The steep mask is deferred, as F6-3 says.
 
 Screener suite: 290 tests OK. No live run.
+
+## Post-change review
+
+A later check found the README worst-case timing false (about 4.3 s at the
+vertex cap, not under a second). Fixed in `10_f6_timing_fix.md`: README
+states the measured 4 to 5 s, the timing test uses the near-cap shape, and a
+README test pins the wording. No change to the fit, the cap or ranking; the
+fit is still attached after the sort and the spy tests still pass. Suite: 291
+tests OK.

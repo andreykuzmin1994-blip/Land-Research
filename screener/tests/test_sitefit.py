@@ -329,16 +329,27 @@ class CostTests(unittest.TestCase):
         self.assertTrue(f.envelope.within(geom))
 
     def test_worst_case_timing(self):
+        # Worst case the cap allows: 100 small holes (wetland or flood
+        # pockets) survive the setback and simplify just under 600 vertices,
+        # so the shape is fitted and every angle is tried. Measured about
+        # 4.3 s; the 36-hole shape used before took 0.7 s and was not the
+        # worst case.
         holes = [box(x, y, x + 20, y + 20).exterior.coords
-                 for x in range(150, 1270, 200) for y in range(150, 1270, 200)]
-        g = Polygon(box(0, 0, 1320, 1320).exterior.coords, holes)   # nothing fits
+                 for x in range(100, 1400, 130) for y in range(100, 1400, 130)]
+        g = Polygon(box(0, 0, 1400, 1400).exterior.coords, holes)
         started = time.monotonic()
-        # About 0.7 s each here (every angle is tried when nothing fits);
-        # 50 of them took about 35 s, measured once outside the suite.
-        for _ in range(4):
-            f = fit(box(0, 0, 1320, 1320), g, constrained=2.0)
-            self.assertEqual(f.state, sitefit.NONE_FOUND)
-        self.assertLess(time.monotonic() - started, 20.0)
+        f = fit(box(0, 0, 1400, 1400), g, constrained=2.0)
+        elapsed = time.monotonic() - started
+        self.assertEqual(f.state, sitefit.NONE_FOUND)
+        self.assertTrue(f.simplified)          # under the cap only after simplify
+        self.assertLess(elapsed, 20.0)
+
+    def test_readme_states_the_measured_worst_case(self):
+        # The README once said "under a second per parcel"; the case above
+        # is about 4 s. Operators size [fit] max_parcels from this sentence.
+        text = " ".join((SCREENER / "README.md").read_text().split())
+        self.assertNotIn("Worst case is under a second", text)
+        self.assertIn("measured worst case is about 4 to 5 seconds per parcel", text)
 
     def test_no_wall_clock_in_the_fit(self):
         self.assertNotIn("time", {n.id for n in ast.walk(ast.parse(
