@@ -30,7 +30,7 @@ Results land in `screener/output/fulton-<date>/`:
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
 | `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate and a building-fit check that aren't scored; see Earthwork and Site fit below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
-| `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps |
+| `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name) |
 | `rejected.csv` | Every parcel screened out, with the reason |
 | `ranked.geojson` | The same survivors for GIS tools |
 | `features.json` | The evaluation's features for each ranked parcel, kept for your decisions (see Decisions below) |
@@ -144,6 +144,17 @@ and the sort, and is in no score, screen or flag. To make it a learned
 feature or a screen, a human would add it to `build_eval.FEATURES`,
 rebuild `data/` and take `--new-baseline`; reading it from `rank.py` is
 not the way.
+
+**Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
+the county parcel map in the same flat local plane as the fit, north up,
+with a scale bar: the parcel outline, the constrained ground (floodplain,
+mapped wetlands and water, conservation easements, protected land), the
+largest open part and the fitted envelope with its prototype and SF. Steep
+ground is not shown. Without a map shape the brief says "Not drawn"; a
+parcel whose map checks or fit didn't run gets the outline with "not
+checked". The file holds no owner, mailing or site address. It is drawn by
+`report.write_all` after scoring and adds nothing to `ranked.csv` or any
+score (`tests/test_plan.py`).
 
 **Public data changes between days.** On 2026-10-28 and 29, the USGS 3DEP
 lidar service returned different slope statistics for 464 of 2,110

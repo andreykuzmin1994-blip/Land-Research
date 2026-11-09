@@ -615,7 +615,9 @@ class BriefNameTests(unittest.TestCase):
             report.write_all(out, ranked, [], summary, top_n=len(ranked))
             briefs = out / "briefs"
             written = sorted(briefs.iterdir())
-            self.assertEqual(len(written), len(ids))
+            # One brief and one F12 site plan (.svg) per parcel.
+            self.assertEqual(len([f for f in written if f.suffix == ".md"]), len(ids))
+            self.assertEqual(len([f for f in written if f.suffix == ".svg"]), len(ids))
             self.assertTrue(all(f.is_file() and f.parent == briefs for f in written))
             self.assertTrue(all(len(f.name) <= 120 for f in written))
             # Ids with only spaces keep the names they had before.

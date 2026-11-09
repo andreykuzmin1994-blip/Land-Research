@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import sitefit
+from . import plan, sitefit
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
@@ -68,10 +68,18 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
     briefs = out_dir / "briefs"
     briefs.mkdir(exist_ok=True)
     for p in ranked[:top_n]:
-        path = briefs / f"{p['rank']:03d}_{_safe_name(p['parcel_id'])}.md"
-        if path.resolve().parent != briefs.resolve():
-            raise ValueError(f"brief file name escapes {briefs}: {path.name!r}")
-        path.write_text(brief(p))
+        stem = f"{p['rank']:03d}_{_safe_name(p['parcel_id'])}"
+        path, svg_path = briefs / f"{stem}.md", briefs / f"{stem}.svg"
+        for f in (path, svg_path):
+            if f.resolve().parent != briefs.resolve():
+                raise ValueError(f"brief file name escapes {briefs}: {f.name!r}")
+        # F12: the site plan is drawn here, after scores, flags and the sort,
+        # and writes nothing on p (plan.py).
+        svg, why = plan.render(p)
+        if svg is not None:
+            svg_path.write_text(svg)
+        path.write_text(brief(p, plan_file=svg_path.name if svg is not None else None,
+                              plan_note=why or None))
 
     (out_dir / "summary.md").write_text(_summary_md(summary, ranked[:10]))
 
@@ -86,7 +94,21 @@ def _money(v: Any) -> str:
     return f"${v:,.0f}" if isinstance(v, (int, float)) and v else "n/a"
 
 
-def brief(p: dict[str, Any]) -> str:
+PLAN_CAPTION = ("_North up, drawn from the county parcel map: shaded blue is floodplain, "
+                "mapped wetlands and water, conservation easements and protected land; green "
+                "is the largest open part; the outlined block is the fitted building envelope. "
+                "Steep ground is not shown. A screening sketch, not a survey._")
+
+
+def _plan_section(plan_file: str | None, plan_note: str | None) -> list[str]:
+    if plan_file:
+        return ["", "## Site plan", f"![Site plan]({plan_file})", "", PLAN_CAPTION]
+    if plan_note:
+        return ["", "## Site plan", f"- Not drawn ({plan_note})"]
+    return []
+
+
+def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None = None) -> str:
     lines = [
         f"# #{p['rank']} — {p.get('site_address') or 'no site address'} ({p['jurisdiction']})",
         "",
@@ -118,6 +140,7 @@ def brief(p: dict[str, Any]) -> str:
         sitefit.brief_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
+        *_plan_section(plan_file, plan_note),
         "",
         "## The owner",
         f"- {p.get('owner') or 'unknown'} ({p.get('owner_type')})",

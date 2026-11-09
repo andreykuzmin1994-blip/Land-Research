@@ -570,7 +570,8 @@ class RunTests(RunHarness):
             header = next(csv.reader(fh))
         from screener import report
         self.assertEqual(header, report.RANKED_COLUMNS)
-        brief = next(f for f in (self.out / "briefs").iterdir() if "14F0001_0001" in f.name)
+        brief = next(f for f in (self.out / "briefs").iterdir()
+                     if "14F0001_0001" in f.name and f.suffix == ".md")
         watch = brief.read_text().split("## Watch-outs", 1)[1]
         self.assertIn("Same owner, adjacent: touching or within 10 ft", watch)
 
