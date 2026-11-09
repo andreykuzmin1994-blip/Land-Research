@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import arcgis, checks, layers, report, scoring, screens, snapshot
+from . import arcgis, checks, layers, owner_clusters, report, scoring, screens, snapshot
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -85,6 +85,10 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = tomllib.loads(args.settings.read_text())
     run_cfg, area, scr = cfg["run"], cfg["area"], cfg["screens"]
+    try:
+        gap_ft = owner_clusters.gap_ft_setting(cfg)
+    except ValueError as exc:
+        ap.error(f"{args.settings}: {exc}")
     arcgis.cache_days = 0 if args.refresh else float(run_cfg.get("cache_days", 7))
     county = importlib.import_module(f"screener.{run_cfg['county']}")
     today = date.today().isoformat()
@@ -100,6 +104,15 @@ def main(argv: list[str] | None = None) -> int:
     except arcgis.ArcGISError as exc:
         return stop("the county parcel layer", exc)
     parcels.sort(key=lambda p: p["parcel_id"])
+    # Same-owner groups over every fetched parcel, before any screen and
+    # before the trial limit, so a trial run gives the same counts. The
+    # result stays in this local variable: nothing goes on p until the
+    # parcels are scored and sorted (the evaluation never measures it).
+    started = time.monotonic()
+    owner_groups = owner_clusters.build(parcels, gap_ft, area["min_acres"], area["max_acres"])
+    log(f"  same-owner groups: {len(owner_groups.groups):,} "
+        f"({time.monotonic() - started:.1f} s)")
+    notes.extend(owner_clusters.summary_notes(owner_groups))
     if args.limit:
         parcels = parcels[:args.limit]
         notes.append(f"trial run limited to {args.limit} parcels")
@@ -241,6 +254,21 @@ def main(argv: list[str] | None = None) -> int:
     # for the reports alone (rank.py and scoring.py never see it).
     for p in survivors:
         p.update(checks.earthwork_fields(earthwork.get(id(p))))
+    # Same-owner lines, now that every sibling's final status is known.
+    # Only p["flags"] (reports) gains them; scores and order are done.
+    ranked_at = {p["parcel_id"]: p["rank"] for p in survivors}
+    out_why = {p["parcel_id"]: reason_key(p["reject_reasons"][0]) for p in rejected}
+    mismatch = {p["parcel_id"] for p in survivors + rejected if p.get("acreage_mismatch")}
+
+    def status_of(pid: str) -> str:
+        if pid in ranked_at:
+            return f"ranked #{ranked_at[pid]}"
+        if pid in out_why:
+            return f"screened out: {out_why[pid]}"
+        return "not screened in this trial run"
+    for p in survivors:
+        p["flags"].extend(owner_clusters.describe(p["parcel_id"], owner_groups, status_of,
+                                                  mismatch.__contains__))
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)

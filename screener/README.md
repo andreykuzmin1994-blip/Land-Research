@@ -163,6 +163,8 @@ reviewed), the meaning differences above, spatial clustering and privacy
   ASSN INC"), or carry HOA inside a company name with a legal form ("... HOA
   INC"; THE doesn't count, since Hoa and The are also Vietnamese given and
   middle names); ASSOC, ASSOCIATION or POA alone don't count.
+  `[owners] adjacency_gap_ft` sets how close two same-owner parcels must be
+  to count as adjacent (see Owner clusters below; flags only).
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark
@@ -225,6 +227,48 @@ parcels (county GIS, 5-50 ac, chosen cities)
   Georgia Secretary of State lookup.
 - Distances are straight-line to the nearest exit with local access
   (freeway-to-freeway interchanges are skipped), not drive time.
+
+### Owner clusters
+
+Each ranked parcel's watch-outs say when the exact same tax-roll owner
+name AND mailing address is on other parcels in the run
+(`screener/owner_clusters.py`), and which of them touch it or lie within
+`[owners] adjacency_gap_ft` (10 ft by default) on the county parcel map,
+directly or in a chain. A chain of two or more that adds up to the
+`[area]` acreage band is flagged as a possible assemblage; a bigger one as
+"larger than the search band". Every sibling is listed (up to five) with
+its status in this run: ranked, screened out and why, or not screened in
+a `--limit` trial. Limits:
+
+- **Only the run's band and area.** The groups are built from the parcels
+  the run fetched (5-50 ac in the chosen jurisdictions), before any screen
+  and before `--limit`. The owner may hold more elsewhere, and small
+  neighbours under 5 ac that would make a site with this one are not seen
+  (a wider fetch is a later phase, with its own review).
+- **Exact match only.** Names are matched after upper-casing, punctuation
+  and spacing ("L.L.C." = "LLC"); addresses likewise, with ZIP+4 cut to five
+  digits. Legal forms, numbers and suites are kept, so "FUND I" and "FUND
+  II", or suite 100 and suite 200, stay apart. Different spellings,
+  addresses or per-site LLCs of one owner are NOT joined. A blank or
+  placeholder name, or a mailing address with no numbered street line,
+  joins nothing. These are not the looser deed-matching rules in
+  `owners.py`.
+- **The gap.** 10 ft bridges digitizing slivers, not a road right-of-way
+  (40-80 ft): parcels across a road are not "adjacent". A shared corner
+  point counts as touching, which is not usable frontage; check the shared
+  boundary on the map. Acres are the tax record's.
+- **It cannot widen the developer exclusion.** The owner type comes from
+  the name alone, so a recognised developer's other parcels are already
+  screened out under the same name. What the groups add is the siblings
+  screened out for other reasons (built on, exempt, passed, steep).
+- **Not a score or a screen.** The groups are built in a local variable and
+  added to the flags only after scoring and the sort; `rank.py` and
+  `scoring.py` never see them (tests pin this). The evaluation has no such
+  fact. Putting portfolio size or assemblage acres in the score would be a
+  human evaluation step: build the same exact-key groups on the 2016
+  snapshot in `build_eval.py` (owner and mailing address exist there), add
+  a FEATURES entry, and rebuild with `--new-baseline`. Do not read the
+  flag text from `rank.py`.
 
 ## AutoResearch
 
