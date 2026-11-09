@@ -163,7 +163,10 @@ applies" (reachable only after a rollback); the R-05 `SystemExit` nit in
    Exit 0: both sources written. 4: names the failed source, its previous
    data kept. 2 after "source(s) ... committed": partial; re-run before the
    baseline (2 without that line: database error or no DATABASE_URL). 3:
-   the current run already has a baseline; start a new run first. 1:
+   refused, either because the current run already has a baseline (start
+   a new run first), or, on `main`, because the database's newest
+   experiment row is from a run that was not halted (`make halt` first;
+   step 1's halt normally prevents this). 1:
    refused (gate off, i.e. not merged; or no table, i.e. step 2). Read the
    console counts (parcels with SFHA, floodway, 0.2% zone, wetlands; H4/H6
    outcomes; "previously imported parcels not covered").
@@ -177,3 +180,29 @@ applies" (reachable only after a rollback); the R-05 `SystemExit` nit in
 Unchanged by this change and by "jsut review" (D2): a floodway blocks;
 A/AE block; AE wholly inside a LOMR, AH/AO/A99/AR and V/VE are review
 passes; H6 fails above `wetlands_max_pct_of_parcel`.
+
+## Post-change adversarial review round 1
+
+An independent reviewer re-checked the landed change. It found the
+prepare.py diff byte-identical to the reviews/26 proposal, without the
+optional metric exclusion. `python prepare.py` ran twice with exit 0 in a
+throwaway schema, giving 30 columns, two GIST indexes and the primary key.
+The root and screener suites passed, and the golden checks exited 0. Three
+findings came back. All three are documentation only, and all three are
+fixed. None changes code or a score.
+
+| ID | Sev | Finding | Disposition |
+|---|---|---|---|
+| A1-01 | minor | README Status step 4 listed exit 2 only as the post-"committed" partial. `hazards_import.run` also returns `EXIT_DB` (2) with nothing written in two cases: no DATABASE_URL, and a database error before any commit. This note already listed both. | Verified against `run()`. Fixed: README Status step 4 and reviews/26's remaining-steps list now give both exit-2 cases. |
+| A1-02 | minor | reviews/26's decision note said step 1's two questions were answered (D2). Yet its "Not done / for the human" list still opened with "The two questions in operator step 1.", and operator step 1 was not marked. | Verified. Fixed: step 1 is marked ANSWERED 2026-11-09 (D2: keep the `AE_with_LOMR` token, no `flood_zones_blocked` change), and the stale bullet is struck through with a pointer to D2. No flood-rule change: the operator said "just review". |
+| A1-03 | minor | The exit-3 legend covered only "the run has its baseline". On `main` (tag None), `zoning_import.mirror_blocks` also refuses with 3 when the newest experiment row belongs to a run that was not halted. The fix for that case is `make halt`, not a new run. | Verified (`mirror_blocks`, the tag-None branch). Fixed: the legend gives both exit-3 causes and the matching action, in this note's step 4, README Status step 4 and reviews/26's step 4. |
+
+The reviewer's own note on `tests/live_hazards_check.py` is not a finding.
+Run without `client_encoding=UTF8`, the check failed on the SQL_ASCII
+cluster: this is the environmental encoding issue the writer documented.
+The check stays recorded as passing only with UTF8.
+
+Operator answers stand as recorded above (2026-11-09). D3: count unlisted
+districts and districts with unreadable setback values. D2: "just review",
+with no flood-rule change and no new root sub-score. Item 3: "fix". Item 4:
+"can you add this yourself", the delegation this change used.

@@ -49,9 +49,11 @@ populated import. Operator next steps, between runs, in order:
    with its `.dbf` and `.prj` (NAD83 or WGS84 geographic, or NAD83 Conus
    Albers; Web Mercator is refused).
 4. `make hazards-import`: exit 0 written; 4 a source failed (its old data
-   kept); 2 after "source(s) ... committed" partial (re-run); 3 the run
-   has its baseline (start a new run first); 1 refused (not merged, or no
-   table: step 2).
+   kept); 2 after "source(s) ... committed" partial (re-run), 2 without
+   that line: no DATABASE_URL or a database error, nothing written; 3
+   refused: the run has its baseline (start a new run first), or on
+   `main` the newest experiment row is from a run that was not halted
+   (`make halt` first); 1 refused (not merged, or no table: step 2).
 5. New run + baseline: the first populated import IS the metric change.
 6. Optional: resolve the old open "H4 flood unjoined" / "H6 wetlands
    unjoined" flags.

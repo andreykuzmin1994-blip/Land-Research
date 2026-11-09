@@ -245,7 +245,9 @@ After a populated import (the metric change):
 
 ## Operator steps (between runs only, in this order)
 
-1. Decide the two human questions first: the `AE_with_LOMR` reading
+1. **ANSWERED 2026-11-09 (D2, "Operator decisions (2026-11-09)" below):
+   keep the `AE_with_LOMR` token; no `flood_zones_blocked` change.**
+   Decide the two human questions first: the `AE_with_LOMR` reading
    (decision 3: keep the token, or remove it so AE always blocks), and the
    other SFHA zones (finding 7: keep, or extend `flood_zones_blocked`). Any
    parameters.json edit follows the prepare-mutation protocol.
@@ -277,7 +279,8 @@ After a populated import (the metric change):
 
 ## Not done / for the human
 
-- The two questions in operator step 1.
+- ~~The two questions in operator step 1.~~ Answered 2026-11-09 (D2,
+  below).
 - The real-data import (steps 4-5). Applying the proposal (step 2) was
   done 2026-11-09 under the operator's delegation (reviews/33_hazards_enabled).
   The real hazard counts listed under LIVE come from that import.
@@ -357,8 +360,11 @@ this order:
 
    Details: `reviews/33_hazards_enabled/02_code_writer_response.md`.
 4. `make hazards-import`. Exit codes: 0 written; 4 a source failed (its
-   data kept); 2 after "committed" partial (re-run); 3 the run has its
-   baseline (start a new run first); 1 refused (not merged, or no table).
+   data kept); 2 after "committed" partial (re-run), 2 without that line
+   no DATABASE_URL or a database error, nothing written; 3 refused: the
+   run has its baseline (start a new run first), or on `main` the newest
+   experiment row is from a run that was not halted (`make halt` first);
+   1 refused (not merged, or no table).
 5. A new run + baseline. The first populated import IS the metric change.
 6. Optional: resolve the old open "H4 flood unjoined" / "H6 wetlands
    unjoined" flags.
