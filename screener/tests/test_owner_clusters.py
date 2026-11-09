@@ -239,6 +239,10 @@ class AdjacencyTests(unittest.TestCase):
         for bad in (-1, "10", True, float("nan"), float("inf"), None):
             with self.subTest(value=bad), self.assertRaises(ValueError):
                 oc.gap_ft_setting({"owners": {"adjacency_gap_ft": bad}})
+        # owners = 10 at the top level (a key, not a table) is refused, not a crash.
+        for bad in (10, "x", [1]):
+            with self.subTest(table=bad), self.assertRaises(ValueError):
+                oc.gap_ft_setting({"owners": bad})
 
 
 class CostAndFailureTests(unittest.TestCase):
@@ -598,6 +602,14 @@ class RunTests(RunHarness):
 
     def test_bad_gap_setting_is_refused_before_any_fetch(self):
         path = self.settings_with(lambda t: t.replace("adjacency_gap_ft = 10", "adjacency_gap_ft = -5"))
+        with self.assertRaises(SystemExit) as cm:
+            self.run_with(path)
+        self.assertEqual(cm.exception.code, 2)
+        self.fetch_parcels.assert_not_called()
+
+    def test_owners_not_a_table_is_refused_before_any_fetch(self):
+        # A top-level "owners = 10" (a key, not the [owners] table).
+        path = self.settings_with(lambda t: "owners = 10\n" + t.split("\n[owners]\n", 1)[0] + "\n")
         with self.assertRaises(SystemExit) as cm:
             self.run_with(path)
         self.assertEqual(cm.exception.code, 2)

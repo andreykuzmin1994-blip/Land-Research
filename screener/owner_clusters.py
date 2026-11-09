@@ -110,7 +110,10 @@ def gap_ft_setting(cfg: dict[str, Any]) -> float:
     """[owners] adjacency_gap_ft, or the default when the table or key is
     absent (an older settings file). ValueError for anything not a finite
     number of feet >= 0."""
-    value = (cfg.get("owners") or {}).get("adjacency_gap_ft", DEFAULT_GAP_FT)
+    table = cfg.get("owners", {})
+    if not isinstance(table, dict):
+        raise ValueError(f"[owners] must be a table (got {table!r})")
+    value = table.get("adjacency_gap_ft", DEFAULT_GAP_FT)
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
             or value < 0:
         raise ValueError(f"[owners] adjacency_gap_ft must be a number of feet, 0 or more "
