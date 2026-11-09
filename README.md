@@ -27,10 +27,38 @@ Phases 1–10 of `BUILD_PHASES.md` are shipped. The autonomous experiment loop r
 - The review process is **tiered** (`STANDING_RISKS.md`): tests+CI for low-risk changes, one independent fresh-context reviewer for ordinary logic, the full three-agent workflow for metric/contract-touching work.
 
 2026-11-06: flood (H4) and wetlands (H6) are built (`hazards.py`,
-`make hazards-import`, `reviews/26_flood_wetlands/`) but **inert**: they
-need a new table that only a human adds to `prepare.py` (the proposal is
-`reviews/26_flood_wetlands/01_prepare_mutation_proposal.md`). Until then H4/H6
-stay data_gap passes and every score is unchanged. See "Flood and wetlands".
+`make hazards-import`, `reviews/26_flood_wetlands/`).
+**2026-11-09: the `parcel_hazards` table is enabled** (operator-authorized
+prepare-mutation, `reviews/33_hazards_enabled/`), but it is empty: H4/H6
+stay data_gap passes and every score is unchanged until the first
+populated import. Operator next steps, between runs, in order:
+
+1. Merge to `main` (halt any active loop first: `make halt`).
+2. `make db-check` on the REAL database, BEFORE any `make verify`,
+   `make baseline` or `make daily`. It creates the empty table. Skipped,
+   every experiment (the baseline included) ends `crash` with
+   `HazardAuditFailed: hazard audit: parcel_hazards unreadable (...)`.
+3. Browser downloads into the gitignored `hazards_inbox/` (both hosts'
+   robots.txt deny automated queries), unpacked FLAT (no subfolders):
+   FEMA NFHL Fulton county package `13121C` (msc.fema.gov) ->
+   `hazards_inbox/nfhl/S_FLD_HAZ_AR.shp` (exact name, lowercase `.shp`),
+   `.dbf`, `.prj` (required) plus
+   `S_LOMR.shp`, `.dbf`, `.prj` if present; USFWS NWI Georgia shapefile
+   (fws.gov Wetlands Mapper, state download) -> `hazards_inbox/nwi/`,
+   exactly one `.shp` or one `*_Wetlands.shp` (e.g. `GA_Wetlands.shp`)
+   with its `.dbf` and `.prj` (NAD83 or WGS84 geographic, or NAD83 Conus
+   Albers; Web Mercator is refused).
+4. `make hazards-import`: exit 0 written; 4 a source failed (its old data
+   kept); 2 after "source(s) ... committed" partial (re-run), 2 without
+   that line: no DATABASE_URL or a database error, nothing written; 3
+   refused: the run has its baseline (start a new run first), or on
+   `main` the newest experiment row is from a run that was not halted
+   (`make halt` first); 1 refused (not merged, or no table: step 2).
+5. New run + baseline: the first populated import IS the metric change.
+6. Optional: resolve the old open "H4 flood unjoined" / "H6 wetlands
+   unjoined" flags.
+
+See "Flood and wetlands".
 
 2026-11-06: site-fit adjacency buffers (residential, other-district, ROW) are
 built (`adjacency.py`, `make adjacency-import`, `reviews/27_site_fit_buffers/`)
@@ -144,7 +172,10 @@ make zoning-import          # off a run branch, add ARGS=--no-open-run-check onl
 
 What it does: finds each parcel's city from its TaxDist on the Fulton
 parcel layer, fetches each zoning source's features around the parcels
-(1 request/second per host, no cache), and assigns a district by parcel id
+(through the shared fetcher of rules_scrape, adjacency_import and
+hazards_import: robots.txt honoured with the D1 ArcGIS exception, whose
+`robots:` line prints once per host; 1 request/second per host; redirects
+only to https on the same site; no cookies, no cache), and assigns a district by parcel id
 (join) or largest polygon overlap in PostGIS (overlay). It updates only
 those two columns, in one transaction; a parcel without a match keeps its
 value; a source that fails or comes back truncated is skipped whole.
@@ -225,8 +256,16 @@ the district's rules list is named), height (the clear height is stated,
 with the district maximum when the rules have one), stormwater detention
 (SiteFit's default pond is 400 x 200 ft, about 1.8 ac, and is not
 placed), car parking, truck drives, flood (H4) and wetlands (H6). A
-setback that is the 25 ft default is never a BTS input, even in a verified
-jurisdiction ("verified jurisdiction, default setback": BTS N/A). Very
+setback that is the 25 ft default is a BTS input only in a verified
+jurisdiction and only for a resolved district: one listed without any
+setback (reviews/29_operator_decisions, D3), one not listed in its table, or
+one listed with unreadable setbacks (reviews/30_d3_count_unlisted). Each
+counts with the default, never blocks and carries an "investigate further"
+`data_gap` flag naming the case. No district rule at all (no stored zoning,
+jurisdiction not in the rules) and rules unavailable stay BTS N/A. A
+district setback with some unreadable front/side/rear values keeps the max
+of the readable ones (BTS unchanged) and carries its own "investigate
+further" flag. Very
 complex buffered outlines are simplified in PostGIS inside a slightly
 deeper buffer (stated on the projection); beyond 600 vertices the
 projection is an error rather than a slow search.
@@ -294,10 +333,16 @@ then deducts the SFHA (floodway included) and NWI wetland area from the
 buildable area; the 0.2% zone, fill and stream/state-waters buffers are
 not considered (stated on every projection).
 
-Nothing of this is active until a human:
+The `parcel_hazards` table is enabled in `prepare.py` since 2026-11-09
+(operator-authorized prepare-mutation, `reviews/33_hazards_enabled/`). While
+it is empty nothing is scored differently: H4/H6 are data_gap passes
+("no hazards import for this parcel"), discovery no longer writes the old
+"unjoined" stub flags, and projections and the memo say flood/wetlands
+were not deducted. To make it active, between runs (full steps in Status
+above):
 
-1. applies `reviews/26_flood_wetlands/01_prepare_mutation_proposal.md` to
-   `prepare.py` between runs (`make db-check`, which runs `python prepare.py`, then creates `parcel_hazards`);
+1. `make db-check` (runs `python prepare.py`) on the real database, before
+   any verify, baseline or daily run, so the table exists;
 2. downloads, in a browser, the FEMA NFHL county package for Fulton
    (13121C, Map Service Center) and the USFWS NWI Georgia shapefile, and
    unpacks them as `hazards_inbox/nfhl/S_FLD_HAZ_AR.*` (+ `S_LOMR.*`) and
@@ -468,7 +513,7 @@ land-site-selector/
 ├── zoning_import.py                   — IMMUTABLE during run: writes parcels.zoning (operator, between runs)
 ├── site_fit.py                        — IMMUTABLE during run: loads + freezes building_prototypes.json, projects buildings
 ├── rules_scrape.py                    — IMMUTABLE during run: zoning-code scraper, writes a CANDIDATE only (operator, between runs)
-├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (inert until the parcel_hazards proposal is applied)
+├── hazards.py                         — IMMUTABLE during run: FEMA NFHL / USFWS NWI facts and the H4/H6 decision (table enabled 2026-11-09; inert until the first populated import)
 ├── hazards_import.py                  — IMMUTABLE during run: writes parcel_hazards from hazards_inbox/ files (operator, between runs)
 ├── hazards_inbox/                     — gitignored: NFHL county package + NWI state shapefile the operator downloads by hand
 ├── adjacency.py                       — IMMUTABLE during run: neighbour adjacency facts, buffer-key allow-list, per-side buffer plan (inert until the parcel_adjacency proposal is applied)

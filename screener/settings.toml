@@ -36,3 +36,10 @@ exclude_listed = true           # parcels you mark "listed" in inputs/decisions.
 # Optional screens (off by default; these otherwise only lower the score):
 max_exit_miles = 0              # drop parcels farther than this from an interstate exit (0 = off)
 exclude_hard_entitlement = false  # drop parcels zoned AND planned residential / conservation
+
+[owners]
+# Same-owner groups (flags only; not a score or a screen). Parcels with the
+# exact same tax-roll owner name and mailing address count as one group, and
+# group members this close on the county parcel map count as adjacent. The
+# default bridges digitizing slivers, not a road right-of-way (40-80 ft).
+adjacency_gap_ft = 10

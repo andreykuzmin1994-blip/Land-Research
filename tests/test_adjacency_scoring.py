@@ -24,7 +24,7 @@ import site_fit
 import adjacency_golden_case as golden
 import site_fit_golden_case as sg
 from adjacency_helpers import MAX, enabled, with_classes
-from hazards_helpers import enabled as hz_enabled
+from hazards_helpers import disabled as hz_disabled, enabled as hz_enabled, with_prepare_mutation
 from zoning_helpers import REPO_ROOT, patch_rules, stored, verified
 
 BASE = "595aa08"
@@ -32,13 +32,20 @@ RECORD = REPO_ROOT / "reviews" / "27_site_fit_buffers" / "golden_head_595aa08.js
 RESEARCH_SRC = (REPO_ROOT / "research.py").read_text(encoding="utf-8")
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled),
+# and these fakes/records predate the hazard read, so they run with it OFF.
+@hz_disabled()
 class DifferentialTests(unittest.TestCase):
     """BUF-03: gate off == 595aa08; gate on + empty table changes only the
     adjacency texts and adds one read (tests/adjacency_golden_check.py)."""
 
     @classmethod
     def setUpClass(cls):
-        cls.want = json.loads(RECORD.read_text(encoding="utf-8"))
+        cls.raw = json.loads(RECORD.read_text(encoding="utf-8"))
+        # reviews/30_d3_count_unlisted (D3U-12): the record + the explicit
+        # expected diff, never a regenerated record.
+        cls.want = golden.expected_after_d3u(cls.raw)
 
     def current(self):
         return json.loads(json.dumps(golden.run_case(research, site_fit, reporting),
@@ -55,6 +62,26 @@ class DifferentialTests(unittest.TestCase):
         reads = [e for e in got["verified"]["executed"]
                  if e[0] == adjacency._SQL_ADJACENCY_FOR_PARCELS]
         self.assertEqual(len(reads), 1)       # one batched read, = ANY(%s)
+
+    def test_d3u_expected_diff_is_exactly_the_change(self):
+        # reviews/30_d3_count_unlisted: against the raw record only the two
+        # listed sections differ, on exactly the listed parcels and fields.
+        got = self.current()
+        self.assertEqual(golden.differences_off(self.raw, got),
+                         ["verified.memo", "verified.projections"])
+        changed = set()
+        for sec in ("projections", "memo"):
+            for pid, a in self.raw["verified"][sec].items():
+                for k, v in a.items():
+                    if got["verified"][sec][pid][k] != v:
+                        changed.add(("verified", sec, pid, k))
+        self.assertEqual(changed, {e[:4] for e in golden.D3U_EXPECTED_DIFF})
+        self.assertEqual(len(golden.D3U_EXPECTED_DIFF), 6)
+        self.assertEqual(self.raw["draft"], got["draft"])
+        self.assertEqual(self.raw["verified"]["scoring"], got["verified"]["scoring"])
+        # The edit refuses a record that is not the expected base.
+        with self.assertRaises(AssertionError):
+            golden.expected_after_d3u(self.want)
 
     def test_record_is_the_base(self):
         try:
@@ -139,6 +166,10 @@ def project(conn, ids=("a", "b"), rules=CLASSES):
         return site_fit.project_parcels(conn, list(ids))
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled),
+# and these fakes/records predate the hazard read, so they run with it OFF.
+@hz_disabled()
 class SiteFitTests(unittest.TestCase):
     """BUF-11: statement choice, named parameters, fallbacks, texts."""
 
@@ -284,6 +315,7 @@ class ComposedSqlTests(unittest.TestCase):
 class ReportingTests(unittest.TestCase):
     """BUF-24: both footnote variants, the highlight clause."""
 
+    @hz_disabled()  # hazards OFF here; its footnote is asserted under hz_enabled
     def test_footnote_variants(self):
         self.assertEqual(reporting._projection_footnote(), reporting._PROJECTION_FOOTNOTE)
         with hz_enabled():
@@ -373,6 +405,10 @@ def run_evaluate(conn):
         return runner.evaluate("atlanta", run_tag="t1", experiment_id="exp-1")
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled),
+# and these fakes/records predate the hazard read, so they run with it OFF.
+@hz_disabled()
 class RunnerAuditTests(unittest.TestCase):
     """BUF-12: a parcel_adjacency change during an experiment crashes it."""
 
@@ -511,6 +547,12 @@ class ProtectionTests(unittest.TestCase):
                                       capture_output=True, check=True).stdout
             except (subprocess.CalledProcessError, OSError):
                 self.skipTest("git history unavailable")
+            if name == "prepare.py":
+                # Re-pinned on the operator decision of 2026-11-09
+                # (reviews/33_hazards_enabled): the base plus exactly the
+                # delegated hazards prepare-mutation, nothing else. Every
+                # other file stays on the base bytes.
+                base = with_prepare_mutation(base)
             self.assertEqual((REPO_ROOT / name).read_bytes(), base, name)
 
     def test_no_pipeline_module_writes_human_owned_files(self):

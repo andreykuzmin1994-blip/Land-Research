@@ -22,7 +22,8 @@ import prepare
 import rules_scrape
 import zoning_import
 from hazards_helpers import (NFHL_DBF_FIELDS, NWI_DBF_FIELDS, PRJ_ALBERS, PRJ_MERCATOR,
-                             PRJ_NAD83, PRJ_WGS84, ccw, cw, enabled, write_shapefile)
+                             PRJ_NAD83, PRJ_WGS84, ccw, cw, disabled, enabled,
+                             write_shapefile)
 from zoning_helpers import REPO_ROOT
 
 FEMA_ROBOTS = ("User-agent: *\nDisallow: /*?*\nDisallow: /arcgis\n"
@@ -490,10 +491,28 @@ class RunGuardTests(unittest.TestCase):
 
     def test_gate_off_refuses(self):
         conn = FakeConn(answer_factory())
-        rc, out = run_tool(conn, mode="files", check_open_run=False)
+        with disabled():
+            rc, out = run_tool(conn, mode="files", check_open_run=False)
         self.assertEqual(rc, hi.EXIT_REFUSED)
         self.assertIn("01_prepare_mutation_proposal.md", out)
         self.assertEqual(conn.executed, [])
+
+    def test_shipped_gate_no_longer_refuses(self):
+        # The operator-authorized prepare-mutation of 2026-11-09
+        # (reviews/33_hazards_enabled): no enabled() patch, and the tool goes
+        # past the gate to the run guard (exit 3 here, never exit 1).
+        self.assertTrue(hazards.enabled())
+        f, http, _ = fetcher(lambda u: text(404, ""))
+        with tempfile.TemporaryDirectory() as d:
+            log = Path(d) / "experiment_log.tsv"
+            log.write_text("commit\tmetric\tconfidence\tapi_calls\twall_clock_min\tstatus\t"
+                           "description\nabc\t1\t0.5\t1\t1\tbaseline\trun=t1 baseline\n")
+            conn = FakeConn(answer_factory())
+            with mock.patch.object(prepare, "current_run_tag", return_value="t1"):
+                rc, out = run_tool(conn, mode="rest", fetcher=f, log_path=log)
+        self.assertEqual(rc, hi.EXIT_RUN_OPEN)
+        self.assertNotIn("01_prepare_mutation_proposal.md", out)
+        self.assertEqual(http.calls, [])
 
     def test_tsv_baseline_exit_3_no_requests(self):
         f, http, _ = fetcher(lambda u: text(404, ""))

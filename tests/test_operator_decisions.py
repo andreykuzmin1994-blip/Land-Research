@@ -34,7 +34,9 @@ import research
 import rules_scrape as rs
 import site_fit
 import zoning
+import zoning_import as zi
 import site_fit_golden_case as golden
+from hazards_helpers import disabled as hazards_disabled
 from zoning_helpers import REPO_ROOT, patch_rules, verified
 
 SVC = "services3.arcgis.com"
@@ -42,6 +44,16 @@ LAYER = f"https://{SVC}/y2BJK2GUfoTwH7py/arcgis/rest/services/Zoning/FeatureServ
 META = LAYER + "?f=json"
 QUERY = LAYER + "/query?" + urlencode({"where": "1=1", "returnIdsOnly": "true", "f": "json"})
 EXC = "robots unavailable (403): ArcGIS public REST accepted by operator 2026-11-09"
+# reviews/30_d3_count_unlisted: the new kinds' texts and the one resolution.
+UNLISTED = ("investigate further: district not listed in zoning_rules.json; "
+            "25 ft default setback used")
+UNREADABLE = ("investigate further: district setbacks unreadable in zoning_rules.json; "
+              "25 ft default setback used")
+RESOLUTION = ("check the district and its setbacks in the code by hand; a human adds the "
+              "district or its setback values to the rules file between runs "
+              "(reviews/29_operator_decisions, reviews/30_d3_count_unlisted)")
+PARTIAL = ("investigate further: some district setbacks unreadable in zoning_rules.json; "
+           "max of the readable setbacks used")
 INVESTIGATE = ("investigate further: no district setbacks in zoning_rules.json; "
                "25 ft default used")
 FEMA_ROBOTS = ("User-agent: *\nDisallow: /*?*\nDisallow: /arcgis\nDisallow: /nri/report/viewer\n"
@@ -102,7 +114,7 @@ class Http:
         return r
 
 
-FETCHERS = (rs.PoliteFetcher, ai.AdjacencyFetcher, hi.HazardsFetcher)
+FETCHERS = (rs.PoliteFetcher, ai.AdjacencyFetcher, hi.HazardsFetcher, zi.ZoningSession)
 
 
 def make(cls, routes):
@@ -144,7 +156,10 @@ class SharedVerdictTests(unittest.TestCase):
             self.assertNotIn("exception", f.robots_meta["gis.county.example"])
 
     def test_tools_define_no_verdict_of_their_own(self):
-        for mod in ("adjacency_import.py", "hazards_import.py"):
+        # zoning_import (reviews/32, D1-11): no _check of its own either, so
+        # it calls robots_verdict zero times; the inherited _check calls it.
+        for mod, n_calls in (("adjacency_import.py", 1), ("hazards_import.py", 1),
+                             ("zoning_import.py", 0)):
             tree = ast.parse((REPO_ROOT / mod).read_text(encoding="utf-8"))
             defs = [n.name for n in ast.walk(tree)
                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
@@ -155,11 +170,14 @@ class SharedVerdictTests(unittest.TestCase):
             self.assertNotIn("robots_verdict", names, mod)
             calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                      and isinstance(n.func, ast.Attribute) and n.func.attr == "robots_verdict"]
-            self.assertEqual(len(calls), 1, mod)
-            self.assertEqual(calls[0].func.value.id, "rules_scrape", mod)
+            self.assertEqual(len(calls), n_calls, mod)
+            self.assertTrue(all(c.func.value.id == "rules_scrape" for c in calls), mod)
             self.assertNotIn("arcgis_exception", (REPO_ROOT / mod).read_text(), mod)
         self.assertIs(ai.AdjacencyFetcher.robots_for, rs.PoliteFetcher.robots_for)
         self.assertIs(hi.HazardsFetcher.robots_for, rs.PoliteFetcher.robots_for)
+        self.assertIs(zi.ZoningSession.robots_for, rs.PoliteFetcher.robots_for)
+        self.assertIs(zi.ZoningSession._check, rs.PoliteFetcher._check)
+        self.assertEqual(zi.ZoningSession.robots_token, zi.UA_TOKEN)
         self.assertEqual(ai.AdjacencyFetcher.robots_token, ai.UA_TOKEN)
         self.assertEqual(hi.HazardsFetcher.robots_token, hi.UA_TOKEN)
 
@@ -448,6 +466,16 @@ class SpacingTests(unittest.TestCase):
         self.assertEqual(len(http.calls), 6)
         self.assertTrue(all(g >= 1.0 for g in gaps), gaps)
 
+    def test_zoning_session_shares_the_arcgis_key(self):
+        # reviews/32, ZI-11: services3 then services8 through get_json.
+        l8 = "https://services8.arcgis.com/Zv/arcgis/rest/services/Z/FeatureServer/0"
+        f, http, c = make(zi.ZoningSession, {**robots_403(), **robots_403("services8.arcgis.com")})
+        for u in (LAYER, l8, LAYER, l8):
+            f.get_json(u, {"f": "pjson"})
+        gaps = [b - a for a, b in zip(http.at, http.at[1:])]
+        self.assertEqual(len(http.calls), 6)
+        self.assertTrue(all(g >= 1.0 for g in gaps), gaps)
+
     def test_other_hosts_keep_their_own_key(self):
         f, http, c = make(rs.PoliteFetcher, {})
         for h in ("a.example", "b.example"):
@@ -557,6 +585,47 @@ class OutputTests(unittest.TestCase):
         self.assertNotIn(tai.SECRET_PID, out)
         self.assertEqual(rc, ai.EXIT_OK)
 
+    def test_zoning_import_names_the_exception_once_per_host(self):
+        # reviews/32 (D1-11): zoning_import on the shared fetcher prints the
+        # D1 line once per host read under it, without URL or query; a
+        # readable FEMA-style disallow and a non-ArcGIS 403 refuse with no
+        # data request.
+        import test_zoning_import as tzi
+        svc8 = "services8.arcgis.com"
+        entries = tzi._entries()
+        entries[2]["url"] = f"https://{SVC}/Org1/arcgis/rest/services/FB_Zoning/FeatureServer/0"
+        entries.insert(3, dict(entries[2], key="fb2", name="Fairburn 2",
+                               url=f"https://{svc8}/Org8/arcgis/rest/services/FB/FeatureServer/0"))
+        r403 = tzi._Resp(b"Invalid URL", 403, {"Content-Type": "text/plain"})
+        conn = tzi.StoreConn(tzi._parcels(), overlay=tzi._sf_overlay())
+        code, out, http = tzi._run(conn, tzi.World(), sources=tzi._sources(entries),
+                                   robots={SVC: r403, svc8: r403})
+        self.assertEqual(code, 0, out)
+        for h in (SVC, svc8):
+            self.assertEqual(out.count(f"robots: {h}: {EXC}"), 1, out)
+        rob = [l for l in out.splitlines() if l.startswith("robots:")]
+        self.assertEqual(len(rob), 2)
+        self.assertNotIn("?", "".join(rob))
+        lines = out.splitlines()
+        self.assertLess(max(lines.index(l) for l in rob),
+                        [i for i, l in enumerate(lines) if l.startswith("requests: ")][0])
+        self.assertGreater(min(lines.index(l) for l in rob),
+                           [i for i, l in enumerate(lines) if l.startswith("written: ")][0])
+        self.assertEqual(conn.committed["fulton-P3"][0], "M-2")
+        for host, robots, reason in (
+                (SVC, tzi._Resp(FEMA_ROBOTS.encode(), 200, {"Content-Type": "text/plain"}),
+                 "robots.txt disallows this path for Land-Research-ZoningImport"),
+                ("gis.county.example", r403, "robots unavailable (HTTP 403)")):
+            ents = tzi._entries()
+            ents[2]["url"] = f"https://{host}/arcgis/rest/services/FB/FeatureServer/0"
+            conn = tzi.StoreConn(tzi._parcels(), overlay=tzi._sf_overlay())
+            code, out, http = tzi._run(conn, tzi.World(), sources=tzi._sources(ents),
+                                       robots={host: robots})
+            self.assertEqual(code, 4, out)
+            self.assertIn(f"source fb: FAILED, nothing used: {host}: {reason}", out)
+            self.assertFalse([c for c in http.calls if host in c[0]], host)
+            self.assertNotIn("robots: ", out)
+
     def test_hazards_import_names_the_exception(self):
         import test_hazards_import as thi
         from hazards_helpers import enabled
@@ -576,10 +645,12 @@ class OutputTests(unittest.TestCase):
 # D2 / D4 pins (no code change)
 # ---------------------------------------------------------------------------
 class PinTests(unittest.TestCase):
-    # Round 2 F6: zoning_import stays outside the shared robots policy (its
-    # own ZoningSession, D1-11 open item). Pin what makes that acceptable under
-    # D1: every layer it can be pointed at is an ArcGIS REST layer, on an
-    # ArcGIS Online services host or one of the two registered org hosts.
+    # Round 2 F6 pinned zoning_import's hosts while it stayed outside the
+    # shared robots policy. D1-11 is closed (reviews/32_zoning_import_fetcher):
+    # ZoningSession is a PoliteFetcher in FETCHERS above. The pin is kept:
+    # every layer it can be pointed at is an ArcGIS REST layer, on an ArcGIS
+    # Online services host or one of the two registered org hosts, so the D1
+    # path guard admits each request it makes.
     ZONING_ORG_HOSTS = frozenset({"gismaps.fultoncountyga.gov", "gis.atlantaga.gov"})
 
     def test_zoning_import_hosts_are_arcgis_rest_only(self):
@@ -670,9 +741,15 @@ def _flags(rec, pid=None):
             and (pid is None or p[1] == pid)]
 
 
+# hazards is not the subject here: the gate is ON in the shipped repo since the
+# operator-authorized prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled);
+# these fakes/records predate the hazard read, so they run with it OFF.
 class D3ScoringTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        hz = hazards_disabled()     # for setUpClass AND every test (R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
         with d3_fixture():
             site_fit._FIT_CACHE.clear()
             cls.draft = _canon(golden.run_case(research))
@@ -698,16 +775,44 @@ class D3ScoringTests(unittest.TestCase):
         cyc = {x["parcel_id"]: x["strategy_fit"] for x in self.ver["cycle"]["summary"]["parcels"]}
         self.assertEqual(cyc["fulton-D01"]["bts"], self.bts(self.ver, "fulton-D01"))
 
-    def test_unlisted_district_stays_na(self):
-        # D3-01: R-1 is unlisted in Fairburn; with unlisted_districts
-        # 'not_permitted' it reaches the projection, and stays BTS N/A.
+    def test_unlisted_district_counts_with_its_flag(self):
+        # Was test_unlisted_district_stays_na. Deliberately inverted by the
+        # operator's answer to D3-01 (2026-11-09, "count them";
+        # reviews/30_d3_count_unlisted): R-1 is unlisted in Fairburn; with
+        # unlisted_districts 'not_permitted' it reaches the projection and now
+        # counts with the default, flagged once on both paths, never a block.
         p = self.proj["fulton-D02"]
         self.assertEqual(site_fit.max_building_sf(p), 520_000)
-        self.assertFalse(site_fit.meets_bts_footprint(p))
-        self.assertIsNone(site_fit.bts_review_text(p))
-        self.assertEqual(self.bts(self.ver, "fulton-D02"), "N/A")
-        self.assertFalse([f for f in _flags(self.ver["per_parcel"]["fulton-D02"])
-                          if INVESTIGATE in f[3]])
+        self.assertTrue(site_fit.meets_bts_footprint(p))
+        self.assertEqual(site_fit.bts_review_text(p), UNLISTED)
+        self.assertNotEqual(self.bts(self.ver, "fulton-D02"), "N/A")
+        cyc = {x["parcel_id"]: x["strategy_fit"] for x in self.ver["cycle"]["summary"]["parcels"]}
+        self.assertEqual(cyc["fulton-D02"]["bts"], self.bts(self.ver, "fulton-D02"))
+        for rec in (self.ver["per_parcel"]["fulton-D02"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D02") if "investigate" in f[3]]
+            self.assertEqual(len(mine), 1)
+            self.assertEqual(mine[0][0], "data_gap")
+            self.assertTrue(mine[0][3].endswith("; " + UNLISTED))
+            self.assertEqual(mine[0][4], RESOLUTION)
+            self.assertFalse([f for f in _flags(rec) if f[0] == "actionability_block"])
+        notes = self.ver["per_parcel"]["fulton-D02"]["research_log_notes"]
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0].count(UNLISTED), 1)
+        self.assertNotIn(INVESTIGATE, notes[0])
+        # The cycle also scores the golden fixture's own unlisted Fairburn
+        # parcel (fulton-Z05, R-2, now past the S9 gate with not_permitted):
+        # one note per flagged parcel.
+        cyc = self.ver["cycle"]
+        self.assertEqual(len([n for n in cyc["research_log_notes"] if UNLISTED in n]),
+                         len([f for f in _flags(cyc) if UNLISTED in f[3]]))
+        self.assertEqual({f[1] for f in _flags(cyc) if UNLISTED in f[3]},
+                         {"fulton-D02", "fulton-Z05"})
+
+    def test_resolution_text_covers_every_kind(self):
+        # D3U-09: one resolution (not part of the dedup key) for all kinds.
+        for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D01") if INVESTIGATE in f[3]]
+            self.assertEqual(mine[0][4], RESOLUTION)
 
     def test_flag_once_data_gap_never_a_block_on_both_paths(self):
         for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
@@ -725,6 +830,10 @@ class D3ScoringTests(unittest.TestCase):
     def test_not_rewritten_while_open(self):
         for rec in (self.again["per_parcel"]["fulton-D01"], self.again["cycle"]):
             self.assertFalse([f for f in _flags(rec, "fulton-D01") if INVESTIGATE in f[3]])
+        # D3U-05: the open PD flag dedups on the unchanged text; the other
+        # parcel's own (unlisted) flag is a different key and is written.
+        for rec in (self.again["per_parcel"]["fulton-D02"], self.again["cycle"]):
+            self.assertEqual(len([f for f in _flags(rec, "fulton-D02") if UNLISTED in f[3]]), 1)
         self.assertEqual(self.bts(self.again, "fulton-D01"), self.bts(self.ver, "fulton-D01"))
 
     def test_draft_is_unchanged(self):
@@ -740,11 +849,22 @@ class D3ScoringTests(unittest.TestCase):
         want = f"yes (default setback; {INVESTIGATE})"
         self.assertEqual(reporting._bts_use_text(p, True), want)
         self.assertIn(f"used for BTS: {want};", reporting._projection_summary(p, True))
+        # reviews/30_d3_count_unlisted (deliberately inverted): the unlisted
+        # district is used with its own text.
         u = self.proj["fulton-D02"]
-        self.assertEqual(reporting._bts_use_text(u, True),
+        self.assertEqual(reporting._bts_use_text(u, True), f"yes (default setback; {UNLISTED})")
+        self.assertIn(f"used for BTS: yes (default setback; {UNLISTED});",
+                      reporting._projection_summary(u, True))
+        # D3U-13: the "rated N/A" branch stays as the fail-closed fallback for
+        # a used projection without a kind (no district rule).
+        conn = golden.zg.AnswerConn(golden.responder(research))
+        with mock.patch.object(zoning, "district_for_stored", return_value=None):
+            site_fit._FIT_CACHE.clear()
+            n = site_fit.project_parcels(conn, ["fulton-D02"])["fulton-D02"]
+        self.assertEqual(reporting._bts_use_text(n, True),
                          "yes, rated N/A (default setback is not a verified rule)")
         self.assertIn("used for BTS: yes, rated N/A (default setback);",
-                      reporting._projection_summary(u, True))
+                      reporting._projection_summary(n, True))
         with d3_fixture():
             conn = golden.zg.AnswerConn(golden.responder(research))
             site_fit._FIT_CACHE.clear()
@@ -752,6 +872,128 @@ class D3ScoringTests(unittest.TestCase):
         self.assertEqual(reporting._bts_use_text(d, False), "no (draft rules)")
         self.assertNotIn("investigate", reporting._projection_summary(d, False))
         self.assertNotIn("investigate", " ".join(d.constraints))
+
+
+def _pd_unreadable(data):
+    _unlisted_not_permitted(data)
+    data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"][
+        "front_setback_ft"] = {"value": "see table", "cite": "x"}
+
+
+class D3UUnreadableScoringTests(unittest.TestCase):
+    """reviews/30_d3_count_unlisted (operator answer to D3-02): a listed
+    district whose setbacks are all unreadable counts with the default and its
+    own flag, on both scoring paths; draft inert."""
+
+    @classmethod
+    def setUpClass(cls):
+        hz = hazards_disabled()     # hazards is not the subject here (reviews/33_hazards_enabled, R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
+        with d3_fixture():
+            with patch_rules(verified("fairburn", mutate=_pd_unreadable)):
+                site_fit._FIT_CACHE.clear()
+                cls.ver = _canon(golden.run_case(research))
+            with patch_rules(verified(mutate=_pd_unreadable)):     # every jurisdiction draft
+                site_fit._FIT_CACHE.clear()
+                cls.draft = _canon(golden.run_case(research))
+
+    def test_flag_once_data_gap_on_both_paths(self):
+        for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D01") if "investigate" in f[3]]
+            self.assertEqual(len(mine), 1)
+            self.assertEqual(mine[0][0], "data_gap")
+            self.assertTrue(mine[0][3].endswith("; " + UNREADABLE))
+            self.assertEqual(mine[0][4], RESOLUTION)
+            self.assertFalse([f for f in _flags(rec) if f[0] == "actionability_block"])
+        self.assertNotEqual(
+            self.ver["per_parcel"]["fulton-D01"]["result"]["strategy_fit"]["bts"], "N/A")
+        notes = self.ver["per_parcel"]["fulton-D01"]["research_log_notes"]
+        self.assertEqual(notes[0].count(UNREADABLE), 1)
+        self.assertNotIn(INVESTIGATE, notes[0])
+
+    def test_draft_is_inert(self):
+        for pid in D3_PARCELS:
+            rec = self.draft["per_parcel"][pid]
+            self.assertFalse([f for f in _flags(rec) if "investigate" in f[3]], pid)
+            self.assertFalse([n for n in rec["research_log_notes"] if "investigate" in n], pid)
+        self.assertFalse([n for n in self.draft["cycle"]["research_log_notes"]
+                          if "investigate" in n])
+
+
+def _pd_partial(data):
+    _unlisted_not_permitted(data)
+    dims = data["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"]
+    dims["front_setback_ft"] = 40
+    dims["side_setback_ft"] = {"value": "see table", "cite": "x"}
+
+
+class Review1PartialUnreadableScoringTests(unittest.TestCase):
+    """reviews/30_d3_count_unlisted, post-change adversarial review round 1
+    (finding 1): a verified district with SOME unreadable setback values keeps
+    its from-the-rules setback and BTS exactly, and now carries one
+    investigate data_gap flag on both scoring paths; draft inert."""
+
+    @classmethod
+    def setUpClass(cls):
+        hz = hazards_disabled()     # hazards is not the subject here (reviews/33_hazards_enabled, R-02)
+        hz.start()
+        cls.addClassCleanup(hz.stop)
+        with d3_fixture():
+            with patch_rules(verified("fairburn", mutate=_pd_partial)):
+                site_fit._FIT_CACHE.clear()
+                cls.ver = _canon(golden.run_case(research))
+                conn = golden.zg.AnswerConn(golden.responder(research))
+                site_fit._FIT_CACHE.clear()
+                cls.proj = site_fit.project_parcels(conn, ["fulton-D01"])["fulton-D01"]
+            with patch_rules(verified("fairburn", mutate=lambda d: (
+                    _unlisted_not_permitted(d),
+                    d["jurisdictions"]["fairburn"]["districts"]["PD"]["dimensions"].update(
+                        front_setback_ft=40)))):
+                site_fit._FIT_CACHE.clear()
+                cls.readable = _canon(golden.run_case(research))
+            with patch_rules(verified(mutate=_pd_partial)):        # every jurisdiction draft
+                site_fit._FIT_CACHE.clear()
+                cls.draft = _canon(golden.run_case(research))
+
+    def test_flag_once_data_gap_on_both_paths(self):
+        for rec in (self.ver["per_parcel"]["fulton-D01"], self.ver["cycle"]):
+            mine = [f for f in _flags(rec, "fulton-D01") if "investigate" in f[3]]
+            self.assertEqual(len(mine), 1)
+            self.assertEqual(mine[0][0], "data_gap")
+            self.assertTrue(mine[0][3].endswith("; " + PARTIAL))
+            self.assertEqual(mine[0][4], RESOLUTION)
+            self.assertFalse([f for f in _flags(rec) if f[0] == "actionability_block"])
+        notes = self.ver["per_parcel"]["fulton-D01"]["research_log_notes"]
+        self.assertEqual(notes[0].count(PARTIAL), 1)
+        for t in (INVESTIGATE, UNLISTED, UNREADABLE):
+            self.assertNotIn(t, notes[0])
+
+    def test_bts_and_scores_unchanged_against_the_fully_readable_district(self):
+        # Same setback (40 ft from the rules) with and without the unreadable
+        # side value: the strategy result is identical; only the flag differs.
+        for path in ("per_parcel", "cycle"):
+            got = self.ver[path] if path == "cycle" else self.ver[path]["fulton-D01"]
+            ref = self.readable[path] if path == "cycle" else self.readable[path]["fulton-D01"]
+            if "result" in got:
+                self.assertEqual(got["result"]["strategy_fit"], ref["result"]["strategy_fit"])
+        self.assertNotEqual(
+            self.ver["per_parcel"]["fulton-D01"]["result"]["strategy_fit"]["bts"], "N/A")
+        for rec in (self.readable["per_parcel"]["fulton-D01"], self.readable["cycle"]):
+            self.assertFalse([f for f in _flags(rec, "fulton-D01") if "investigate" in f[3]])
+
+    def test_memo_lines(self):
+        p = self.proj
+        self.assertEqual(reporting._bts_use_text(p, True), f"yes (verified rules; {PARTIAL})")
+        self.assertIn(f"used for BTS: yes ({PARTIAL});", reporting._projection_summary(p, True))
+        self.assertNotIn("default setback", reporting._bts_use_text(p, True))
+
+    def test_draft_is_inert(self):
+        rec = self.draft["per_parcel"]["fulton-D01"]
+        self.assertFalse([f for f in _flags(rec) if "investigate" in f[3]])
+        self.assertFalse([n for n in rec["research_log_notes"] if "investigate" in n])
+        self.assertFalse([n for n in self.draft["cycle"]["research_log_notes"]
+                          if "investigate" in n])
 
 
 if __name__ == "__main__":

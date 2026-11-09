@@ -3,6 +3,13 @@
 - ``enabled()``: the hazard table gate ON (as if prepare.py carried the
   proposed DDL constant: ``hazards._SOURCE_DDL`` and the prepare attribute
   are patched) for the duration of a ``with`` block. Nothing on disk changes.
+- ``disabled()``: the hazard table gate OFF (``hazards._SOURCE_DDL`` patched
+  to None) for the duration of a ``with`` block or as a class/method
+  decorator. The SHIPPED state is ON since the operator-authorized
+  prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled); use this only
+  where hazards is NOT the subject of the test (a fake that predates the
+  hazard read, a golden record taken before it) or for the off-branch half
+  of a gate test that also asserts the shipped ON state. Never suite-wide.
 - ``write_shapefile``: a minimal pure-stdlib writer of polygon .shp/.shx/
   .dbf/.prj files, for synthetic fixtures only.
 - ``row``: a read-row mapping for ``hazards.assess_row``.
@@ -52,6 +59,49 @@ def enabled(ddl: str | None = None):
     with mock.patch.object(hazards, "_SOURCE_DDL", text), \
             mock.patch.object(prepare, hazards.GATE_CONSTANT, text, create=True):
         yield
+
+
+def disabled():
+    """The hazard-table gate OFF, as before the 2026-11-09 prepare-mutation
+    (reviews/33_hazards_enabled). A ``mock.patch.object`` of
+    ``hazards._SOURCE_DDL`` to None, usable as a context manager or as a
+    class or method decorator. Not for suite-wide use (R-02)."""
+    return mock.patch.object(hazards, "_SOURCE_DDL", None)
+
+
+# The operator-authorized prepare-mutation of 2026-11-09
+# (reviews/33_hazards_enabled; the text of
+# reviews/26_flood_wetlands/01_prepare_mutation_proposal.md). The byte pins
+# on prepare.py compare it to base WITH exactly this edit applied, so they
+# prove the diff is the proposal and nothing else.
+PREPARE_MUTATION_COMMENT = (
+    "# prepare-mutation (2026-11-09, operator-authorized: the operator delegated\n"
+    "# this one edit to the agent, reviews/33_hazards_enabled): the FEMA NFHL flood\n"
+    "# (H4) / USFWS NWI wetlands (H6) per-parcel facts, written only by the\n"
+    "# between-runs hazards_import.py and read by hazards.py. Text exactly as in\n"
+    "# reviews/26_flood_wetlands/01_prepare_mutation_proposal.md. Additive: the\n"
+    "# metric SQL is unchanged, and with the table empty no score changes.\n")
+_ALL_DDL_BEFORE = "    _DDL_EXPERIMENT_LOG_MIRROR,\n    *_DDL_INDEXES,\n)"
+_ALL_DDL_AFTER = ("    _DDL_EXPERIMENT_LOG_MIRROR,\n    _DDL_PARCEL_HAZARDS,\n"
+                  "    *_DDL_PARCEL_HAZARDS_INDEXES,\n    *_DDL_INDEXES,\n)")
+_INSERT_ANCHOR = "\n_DDL_INDEXES = (\n"
+
+
+def prepare_mutation_block() -> str:
+    return (PREPARE_MUTATION_COMMENT
+            + '_DDL_PARCEL_HAZARDS = """' + hazards.PROPOSED_DDL.rstrip("\n") + '"""\n\n'
+            + "_DDL_PARCEL_HAZARDS_INDEXES = (\n"
+            + "".join(f'    "{s}",\n' for s in hazards.PROPOSED_INDEXES) + ")\n\n")
+
+
+def with_prepare_mutation(base: bytes) -> bytes:
+    """prepare.py at a pre-2026-11-09 base with exactly the hazards
+    prepare-mutation applied. Raises if the base lacks either anchor once."""
+    text = base.decode("utf-8")
+    if text.count(_INSERT_ANCHOR) != 1 or text.count(_ALL_DDL_BEFORE) != 1:
+        raise ValueError("base prepare.py does not carry the mutation anchors exactly once")
+    text = text.replace(_INSERT_ANCHOR, "\n" + prepare_mutation_block() + "_DDL_INDEXES = (\n")
+    return text.replace(_ALL_DDL_BEFORE, _ALL_DDL_AFTER).encode("utf-8")
 
 
 def _dbf_bytes(fields: Sequence[tuple], records: Sequence[Mapping[str, Any]]) -> bytes:

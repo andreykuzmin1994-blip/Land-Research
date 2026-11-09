@@ -335,6 +335,56 @@ The restore refuses to overwrite an existing non-empty TSV; reconciling a
 live TSV into the mirror is the other direction (`make mirror-backfill`,
 idempotent count-based dedup).
 
+**parcel_hazards**
+Per-parcel FEMA NFHL flood (H4) and USFWS NWI wetlands (H6) facts
+(prepare-mutation 2026-11-09, operator-authorized, reviews/33_hazards_enabled;
+proposal and column meanings in
+reviews/26_flood_wetlands/01_prepare_mutation_proposal.md). Written only by
+the between-runs `hazards_import.py` (`make hazards-import`), read only by
+the protected `hazards.py` (scoring gate 4, site fit, the snapshot and the
+runner's H4/H6 audit). Each source's columns are stamped with the md5 of the
+parcel geometry they were computed on; a different current value is stale
+(a data_gap pass). Additive: the metric SQL does not read it. While it is
+empty no score changes; the first populated import is the metric change
+(new run + baseline). The DDL as prepare.py applies it:
+```sql
+CREATE TABLE IF NOT EXISTS parcel_hazards (
+    parcel_id TEXT PRIMARY KEY REFERENCES parcels(parcel_id) ON DELETE CASCADE,
+    nfhl_parcel_geom_md5 TEXT,
+    nfhl_parcel_sf NUMERIC,
+    nfhl_mapped_sf NUMERIC,
+    nfhl_undetermined_sf NUMERIC,
+    sfha_sf NUMERIC,
+    floodway_sf NUMERIC,
+    x500_sf NUMERIC,
+    sfha_pct NUMERIC,
+    floodway_pct NUMERIC,
+    x500_pct NUMERIC,
+    nfhl_zone_sf JSONB,
+    nfhl_zone_lomr_sf JSONB,
+    zones TEXT[],
+    bfe_ft NUMERIC,
+    lomr_status TEXT,
+    nfhl_as_of TEXT,
+    nfhl_source TEXT,
+    nfhl_fetched_at TIMESTAMPTZ,
+    sfha_geom geometry(MultiPolygon, 2240),
+    nwi_parcel_geom_md5 TEXT,
+    nwi_parcel_sf NUMERIC,
+    wetland_sf NUMERIC,
+    wetland_pct NUMERIC,
+    wetland_deep_excavated_sf NUMERIC,
+    wetland_type_sf JSONB,
+    nwi_as_of TEXT,
+    nwi_source TEXT,
+    nwi_fetched_at TIMESTAMPTZ,
+    wetland_geom geometry(MultiPolygon, 2240)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hazards_sfha_geom ON parcel_hazards USING GIST(sfha_geom);
+CREATE INDEX IF NOT EXISTS idx_hazards_wetland_geom ON parcel_hazards USING GIST(wetland_geom);
+```
+
 ---
 
 ## Key Spatial Queries

@@ -19,7 +19,7 @@ Python file the agent edits while the experiment loop is active. The agent:
       ``site_fit.project_parcel`` / ``project_parcels`` and tests them only
       with ``site_fit.meets_bts_footprint`` (reviews/22_site_fit); the D3
       review text comes only from ``site_fit.bts_review_text``
-      (reviews/29_operator_decisions),
+      (reviews/29_operator_decisions, reviews/30_d3_count_unlisted),
     - never modifies :mod:`hazards` or ``hazards_import.py``, holds no flood
       or wetland threshold, zone list or hazard SQL of its own, and gets the
       H4/H6 verdicts only from ``hazards.assess_parcels`` behind
@@ -389,6 +389,11 @@ class _DiscoverySession:
         so the existing corridor-level handler still aborts the corridor and
         continues the cycle rather than mistaking a dead endpoint for an empty
         one. The retry is safe because this session issues only GETs (R-1307).
+
+        A 2xx/3xx answer is returned as parsed JSON WITHOUT looking at the
+        body. ArcGIS error envelopes (HTTP 200 + ``{"error": {...}}``) are
+        checked by the callers via ``_raise_on_arcgis_error`` and are never
+        retried (reviews/31_discovery_fixes).
         """
         host = urlparse(url).hostname or ""
         # NOTE: do NOT log the full URL with query params on retry — Fulton is
@@ -1313,6 +1318,45 @@ def _upsert_parcel(conn: Any, row: Mapping[str, Any], wkt: str) -> None:
 # ---------------------------------------------------------------------------
 # ArcGIS query loop (R-13, R-14, R-15, R-16, R-18, R-19, R-25)
 # ---------------------------------------------------------------------------
+class ArcGISErrorEnvelope(requests.RequestException):
+    """An ArcGIS answer that is not a usable result (reviews/31_discovery_fixes).
+
+    ArcGIS answers HTTP 200 with ``{"error": {...}}`` when a query fails
+    (the harness's R-04 "logic" failure). A body that is not a JSON object,
+    or that lacks the expected list (``features`` for a query, ``fields`` for
+    a layer schema), is the same failure class. Subclassing
+    ``requests.RequestException`` routes it through the existing corridor
+    handler (R-18 / R-1302): one ``abort`` row plus a partial-corridor
+    data_gap flag, then the cycle continues. It is never read as an empty
+    corridor and never retried (SR-11).
+
+    The text carries only the hostname and the numeric error code: ArcGIS
+    ``message``/``details`` can echo the ``where`` clause or the request,
+    and the URL can carry a key (SR-8, R-1308).
+    """
+
+
+def _raise_on_arcgis_error(body: Any, url: str, list_key: str) -> None:
+    """Raise ArcGISErrorEnvelope unless ``body`` is a usable ArcGIS answer.
+
+    ``list_key`` is ``"features"`` (query) or ``"fields"`` (layer schema).
+    A genuine empty answer (``{"features": []}``) passes: empty corridors
+    are not an error (R-19).
+    """
+    host = urlparse(url).hostname or "?"
+    if not isinstance(body, dict):
+        raise ArcGISErrorEnvelope(
+            f"{host}: ArcGIS answer is not a JSON object ({type(body).__name__})"
+        )
+    if "error" in body:
+        err = body.get("error")
+        code = err.get("code") if isinstance(err, dict) else None
+        shown = code if isinstance(code, int) and not isinstance(code, bool) else "?"
+        raise ArcGISErrorEnvelope(f"{host}: ArcGIS error envelope code={shown}")
+    if not isinstance(body.get(list_key), list):
+        raise ArcGISErrorEnvelope(f"{host}: ArcGIS answer has no {list_key} list")
+
+
 def _check_field_mapping_drift(
     session: _DiscoverySession,
     service_url: str,
@@ -1325,10 +1369,16 @@ def _check_field_mapping_drift(
     present. Returns ``(ok, missing_fields)``. The harness already does
     this check on its schedule; replicating it inside the cycle catches
     drift between harness runs.
+
+    An error envelope or a malformed schema body raises ArcGISErrorEnvelope
+    (reviews/31_discovery_fixes) instead of reporting every mapped field as
+    missing, which would send a human to refresh ``field_mapping`` for
+    nothing. ``_discover_fulton`` turns it into a county abort.
     """
     schema_url = f"{service_url.rstrip('/')}/{layer_id}"
     body = session.get(schema_url, params={"f": "pjson"})
-    fields = body.get("fields") or []
+    _raise_on_arcgis_error(body, schema_url, "fields")
+    fields = body["fields"]
     available = {f.get("name") for f in fields if f.get("name")}
     needed = {v for v in mapping.values() if v}
     missing = sorted(needed - available)
@@ -1389,7 +1439,36 @@ def _query_arcgis_corridor(
     Honors ``exceededTransferLimit`` if present, falls back to
     ``len(features) < page_size`` otherwise (R-13). Caches each raw
     response under ``sources/{cycle_id}/{corridor}_{offset}.json`` for
-    audit (R-30, R-40). Empty corridors are not an error (R-19).
+    audit (R-30, R-40). Empty corridors are not an error (R-19); an error
+    envelope or a malformed body raises ArcGISErrorEnvelope, a corridor
+    abort (R-04 parity with the harness, reviews/31_discovery_fixes).
+    Thin wrapper over ``_query_arcgis_corridor_pages``.
+    """
+    for _cache_path, features in _query_arcgis_corridor_pages(
+        session, service_url, layer_id, bbox, mapping, params,
+        cycle_id, corridor_name, page_size=page_size,
+    ):
+        yield from features
+
+
+def _query_arcgis_corridor_pages(
+    session: _DiscoverySession,
+    service_url: str,
+    layer_id: int,
+    bbox: Mapping[str, float],
+    mapping: Mapping[str, str],
+    params: Mapping[str, Any],
+    cycle_id: str,
+    corridor_name: str,
+    page_size: int = _FULTON_PAGE_SIZE,
+) -> Iterator[tuple[Path, list[dict[str, Any]]]]:
+    """Page through ArcGIS for one corridor; yield ``(cache_path, features)``.
+
+    ``cache_path`` is the file that holds THIS page's raw answer, so every
+    feature's ``raw_response_path`` names the page it came from
+    (reviews/31_discovery_fixes, bug B). The raw body is cached BEFORE the
+    envelope check, so a failed page leaves its evidence on disk (R-10 of
+    that review). Termination is unchanged from Phase 3 (R-13).
     """
     base = f"{service_url.rstrip('/')}/{layer_id}/query"
     offset = 0
@@ -1403,13 +1482,13 @@ def _query_arcgis_corridor(
         cache_path = _safe_cache_path(cycle_id, corridor_name, offset)
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(body, ensure_ascii=False), encoding="utf-8")
-        features = body.get("features") or []
+        _raise_on_arcgis_error(body, base, "features")
+        features = body["features"]
         log.info(
             "arcgis page %s of corridor=%s offset=%s features=%s",
             page, corridor_name, offset, len(features),
         )
-        for feat in features:
-            yield feat
+        yield cache_path, features
         # Termination: exceededTransferLimit==False, or short page.
         exceeded = body.get("exceededTransferLimit")
         if exceeded is False:
@@ -1658,26 +1737,28 @@ def _discover_fulton_corridor(
     counts = {"discovery": 0, "rejection": 0, "unmappable": 0}
     service_url = _fulton_service_url(sources)
     layer_id = _fulton_parcel_layer_id(sources)
-    offset_for_audit = 0
     try:
         empty = True
-        for feat in _query_arcgis_corridor(
+        # Each feature's raw_response_path is the cache file of the page that
+        # held it (reviews/31_discovery_fixes, bug B: it used to name page 1's
+        # file for every page).
+        for cache_path, features in _query_arcgis_corridor_pages(
             session, service_url, layer_id, bbox, mapping, params,
             cycle_id, corridor_name,
         ):
-            empty = False
-            cache_path = _safe_cache_path(cycle_id, corridor_name, offset_for_audit)
-            status = _process_parcel(
-                feat, conn, cycle_id, corridor_name, market,
-                mapping, classification, params,
-                raw_response_path=str(cache_path),
-            )
-            if status == "discovery":
-                counts["discovery"] += 1
-            elif status.startswith("rejection_"):
-                counts["rejection"] += 1
-            else:
-                counts["unmappable"] += 1
+            for feat in features:
+                empty = False
+                status = _process_parcel(
+                    feat, conn, cycle_id, corridor_name, market,
+                    mapping, classification, params,
+                    raw_response_path=str(cache_path),
+                )
+                if status == "discovery":
+                    counts["discovery"] += 1
+                elif status.startswith("rejection_"):
+                    counts["rejection"] += 1
+                else:
+                    counts["unmappable"] += 1
         if empty:
             try:
                 with conn.transaction():
@@ -1718,9 +1799,22 @@ def _discover_fulton(
     classification = params["owner_classification"]
     # R-25: defensive schema-drift check. If any mapped field is missing,
     # abort the entire Fulton run for this cycle.
-    ok, missing = _check_field_mapping_drift(
-        session, _fulton_service_url(sources), _fulton_parcel_layer_id(sources), mapping,
-    )
+    # An error envelope at the schema check is a county abort with its own
+    # reason, not drift (reviews/31_discovery_fixes). Same county shape as
+    # the drift abort, so the runner's discovery count stays None. The note
+    # carries the host and numeric code only (SR-8).
+    try:
+        ok, missing = _check_field_mapping_drift(
+            session, _fulton_service_url(sources), _fulton_parcel_layer_id(sources), mapping,
+        )
+    except ArcGISErrorEnvelope as exc:
+        log.warning("fulton schema check aborted: %s", exc)
+        with conn.transaction():
+            _log_research(
+                conn, cycle_id, "abort", market, None,
+                f"schema check: {exc}",
+            )
+        return {"aborted": True, "reason": "arcgis_error"}
     if not ok:
         with conn.transaction():
             _log_research(
@@ -2733,7 +2827,10 @@ def _assess_strategy_bts(
     or missing projection is N/A, never the acreage proxy). Since operator
     decision D3 (reviews/29_operator_decisions, 2026-11-09) a listed district
     without any setback in the rules counts with the 25 ft default and
-    carries site_fit.bts_review_text (a data_gap flag, never a block).
+    carries site_fit.bts_review_text (a data_gap flag, never a block); since
+    the operator's answer to D3-01/D3-02 (reviews/30_d3_count_unlisted) an
+    unlisted district and a listed one with unreadable setbacks do too, each
+    with its own text.
     Without a projection the acreage proxy below is unchanged."""
     if projection is not None:
         if not site_fit.meets_bts_footprint(projection):
@@ -3193,10 +3290,13 @@ def score_parcel(
             f"S9={sub_scores['S9_entitlement_complexity']} "
             f"S10={sub_scores['S10_incentives']}"
         )[:480]
-        # reviews/29_operator_decisions (D3): a verified, listed district
-        # without setbacks counts for BTS with the default; the notes and one
-        # data_gap flag say "investigate further". None for every other
-        # projection, and no projection exists for draft parcels.
+        # reviews/29_operator_decisions (D3) and reviews/30_d3_count_unlisted:
+        # a verified district that is listed without setbacks, not listed, or
+        # listed with unreadable setbacks counts for BTS with the default; the
+        # notes and one data_gap flag say "investigate further". A district
+        # setback with SOME unreadable values (post-change review round 1)
+        # gets the same flag, BTS unchanged. None for every other projection,
+        # and no projection exists for draft parcels.
         bts_review = site_fit.bts_review_text(projection) if projection is not None else None
         if bts_review is not None:
             notes = f"{notes} | {bts_review}"[:480]
@@ -3264,8 +3364,9 @@ def score_parcel(
                 if bts_review is not None:
                     _flag_data_gap_once(
                         conn, cycle_id, parcel_id, market_name, bts_review,
-                        "check the district's setbacks in the code by hand; a human adds them "
-                        "to the rules file between runs (reviews/29_operator_decisions)",
+                        "check the district and its setbacks in the code by hand; a human "
+                        "adds the district or its setback values to the rules file between "
+                        "runs (reviews/29_operator_decisions, reviews/30_d3_count_unlisted)",
                         open_gaps, written,
                     )
                 # reviews/26_flood_wetlands (FW-04, FW-17): missing or stale

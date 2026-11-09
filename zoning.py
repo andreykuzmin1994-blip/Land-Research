@@ -470,13 +470,22 @@ class District:
     South Fulton's table unless the parcel is listed as unincorporated);
     ``dimensions`` is the frozen ``dimensions`` mapping, or None when the
     district is not listed in that table. ``verified`` follows the same rule
-    as ``classify`` (both jurisdictions verified when governed).
+    as ``classify`` (both jurisdictions verified when governed). ``listed``
+    says whether the district has an entry in that table at all, so site fit
+    can tell an unlisted district from a listed one without a usable
+    ``dimensions`` mapping (reviews/30_d3_count_unlisted, D3U-06).
+    ``dimensions_absent`` says the listed entry has no ``dimensions`` key or
+    has ``dimensions: null`` -- it states no setbacks at all, as distinct from
+    a ``dimensions`` value that is present but not a mapping (reviews/30,
+    post-change adversarial review round 1).
     """
     jurisdiction: str
     table_jurisdiction: str
     district: str
     verified: bool
     dimensions: Mapping[str, Any] | None
+    listed: bool = False
+    dimensions_absent: bool = False
 
 
 def district_for_stored(zoning: Any, zoning_description: Any,
@@ -517,7 +526,8 @@ def district_for_stored(zoning: Any, zoning_description: Any,
     d = districts.get(base)
     dims = d.get("dimensions") if isinstance(d, Mapping) else None
     return District(st.jurisdiction, table_key, base, verified,
-                    dims if isinstance(dims, Mapping) else None)
+                    dims if isinstance(dims, Mapping) else None, isinstance(d, Mapping),
+                    isinstance(d, Mapping) and dims is None)
 
 
 def classify_stored(zoning: Any, zoning_description: Any,

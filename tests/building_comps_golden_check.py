@@ -18,6 +18,12 @@ Regenerate the record (only to re-prove against a different base commit):
       reporting_base as r; assert not hasattr(r, 'fetch_building_comps'); \\
       json.dump(c.run_case(r), open('reviews/28_building_comps/golden_head_3898047.json', 'w'), \\
       indent=1, sort_keys=True)"
+
+Since the operator-authorized prepare-mutation of 2026-11-09
+(reviews/33_hazards_enabled) the hazard gate is ON in the shipped repo. This
+record predates the hazard read and records non-hazard behaviour, so the
+case runs with the gate OFF (``hazards_helpers.disabled()``); the shipped
+hazard state is proven by tests/hazards_golden_check.py's enabled mode.
 """
 
 from __future__ import annotations
@@ -36,7 +42,7 @@ import building_comps_golden_case as golden  # noqa: E402
 RECORD = HERE.parent / "reviews" / "28_building_comps" / "golden_head_3898047.json"
 
 
-def main() -> int:
+def _compare() -> int:
     base = json.loads(RECORD.read_text(encoding="utf-8"))
     now = golden.run_case(reporting)
     problems = []
@@ -52,6 +58,12 @@ def main() -> int:
     print("identical to the 3898047 record: memo and snapshot texts; statements identical "
           "apart from the two building-comps reads at the end of each path")
     return 0
+
+
+def main() -> int:
+    from hazards_helpers import disabled
+    with disabled():
+        return _compare()
 
 
 if __name__ == "__main__":

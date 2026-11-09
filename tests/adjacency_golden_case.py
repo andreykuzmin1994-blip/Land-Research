@@ -168,3 +168,62 @@ def differences_on_empty(want: dict[str, Any], got: dict[str, Any], site_fit: An
         if gp["footnote"] != wp["footnote"].replace(site_fit.RES_BUFFERS, adjacency.FOOTNOTE):
             bad.append(f"{label} footnote")
     return bad
+
+
+# ---------------------------------------------------------------------------
+# reviews/30_d3_count_unlisted (D3U-12): the explicit expected diff
+# ---------------------------------------------------------------------------
+# The operator's answer to D3-01/D3-02 (2026-11-09, "count them") makes an
+# UNLISTED district in a verified jurisdiction count for BTS with the default
+# setback, flagged for investigation. fulton-Z03 (south_fulton R-3) and
+# fulton-Z05 (fairburn R-2) are unlisted; with every fixture jurisdiction
+# verified their projections gain the investigate line and their memo lines
+# say so. Nothing else moves: neither reaches the S9 gate in scoring
+# (unlisted_districts "unknown"), so scoring is identical, and neither reaches
+# 150K SF. The record is NOT regenerated: this list is applied to it and the
+# result must then match the current code exactly. Literal strings on
+# purpose, so a text change fails here.
+D3U_UNLISTED_TEXT = ("investigate further: district not listed in zoning_rules.json; "
+                     "25 ft default setback used")
+D3U_OLD_USED = "used for BTS: yes, rated N/A (default setback);"
+D3U_NEW_USED = f"used for BTS: yes (default setback; {D3U_UNLISTED_TEXT});"
+# (state, section, parcel, field, edit)
+D3U_EXPECTED_DIFF = (
+    ("verified", "projections", "fulton-Z03", "constraints", "insert after line 0"),
+    ("verified", "projections", "fulton-Z05", "constraints", "insert after line 0"),
+    ("verified", "memo", "fulton-Z03", "summary_used", "used-for-BTS clause"),
+    ("verified", "memo", "fulton-Z05", "summary_used", "used-for-BTS clause"),
+    ("verified", "memo", "fulton-Z03", "development_potential", "Constraints applied line"),
+    ("verified", "memo", "fulton-Z05", "development_potential", "Constraints applied line"),
+)
+
+
+def expected_after_d3u(want: dict[str, Any]) -> dict[str, Any]:
+    """The 595aa08 record with D3U_EXPECTED_DIFF applied (a deep copy). Each
+    edit first checks the record still holds the old text, so the list
+    cannot apply silently to a different record."""
+    import copy
+    out = copy.deepcopy(want)
+    for state, section, pid, fld, _edit in D3U_EXPECTED_DIFF:
+        entry = out[state][section][pid]
+        if fld == "constraints":
+            lines = entry[fld]
+            if not lines[0].startswith("setback 25 ft all sides = default (district ") or \
+                    not lines[0].endswith(" not listed in the rules), verified jurisdiction, "
+                                          "default setback") or D3U_UNLISTED_TEXT in lines:
+                raise AssertionError(f"record {pid} constraints are not the expected base")
+            entry[fld] = [lines[0], D3U_UNLISTED_TEXT] + lines[1:]
+        elif fld == "summary_used":
+            if entry[fld].count(D3U_OLD_USED) != 1:
+                raise AssertionError(f"record {pid} summary_used is not the expected base")
+            entry[fld] = entry[fld].replace(D3U_OLD_USED, D3U_NEW_USED)
+        else:
+            lines = entry[fld].split("\n")
+            hits = [i for i, x in enumerate(lines)
+                    if x.startswith("- **Constraints applied**: ")]
+            anchor = "not listed in the rules), verified jurisdiction, default setback; "
+            if len(hits) != 1 or lines[hits[0]].count(anchor) != 1:
+                raise AssertionError(f"record {pid} development_potential is not the base")
+            lines[hits[0]] = lines[hits[0]].replace(anchor, f"{anchor}{D3U_UNLISTED_TEXT}; ")
+            entry[fld] = "\n".join(lines)
+    return out

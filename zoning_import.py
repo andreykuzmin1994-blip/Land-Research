@@ -56,11 +56,24 @@ parcels FAILED (named on the last line; its parcels kept their previous
 values), so a wrapper that checks the exit code cannot mistake a partial
 import for a full one.
 
-HTTP: 1 request/second per host, bounded retries with back-off, Retry-After
-honoured and capped, descriptive User-Agent, no cache (SR-11).
+HTTP (SR-11; reviews/32_zoning_import_fetcher, D1-11): ``ZoningSession`` is
+rules_scrape.PoliteFetcher, the fetcher of rules_scrape, adjacency_import and
+hazards_import, with this tool's User-Agent and robots token: robots.txt of
+every origin read once and honoured for this token and every AI-agent token
+through the ONE shared verdict rules_scrape.robots_verdict (the D1 ArcGIS
+exception included; its line is printed once per host read under it), 1
+request/second per host (Crawl-delay when larger; the ArcGIS Online
+services hosts share one key), 2 retries with back-off on 5xx / connection
+errors, 429 retried only with a Retry-After of at most 30 s, redirects
+followed by hand only to https on the same registrable domain (5 hops at
+most), the denylist and terms block applied to the prepared URL, challenge
+pages and answers over 25 MB refused, no cookies, no cache. Each of these
+fails the source (or refuses the parcel layer) and never writes a guess:
+parcels keep their values.
 
-Depends only on prepare and zoning -- never on research.py (the agent's
-sandbox), runner.py (which imports it), or screener/ (a separate tool).
+Depends only on prepare, zoning and rules_scrape (its fetcher and robots
+verdict) -- never on research.py (the agent's sandbox), runner.py (which
+imports it), or screener/ (a separate tool).
 """
 
 from __future__ import annotations
@@ -68,19 +81,21 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import sys
-import threading
 import time
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import requests
+from requests.structures import CaseInsensitiveDict
 
 import prepare
+import rules_scrape
 import zoning
 
 _REPO_ROOT = Path(__file__).resolve().parent
@@ -89,11 +104,7 @@ EXPERIMENT_LOG = _REPO_ROOT / "experiment_log.tsv"
 SOURCES_KEY_PATH = "county_parcel_data.fulton_ga.zoning_sources"
 
 USER_AGENT = "Land-Research-ZoningImport/1.0 (between-runs operator tool; 1 req/s per host)"
-REQUEST_INTERVAL_S = 1.0          # SR-11
-MAX_RETRIES = 3
-BACKOFF_S = (2.0, 4.0, 8.0)
-RETRY_AFTER_CAP_S = 30.0
-HTTP_TIMEOUT_S = 60
+UA_TOKEN = "Land-Research-ZoningImport"     # this tool's robots.txt token
 MAX_REQUESTS_PER_SOURCE = 400     # budget guard: a runaway source fails, it never hammers
 ID_CHUNK = 60                     # ParcelIDs per IN-list query (URL stays under ~2 kB)
 OID_CHUNK = 150                   # objectIds per feature page (URL stays under ~2 kB)
@@ -305,72 +316,92 @@ def load_config(path: Path = SOURCES_PATH) -> tuple[str, list[ZoningSource]]:
 # ---------------------------------------------------------------------------
 # HTTP (SR-11)
 # ---------------------------------------------------------------------------
-class ZoningSession:
-    """GET-only JSON session: 1 req/s per host, bounded retries, no cache."""
+class ZoningSession(rules_scrape.PoliteFetcher):
+    """rules_scrape.PoliteFetcher with this tool's User-Agent and robots
+    token (D1-11). ``robots_for``, ``_check`` and ``fetch`` are inherited
+    unchanged: the robots verdict is the shared rules_scrape.robots_verdict
+    and this module defines none of its own. ``get_json`` maps every refusal
+    to SourceError, so a failure fails one source and never escapes run()."""
+
+    robots_token = UA_TOKEN
+    user_agent = USER_AGENT
 
     def __init__(self, http: Any = None, clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
-        self.http = http or requests.Session()
+                 sleep: Callable[[float], None] = time.sleep, **kw: Any) -> None:
+        # run() raises the global budget to request_budget() (ZI-02).
+        super().__init__(http, clock=clock, sleep=sleep, **kw)
         if hasattr(self.http, "headers"):
-            self.http.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
-        self.clock = clock
-        self.sleep = sleep
-        self._last: dict[str, float] = {}
-        self._lock = threading.Lock()
-        self.requests: dict[str, int] = {}
+            self.http.headers["Accept"] = "application/json"
+        self.last_headers: Mapping[str, Any] = {}
+        self._robots_seen = 0
+        self._scanned = 0
 
-    def _space(self, host: str) -> None:
-        with self._lock:
-            now = self.clock()
-            last = self._last.get(host)
-            wait = 0.0 if last is None else max(0.0, REQUEST_INTERVAL_S - (now - last))
-            self._last[host] = now + wait
-        if wait > 0:
-            self.sleep(wait)
-
-    @staticmethod
-    def retry_after(resp: Any, scheduled: float) -> float:
-        try:
-            ra = float(int(resp.headers.get("Retry-After", "")))
-        except (TypeError, ValueError, AttributeError):
-            return scheduled
-        return max(scheduled, min(ra, RETRY_AFTER_CAP_S)) if ra > 0 else scheduled
-
-    def get_json(self, url: str, params: Mapping[str, Any]) -> dict[str, Any]:
-        host = urlparse(url).hostname or "?"
-        status: Any = "no answer"
-        for attempt in range(MAX_RETRIES + 1):
-            self._space(host)
-            self.requests[host] = self.requests.get(host, 0) + 1
-            delay = BACKOFF_S[min(attempt, len(BACKOFF_S) - 1)]
-            try:
-                resp = self.http.get(url, params=dict(params), timeout=HTTP_TIMEOUT_S)
-            except (requests.ConnectionError, requests.Timeout):
-                status = "connection error"
-            else:
-                status = resp.status_code
-                if 200 <= status < 300:
-                    try:
-                        body = resp.json()
-                    except ValueError:
-                        raise SourceError(f"{host}: answer is not JSON") from None
-                    if not isinstance(body, dict):
-                        raise SourceError(f"{host}: answer is not a JSON object")
-                    if "error" in body:
-                        code = (body.get("error") or {}).get("code") if isinstance(
-                            body.get("error"), dict) else None
-                        raise SourceError(f"{host}: service error {code if isinstance(code, int) else '?'}")
-                    return body
-                if status == 429:
-                    delay = self.retry_after(resp, delay)
-                elif not 500 <= status < 600:
-                    raise SourceError(f"{host}: HTTP {status}")
-            if attempt < MAX_RETRIES:
-                self.sleep(delay)
-        raise SourceError(f"{host}: {status} after {MAX_RETRIES + 1} attempts")
+    def _get(self, url: str) -> tuple[Any, bytes]:
+        # Recorded only, so get_json decodes the body exactly as
+        # requests.Response.json() did before (charset from the headers).
+        resp, body = super()._get(url)
+        self.last_headers = getattr(resp, "headers", None) or {}
+        return resp, body
 
     def total_requests(self) -> int:
-        return sum(self.requests.values())
+        """Data requests (robots.txt GETs excluded, ZI-08), retries and
+        redirect hops included: what MAX_REQUESTS_PER_SOURCE counts. A
+        request is excluded by its URL ending in ``/robots.txt``, so a
+        robots.txt redirect hop that lands on another ``.../robots.txt`` is
+        excluded too (at most MAX_REDIRECTS per host); the global
+        PoliteFetcher budget still counts every request."""
+        for u in self.calls[self._scanned:]:
+            if u.endswith("/robots.txt"):
+                self._robots_seen += 1
+        self._scanned = len(self.calls)
+        return len(self.calls) - self._robots_seen
+
+    def get_json(self, url: str, params: Mapping[str, Any]) -> dict[str, Any]:
+        full = url + ("?" + urlencode(dict(params)) if params else "")
+        host = urlparse(url).hostname or "?"
+        try:
+            got = self.fetch(full)
+        except rules_scrape.Unreachable as exc:
+            raise SourceError(f"{host}: {exc.reason}") from None
+        except rules_scrape.BudgetExceeded as exc:
+            raise SourceError(f"{host}: {exc}") from None
+        except requests.RequestException:     # e.g. a body cut off mid-read (ZI-09)
+            raise SourceError(f"{host}: connection error") from None
+        try:
+            body = _json_like_requests(got.body, self.last_headers)
+        except ValueError:
+            raise SourceError(f"{host}: answer is not JSON") from None
+        if not isinstance(body, dict):
+            raise SourceError(f"{host}: answer is not a JSON object")
+        if "error" in body:
+            code = (body.get("error") or {}).get("code") if isinstance(
+                body.get("error"), dict) else None
+            raise SourceError(f"{host}: service error {code if isinstance(code, int) else '?'}")
+        return body
+
+
+def _json_like_requests(body: bytes, headers: Mapping[str, Any]) -> Any:
+    """``body`` parsed by requests.Response.json() itself, with the encoding
+    requests derives from ``headers`` (as the session's answers were parsed
+    before D1-11). ValueError when it is not JSON."""
+    r = requests.models.Response()
+    r._content = body
+    r.headers = CaseInsensitiveDict(dict(headers or {}))
+    r.encoding = requests.utils.get_encoding_from_headers(r.headers)
+    return r.json()
+
+
+def request_budget(n_sources: int, n_parcels: int) -> int:
+    """The global PoliteFetcher budget for one run (ZI-02): a backstop that
+    can never bind before MAX_REQUESTS_PER_SOURCE. A source makes at most
+    MAX_REQUESTS_PER_SOURCE + 1 get_json calls (each but a final failing one
+    makes at least one data request), the parcel layer ceil(parcels /
+    ID_CHUNK); one call makes at most (MAX_REDIRECTS + 1) hops of
+    (MAX_RETRIES + 1) attempts, plus that many robots.txt reads per hop."""
+    hop = (rules_scrape.MAX_REDIRECTS + 1) * (rules_scrape.MAX_RETRIES + 1)
+    per_call = hop + (rules_scrape.MAX_REDIRECTS + 1) * hop
+    calls = n_sources * (MAX_REQUESTS_PER_SOURCE + 1) + math.ceil(max(0, n_parcels) / ID_CHUNK)
+    return max(1, calls) * per_call
 
 
 # ---------------------------------------------------------------------------
@@ -829,7 +860,10 @@ def run(*, sources_path: Path = SOURCES_PATH, session: ZoningSession | None = No
     if not stored:
         print("zoning_import: no Fulton parcels in the database; nothing to do.")
         return 0
-    # Network (no database transaction held open meanwhile).
+    # Network (no database transaction held open meanwhile). The global
+    # budget is a backstop that never binds before the per-source one (ZI-02).
+    session.max_requests = max(session.max_requests, request_budget(
+        sum(s.role == "zoning" for s in sources), len(stored)))
     try:
         juris, jcounts = fetch_jurisdictions(session, layer_url, list(stored))
     except SourceError as exc:
@@ -898,6 +932,8 @@ def run(*, sources_path: Path = SOURCES_PATH, session: ZoningSession | None = No
     print(f"written: {n} changed, {c['unchanged']} unchanged, {c['unmatched_kept']} "
           f"unmatched_kept, {c['no_source']} no_source, {c['unknown_jurisdiction']} unknown "
           f"jurisdiction, {c['drift']} drift, {c['precedence_conflicts']} precedence conflicts")
+    for line in rules_scrape.robots_exception_lines(session):    # D1-07: once per host
+        print(line)
     print("requests: " + ", ".join(f"{h} {k}" for h, k in sorted(session.requests.items())))
     print("Re-run make zoning-import at every new run; zoning_rules.json edits are between "
           "runs only.")

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -35,6 +36,23 @@ import research
 import runner
 import reporting
 import costar_ingest
+# The hazard gate is ON in the shipped repo since the operator-authorized
+# prepare-mutation of 2026-11-09 (reviews/33_hazards_enabled). Tests here
+# whose fakes predate the hazard read (or the runner's extra audit
+# connection), or that pin the pre-hazard H4/H6 stubs, run under
+# hazards_disabled(); the shipped-state inverse is test_hazards_enabled.
+#
+# CI runs this module DOTTED (discovery-fulton.yml offline-tests:
+# ``python -m unittest tests.test_discovery``), where tests/ is NOT on
+# sys.path; only ``discover -s tests`` puts it there. Append tests/ (append,
+# not prepend, so no tests/ file can shadow a repo-root module) so the bare
+# helper import resolves to the same single ``hazards_helpers`` module under
+# both invocation styles (post-change adversarial review round 2,
+# reviews/33_hazards_enabled; pinned by tests/test_ci_module_imports.py).
+_TESTS_DIR = str(Path(__file__).resolve().parent)
+if _TESTS_DIR not in sys.path:
+    sys.path.append(_TESTS_DIR)
+from hazards_helpers import disabled as hazards_disabled  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "discovery"
 COSTAR_FIXTURES_DIR = Path(__file__).parent / "fixtures" / "costar"
@@ -244,6 +262,7 @@ class TestStaticChecks(unittest.TestCase):
             "_discover_fulton", "_discover_fulton_corridor", "_process_parcel",
             "_upsert_parcel", "_log_research", "_flag",
             "_query_arcgis_corridor", "_check_field_mapping_drift",
+            "_query_arcgis_corridor_pages", "_raise_on_arcgis_error",
         }
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -700,6 +719,7 @@ class TestHarnessGate(unittest.TestCase):
 class TestHappyPathDryRun(unittest.TestCase):
     """End-to-end dry-run with mocked harness, mocked HTTP, fake conn."""
 
+    @hazards_disabled()
     def test_two_feature_happy_path(self) -> None:
         sources_payload = {
             "county_parcel_data": {"fulton_ga": {
@@ -1088,6 +1108,7 @@ class TestPhase4HardFilterStubs(unittest.TestCase):
         result = research._h5_filter({}, None, _passing_params())
         self._assert_flag("H5", result, ["EPA", "Envirofacts"])
 
+    @hazards_disabled()
     def test_h6_returns_flag(self) -> None:
         result = research._h6_filter({}, None, _passing_params())
         self._assert_flag("H6", result, ["NWI", "wetlands", "USGS"])
@@ -1113,6 +1134,7 @@ class TestPhase4FilterPipelineEndToEnd(unittest.TestCase):
     """Integration-style test: _process_parcel emits one flagged_items row per
     H5..H10 stub for a happy-path parcel (R-103, R-105)."""
 
+    @hazards_disabled()
     def test_h5_through_h10_emit_flag_rows(self) -> None:
         feature = _load_fixture("arcgis_query_two_features.json")["features"][0]
         mapping = _sources_payload()["county_parcel_data"]["fulton_ga"]["field_mapping"]
@@ -5181,6 +5203,7 @@ class TestPhase10VerifySetupComposite(unittest.TestCase):
             self.assertEqual(out["checks"]["corridor_bbox"]["status"], "skipped")
 
 
+@hazards_disabled()
 class TestPhase10EvaluateMetricRouting(unittest.TestCase):
     """R-701 -- evaluate() routes through prepare.calculate_* exclusively."""
 
@@ -5934,6 +5957,7 @@ class TestPhase13PrefetchCache(unittest.TestCase):
         self.assertNotIn(research._SQL_SUBMARKET_LAND_MEDIAN_BATCH, sqls)
         self.assertEqual(cache.market_context, {})
 
+    @hazards_disabled()
     def test_any_params_passed_as_single_tuple_wrapping_list(self) -> None:
         # R-1316: every ANY(%s) query is called with (list,) — NOT the list
         # spread across placeholders. This is the mistake the fake-conn cannot
@@ -6264,6 +6288,7 @@ class TestScoreParcelRunStamp(unittest.TestCase):
 class TestEvaluateRunThreading(unittest.TestCase):
     """evaluate() threads run_tag + experiment_id into scoring and metric."""
 
+    @hazards_disabled()
     def test_run_tag_and_experiment_id_reach_scoring_and_metric(self) -> None:
         captured: dict[str, Any] = {}
 
@@ -6544,6 +6569,7 @@ class TestHarnessGateTTLCache(unittest.TestCase):
 
 
 class TestApiCallsSignal(unittest.TestCase):
+    @hazards_disabled()
     def test_evaluate_reports_api_call_delta(self) -> None:
         @contextmanager
         def fake_get_connection():
@@ -6825,6 +6851,7 @@ class TestTerminalStatusBreaker(unittest.TestCase):
 class TestStampAudit(unittest.TestCase):
     """F3(b): evaluate counts wrong-stamp rows written during its window."""
 
+    @hazards_disabled()
     def test_violations_surfaced_in_result_and_description(self) -> None:
         class _AuditFake(Phase5FakeConnection):
             pass
@@ -6861,3 +6888,417 @@ class TestStampAudit(unittest.TestCase):
         self.assertEqual(audit_executes[0][1][2], "exp-good")
         desc = runner._format_loop_description(result, "test")
         self.assertIn("stamp_audit_violations=3", desc)
+
+
+# ---------------------------------------------------------------------------
+# reviews/31_discovery_fixes — ArcGIS error envelope (bug A) and per-page
+# raw_response_path (bug B). Gates G2-G6 of 02_risk_review.md.
+# ---------------------------------------------------------------------------
+_ENV_SENTINEL = "SENTINEL-WHERE-LandAcres-BETWEEN-5-AND-50"
+_ENV_TOKEN = "SENTINELTOKEN123"
+
+
+def _envelope(code: Any = 400) -> dict[str, Any]:
+    """A forged ArcGIS error envelope whose message/details echo a sentinel."""
+    return {"error": {
+        "code": code,
+        "message": f"Unable to complete operation: {_ENV_SENTINEL}",
+        "details": [f"where={_ENV_SENTINEL}&token={_ENV_TOKEN}"],
+    }}
+
+
+class _RouteSession:
+    """Mock session: schema URL -> schema; query URL -> scripted bodies in
+    order (the last one repeats). Records every query call."""
+
+    def __init__(self, query_bodies: list[Any], schema: Any = None) -> None:
+        self.query_bodies = list(query_bodies)
+        self.schema = schema if schema is not None else _load_fixture(
+            "arcgis_layer11_schema.json")
+        self.query_calls = 0
+        self.schema_calls = 0
+
+    def get(self, url, params=None, timeout=None):
+        if url.endswith("/11"):
+            self.schema_calls += 1
+            return self.schema
+        self.query_calls += 1
+        if len(self.query_bodies) > 1:
+            return self.query_bodies.pop(0)
+        return self.query_bodies[0]
+
+    def close(self) -> None:
+        pass
+
+
+def _log_rows(fake: Any, action_type: str | None = None) -> list[tuple]:
+    rows = [p for s, p in fake.all_executes if s == research._SQL_INSERT_RESEARCH_LOG]
+    if action_type is not None:
+        rows = [p for p in rows if p[1] == action_type]
+    return rows
+
+
+def _flag_texts(fake: Any) -> list[str]:
+    """Flag descriptions with the ``cycle=<id>; `` prefix (R-38) removed."""
+    return [
+        re.sub(r"^cycle=[^;]*; ", "", p[3]) for s, p in fake.all_executes
+        if s.startswith("INSERT INTO flagged_items") and len(p) >= 5
+        and isinstance(p[3], str)
+    ]
+
+
+def _run_corridor(session: Any, fake: Any, cycle_id: str | None = None) -> dict[str, int]:
+    payload = _sources_payload()
+    return research._discover_fulton_corridor(
+        session, fake, cycle_id or research._make_cycle_id("fulton"),
+        "south_fulton_campbellton",
+        research._FULTON_CORRIDORS["south_fulton_campbellton"],
+        "atlanta", payload,
+        payload["county_parcel_data"]["fulton_ga"]["field_mapping"],
+        _passing_params()["owner_classification"], _passing_params(),
+    )
+
+
+class TestArcgisEnvelopeHelper(unittest.TestCase):
+    """reviews/31 R-4/R-5: what counts as an unusable ArcGIS answer."""
+
+    URL = f"https://gis.example.test/MapServer/11/query?token={_ENV_TOKEN}"
+
+    def _raises(self, body: Any, key: str = "features") -> str:
+        with self.assertRaises(research.ArcGISErrorEnvelope) as cm:
+            research._raise_on_arcgis_error(body, self.URL, key)
+        return str(cm.exception)
+
+    def test_is_a_request_exception(self) -> None:
+        # Routes through the existing corridor handler unchanged (G2).
+        self.assertTrue(issubclass(research.ArcGISErrorEnvelope,
+                                   research.requests.RequestException))
+
+    def test_envelope_text_is_host_and_numeric_code_only(self) -> None:
+        text = self._raises(_envelope(400))
+        self.assertEqual(text, "gis.example.test: ArcGIS error envelope code=400")
+        self.assertNotIn(_ENV_SENTINEL, text)
+        self.assertNotIn(_ENV_TOKEN, text)
+        self.assertNotIn("query", text)
+
+    def test_non_numeric_or_missing_code_shows_question_mark(self) -> None:
+        for err in ({"code": "500"}, {"code": True}, {"message": _ENV_SENTINEL},
+                    "boom", None, [1, 2]):
+            text = self._raises({"error": err})
+            self.assertTrue(text.endswith("code=?"), text)
+            self.assertNotIn(_ENV_SENTINEL, text)
+
+    def test_envelope_wins_even_with_features_present(self) -> None:
+        body = dict(_envelope(498))
+        body["features"] = []
+        self.assertIn("code=498", self._raises(body))
+
+    def test_malformed_top_levels(self) -> None:
+        for body in ([], [{"attributes": {}}], None, "html", 3):
+            self.assertIn("not a JSON object", self._raises(body))
+
+    def test_missing_or_non_list_features(self) -> None:
+        for body in ({}, {"exceededTransferLimit": False}, {"features": None},
+                     {"features": {"a": 1}}, {"features": "x"}):
+            self.assertIn("no features list", self._raises(body))
+
+    def test_schema_key_checked_for_schema_bodies(self) -> None:
+        self.assertIn("no fields list", self._raises({"name": "Tax Parcels"}, "fields"))
+        research._raise_on_arcgis_error(
+            _load_fixture("arcgis_layer11_schema.json"), self.URL, "fields")
+
+    def test_genuine_empty_answer_passes(self) -> None:
+        # R-19: a real empty corridor is not an error.
+        research._raise_on_arcgis_error(
+            _load_fixture("arcgis_query_empty.json"), self.URL, "features")
+        research._raise_on_arcgis_error({"features": []}, self.URL, "features")
+
+    def test_host_fallback_when_url_has_no_host(self) -> None:
+        with self.assertRaises(research.ArcGISErrorEnvelope) as cm:
+            research._raise_on_arcgis_error(_envelope(1), "not a url", "features")
+        self.assertTrue(str(cm.exception).startswith("?: "))
+
+
+class TestArcgisEnvelopeCorridor(unittest.TestCase):
+    """reviews/31 G2: an envelope is a corridor abort, never discovery_empty."""
+
+    def test_query_generator_raises_and_caches_the_envelope(self) -> None:
+        cycle_id = research._make_cycle_id("fulton")
+        gen = research._query_arcgis_corridor(
+            _RouteSession([_envelope(400)]), "https://example.test/MapServer", 11,
+            research._FULTON_CORRIDORS["south_fulton_campbellton"],
+            {"acreage": "LandAcres", "parcel_id": "ParcelID"},
+            _passing_params(), cycle_id, "south_fulton_campbellton",
+        )
+        with self.assertRaises(research.ArcGISErrorEnvelope):
+            list(gen)
+        # R-10: the failed page stays on disk as evidence.
+        cached = research._safe_cache_path(cycle_id, "south_fulton_campbellton", 0)
+        self.assertTrue(cached.exists())
+        self.assertIn("error", json.loads(cached.read_text(encoding="utf-8")))
+
+    def test_envelope_on_page_1_aborts_corridor(self) -> None:
+        fake = FakeConnection()
+        sess = _RouteSession([_envelope(400)])
+        counts = _run_corridor(sess, fake)
+        self.assertEqual(counts, {"discovery": 0, "rejection": 0, "unmappable": 0})
+        self.assertEqual(sess.query_calls, 1)  # G6: never retried
+        self.assertEqual(_log_rows(fake, "discovery_empty"), [])
+        aborts = _log_rows(fake, "abort")
+        self.assertEqual(len(aborts), 1)
+        self.assertIn("corridor=south_fulton_campbellton", aborts[0][4])
+        self.assertIn("ArcGISErrorEnvelope", aborts[0][4])
+        self.assertIn("code=400", aborts[0][4])
+        flags = [t for t in _flag_texts(fake) if t.startswith("partial corridor")]
+        self.assertEqual(
+            flags, ["partial corridor: south_fulton_campbellton; processed_parcels=0"])
+
+    def test_malformed_bodies_abort_instead_of_empty_or_crash(self) -> None:
+        # A top-level list used to crash the cycle (AttributeError); a dict
+        # with no features list used to read as an empty corridor.
+        for body in ([], {}, {"features": None}):
+            fake = FakeConnection()
+            counts = _run_corridor(_RouteSession([body]), fake)
+            self.assertEqual(sum(counts.values()), 0, body)
+            self.assertEqual(_log_rows(fake, "discovery_empty"), [], body)
+            self.assertEqual(len(_log_rows(fake, "abort")), 1, body)
+
+    def test_envelope_on_page_2_keeps_page_1_parcels(self) -> None:
+        fake = FakeConnection()
+        page1 = _load_fixture("arcgis_query_pagination_page1.json")  # 2, exceeded=true
+        sess = _RouteSession([page1, _envelope(500)])
+        counts = _run_corridor(sess, fake)
+        self.assertEqual(sess.query_calls, 2)
+        self.assertEqual(counts["discovery"], 2)
+        self.assertEqual(len(_log_rows(fake, "discovery")), 2)
+        self.assertEqual(_log_rows(fake, "discovery_empty"), [])
+        self.assertEqual(len(_log_rows(fake, "abort")), 1)
+        flags = [t for t in _flag_texts(fake) if t.startswith("partial corridor")]
+        self.assertEqual(
+            flags, ["partial corridor: south_fulton_campbellton; processed_parcels=2"])
+
+    def test_real_empty_is_still_discovery_empty(self) -> None:
+        fake = FakeConnection()
+        counts = _run_corridor(
+            _RouteSession([_load_fixture("arcgis_query_empty.json")]), fake)
+        self.assertEqual(sum(counts.values()), 0)
+        self.assertEqual(len(_log_rows(fake, "discovery_empty")), 1)
+        self.assertEqual(_log_rows(fake, "abort"), [])
+        self.assertFalse(any(t.startswith("partial corridor") for t in _flag_texts(fake)))
+
+    def test_sentinel_never_reaches_log_flag_or_logs(self) -> None:
+        # G4 / SR-8: message/details and the query string stay out of every
+        # written or logged text.
+        fake = FakeConnection()
+        payload = _sources_payload()
+        payload["county_parcel_data"]["fulton_ga"]["service_url"] = (
+            "https://gis.example.test/MapServer")
+        with self.assertLogs("research", level="DEBUG") as logs:
+            research._discover_fulton_corridor(
+                _RouteSession([_envelope(400)]), fake, research._make_cycle_id("fulton"),
+                "south_fulton_campbellton",
+                research._FULTON_CORRIDORS["south_fulton_campbellton"],
+                "atlanta", payload,
+                payload["county_parcel_data"]["fulton_ga"]["field_mapping"],
+                _passing_params()["owner_classification"], _passing_params(),
+            )
+        written = [p[4] for p in _log_rows(fake)] + _flag_texts(fake)
+        everything = "\n".join(written + logs.output)
+        self.assertIn("gis.example.test", everything)
+        for secret in (_ENV_SENTINEL, _ENV_TOKEN, "Unable to complete", "where=",
+                       "BETWEEN"):
+            self.assertNotIn(secret, everything)
+
+    def test_real_session_does_not_retry_an_envelope(self) -> None:
+        # G6 / SR-11: one HTTP request for a 200 envelope, then the abort.
+        fake = FakeConnection()
+        with _patched_discovery_session([_FakeResponse(200, _envelope(503))]) as (
+                sess, sleeps, scripted):
+            counts = _run_corridor(sess, fake)
+        self.assertEqual(scripted.calls, 1)
+        self.assertEqual(sum(counts.values()), 0)
+        self.assertEqual(len(_log_rows(fake, "abort")), 1)
+        self.assertEqual(research._DISCOVERY_MAX_RETRIES, 2)
+
+    def test_cycle_continues_to_next_corridor_after_envelope(self) -> None:
+        sess = _RouteSession([_envelope(400),
+                              _load_fixture("arcgis_query_two_features.json")])
+        with fake_connection_context() as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()), \
+                mock.patch.object(research, "_DiscoverySession", return_value=sess), \
+                mock.patch.object(
+                    research.connector_harness, "run_harness_for_county",
+                    return_value=_load_fixture("harness_healthy.json"),
+                ):
+            summary = research.run_discovery_cycle("atlanta")
+        self.assertFalse(summary["aborted"])
+        fulton = summary["per_county"]["fulton"]
+        self.assertFalse(fulton["aborted"])
+        per = fulton["per_corridor"]
+        first, *rest = list(research._FULTON_CORRIDORS)
+        self.assertEqual(sum(per[first].values()), 0)
+        self.assertEqual(fulton["totals"]["discovery"], 2 * len(rest))
+        aborts = _log_rows(fake, "abort")
+        self.assertEqual(len(aborts), 1)
+        self.assertIn(f"corridor={first}", aborts[0][4])
+        self.assertEqual(_log_rows(fake, "discovery_empty"), [])
+
+    def test_every_corridor_enveloped_pins_documented_residual(self) -> None:
+        # reviews/31 post-change round 1 (residual, pinned on purpose): when
+        # every corridor gets an envelope the county is NOT aborted and the
+        # TSV reads discovery_fulton=0, the same as the transport-error path.
+        # The failure is loud elsewhere: one abort row and one partial-
+        # corridor data_gap flag per corridor, and no discovery_empty row.
+        # A later change that marks this county shape must update this test.
+        sess = _RouteSession([_envelope(400)])
+        with fake_connection_context() as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()), \
+                mock.patch.object(research, "_DiscoverySession", return_value=sess), \
+                mock.patch.object(
+                    research.connector_harness, "run_harness_for_county",
+                    return_value=_load_fixture("harness_healthy.json"),
+                ):
+            summary = research.run_discovery_cycle("atlanta")
+        n = len(research._FULTON_CORRIDORS)
+        fulton = summary["per_county"]["fulton"]
+        self.assertFalse(fulton["aborted"])
+        self.assertEqual(fulton["totals"]["discovery"], 0)
+        self.assertEqual(sess.query_calls, n)  # one request per corridor, no retry
+        self.assertEqual(len(_log_rows(fake, "abort")), n)
+        self.assertEqual(_log_rows(fake, "discovery_empty"), [])
+        flags = [t for t in _flag_texts(fake) if t.startswith("partial corridor")]
+        self.assertEqual(len(flags), n)
+        self.assertEqual(runner._discovery_count(fulton), 0)
+        desc = runner._format_loop_description(
+            {"market": "atlanta", "sub_summaries": {"discovery": summary}}, "t")
+        self.assertIn("discovery_fulton=0", desc)
+
+
+class TestArcgisEnvelopeSchemaCheck(unittest.TestCase):
+    """reviews/31 G3: an envelope at the schema check is a county abort with
+    reason arcgis_error, not field_mapping_drift and not a crash."""
+
+    def test_drift_check_raises_on_envelope(self) -> None:
+        with self.assertRaises(research.ArcGISErrorEnvelope):
+            research._check_field_mapping_drift(
+                _RouteSession([], schema=_envelope(499)),
+                "https://example.test/MapServer", 11, {"acreage": "LandAcres"},
+            )
+
+    def _cycle(self, schema: Any, expect_logs: bool = True):
+        sess = _RouteSession([_load_fixture("arcgis_query_two_features.json")],
+                             schema=schema)
+        with fake_connection_context() as fake, \
+                mock.patch("research.prepare.get_parameters", return_value=_passing_params()), \
+                mock.patch("research.prepare.verify_parameters_unchanged", return_value=None), \
+                mock.patch.object(research, "_load_sources_json", return_value=_sources_payload()), \
+                mock.patch.object(research, "_DiscoverySession", return_value=sess), \
+                mock.patch.object(
+                    research.connector_harness, "run_harness_for_county",
+                    return_value=_load_fixture("harness_healthy.json"),
+                ):
+            if expect_logs:
+                with self.assertLogs("research", level="DEBUG") as logs:
+                    summary = research.run_discovery_cycle("atlanta")
+            else:
+                logs = None
+                summary = research.run_discovery_cycle("atlanta")
+        return summary, fake, sess, logs
+
+    def test_schema_envelope_aborts_county(self) -> None:
+        summary, fake, sess, logs = self._cycle(_envelope(499))
+        self.assertFalse(summary["aborted"])  # cycle-level shape unchanged
+        self.assertEqual(summary["per_county"]["fulton"],
+                         {"aborted": True, "reason": "arcgis_error"})
+        self.assertEqual(sess.query_calls, 0)
+        aborts = _log_rows(fake, "abort")
+        self.assertEqual(len(aborts), 1)
+        self.assertEqual(aborts[0][4],
+                         "schema check: example.test: ArcGIS error envelope code=499")
+        self.assertFalse(any("drift" in p[4] for p in _log_rows(fake)))
+        everything = "\n".join([p[4] for p in _log_rows(fake)] + logs.output)
+        self.assertNotIn(_ENV_SENTINEL, everything)
+        self.assertNotIn(_ENV_TOKEN, everything)
+        # No discovery_fulton= TSV token, as for a drift abort.
+        self.assertIsNone(runner._discovery_count(summary["per_county"]["fulton"]))
+        desc = runner._format_loop_description(
+            {"market": "atlanta", "sub_summaries": {"discovery": summary}}, "t")
+        self.assertNotIn("discovery_fulton", desc)
+
+    def test_malformed_schema_body_aborts_county(self) -> None:
+        for schema in ({"name": "Tax Parcels"}, {"fields": None}):
+            summary, fake, _sess, _logs = self._cycle(schema)
+            self.assertEqual(summary["per_county"]["fulton"]["reason"], "arcgis_error")
+
+    def test_real_drift_still_reported_as_drift(self) -> None:
+        summary, fake, _sess, _logs = self._cycle(
+            _load_fixture("arcgis_layer11_schema_missing_landacres.json"),
+            expect_logs=False)
+        self.assertEqual(summary["per_county"]["fulton"]["reason"], "field_mapping_drift")
+        self.assertIn("LandAcres", summary["per_county"]["fulton"]["missing"])
+        drift = [p for p in _log_rows(fake, "abort") if "field-mapping drift" in p[4]]
+        self.assertEqual(len(drift), 1)
+
+
+class TestRawResponsePathPerPage(unittest.TestCase):
+    """reviews/31 G5: raw_response_path names the page that held the feature."""
+
+    def _pages(self) -> list[dict[str, Any]]:
+        return [_load_fixture("arcgis_query_pagination_page1.json"),
+                _load_fixture("arcgis_query_pagination_page2.json")]
+
+    def test_each_feature_points_at_its_own_page(self) -> None:
+        cycle_id = research._make_cycle_id("fulton")
+        seen: list[tuple[str, str]] = []
+
+        def _record(feature, conn, cycle_id_, corridor, market, mapping,
+                    classification, params, raw_response_path):
+            seen.append((feature["attributes"]["ParcelID"], raw_response_path))
+            return "discovery"
+
+        with mock.patch.object(research, "_process_parcel", _record):
+            counts = _run_corridor(_RouteSession(self._pages()), FakeConnection(), cycle_id)
+        self.assertEqual(counts["discovery"], 3)
+        page_size = research._FULTON_PAGE_SIZE
+        p0 = str(research._safe_cache_path(cycle_id, "south_fulton_campbellton", 0))
+        p1 = str(research._safe_cache_path(cycle_id, "south_fulton_campbellton", page_size))
+        self.assertTrue(p0.endswith("south_fulton_campbellton_0.json"))
+        self.assertTrue(p1.endswith(f"south_fulton_campbellton_{page_size}.json"))
+        self.assertEqual(seen, [("14F-PAGE1-001", p0), ("14F-PAGE1-002", p0),
+                                ("14F-PAGE2-001", p1)])
+        # Each named file really holds the feature it is attributed to.
+        for parcel, path in seen:
+            ids = [f["attributes"]["ParcelID"] for f in
+                   json.loads(Path(path).read_text(encoding="utf-8"))["features"]]
+            self.assertIn(parcel, ids)
+
+    def test_upsert_carries_the_page_path(self) -> None:
+        cycle_id = research._make_cycle_id("fulton")
+        fake = FakeConnection()
+        _run_corridor(_RouteSession(self._pages()), fake, cycle_id)
+        upserts = [p for s, p in fake.all_executes if s == research._SQL_UPSERT_PARCEL]
+        by_id = {p[0]: p[-1] for p in upserts}
+        self.assertTrue(by_id["fulton-14F-PAGE1-001"].endswith("_0.json"))
+        self.assertTrue(by_id["fulton-14F-PAGE2-001"].endswith(
+            f"_{research._FULTON_PAGE_SIZE}.json"))
+
+    def test_public_generator_still_yields_plain_features(self) -> None:
+        pages = self._pages()
+        feats = list(research._query_arcgis_corridor(
+            _RouteSession(self._pages()), "https://example.test/MapServer", 11,
+            research._FULTON_CORRIDORS["south_fulton_campbellton"],
+            {"acreage": "LandAcres", "parcel_id": "ParcelID"},
+            _passing_params(), research._make_cycle_id("fulton"),
+            "south_fulton_campbellton", page_size=2,
+        ))
+        self.assertEqual(feats, pages[0]["features"] + pages[1]["features"])
+        for f in feats:
+            self.assertNotIn("raw_response_path", f)
+            self.assertNotIn("_cache_path", f)
+
+    def test_offset_for_audit_is_gone(self) -> None:
+        self.assertNotIn("offset_for_audit", RESEARCH_PY_SRC)

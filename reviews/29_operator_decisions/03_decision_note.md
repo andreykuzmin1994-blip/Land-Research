@@ -62,6 +62,13 @@ jus investigate further 4- Keep for now"
    unlisted districts out. Please answer listed-only vs also-unlisted (and
    unreadable values, D3-02) with that in hand, before the first
    verification.
+   **Answered (operator, in chat, 2026-11-09): "Count them".** Unlisted
+   districts AND listed districts whose setback values are unreadable also
+   count with the default setback, never block, and carry their own
+   investigate text. D3-01 and D3-02 are CLOSED by
+   `reviews/30_d3_count_unlisted/` (dist-is-None and rules-unavailable still
+   never count; Fairburn PD's text is unchanged). The first verification
+   after that change needs a new run and baseline.
 6. **D3 never blocks and never runs while draft.** The text is a `data_gap`
    flag written once while open and a line in the notes and memo; draft
    parcels get no projection, so nothing changes until a jurisdiction is
@@ -191,6 +198,8 @@ Zoneomics mirror sources skipped by the terms block.
 - D3-01: confirm that unlisted districts (and unreadable values, D3-02)
   stay BTS N/A, knowing the only parcels D3 moves today are Fairburn PD
   where warehouse is not_permitted (decision 5, round 2 F2/F3).
+  **Closed** (operator, 2026-11-09, "count them"): both count, flagged;
+  implemented in `reviews/30_d3_count_unlisted/`.
 - Esri / item-owner terms of use remain unverified (D1-09); D1 is the basis.
 - Before verifying any jurisdiction: a new run and baseline (D3 moves BTS
   for Fairburn PD; the adjacency import, once the DDL is applied, moves
@@ -271,3 +280,13 @@ on any day.
 unreadable) before verifying any jurisdiction. (2) Schedule the D1-11
 zoning_import round if wanted. (3) Before any verification or populated
 import: new run and baseline.
+
+**2026-11-09, D1-11 (item 4) implemented:** zoning_import.ZoningSession is now a
+rules_scrape.PoliteFetcher on the shared robots verdict (code commit 16b5b97,
+offline equivalence proof, operator answer 3 "fix"); pending the post-change
+review in `reviews/32_zoning_import_fetcher/` (02_risk_review.md,
+02_code_writer_response.md, then 03_decision_note.md).
+
+**2026-11-09, D1-11 reviewed:** the post-change review approved it after one
+docstring fix; see `reviews/32_zoning_import_fetcher/03_decision_note.md`.
+Item 4 is closed.

@@ -540,6 +540,51 @@ CREATE TABLE IF NOT EXISTS experiment_log_mirror (
 );
 """
 
+# prepare-mutation (2026-11-09, operator-authorized: the operator delegated
+# this one edit to the agent, reviews/33_hazards_enabled): the FEMA NFHL flood
+# (H4) / USFWS NWI wetlands (H6) per-parcel facts, written only by the
+# between-runs hazards_import.py and read by hazards.py. Text exactly as in
+# reviews/26_flood_wetlands/01_prepare_mutation_proposal.md. Additive: the
+# metric SQL is unchanged, and with the table empty no score changes.
+_DDL_PARCEL_HAZARDS = """
+CREATE TABLE IF NOT EXISTS parcel_hazards (
+    parcel_id TEXT PRIMARY KEY REFERENCES parcels(parcel_id) ON DELETE CASCADE,
+    nfhl_parcel_geom_md5 TEXT,
+    nfhl_parcel_sf NUMERIC,
+    nfhl_mapped_sf NUMERIC,
+    nfhl_undetermined_sf NUMERIC,
+    sfha_sf NUMERIC,
+    floodway_sf NUMERIC,
+    x500_sf NUMERIC,
+    sfha_pct NUMERIC,
+    floodway_pct NUMERIC,
+    x500_pct NUMERIC,
+    nfhl_zone_sf JSONB,
+    nfhl_zone_lomr_sf JSONB,
+    zones TEXT[],
+    bfe_ft NUMERIC,
+    lomr_status TEXT,
+    nfhl_as_of TEXT,
+    nfhl_source TEXT,
+    nfhl_fetched_at TIMESTAMPTZ,
+    sfha_geom geometry(MultiPolygon, 2240),
+    nwi_parcel_geom_md5 TEXT,
+    nwi_parcel_sf NUMERIC,
+    wetland_sf NUMERIC,
+    wetland_pct NUMERIC,
+    wetland_deep_excavated_sf NUMERIC,
+    wetland_type_sf JSONB,
+    nwi_as_of TEXT,
+    nwi_source TEXT,
+    nwi_fetched_at TIMESTAMPTZ,
+    wetland_geom geometry(MultiPolygon, 2240)
+);"""
+
+_DDL_PARCEL_HAZARDS_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_hazards_sfha_geom ON parcel_hazards USING GIST(sfha_geom);",
+    "CREATE INDEX IF NOT EXISTS idx_hazards_wetland_geom ON parcel_hazards USING GIST(wetland_geom);",
+)
+
 _DDL_INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_parcels_county ON parcels(county);",
     "CREATE INDEX IF NOT EXISTS idx_parcels_market ON parcels(market);",
@@ -593,6 +638,8 @@ _ALL_DDL: tuple[str, ...] = (
     _DDL_HARNESS_REPORTS,
     _DDL_FLAGGED_ITEMS,
     _DDL_EXPERIMENT_LOG_MIRROR,
+    _DDL_PARCEL_HAZARDS,
+    *_DDL_PARCEL_HAZARDS_INDEXES,
     *_DDL_INDEXES,
 )
 
