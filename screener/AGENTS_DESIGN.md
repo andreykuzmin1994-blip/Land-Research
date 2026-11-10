@@ -12,15 +12,15 @@ the evaluation and changing zoning facts stay human.
 
 | Plan step | State |
 |---|---|
-| 3. Lead grade | Built and independently reviewed (`grade.py`, `reviews/35_screener_lead_layer`). Thresholds are defaults the operator has not confirmed. |
+| 3. Lead grade | Built and independently reviewed (`grade.py`, `reviews/35_screener_lead_layer`). The operator kept the default thresholds and the prototype list as they are (2026-11-10). |
 | `leads.md` digest | Built and reviewed (`digest.py`). |
 | 5. Decisions with facts | Built and reviewed (`facts.py`, `decide.py`). |
 | Storage: kept slope answers | Built and reviewed. A warm Fulton run is about 80 seconds instead of 55 minutes. |
 | Storage: data branch | `screener-data` holds the first run, its digest, the slope answers and two pilot lead checks. |
-| Scheduled weekly run | Created, but **cannot save results yet**: a scheduled session starts without push access to the repository. Operator decision pending. |
+| Runs | **On demand** (operator decision, 2026-11-10): ask a Claude session with the repository attached to follow `RUNBOOK.md` on the `screener-data` branch. The weekly schedule made earlier is switched off; a scheduled session starts without push access to the repository and could not save its results. |
 | 4. Investigation | `quotecheck.py` and `INVESTIGATE.md` written and piloted on two leads (`reviews/35_screener_lead_layer/04_investigation_pilot.md`). **Not independently reviewed.** The skeptic step has not been run. |
 | 2. Enrichment contract | Not started. |
-| 6. Bigger answer key / more counties | Not started; a data feasibility check is under way. Rebuilding the key is a human-only step. |
+| 6. Bigger answer key / more counties | Not started. No neighbouring county publishes a 2016 snapshot like Fulton's (`reviews/35_screener_lead_layer/05_county_feasibility.md`). Fulton itself publishes yearly snapshots for 2015-2021 and 2023-2026 (service names seen 2026-11-10; fields not checked). Rebuilding the key is a human-only step. |
 
 What the pilot changed in the plan: the zoning text (Municode) and the
 owner record (Secretary of State) cannot be read by a polite, plain fetch
