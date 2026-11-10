@@ -19,7 +19,7 @@ RANKED_COLUMNS = [
     "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft",
     "largest_open_acres", "envelope_fit", "envelope_building_sf", "detention_pct", "pond_fit",
     "soil_hsg", "soil_hydric_pct", "soil_poorly_drained_pct", "soil_dwellings_limited_pct",
-    "frontage_ft", "frontage_road", "frontage_limited_ft",
+    "frontage_ft", "frontage_road", "frontage_limited_ft", "frontage_private_ft",
     "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",

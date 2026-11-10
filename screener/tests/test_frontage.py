@@ -103,8 +103,68 @@ class ParcelCheckTests(Offline):
         self.assertEqual((f.state, f.feet), (frontage.NONE, 0))
         self.assertAlmostEqual(f.limited_feet, along(5.0), delta=2)
         line = frontage.brief_line(f.fields())
-        self.assertIn("along an interstate or freeway/expressway (access controlled: a driveway is unlikely)", line)
-        self.assertIn("only interstates or freeways nearby", line)
+        self.assertIn("along an interstate, freeway/expressway or ramp (access controlled: a "
+                      "driveway is unlikely)", line)
+        self.assertIn("only access-controlled or private GDOT roads nearby", line)
+
+    # Function type = route id character 0 (GDOT FUNCTION_TYPE domain).
+    PRIVATE_LOCAL = "9003300031500INC"     # live: layer 6, type 9 (Private)
+    RAMP = "20001008042F0INC"              # live: layer 2, type 2 (Ramp), system 1
+
+    def test_private_road_is_not_public_frontage(self):
+        f = self.ask(fake_roads([(6, self.PRIVATE_LOCAL, 10.0)]))
+        self.assertEqual((f.state, f.feet, f.limited_feet), (frontage.NONE, 0, 0))
+        self.assertAlmostEqual(f.private_feet, along(10.0), delta=2)
+        self.assertIsNone(f.nearest_ft)
+        fields = f.fields()
+        self.assertEqual((fields["frontage_ft"], fields["frontage_road"]),
+                         (0, frontage.NONE_LABEL))
+        self.assertAlmostEqual(fields["frontage_private_ft"], along(10.0), delta=2)
+        self.assertIsNone(fields[frontage.LINE_KEY])
+        line = frontage.brief_line(fields)
+        self.assertIn("ft along a road GDOT maps as private (not public access", line)
+        self.assertNotIn("GDOT route 9003300031500", line)
+
+    def test_private_road_next_to_a_public_one(self):
+        f = self.ask(fake_roads([(6, self.PRIVATE_LOCAL, 5.0), (3, "1000100001400INC", 10.0)]))
+        self.assertEqual((f.state, f.road), (frontage.CHECKED, "minor arterial, SR 14"))
+        self.assertEqual([lab for lab, _ in f.roads], ["minor arterial, SR 14"])
+        self.assertAlmostEqual(f.feet, along(10.0), delta=2)
+        self.assertAlmostEqual(f.private_feet, along(5.0), delta=2)
+
+    def test_ramps_and_connectors_are_limited_access_on_any_layer(self):
+        for ftype in "23478":
+            rid = ftype + self.RAMP[1:]
+            for layer in (2, 3, 6):
+                with self.subTest(ftype=ftype, layer=layer):
+                    f = self.ask(fake_roads([(layer, rid, 10.0)]))
+                    self.assertEqual((f.state, f.feet, f.private_feet), (frontage.NONE, 0, 0))
+                    self.assertAlmostEqual(f.limited_feet, along(10.0), delta=2)
+                    self.assertNotIn("SR 8042", frontage.brief_line(f.fields()))
+
+    def test_projected_alignment_is_left_out(self):
+        f = self.ask(fake_roads([(3, "P000100001400INC", 5.0)]))
+        self.assertEqual((f.state, f.feet, f.limited_feet, f.private_feet),
+                         (frontage.NONE, 0, 0, 0))
+        self.assertEqual(f.reason, "no GDOT road within about 500 ft")
+
+    def test_public_function_types_stay_access(self):
+        for ftype in "156ZR":
+            with self.subTest(ftype=ftype):
+                f = self.ask(fake_roads([(6, ftype + "121200054600INC", 10.0)]))
+                self.assertEqual(f.state, frontage.CHECKED)
+                self.assertAlmostEqual(f.feet, along(10.0), delta=2)
+                self.assertEqual((f.limited_feet, f.private_feet), (0, 0))
+
+    def test_road_kinds(self):
+        kind = frontage.road_kind
+        self.assertEqual(kind(3, "1000100001400INC"), frontage.ACCESS)
+        self.assertEqual(kind(0, "1000100040200INC"), frontage.LIMITED)
+        self.assertEqual(kind(2, self.RAMP), frontage.LIMITED)
+        self.assertEqual(kind(6, self.PRIVATE_LOCAL), frontage.PRIVATE)
+        self.assertEqual(kind(3, "P000100001400INC"), frontage.SKIP)
+        self.assertEqual(kind(6, None), frontage.ACCESS)          # unknown form: as before
+        self.assertEqual(kind(1, self.PRIVATE_LOCAL), frontage.LIMITED)
 
     def test_longest_road_wins_and_ties_are_deterministic(self):
         f = self.ask(fake_roads([(6, "1121200054600INC", 5.0), (3, "1000100001400INC", 10.0)]))
@@ -191,6 +251,13 @@ class ParcelCheckTests(Offline):
         self.assertEqual(frontage.road_label(6, "1121200054600INC"),
                          "local road, GDOT route 1121200054600")
         self.assertEqual(frontage.road_label(6, None), "local road, unnamed route")
+        # "SR N" only for a main line (function type 1): no made-up "SR 8042 F0".
+        self.assertEqual(frontage.road_label(2, "20001008042F0INC"),
+                         "principal arterial, GDOT route 20001008042F0")
+        self.assertEqual(frontage.road_label(3, "5000100001400INC"),
+                         "minor arterial, GDOT route 5000100001400")
+        self.assertEqual(frontage.road_label(6, "Z121200054600INC"),
+                         "local road, GDOT route Z121200054600")
         self.assertEqual(frontage.road_label(6, "=cmd|' /C calc'!A0 <b>"),
                          "local road, GDOT route CMDCCALCA0B")
 
@@ -353,6 +420,7 @@ class FrontageRunTests(RunHarness):
                     self.assertEqual(r["frontage_road"], "minor arterial, SR 14")
                     self.assertAlmostEqual(int(r["frontage_ft"]), along(10.0), delta=2)
                     self.assertEqual(r["frontage_limited_ft"], "0")
+                    self.assertEqual(r["frontage_private_ft"], "0")
                 for p in self.parcels:
                     self.assertIn(frontage.DETAIL_KEY, p)
 
@@ -392,9 +460,10 @@ class FrontageRunTests(RunHarness):
         rows = self.rows()
         a, b, c = rows["14F0001 0001"], rows["14F0002 0002"], rows["14F0003 0003"]
         self.assertEqual(a["frontage_road"], "minor arterial, SR 14")
-        self.assertEqual([b[k] for k in frontage.COLUMNS], ["0", frontage.NONE_LABEL, "0"])
+        self.assertEqual([b[k] for k in frontage.COLUMNS], ["0", frontage.NONE_LABEL, "0", "0"])
         self.assertTrue(c["frontage_road"].startswith("not checked: road service failed"))
-        self.assertEqual((c["frontage_ft"], c["frontage_limited_ft"]), ("", ""))
+        self.assertEqual((c["frontage_ft"], c["frontage_limited_ft"], c["frontage_private_ft"]),
+                         ("", "", ""))
         self.assertIn("about 969 ft", self.front_line("14F0001 0001"))
         self.assertIn("none within 50 ft", self.front_line("14F0002 0002"))
         self.assertIn("Road frontage: not checked (road service failed",
@@ -442,7 +511,7 @@ class FrontageRunTests(RunHarness):
         with open(self.out / "ranked.csv", newline="") as fh:
             header = next(csv.reader(fh))
         i = header.index("soil_dwellings_limited_pct")
-        self.assertEqual(header[i + 1:i + 4], list(frontage.COLUMNS))
+        self.assertEqual(header[i + 1:i + 1 + len(frontage.COLUMNS)], list(frontage.COLUMNS))
         props = json.loads((self.out / "ranked.geojson").read_text())["features"][0]["properties"]
         self.assertEqual(props["frontage_road"], "minor arterial, SR 14")
         self.assertNotIn(frontage.DETAIL_KEY, props)

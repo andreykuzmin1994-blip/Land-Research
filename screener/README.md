@@ -219,7 +219,7 @@ the screener sends its own User-Agent, at most 3 requests at a time
 (`[soils] workers`, 1-3) and caches answers like every other source.
 `[soils] max_parcels` (250 by default) caps it to the top N by rank.
 
-**Road frontage (GDOT road centrelines).** Three more columns follow
+**Road frontage (GDOT road centrelines).** Four more columns follow
 `soil_dwellings_limited_pct`, and each brief has a "Road frontage" line.
 After the sort, the fit, the pond and the soils, the screener sends one
 `identify` request per ranked parcel to GDOT's public Functional Class map
@@ -230,19 +230,29 @@ functional-class layers (interstate, freeway/expressway, principal and
 minor arterial, major and minor collector, local road). The parcel line
 within 50 ft of a centreline counts as frontage on that road:
 
-- `frontage_ft`: parcel line within 50 ft of any road that is not an
-  interstate or freeway.
+- `frontage_ft`: parcel line within 50 ft of any public road that is not
+  access controlled and not private.
 - `frontage_road`: class and route of the road with the longest frontage
   ("minor arterial, SR 14"). The layer has no street names, so a county or
   city road shows its GDOT route id; the county's road type stays in the
   brief's Access line.
 - `frontage_limited_ft`: parcel line within 50 ft of an interstate or
-  freeway/expressway: access is controlled and a driveway unlikely, so it
-  is kept apart.
+  freeway/expressway, or of a ramp, collector-distributor road, ramp
+  connector, managed lane or Y-connector on any layer: access is
+  controlled and a driveway unlikely, so it is kept apart.
+- `frontage_private_ft`: parcel line within 50 ft of a road GDOT marks as
+  private: mapped, but not public access (check an access easement).
+
+The road's type is the first character of its GDOT route id (GDOT's
+FUNCTION_TYPE domain: 1 main line, 2 ramp, 3 collector distributor, 4
+ramp-CD connector, 5 frontage road, 6 alley, 7 managed facility, 8
+Y-connector, 9 private, P projected, Z other, R roundabout). Projected
+alignments (not built) are left out, and only a main line is labelled
+"SR N"; a ramp or other piece of a state route shows its GDOT route id.
 
 Three states stay apart: a number and a road; `0` with `none within 50 ft`
 (the brief gives the nearest road's distance and says "possibly
-land-locked"); and `not checked: <why>` in `frontage_road`, with both
+land-locked"); and `not checked: <why>` in `frontage_road`, with all three
 numbers empty, when the check didn't run or failed (`[frontage]` off or
 outside `max_parcels`, an HTTP error, an answer without a results list, a
 road from another layer, without polyline geometry or not in WGS84, or an

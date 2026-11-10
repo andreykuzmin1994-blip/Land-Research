@@ -12,15 +12,25 @@ bounding box (padded about 500 ft) on the seven functional-class layers:
 roads.) The parcel line within ``BUFFER_FT`` (50 ft) of a centreline counts
 as frontage on that road, measured in the parcel's local plane:
 
-- ``frontage_ft``: parcel line within 50 ft of any road that is not an
-  interstate or freeway/expressway (access controlled: a driveway is
-  unlikely).
+- ``frontage_ft``: parcel line within 50 ft of any public road that is
+  not access controlled (an interstate or freeway/expressway, a ramp or
+  the like: a driveway is unlikely) and not private.
 - ``frontage_road``: class and route of the road with the longest frontage
   ("minor arterial, SR 14"; a county or city road shows its GDOT route id,
   since the layer carries no street names), or ``none within 50 ft``, or
   ``not checked: <why>``.
 - ``frontage_limited_ft``: parcel line within 50 ft of an interstate or
-  freeway (frontage that gives no access).
+  freeway, or of a ramp, collector-distributor road, ramp connector,
+  managed lane or Y-connector on any layer (frontage that gives no access).
+- ``frontage_private_ft``: parcel line within 50 ft of a road GDOT marks
+  as private (function type 9): mapped, but not public access.
+
+The function type is the first character of the GDOT route id (GDOT's
+FUNCTION_TYPE domain: 1 main line, 2 ramp, 3 collector distributor, 4
+ramp-CD connector, 5 frontage road, 6 alley, 7 separate managed facility, 8
+Y-connector, 9 private, P projected alignment, Z other, R roundabout).
+Projected alignments (not built) are left out. Only a main line is
+labelled "SR N"; any other piece of a state route shows its GDOT route id.
 
 Three states: a number and a road; ``0`` and ``none within 50 ft``; empty
 numbers and ``not checked: <why>``. Fail soft: an HTTP error, an answer
@@ -81,7 +91,7 @@ STOP_AFTER_FAILURES = 5
 
 # Name stem of every F10 key (the static and spy guards import it).
 KEY_STEMS = ("frontage_",)
-COLUMNS = ("frontage_ft", "frontage_road", "frontage_limited_ft")
+COLUMNS = ("frontage_ft", "frontage_road", "frontage_limited_ft", "frontage_private_ft")
 DETAIL_KEY = "_frontage_detail"
 LINE_KEY = "_frontage_line"   # the frontage part of the parcel line, WGS84 (plan)
 
@@ -93,7 +103,14 @@ SERVICE_FAILED = "road service failed"
 # GDOT route id (16 characters): function type, county (000 for most state
 # routes), system code (1 state route, 2 public road), 6-digit route number,
 # 2-character suffix (00, or AL / CO / SO ...), direction.
-_ROUTE_ID = re.compile(r"^\d{5}\d{6}[A-Z0-9]{2}[A-Z]{3}$")
+_ROUTE_ID = re.compile(r"^[0-9PZR]\d{4}\d{6}[A-Z0-9]{2}[A-Z]{3}$")
+# Function types (route id character 0) that are access controlled
+# wherever they sit: ramp, collector distributor, ramp-CD connector,
+# separate managed facility, Y-connector.
+LIMITED_TYPES = frozenset("23478")
+PRIVATE_TYPE = "9"
+SKIPPED_TYPES = frozenset("P")          # projected alignment: not built
+ACCESS, LIMITED, PRIVATE, SKIP = "access", "limited", "private", "skip"
 _SAFE = re.compile(r"[^A-Z0-9]")
 
 CAVEAT = (f"Measured as the parcel line within {BUFFER_FT:.0f} ft of a GDOT road centreline, from the county "
@@ -110,6 +127,7 @@ class Frontage:
     reason: str = ""
     feet: int | None = None                      # access frontage (not limited access)
     limited_feet: int | None = None
+    private_feet: int | None = None
     road: str | None = None                      # label of the longest-frontage road
     roads: list[tuple[str, int]] = field(default_factory=list)   # (label, ft), longest first
     nearest_ft: int | None = None                # nearest access road when NONE
@@ -119,15 +137,40 @@ class Frontage:
         """The report fields (attached after the sort, never before)."""
         if self.state == NOT_CHECKED:
             return {"frontage_ft": None, "frontage_road": NOT_CHECKED_PREFIX + self.reason,
-                    "frontage_limited_ft": None, DETAIL_KEY: self, LINE_KEY: None}
+                    "frontage_limited_ft": None, "frontage_private_ft": None,
+                    DETAIL_KEY: self, LINE_KEY: None}
         return {"frontage_ft": self.feet,
                 "frontage_road": self.road if self.state == CHECKED else NONE_LABEL,
-                "frontage_limited_ft": self.limited_feet, DETAIL_KEY: self,
+                "frontage_limited_ft": self.limited_feet,
+                "frontage_private_ft": self.private_feet, DETAIL_KEY: self,
                 LINE_KEY: self.line}
 
 
 def not_checked(reason: str) -> Frontage:
     return Frontage(NOT_CHECKED, reason=reason)
+
+
+def _clean(route_id: Any) -> str:
+    return _SAFE.sub("", str(route_id or "").upper())[:20]
+
+
+def function_type(route_id: Any) -> str | None:
+    """GDOT function type (route id character 0), or None for an id not
+    in GDOT's 16-character form."""
+    rid = _clean(route_id)
+    return rid[0] if _ROUTE_ID.match(rid) else None
+
+
+def road_kind(layer_id: int, route_id: Any) -> str:
+    """ACCESS, LIMITED (access controlled), PRIVATE or SKIP (not built)."""
+    ftype = function_type(route_id)
+    if ftype in SKIPPED_TYPES:
+        return SKIP
+    if layer_id in LIMITED_ACCESS or ftype in LIMITED_TYPES:
+        return LIMITED
+    if ftype == PRIVATE_TYPE:
+        return PRIVATE
+    return ACCESS
 
 
 def road_label(layer_id: int, route_id: Any) -> str:
@@ -136,10 +179,10 @@ def road_label(layer_id: int, route_id: Any) -> str:
     The 3-letter direction (INC / DEC) is dropped, so the two carriageways
     of a divided road count as one road."""
     cls = CLASSES[layer_id]
-    rid = _SAFE.sub("", str(route_id or "").upper())[:20]
+    rid = _clean(route_id)
     if not rid:
         return f"{cls}, unnamed route"
-    if _ROUTE_ID.match(rid) and rid[4] == "1":
+    if _ROUTE_ID.match(rid) and rid[4] == "1" and rid[0] == "1":   # state route main line
         suffix = rid[11:13]
         return f"{cls}, SR {int(rid[5:11])}" + (f" {suffix}" if suffix != "00" else "")
     if _ROUTE_ID.match(rid):
@@ -211,37 +254,48 @@ def measure(geometry: BaseGeometry, results: list[dict[str, Any]]) -> Frontage:
     proj = LocalProjection.around(geometry)
     edge = proj(geometry).boundary
     buf_m = BUFFER_FT / FT_PER_M
-    roads: dict[tuple[int, str], list[LineString]] = {}
+    roads: dict[tuple[str, int, str], list[LineString]] = {}
     for r in results:
+        rid = (r.get("attributes") or {}).get("route_id")
+        kind = road_kind(r["layerId"], rid)
+        if kind == SKIP:
+            continue
         lines = [LineString([pt[:2] for pt in path]) for path in r["geometry"]["paths"]]
-        key = (r["layerId"], road_label(r["layerId"], (r.get("attributes") or {}).get("route_id")))
+        key = (kind, r["layerId"], road_label(r["layerId"], rid))
         roads.setdefault(key, []).extend(proj(ln) for ln in lines)
     if not roads:
-        return Frontage(NONE, feet=0, limited_feet=0, reason="no GDOT road within about 500 ft")
+        return Frontage(NONE, feet=0, limited_feet=0, private_feet=0,
+                        reason="no GDOT road within about 500 ft")
     zones = {key: unary_union(lines).buffer(buf_m) for key, lines in roads.items()}
     per_road = []
-    for (layer, label), zone in zones.items():
-        if layer in LIMITED_ACCESS:
+    for (kind, _, label), zone in zones.items():
+        if kind != ACCESS:
             continue
         ft = round(edge.intersection(zone).length * FT_PER_M)
         if ft >= 1:
             per_road.append((label, ft))
     per_road.sort(key=lambda kv: (-kv[1], kv[0]))
-    access = [z for (layer, _), z in zones.items() if layer not in LIMITED_ACCESS]
-    limited = [z for (layer, _), z in zones.items() if layer in LIMITED_ACCESS]
+
+    def of(kind):
+        return [z for k, z in zones.items() if k[0] == kind]
+
+    def feet_along(zs):
+        return round(edge.intersection(unary_union(zs)).length * FT_PER_M) if zs else 0
+
+    access = of(ACCESS)
     access_line = edge.intersection(unary_union(access)) if access else None
     feet = round(access_line.length * FT_PER_M) if access_line is not None else 0
-    limited_ft = round(edge.intersection(unary_union(limited)).length * FT_PER_M) if limited else 0
+    limited_ft, private_ft = feet_along(of(LIMITED)), feet_along(of(PRIVATE))
     if feet < 1 or not per_road:
         near = None
         if access:
-            near_m = min(edge.distance(unary_union(roads[k])) for k in roads
-                         if k[0] not in LIMITED_ACCESS)
+            near_m = min(edge.distance(unary_union(roads[k])) for k in roads if k[0] == ACCESS)
             near = round(near_m * FT_PER_M)
-        return Frontage(NONE, feet=0, limited_feet=limited_ft, nearest_ft=near)
+        return Frontage(NONE, feet=0, limited_feet=limited_ft, private_feet=private_ft,
+                        nearest_ft=near)
     line = shapely.transform(access_line, _inverse(proj))
-    return Frontage(CHECKED, feet=feet, limited_feet=limited_ft, road=per_road[0][0],
-                    roads=per_road, line=line)
+    return Frontage(CHECKED, feet=feet, limited_feet=limited_ft, private_feet=private_ft,
+                    road=per_road[0][0], roads=per_road, line=line)
 
 
 def check_parcel(geometry: BaseGeometry | None) -> Frontage:
@@ -318,17 +372,19 @@ def brief_line(p: dict[str, Any]) -> str:
         return "- Road frontage: not checked (frontage off)"
     if f.state == NOT_CHECKED:
         return f"- Road frontage: not checked ({f.reason}). {CURB_CUT}"
-    limited = (f"; {f.limited_feet:,} ft along an interstate or freeway/expressway (access "
-               "controlled: a driveway is unlikely)" if f.limited_feet else "")
+    limited = (f"; {f.limited_feet:,} ft along an interstate, freeway/expressway or ramp "
+               "(access controlled: a driveway is unlikely)" if f.limited_feet else "")
+    limited += (f"; {f.private_feet:,} ft along a road GDOT maps as private (not public "
+                "access: check an access easement)" if f.private_feet else "")
     if f.state == NONE:
         if f.reason:
             where = f.reason
         elif f.nearest_ft is not None:
             where = f"nearest non-freeway GDOT road about {f.nearest_ft:,} ft from the parcel line"
         else:
-            where = "only interstates or freeways nearby"
+            where = "only access-controlled or private GDOT roads nearby"
         return (f"- Road frontage (GDOT road centrelines): {NONE_LABEL} ({where}){limited}; "
-                f"possibly land-locked or on a road GDOT doesn't map (a private drive), check "
+                f"possibly land-locked or on a private road or drive, check "
                 f"access easements. {CAVEAT}. {CURB_CUT}")
     others = ", ".join(f"{label} {ft:,} ft" for label, ft in f.roads[1:4])
     more = f" (+{len(f.roads) - 4} more)" if len(f.roads) > 4 else ""
