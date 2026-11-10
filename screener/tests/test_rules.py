@@ -347,6 +347,7 @@ class RankPurityTests(unittest.TestCase):
             "W = 1\ndef f():\n    global W\n    W = 2",
             "def f():\n    x = 1\n    def g():\n        nonlocal x\n",
             "P = 'screener/autoresearch/data/fulton_2016_labels.json'",
+            "P = 'fulton_2019_features.json.gz'", "P = 'test_blocks.json'",
             "P = 'experiments.tsv'", "P = 'best_ranking.json'", "def f(:",
             "from typing import _eval_type",
             # The scorer's caller frames hold the evaluator's records and answer key.
@@ -462,8 +463,11 @@ class DecideTests(unittest.TestCase):
                 path.unlink()
 
     def run_decide(self, hits, order=None, new_baseline=False, **extra):
-        dev = {"hits": hits, "positives": 10, "k": 3, "recall": round(hits / 10, 3),
-               "score_range": [0.0, 90.0], "order": order or self.bad, "nonfinite_scores": 0}
+        # The keep decision is made from the rankings themselves (rescored in
+        # decide); "hits" and "graded" here are only what gets logged.
+        dev = {"hits": float(hits), "graded": float(hits), "sites": 10.0, "positives": 10,
+               "k": 3, "score_range": [0.0, 90.0], "order": {0: order or self.bad},
+               "nonfinite_scores": 0}
         dev.update(extra)
         return ev.decide(self.records, self.positives, dev, new_baseline)
 

@@ -426,7 +426,7 @@ Some names mean slightly different things live and in the evaluation:
 `usable_after_slope` is slope-adjusted live but equals `usable_acres` in
 the evaluation; `rail_ft` / `rail_owner` come from the whole live rail
 layer but only main lines and yards in the evaluation; ownership fields
-are as of today live and as of 2016-01-01 in the evaluation.
+are as of today live and as of 1 January of each as-of year in the evaluation.
 
 Neither a decision nor the snapshot is on a parcel while it is scored
 (`tests/test_decisions.py` spies on `rank.learned_score` and
@@ -572,30 +572,33 @@ a `--limit` trial. Limits:
   added to the flags only after scoring and the sort; `rank.py` and
   `scoring.py` never see them (tests pin this). The evaluation has no such
   fact. Putting portfolio size or assemblage acres in the score would be a
-  human evaluation step: build the same exact-key groups on the 2016
-  snapshot in `build_eval.py` (owner and mailing address exist there), add
+  human evaluation step: build the same exact-key groups on each as-of
+  year's snapshot in `build_eval.py` (owner and mailing address exist there), add
   a FEATURES entry, and rebuild with `--new-baseline`. Do not read the
   flag text from `rank.py`.
 
 ## AutoResearch
 
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
-against an answer key it can't game: Fulton land (as of the 2016 tax
-digest) that its owner sold in 2016 or later, and that carried a $1M+
-industrial building by 2025. That's 46 sites, spatially split 34 dev / 12
-test. See `screener/autoresearch/PROGRAM.md`.
+against an answer key it can't game: Fulton land that its owner sold,
+before any building, to someone who had a $1M+ industrial building on it
+by 2025, asked from each January of 2015 to 2019. That's 49 distinct
+sites (164 site-years), spatially split 38 dev / 11 test. See
+`screener/autoresearch/PROGRAM.md`.
 
-Key rebuilt 2026-10-29 after the owner and association screens changed:
-the hand-built ranking puts 2 of the 34 dev sites in its top 2% (45
-parcels). Random ranking averages 0.8. The developer
-sites sit much closer to exits and inside industrial areas, and were
-mostly sold by companies, so there is a lot for the loop to learn.
+Key rebuilt 2026-11-10 (`reviews/36_screener_eval_cohorts_metric`): five
+as-of years instead of 2016 alone, a sale must precede the building, and
+a change is judged on a graded score (where each site ranks) instead of
+whole top-2% hits. The hand-built ranking scores graded 12.2 of 38 dev
+sites (1.9 in the top 2%); random ranking averages 3.4. Earlier scores are
+not comparable.
 
 ```bash
-python -m screener.autoresearch.build_eval          # rebuild the frozen key (humans only, ~5 min)
+python -m screener.autoresearch.build_eval          # rebuild the frozen key (humans only, ~5 min; needs data/test_blocks.json)
 python -m screener.autoresearch.evaluate --decide   # baseline, then once per experiment
 python -m screener.autoresearch.evaluate --test     # sealed test split (humans only)
 python -m screener.autoresearch.evaluate --decide --new-baseline   # humans, after changing the key or screens
+python -m screener.autoresearch.evaluate --null-test               # humans: how often the keep rule keeps noise (minutes)
 ```
 
 To run the loop, open a fresh Claude Code session and say: "Read
@@ -610,6 +613,9 @@ The evaluator refuses (prints `REFUSED: ...`, exits 3, logs nothing) when:
   `screener/` (ignored files such as `cache/` don't count), the experiment
   commit touches any file besides `screener/rank.py`, or git can't be read.
 - (`--decide`) any score is NaN or infinite, or outside 0–100.
+- (`--decide`) `experiments.tsv` was written by an earlier version of the
+  evaluator (other columns), or holds runs of another key and none of
+  this one: a human moves the old file aside or records a new baseline.
 - (`--decide`) the evaluation changed since the best kept run (`evaluate.py`,
   `screens.py`, `data/`), or the best kept run's record is broken:
   `best_ranking.json` is missing, unreadable or from another run, or
