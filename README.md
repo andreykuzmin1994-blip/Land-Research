@@ -1,6 +1,6 @@
 # screener-data
 
-Data for the land screener's scheduled cloud runs. **No code lives here,
+Data for the land screener's cloud runs (on demand; nothing is scheduled). **No code lives here,
 and this branch is never merged into `main`.** It exists because a cloud
 session's files are discarded when the session ends.
 
@@ -15,7 +15,7 @@ repository private.
 | `digests/<county>-<date>.md` | What changed since the previous run. Start here. |
 | `leads/<parcel>/` | An agent's check of one lead: `lead.md` (start there) and its quote-checked findings. The fetched pages are not kept here. |
 | `cache/slope/` | Kept lidar slope answers (public data, about 2 KB per parcel). They spare each run about 50 minutes. |
-| `RUNBOOK.md` | The steps the scheduled session follows. |
+| `RUNBOOK.md` | The steps a session follows when you ask it to run the screen. |
 
 ## Recording a decision
 

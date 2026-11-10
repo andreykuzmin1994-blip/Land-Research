@@ -1,8 +1,10 @@
-# Runbook: scheduled screener run
+# Runbook: a screener run on demand
 
-For the Claude session a schedule starts. Follow these steps in order.
-The code is whatever is on `main`; the data is this branch
-(`screener-data`).
+For the Claude session the operator asks to run the screen. Runs are on
+demand (operator decision, 2026-11-10); nothing is scheduled. Use a
+session that has the repository attached, so it can push. Follow these
+steps in order. The code is whatever is on `main`; the data is this
+branch (`screener-data`).
 
 ## Rules
 
