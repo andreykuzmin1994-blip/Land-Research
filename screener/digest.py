@@ -19,9 +19,14 @@ from . import grade
 FILE_NAME = "leads.md"
 
 
+_MARKUP = str.maketrans({"|": "/", "[": "(", "]": ")", "<": "(", ">": ")", "`": "'",
+                         "*": "", "_": " ", "\\": "/"})
+
+
 def _cell(text: Any) -> str:
-    """One markdown table cell: no pipes or line breaks from county text."""
-    return re.sub(r"\s+", " ", str(text if text is not None else "")).replace("|", "/").strip()
+    """One markdown table cell of county text: no pipes or line breaks (they
+    would add a column or a row) and no link, HTML, code or emphasis markup."""
+    return re.sub(r"\s+", " ", str(text if text is not None else "").translate(_MARKUP)).strip()
 
 
 def _acres(p: dict[str, Any]) -> str:
@@ -69,8 +74,10 @@ def _row(p: dict[str, Any], brief: str | None, with_item: bool) -> str:
              _acres(p), _zoning(p), _building(p), _frontage(p), _owner(p)]
     if with_item:
         cells.append(_open_item(p))
-    cells.append(f"[brief](briefs/{brief})" if brief else f"`{p.get('parcel_id')}`")
-    return "| " + " | ".join(_cell(c) for c in cells) + " |"
+    # The last cell is ours, not county text: a link to a file name the
+    # report made safe, or the parcel id as plain text.
+    last = f"[brief](briefs/{brief})" if brief else _cell(p.get("parcel_id"))
+    return "| " + " | ".join([*(_cell(c) for c in cells), last]) + " |"
 
 
 def select(ranked: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
@@ -109,12 +116,15 @@ def leads_md(county: str, run_date: str, ranked: list[dict[str, Any]], limit: in
         lines += [head + extra + " Detail |", rule + ("---|" if with_item else "") + "---|"]
         lines += [_row(p, brief_names.get(id(p)), with_item) for p in rows]
     lines += ["", "## How to read this", "",
-              "- A: zoning path by right or likely, a prototype building envelope fits on the "
-              "open ground, a detention pond fits beside it, the parcel has public road "
-              "frontage, and no watch item was found (wet soils, a listed contamination site "
-              "on the parcel, the same owner built next door, a recent purchase).",
-              "- B: exactly one of those was found or could not be checked. C: two or more. "
-              "Blocked: zoned and planned against industrial use.",
+              "- A: every check came back clear. The zoning path is by right or likely, a "
+              "prototype building envelope fits on the open ground, a detention pond fits "
+              "beside it, the parcel has public road frontage, the slope and soils readings "
+              "came back and are under their limits, the parcel map agrees with the tax "
+              "record, and none of these was found: the same owner built next door, a listed "
+              "contamination site on the parcel, a priced deed in the last few years.",
+              "- B: exactly one of those was found or could not be checked (a failed service "
+              "counts as not checked, never as clear). C: two or more. Blocked: the zoning "
+              "path is against industrial use.",
               f"- {grade.CAVEAT}.",
               "- Still not checked by anything here: utilities and their capacity, zoning "
               "conditions, easements other than conservation easements, curb cuts, whether "

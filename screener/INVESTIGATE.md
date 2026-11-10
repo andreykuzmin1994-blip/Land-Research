@@ -25,8 +25,11 @@ The product is `leads/<parcel>/findings.checked.json` and a short
    primary source over a summary of it.
    - Never CoStar, LoopNet or Crexi, by any route (their terms prohibit
      automated use; `quotecheck` refuses them).
-   - Honour robots.txt. One request per second per host. No sign-ins, no
-     paywalls, no forms that submit anything.
+   - Honour robots.txt, and read it **before** the first request to a
+     host, in a separate step: never in the same command as the page.
+     Wait at least one second between requests to a host, or the host's
+     own `Crawl-delay` if it asks for more. No sign-ins, no paywalls, no
+     forms that submit anything.
 5. **No contact with anyone.** No calls, emails, forms, or messages to
    an owner, broker, city or utility. Write the question down as an open
    item for the person.
@@ -34,11 +37,35 @@ The product is `leads/<parcel>/findings.checked.json` and a short
    edit code, settings, `inputs/decisions.csv` or anything under
    `autoresearch/`.
 7. **Owner details stay here.** Do not put an owner's name or mailing
-   address into a search engine or any other outside service. Look the
-   owner up only on the Georgia Secretary of State's own site and the
-   county's own records.
-8. **Budget per lead:** at most 25 page fetches and 30 minutes. Stop at
-   the budget and report what is still `unknown`.
+   address into a search engine or any other outside service. Public
+   documents you reach another way (a rezoning file, a press release) may
+   name the owner; read them, but do not search by the name.
+8. **Budget per lead:** at most 40 requests and 30 minutes. Every HTTP
+   request counts: pages, robots.txt, failures and redirects; the
+   requests `quotecheck` makes do not. At most 10 web searches on top.
+   Stop at the budget and report what is still `unknown`.
+9. **Submit only claims you expect to pass.** A page you could read but
+   `quotecheck` cannot fetch (blocked, too large, robots.txt) does not
+   support a claim. Put what you saw in `open_items`, marked "seen, not
+   verifiable", with the address.
+
+## Known walls (first pilot, 2026-11-10)
+
+These stopped a plain, polite fetch. Do not try to get around them; the
+section is `unknown` and the question goes to a person.
+
+- **Municode** (the zoning text of South Fulton, Fairburn and most Georgia
+  cities): JavaScript-only, and its API answers a bot challenge (403). The
+  district's use table cannot be quoted. An adopted ordinance, staff
+  report or agenda packet on the city's own site often can.
+- **Georgia Secretary of State** business search: 403 even for
+  robots.txt, and it is a form. The `owner` section stays `unknown`
+  unless another primary source carries the record.
+- **ArcGIS Online hosts** (`services*.arcgis.com`) answer robots.txt with
+  403, so `quotecheck` will not fetch them. County-run GIS hosts that
+  answer 404 work, and a `...?f=json` query makes a quotable page.
+- **Georgia DCA** (`apps.dca.ga.gov`): robots.txt disallows everything.
+- Scanned ordinances are OCR text: quote a short, clean run of words.
 
 ## Input
 
@@ -56,12 +83,20 @@ questions a person should ask next).
 |---|---|---|
 | `zoning` | Does the district's own text permit warehouse / distribution / light industrial use on this parcel, and under what conditions (a "-C" conditional zoning, an overlay, a special use permit)? | `by_right`, `conditional`, `rezoning_needed`, `blocked`, `unknown` |
 | `plans` | Does the adopted comprehensive plan or future land use map support industrial use here? Any rezoning case, moratorium or overlay on or beside the parcel in the last five years? | `supports`, `neutral`, `against`, `unknown` |
-| `utilities` | Is public water and sewer shown at or near the parcel on a published map or capital plan? (Capacity is always an open item: only the utility can say.) | `at_site`, `nearby`, `not_shown`, `unknown` |
-| `market` | Is there a public sign the parcel is for sale or under contract (a public notice, a government surplus list, a rezoning application naming a buyer)? | `signs_for_sale`, `signs_under_contract`, `no_sign_found`, `unknown` |
+| `utilities` | Is public water and sewer shown at or near the parcel on a published map or capital plan? Say water and sewer separately in the claims; the verdict is the weaker of the two. (Capacity is always an open item: only the utility can say.) | `at_site`, `nearby`, `not_shown`, `unknown` |
+| `market` | Is there a public sign the parcel is for sale, under contract or already in a developer's hands (a public notice, a government surplus list, a rezoning applied for by someone other than the owner, a development-authority release)? | `signs_for_sale`, `signs_developer_pursuing`, `signs_under_contract`, `no_sign_found`, `unknown` |
 | `owner` | For a company owner: what does the Secretary of State record show (status, formed when, principal office, registered agent)? Does it look like an operating business, a developer or investor vehicle, or a holding entity? | `operator`, `developer_or_investor`, `holding_entity`, `individual_or_family`, `unknown` |
 
-`no_sign_found` means the places you looked showed nothing. Say which
-places. It is not "not for sale".
+`no_sign_found` and `not_shown` mean the places you looked showed
+nothing. They still need a kept claim: quote the page you looked at (the
+list of pending cases, the map query's empty answer) and say in the claim
+text that the parcel is not on it. They are not "not for sale" or "no
+utilities".
+
+Check `market` and the rezoning history early. In the first pilot a
+grade A parcel turned out to have been rezoned months earlier for a named
+developer's project with a closing date announced: the single most
+useful thing an investigation can find.
 
 ## Output
 
@@ -103,7 +138,8 @@ reported as the skeptic's opinion, not as a finding.
 
 ## lead.md
 
-At most one page, plain words:
+At most about 500 words, plain words. Lead with one line: the single
+finding a person should act on first.
 
 - the lead's grade line from the brief;
 - per section: the verdict and the one claim that best supports it, with

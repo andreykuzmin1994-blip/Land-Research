@@ -31,7 +31,7 @@ Results land in `screener/output/fulton-<date>/`:
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
 | `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance, SSURGO soils, GDOT road frontage and the lead grade that aren't scored; see below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
-| `briefs/` | One page per top parcel and per lead listed in `leads.md`: lead grade, site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name). A re-run into the same folder removes the earlier run's briefs |
+| `briefs/` | One page per top parcel and per lead listed in `leads.md`: lead grade, site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name). A re-run into the same folder removes the brief and plan files the earlier run wrote (it keeps their names in `.briefs-written.json`) and nothing else in `briefs/` |
 | `rejected.csv` | Every parcel screened out, with the reason |
 | `ranked.geojson` | The same survivors for GIS tools |
 | `features.json` | The evaluation's features for each ranked parcel, kept for your decisions (see Decisions below) |
@@ -43,8 +43,12 @@ fresh downloads of both. The lidar slope answers are kept apart, in
 `screener/cache/slope/`, for `[run] slope_cache_days` (3650 by default):
 the survey is from 2018-19 and does not change, and the slope step is
 most of an uncached run (about 49 of 55 minutes for Fulton, measured
-2026-11-10). `--refresh` leaves them alone; `--refresh-slope` asks the
-lidar service again for every parcel. A changed parcel shape or open
+2026-11-10). The service's answer for one shape is not as steady as the
+survey (see "Public data changes between days"), so a kept answer is one
+reading, held; `summary.md` says how many were reused and how old the
+oldest is. `--refresh` leaves them alone; `--refresh-slope` asks the
+lidar service again for every parcel, and falls back on the kept reading
+for a parcel whose new request fails. A changed parcel shape or open
 ground is a new request either way. The folder is small (about 2 KB per
 parcel), so it can be copied to another machine to spare it the wait. If a map layer is down, or sends back a malformed
 or partial answer, the run stops rather than treat its parcels as clear.
@@ -294,27 +298,32 @@ max_parcels` (250 by default) caps it to the top N by rank.
 
 The grade is one fixed rule over the facts above. It is **not a score and
 not a screen**: `ranked.csv` keeps the order the score gave it, and no
-parcel is removed. Four core checks each read clear, found or not checked:
+parcel is removed. Every check reads clear, found or not checked, and
+**only a state the check itself reports as good is clear**: a failed
+service, a check that was off, a missing result or an unknown state is
+"not checked", never clear.
 
-| Core check | Clear | Found | Not checked |
+| Check | Clear | Found | Not checked |
 |---|---|---|---|
-| Zoning path | `by_right`, `likely` | `possible` (rezoning needed); `hard` blocks | `unknown` |
-| Building fit | an envelope fits | `none found` | fit off, capped or faulted |
+| Zoning path | `by_right`, `likely` | `possible`; `hard` blocks | `unknown` |
+| Building fit | an envelope fits | `none found` | fit faulted or missing |
 | Detention pond (read only when an envelope fits) | `pond fits` | `no pond room found` | not checked |
-| Road frontage | at least `min_frontage_ft` (50) of public, not access-controlled frontage | less, or none within 50 ft | service failed, off or capped |
+| Road frontage | at least `min_frontage_ft` (50) of public, not access-controlled frontage | less, or none within 50 ft | the road service failed |
+| Slope | a lidar reading came back (the steep-ground screen was applied) | | the reading failed, or the open ground is under one lidar pixel |
+| Soils | an answer came back under both thresholds, or with no rating | hydric or poorly-drained share at or above `max_hydric_pct` / `max_poorly_drained_pct` (25; 0 = off) | the soil service failed |
+| Parcel map against the tax record | they agree | | an acreage mismatch (every map-based check may be off) |
+| Same owner built next door (`owner_next_door`) | no adjacent same-owner parcel is built on | one is: adjacent directly or through other same-owner parcels | adjacency could not be measured |
 
-Five watch items count only when found (an unchecked one is not counted
-either way): a hydric or poorly-drained soil share at or above
-`max_hydric_pct` / `max_poorly_drained_pct` (25); a listed contamination
-site on the parcel; the assessor's "land-locked" entry (when frontage did
-not already count); the same owner holding a built-on parcel next door;
-and a purchase within `recent_purchase_years` (5).
+Three watch items count only when found (the fact is on the tax roll or
+it is not): a listed contamination site on the parcel; the assessor's
+"land-locked" entry (when frontage did not already count); and a last
+priced deed more recent than `recent_purchase_years` (5; 0 = off).
 
-`blocked` if the zoning path is `hard`; otherwise the number of found and
-not-checked items decides: none is **A**, one is **B**, two or more is
-**C**. A parcel outside a core check's `max_parcels` cap, or run with a
-core check switched off, reads `not graded: <why>` and still lists what
-was found. A check whose service failed is "not checked", never clear.
+`blocked` if the zoning path is `hard` (that rests on no other check).
+Otherwise a parcel outside a check's `max_parcels` cap, or run with a
+check switched off (`--no-slope` included), reads `not graded: <why>` and
+still lists what was found. Otherwise the number of found and not-checked
+items decides: none is **A**, one is **B**, two or more is **C**.
 
 Limits:
 
@@ -326,18 +335,23 @@ Limits:
 - The "built next door" item sees only same-owner parcels the run fetched
   (5-50 acres, exact owner name and mailing address; see Owner clusters).
   A plant on a smaller or larger parcel, or under another company name,
-  is not seen. Its flag line ("Same owner, adjacent and built on") stays
-  in the watch-outs even with `owner_next_door = false`.
-- The recent-purchase item reads the county deed file: a recent deed
-  between related companies counts as a purchase when it carries a price.
-- Nothing here knows whether a parcel is for sale, who is behind a
+  is not seen, so "clear" here is weak. Its flag line ("Same owner,
+  adjacent and built on") stays in the watch-outs even with
+  `owner_next_door = false`.
+- The recent-deed item reads the county deed file. Any priced deed
+  counts, so a transfer between related companies reads the same as a
+  purchase. That a recent buyer is an unlikely seller is a rule of thumb,
+  not something this tool has tested.
+- A answers "did every check come back clear", not "is this a good
+  site". Nothing here knows whether a parcel is for sale, who is behind a
   company, or what the utilities can serve.
 
 `leads.md` lists A leads in rank order, then B, at most `[grade]
 digest_max` (40), and each listed lead gets a brief even outside the top
 `briefs`. C, blocked and ungraded parcels are counted, not listed. County
-text in the table cannot add a column (pipes and line breaks are
-replaced). `[grade] enabled = false` writes `not graded` everywhere and
+text in the table cannot add a column or carry markup (pipes, line
+breaks, brackets, angle brackets, backticks, asterisks and underscores
+are replaced). `[grade] enabled = false` writes `not graded` everywhere and
 an empty list.
 
 Like the facts it reads, the grade is attached only after scoring, the

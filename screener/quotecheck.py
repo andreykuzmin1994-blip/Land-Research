@@ -23,8 +23,10 @@ skeptic's job and then a person's.
 Fetching rules: http(s) only; never a host in ``REFUSED_HOSTS`` (CoStar,
 LoopNet, Crexi: their terms prohibit automated use); robots.txt is read
 first and honoured, and a robots.txt that cannot be read (other than
-"not found") means the page is not fetched; one request per second per
-host; a size cap; the screener's own User-Agent. PDFs are read with the
+"not found") means the page is not fetched, a 403 included; at least one
+second between requests to a host, or the host's own Crawl-delay when it
+asks for more (a host asking for more than 30 seconds is not fetched); a
+size cap; the screener's own User-Agent. PDFs are read with the
 ``pdftotext`` command when it is installed and are otherwise not
 verifiable (the claim is dropped and says so).
 
@@ -60,9 +62,10 @@ CHECKED_NAME = "findings.checked.json"
 PAGES_DIR = "pages"
 MIN_QUOTE_CHARS = 25
 MAX_QUOTE_CHARS = 1200
-MAX_PAGE_BYTES = 25_000_000
+MAX_PAGE_BYTES = 200_000_000     # adopted comprehensive plans run past 150 MB
 MAX_CLAIMS = 200
 HOST_DELAY_S = 1.0
+MAX_CRAWL_DELAY_S = 30.0         # a host asking for more is not fetched
 UNKNOWN = "unknown"
 # Hosts never fetched: their terms prohibit automated use (README, "What it
 # can't tell you"; CLAUDE.md "NEVER scrape CoStar").
@@ -154,21 +157,27 @@ class Fetcher:
                  clock: Callable[[], float] = time.monotonic) -> None:
         self._sleep, self._clock = sleep, clock
         self._last: dict[str, float] = {}
+        self._delay: dict[str, float] = {}
         self._robots: dict[str, urllib.robotparser.RobotFileParser | str] = {}
 
     def get(self, url: str) -> tuple[bytes, str]:
         """(body, content type). Raises OSError / ValueError on failure."""
-        host = host_of(url)
-        wait = HOST_DELAY_S - (self._clock() - self._last.get(host, -HOST_DELAY_S))
-        if wait > 0:
-            self._sleep(wait)
-        self._last[host] = self._clock()
+        self.wait(url)
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=60) as resp:        # noqa: S310 (http/https only)
             body = resp.read(MAX_PAGE_BYTES + 1)
             if len(body) > MAX_PAGE_BYTES:
                 raise ValueError(f"page larger than {MAX_PAGE_BYTES:,} bytes")
             return body, (resp.headers.get("Content-Type") or "").lower()
+
+    def wait(self, url: str) -> None:
+        """Sleep until this host may be asked again (call before each request)."""
+        host = host_of(url)
+        delay = self._delay.get(host, HOST_DELAY_S)
+        pause = delay - (self._clock() - self._last.get(host, -delay))
+        if pause > 0:
+            self._sleep(pause)
+        self._last[host] = self._clock()
 
     def allowed(self, url: str) -> str:
         """'' when robots.txt allows the fetch, else why not."""
@@ -180,7 +189,17 @@ class Fetcher:
             self._robots[root] = rules
         if isinstance(rules, str):
             return rules
-        return "" if rules.can_fetch(USER_AGENT, url) else "robots.txt disallows this page"
+        if not rules.can_fetch(USER_AGENT, url):
+            return "robots.txt disallows this page"
+        try:
+            asked = float(rules.crawl_delay(USER_AGENT) or 0)
+        except (TypeError, ValueError):
+            asked = 0.0
+        if asked > MAX_CRAWL_DELAY_S:
+            return (f"robots.txt asks for {asked:g} s between requests "
+                    f"(over {MAX_CRAWL_DELAY_S:g} s): not fetched")
+        self._delay[host_of(url)] = max(HOST_DELAY_S, asked)
+        return ""
 
     def _read_robots(self, root: str) -> urllib.robotparser.RobotFileParser | str:
         parser = urllib.robotparser.RobotFileParser()

@@ -39,7 +39,21 @@ def _cell(v: Any) -> Any:
     return "" if v is None else v
 
 
-_BRIEF_FILE_RE = re.compile(r"^\d{3,}_.+\.(md|svg)$")
+# The brief and plan files the last run into this folder wrote, so a re-run
+# removes exactly those it does not write again (and nothing a person put
+# in briefs/).
+BRIEFS_LIST = ".briefs-written.json"
+
+
+def _last_written(out_dir: Path) -> set[str]:
+    try:
+        names = json.loads((out_dir / BRIEFS_LIST).read_text())
+    except (OSError, ValueError):
+        return set()
+    if not isinstance(names, list):
+        return set()
+    # Plain file names only: nothing in the list can point outside briefs/.
+    return {n for n in names if isinstance(n, str) and n == Path(n).name and n not in ("", ".", "..")}
 
 
 def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[str, Any]],
@@ -101,12 +115,16 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
         if svg is not None:
             written.add(svg_path.name)
         brief_names[id(p)] = path.name
-    # A same-day re-run reuses the folder: remove the earlier run's briefs
-    # and plans (same rank prefixes, other parcels). Only files named like
-    # a brief are touched.
-    for old in briefs.iterdir():
-        if old.is_file() and _BRIEF_FILE_RE.match(old.name) and old.name not in written:
+    # A same-day re-run reuses the folder: remove the briefs and plans the
+    # earlier run wrote and this one did not (same rank prefixes, other
+    # parcels). Only files on that run's own list are touched.
+    for name in sorted(_last_written(out_dir) - written):
+        old = briefs / name
+        if old.is_file():
             old.unlink()
+    tmp = out_dir / (BRIEFS_LIST + ".tmp")
+    tmp.write_text(json.dumps(sorted(written)))
+    tmp.replace(out_dir / BRIEFS_LIST)
 
     (out_dir / digest.FILE_NAME).write_text(digest.leads_md(
         summary["county"], summary["run_date"], ranked, lead_limit, brief_names))

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
@@ -55,6 +56,18 @@ SLOPE_MIN_M2 = 100.0
 # per parcel), so it can be carried between machines.
 SLOPE_CACHE_DAYS = 3650.0
 slope_cache_days: float = SLOPE_CACHE_DAYS
+# What the last slope_checks call did, for the run's summary note: answers
+# reused from the folder, asked of the service, taken from the folder
+# because a fresh request failed, and the file time of the oldest one used.
+slope_tally: dict[str, Any] = {"reused": 0, "asked": 0, "fell_back": 0, "oldest": None}
+_tally_lock = threading.Lock()
+
+
+def _tally(kind: str, mtime: float | None = None) -> None:
+    with _tally_lock:
+        slope_tally[kind] += 1
+        if mtime is not None and (slope_tally["oldest"] is None or mtime < slope_tally["oldest"]):
+            slope_tally["oldest"] = mtime
 
 
 def slope_cache_dir():
@@ -237,14 +250,35 @@ def slope_stats(geom) -> tuple[dict[str, Any], dict[str, Any] | None]:
     must keep it off the parcel until after scoring (slope_checks, run.main).
     An answer without usable histograms raises arcgis.BadAnswer.
     """
-    data = arcgis.request_json(SLOPE_URL, {
+    params = {
         "geometry": json.dumps(_esri_polygon(geom)),
         "geometryType": "esriGeometryPolygon",
         "renderingRule": SLOPE_RULE,
         # Resample the 1 m lidar to ~10 m: at 1 m, ditches and stream banks
         # read as "steep" and overstate grading by 2-3x; relief is unchanged.
         "pixelSize": SLOPE_PIXEL,
-    }, check=_slope_problem, cache_dir=slope_cache_dir(), max_age_days=slope_cache_days)
+    }
+    folder = slope_cache_dir()
+    kept = arcgis.cached_json(SLOPE_URL, params, max_age_days=slope_cache_days,
+                              check=_slope_problem, cache_dir=folder)
+    if kept is not None:
+        data = kept[0]
+        _tally("reused", kept[1])
+    else:
+        try:
+            data = arcgis.request_json(SLOPE_URL, params, check=_slope_problem, fresh=True,
+                                       cache_dir=folder, max_age_days=slope_cache_days)
+            _tally("asked")
+        except arcgis.ArcGISError:
+            # The service failed. A kept answer of any age (one --refresh-slope
+            # or the lifetime set aside) beats leaving the steep-ground screen
+            # unapplied to a parcel that had a good reading.
+            old = arcgis.cached_json(SLOPE_URL, params, max_age_days=math.inf,
+                                     check=_slope_problem, cache_dir=folder)
+            if old is None:
+                raise
+            data = old[0]
+            _tally("fell_back", old[1])
     out = _slope_from(data)
     earthwork = None
     try:
@@ -448,6 +482,8 @@ def slope_checks(parcels: list[dict[str, Any]], workers: int,
         p.update(fields)
         return earthwork
 
+    with _tally_lock:
+        slope_tally.update(reused=0, asked=0, fell_back=0, oldest=None)
     done = 0
     out: list[dict[str, Any] | None] = []
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:

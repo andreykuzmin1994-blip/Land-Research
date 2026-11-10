@@ -4,39 +4,48 @@ blocked, and says which facts decided it.
 
 It is NOT a score and NOT a screen. ``ranked.csv`` keeps the order
 ``scoring.py`` and ``rank.py`` gave it; the grade is three extra columns,
-a line at the top of each brief and the order of ``leads.md``.
+a block at the top of each brief and the order of ``leads.md``.
 
-The rule reads four core checks and five watch items.
+Every check reads one of three ways: clear, found, or not checked. Only a
+state the check itself reports as good is clear. A failed service, a
+check that was off, a missing result or a state this module does not know
+is "not checked", never clear.
 
-Core checks (each is ok, found, or not checked):
+Checks that count when found OR not checked:
 
-- zoning path: ``by_right`` / ``likely`` ok; ``possible`` found (rezoning
-  needed); ``hard`` blocks; anything else is not checked.
-- building fit (sitefit.py): ``fits`` ok; ``none found`` found; else not
-  checked.
+- zoning path: ``by_right`` / ``likely`` clear; ``possible`` found;
+  ``hard`` blocks; anything else not checked.
+- building fit (sitefit.py): ``fits`` clear; ``none found`` found.
 - detention pond (detention.py), read only when an envelope fits: ``pond
-  fits`` ok; ``no pond room found`` found; else not checked. Without an
-  envelope the pond says nothing about room for both, and the fit already
-  counts.
+  fits`` clear; ``no pond room found`` found. Without an envelope the pond
+  says nothing about room for both, and the fit already counts.
 - road frontage (frontage.py): at least ``min_frontage_ft`` of public,
-  not access-controlled frontage ok; less, or none within 50 ft, found;
-  else not checked.
+  not access-controlled frontage clear; less, or none within 50 ft, found.
+- slope (checks.py): a lidar reading clear (the steep-ground screen has
+  already been applied); a failed or skipped reading not checked.
+- soils (soils.py): checked and under both thresholds clear (an answer
+  with no rating counts as checked: the map has nothing to say); a hydric
+  or poorly-drained share at or above its threshold found.
+- the parcel map against the tax record: an acreage mismatch means every
+  map-based check may be off: not checked.
+- same owner built next door (owner_clusters.py): a same-owner parcel
+  adjacent to this one, directly or through other same-owner parcels,
+  that the run screened out as already built on: found. Adjacency that
+  could not be measured: not checked.
 
-Watch items (count only when found; an unchecked one is not counted):
+Watch items that count only when found (there is no "not checked" for
+them: the fact is on the tax roll or it is not):
 
-- soils (soils.py): hydric share or poorly-drained share at or above its
-  threshold.
 - a listed contamination site on the parcel (checks.map_checks).
 - the assessor's "land-locked" road entry, when frontage did not already
   count.
-- the same owner holds a built-on parcel next door (owner_clusters.py):
-  possibly spare land of an operating site.
-- a purchase within ``recent_purchase_years``: a recent buyer rarely sells.
+- the last priced deed is more recent than ``recent_purchase_years``.
 
-Grade: ``blocked`` if anything blocks; else by the number of found and
-not-checked items: 0 is A, 1 is B, 2 or more is C. A parcel outside a
-core check's ``max_parcels`` cap, or run with a core check switched off,
-reads ``not graded: <why>`` (its found items are still listed).
+Grade: ``blocked`` if the zoning path is ``hard`` (that needs no other
+check); else ``not graded: <why>`` for a parcel outside a check's
+``max_parcels`` cap or run with a check switched off (what was found is
+still listed); else by the number of found and not-checked items: 0 is A,
+1 is B, 2 or more is C.
 
 "Found" is what the screen found, with every limit of the check behind
 it: "no building envelope found" is a lower bound, not proof nothing
@@ -79,8 +88,8 @@ CAVEAT = ("The grade is a fixed rule over this screen's own checks, each with th
 class Settings:
     enabled: bool = True
     min_frontage_ft: float = 50.0
-    max_hydric_pct: float = 25.0
-    max_poorly_drained_pct: float = 25.0
+    max_hydric_pct: float = 25.0            # 0 = off
+    max_poorly_drained_pct: float = 25.0    # 0 = off
     owner_next_door: bool = True
     recent_purchase_years: float = 5.0      # 0 = off
     digest_max: int = 40
@@ -157,32 +166,36 @@ def _zoning(p: dict[str, Any], lead: Lead) -> None:
         lead.not_checked.append(f"zoning path not known ({note})")
 
 
+def _why(detail: Any, kind: type) -> str:
+    return detail.reason if isinstance(detail, kind) and detail.reason else "no result"
+
+
 def _fit_and_pond(p: dict[str, Any], lead: Lead) -> None:
     fit = p.get("_envelope_detail")
-    if not isinstance(fit, sitefit.Fit) or fit.state == sitefit.NOT_CHECKED:
-        why = fit.reason if isinstance(fit, sitefit.Fit) and fit.reason else "no result"
-        lead.not_checked.append(f"building fit not checked ({why})")
-        return
-    if fit.state != sitefit.FITS:
+    state = fit.state if isinstance(fit, sitefit.Fit) else None
+    if state == sitefit.NONE_FOUND:
         lead.found.append("no building envelope found (a lower bound, not proof)")
         return
+    if state != sitefit.FITS:
+        lead.not_checked.append(f"building fit not checked ({_why(fit, sitefit.Fit)})")
+        return
     pond = p.get(detention.DETAIL_KEY)
-    if not isinstance(pond, detention.Pond) or pond.state == detention.NOT_CHECKED:
-        why = pond.reason if isinstance(pond, detention.Pond) and pond.reason else "no result"
-        lead.not_checked.append(f"detention pond not checked ({why})")
-    elif pond.state != detention.FITS:
+    state = pond.state if isinstance(pond, detention.Pond) else None
+    if state == detention.NONE_FOUND:
         lead.found.append("no detention pond room found beside the building envelope")
+    elif state != detention.FITS:
+        lead.not_checked.append(f"detention pond not checked ({_why(pond, detention.Pond)})")
 
 
 def _frontage(p: dict[str, Any], lead: Lead, s: Settings) -> bool:
     """True when frontage itself counted as found (so the assessor's
     land-locked entry is not counted a second time)."""
     f = p.get(frontage.DETAIL_KEY)
-    if not isinstance(f, frontage.Frontage) or f.state == frontage.NOT_CHECKED:
-        why = f.reason if isinstance(f, frontage.Frontage) and f.reason else "no result"
-        lead.not_checked.append(f"road frontage not checked ({why})")
+    state = f.state if isinstance(f, frontage.Frontage) else None
+    if state not in (frontage.CHECKED, frontage.NONE):
+        lead.not_checked.append(f"road frontage not checked ({_why(f, frontage.Frontage)})")
         return False
-    if f.state == frontage.NONE:
+    if state == frontage.NONE:
         extra = []
         if f.private_feet:
             extra.append(f"{f.private_feet:,} ft on a private road")
@@ -199,43 +212,68 @@ def _frontage(p: dict[str, Any], lead: Lead, s: Settings) -> bool:
     return False
 
 
-def _watch(p: dict[str, Any], lead: Lead, s: Settings, frontage_counted: bool) -> None:
+def _slope_soils_and_map(p: dict[str, Any], lead: Lead, s: Settings) -> None:
+    if p.get("slope_error"):
+        lead.not_checked.append("slope check failed (the steep-ground screen was not applied)")
+    elif p.get("slope_skipped"):
+        lead.not_checked.append("slope not checked (under one lidar pixel of open ground)")
+    elif _num(p.get("steep_pct")) is None:
+        lead.not_checked.append("slope not checked")
     soil = p.get(soils.DETAIL_KEY)
-    if isinstance(soil, soils.Soils) and soil.state == soils.CHECKED:
+    if not isinstance(soil, soils.Soils) or soil.state != soils.CHECKED:
+        lead.not_checked.append(f"soils not checked ({_why(soil, soils.Soils)})")
+    else:
         hydric, poor = _num(soil.hydric_pct), _num(soil.poorly_drained_pct)
-        if hydric is not None and hydric >= s.max_hydric_pct:
+        if s.max_hydric_pct and hydric is not None and hydric >= s.max_hydric_pct:
             lead.found.append(f"{hydric:.0f}% hydric soil components (SSURGO map units)")
-        elif poor is not None and poor >= s.max_poorly_drained_pct:
+        elif s.max_poorly_drained_pct and poor is not None and poor >= s.max_poorly_drained_pct:
             lead.found.append(f"{poor:.0f}% poorly drained soils (SSURGO map units)")
+    fit = p.get("_envelope_detail")
+    if p.get("acreage_mismatch") or (isinstance(fit, sitefit.Fit) and fit.map_mismatch):
+        lead.not_checked.append("the county parcel map disagrees with the tax record, so the "
+                                "map-based checks may be off")
+
+
+def _next_door(p: dict[str, Any], lead: Lead, s: Settings) -> None:
+    if not s.owner_next_door:
+        return
+    built = p.get(NEXT_DOOR_KEY)
+    if isinstance(built, bool) or not isinstance(built, int) or built < 0:
+        lead.not_checked.append("same-owner adjacency not checked")
+    elif built > 0:
+        lead.found.append(f"the same owner holds {built} built-on parcel"
+                          f"{'s' if built != 1 else ''} adjacent to this one, directly or "
+                          "through its other parcels (possibly spare land of an operating site)")
+
+
+def _watch(p: dict[str, Any], lead: Lead, s: Settings, frontage_counted: bool) -> None:
     sites = p.get("contamination") or []
     if any(isinstance(x, dict) and x.get("feet") == 0 for x in sites):
         lead.found.append("a listed contamination site is on the parcel")
     if not frontage_counted and (p.get("road") or "").lower() == "land-locked":
         lead.found.append("the assessor lists the parcel as land-locked")
-    built = p.get(NEXT_DOOR_KEY)
-    if s.owner_next_door and isinstance(built, int) and not isinstance(built, bool) and built > 0:
-        lead.found.append(f"the same owner holds {built} built-on parcel"
-                          f"{'s' if built != 1 else ''} next door (possibly spare land of an "
-                          "operating site)")
     years = _num(p.get("years_held"))
-    if s.recent_purchase_years and years is not None and years < s.recent_purchase_years \
+    if s.recent_purchase_years and years is not None and 0 <= years < s.recent_purchase_years \
             and (_num(p.get("last_sale_price")) or 0) > 0:
-        lead.found.append(f"bought {years:.1f} years ago (a recent buyer rarely sells)")
+        lead.found.append(f"last priced deed {years:.1f} years ago (a recent purchase, or a "
+                          "transfer between related owners)")
 
 
 def grade_parcel(p: dict[str, Any], s: Settings, not_graded: str = "") -> Lead:
     """The grade of one ranked parcel from the report facts on it. Reads
-    only; writes nothing. ``not_graded`` is the reason a core check was
-    never attempted for this parcel (a cap or a switch), if any."""
+    only; writes nothing. ``not_graded`` is the reason a check was never
+    attempted for this parcel (a cap or a switch), if any."""
     lead = Lead(A)
     _zoning(p, lead)
     _fit_and_pond(p, lead)
     counted = _frontage(p, lead, s)
+    _slope_soils_and_map(p, lead, s)
+    _next_door(p, lead, s)
     _watch(p, lead, s, counted)
-    if not_graded:
+    if lead.blocks:
+        lead.grade = BLOCKED            # the zoning path needs no other check
+    elif not_graded:
         lead.grade, lead.reason = NOT_GRADED, not_graded
-    elif lead.blocks:
-        lead.grade = BLOCKED
     else:
         n = len(lead.found) + len(lead.not_checked)
         lead.grade = A if n == 0 else B if n == 1 else C
@@ -243,11 +281,12 @@ def grade_parcel(p: dict[str, Any], s: Settings, not_graded: str = "") -> Lead:
 
 
 def _outside(rank: int, caps: list[tuple[str, str, bool, int]]) -> str:
-    """Why a core check was never attempted at this rank ('' if all were).
-    caps: (label, settings table, enabled, max_parcels) per capped check."""
+    """Why a check was never attempted at this rank ('' if all were).
+    caps: (label, settings table, enabled, max_parcels) per check that can
+    be switched off or capped."""
     for label, table, enabled, cap in caps:
         if not enabled:
-            return f"{label} switched off in settings"
+            return f"{label} not run (switched off)"
     for label, table, enabled, cap in caps:
         if cap and rank > cap:
             return f"{label} only checked for the top {cap} ([{table}] max_parcels)"
@@ -287,8 +326,8 @@ def brief_lines(p: dict[str, Any]) -> list[str]:
     if lead.grade == NOT_GRADED:
         head = f"**Lead grade: not graded** ({lead.reason})"
     elif lead.grade == A:
-        head = ("**Lead grade A**: zoning path, building fit, pond room and road frontage "
-                "all came back clear, and no watch item was found")
+        head = ("**Lead grade A**: zoning path, building fit, pond room, road frontage, "
+                "slope and soils all came back clear, and no watch item was found")
     elif lead.grade == BLOCKED:
         head = "**Lead grade: blocked**"
     else:

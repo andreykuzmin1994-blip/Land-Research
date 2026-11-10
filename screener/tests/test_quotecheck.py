@@ -23,12 +23,15 @@ QUOTE = 'Permitted uses: Warehousing and distribution facilities, "light" manufa
 
 class FakeFetcher(qc.Fetcher):
     def __init__(self, pages=None, robots=None):
-        super().__init__(sleep=lambda s: None)
+        self.slept: list[float] = []
+        self.now = [0.0]
+        super().__init__(sleep=self.slept.append, clock=lambda: self.now[0])
         self.pages = dict(pages or {})
         self.robots = robots              # None: 404; bytes: the file; Exception: raised
         self.calls: list[str] = []
 
     def get(self, url):
+        self.wait(url)
         self.calls.append(url)
         if url.endswith("/robots.txt"):
             if self.robots is None:
@@ -149,8 +152,27 @@ class CheckTests(Base):
         self.assertEqual(self.fetcher.calls, ["https://city.example.gov/robots.txt"])
         self.assertFalse(self.pages.exists())
 
+    def test_crawl_delay_is_honoured_and_a_long_one_refuses_the_host(self):
+        self.fetcher.robots = b"User-agent: *\nCrawl-delay: 10\n"
+        r = self.check(findings(claim()))
+        self.assertEqual(r.kept, 1)
+        # robots.txt itself was asked at the default pace; the page waited the 10 s asked.
+        self.assertEqual(self.fetcher.slept, [10.0])
+        self.fetcher = FakeFetcher({URL: PAGE}, robots=b"User-agent: *\nCrawl-delay: 120\n")
+        self.pages = self.dir / "pages2"
+        r = self.check(findings(claim()))
+        self.assertIn("asks for 120 s between requests", r.dropped[0]["reason"])
+        self.assertEqual(self.fetcher.calls, ["https://city.example.gov/robots.txt"])
+
+    def test_default_pace_is_one_second_per_host(self):
+        other = "https://city.example.gov/code/article-10"
+        self.fetcher.pages[other] = PAGE
+        self.check(findings(claim(), claim(source_url=other)))
+        self.assertEqual(self.fetcher.slept, [qc.HOST_DELAY_S, qc.HOST_DELAY_S])
+
     def test_unreadable_robots_txt_means_no_fetch(self):
-        for robots, words in ((urllib.error.HTTPError("u", 503, "x", None, None), "HTTP 503"),
+        for robots, words in ((urllib.error.HTTPError("u", 403, "x", None, None), "HTTP 403"),
+                              (urllib.error.HTTPError("u", 503, "x", None, None), "HTTP 503"),
                               (OSError("timed out"), "timed out")):
             with self.subTest(words):
                 self.fetcher = FakeFetcher({URL: PAGE}, robots=robots)
@@ -241,16 +263,6 @@ class CliTests(Base):
 class HelperTests(unittest.TestCase):
     def test_normalise(self):
         self.assertEqual(qc.normalise(" A –\tB\n“c” "), 'a - b "c"')
-
-    def test_politeness_delay_per_host(self):
-        slept, now = [], [0.0]
-        f = qc.Fetcher(sleep=slept.append, clock=lambda: now[0])
-        f._last["a.example"] = 0.0
-        now[0] = 0.25
-        wait = qc.HOST_DELAY_S - (f._clock() - f._last.get("a.example", -qc.HOST_DELAY_S))
-        self.assertAlmostEqual(wait, 0.75)
-        self.assertLessEqual(qc.HOST_DELAY_S - (f._clock() - f._last.get("b.example",
-                                                                         -qc.HOST_DELAY_S)), 0)
 
     def test_page_name_is_stable_and_safe(self):
         name = qc.page_name("https://x.example/../../etc/passwd?a=b")

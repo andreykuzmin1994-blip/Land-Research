@@ -373,6 +373,17 @@ def main(argv: list[str] | None = None) -> int:
         # Keyed by the parcel object, not its id (ids aren't guaranteed
         # unique): the estimate stays off p until scoring is done.
         earthwork = {id(p): e for p, e in zip(survivors, estimates)}
+        tally = dict(checks.slope_tally)
+        if tally["reused"] or tally["fell_back"]:
+            oldest = (time.strftime("%Y-%m-%d", time.gmtime(tally["oldest"]))
+                      if tally["oldest"] else "unknown")
+            fell = (f"; {tally['fell_back']} more came from a kept answer because the lidar "
+                    "service failed" if tally["fell_back"] else "")
+            notes.append(f"Slope: {tally['reused']} of {len(survivors)} lidar answers were "
+                         f"reused from cache/slope (oldest kept {oldest}), {tally['asked']} "
+                         f"asked now{fell}. A kept answer is one reading from a service whose "
+                         "answers for the same shape do not always agree (README, \"Public "
+                         "data changes between days\"); --refresh-slope takes new readings.")
         slope_failed = sum(1 for p in survivors if p.get("slope_error"))
         if slope_failed:
             log(f"  ! slope check failed for {slope_failed:,} of {len(survivors):,} parcels")
@@ -450,13 +461,17 @@ def main(argv: list[str] | None = None) -> int:
                                                built_on.__contains__)
         if built:
             p["flags"].append(owner_clusters.built_line(built))
-        p[grade.NEXT_DOOR_KEY] = len(built)
+        # None: adjacency could not be measured, so "none built" is not known.
+        p[grade.NEXT_DOOR_KEY] = (None if owner_clusters.adjacency_not_checked(
+            p["parcel_id"], owner_groups) else len(built))
     # The lead grade reads the report facts above and is live-only like
     # them: attached last, for the reports alone (grade.py). It changes no
     # score and no order.
     grade.attach(survivors, grade_cfg,
-                 [("building fit", "fit", fit_on, fit_max),
+                 [("the lidar slope check", "run", slope_on, 0),
+                  ("building fit", "fit", fit_on, fit_max),
                   ("detention pond", "detention", pond_on, pond_max),
+                  ("soils", "soils", soils_on, soils_max),
                   ("road frontage", "frontage", front_on, front_max)], notes)
     funnel.append(("ranked", len(survivors)))
 

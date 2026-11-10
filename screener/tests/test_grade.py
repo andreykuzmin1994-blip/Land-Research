@@ -44,7 +44,7 @@ def clear_parcel(**over):
         soils.DETAIL_KEY: soils.Soils(soils.CHECKED, hsg="B", hydric_pct=0.0,
                                       poorly_drained_pct=0.0, dwellings_limited_pct=0.0),
         "contamination": [], "road": "Paved", "years_held": 20.0, "last_sale_price": 90000.0,
-        grade.NEXT_DOOR_KEY: 0,
+        "steep_pct": 4.0, grade.NEXT_DOOR_KEY: 0,
     }
     p.update(over)
     return p
@@ -69,6 +69,9 @@ class RuleTests(unittest.TestCase):
                          ["zoning path only possible (rezoning needed)"])
         hard = self.g(entitlement="hard", entitlement_note="zoned and planned residential")
         self.assertEqual(hard.grade, grade.BLOCKED)
+        # Blocked rests on the zoning path alone, so a cap does not hide it.
+        capped = grade.grade_parcel(clear_parcel(entitlement="hard"), S, "soils only checked")
+        self.assertEqual(capped.grade, grade.BLOCKED)
         self.assertEqual(hard.blocks, ["entitlement unlikely (zoned and planned residential)"])
         self.assertEqual(hard.fields()["lead_found"], hard.blocks)
         for path in ("unknown", None, "something new"):
@@ -87,6 +90,12 @@ class RuleTests(unittest.TestCase):
                          ["building fit not checked (fit switched off in settings)"])
         missing = self.g(_envelope_detail=None)
         self.assertEqual(missing.not_checked, ["building fit not checked (no result)"])
+        # A state this module does not know is not checked, never clear.
+        odd = self.g(_envelope_detail=sitefit.Fit("some new state"))
+        self.assertEqual((odd.grade, odd.not_checked),
+                         (grade.B, ["building fit not checked (no result)"]))
+        odd_pond = self.g(**{detention.DETAIL_KEY: detention.Pond("some new state")})
+        self.assertEqual(odd_pond.not_checked, ["detention pond not checked (no result)"])
 
     def test_pond_is_read_only_beside_an_envelope(self):
         no_room = self.g(**{detention.DETAIL_KEY: detention.Pond(detention.NONE_FOUND)})
@@ -114,8 +123,11 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(off.not_checked, ["road frontage not checked (road service failed (x))"])
         self.assertEqual(self.g(**{frontage.DETAIL_KEY: None}).not_checked,
                          ["road frontage not checked (no result)"])
+        odd = self.g(**{frontage.DETAIL_KEY: frontage.Frontage("some new state", feet=900)})
+        self.assertEqual((odd.grade, odd.not_checked),
+                         (grade.B, ["road frontage not checked (no result)"]))
 
-    def test_soils_count_only_when_checked_and_high(self):
+    def test_soils_three_states(self):
         def soil(**kw):
             return {soils.DETAIL_KEY: soils.Soils(soils.CHECKED, hsg="B", **kw)}
         self.assertEqual(self.g(**soil(hydric_pct=25.0, poorly_drained_pct=0.0)).found,
@@ -124,11 +136,49 @@ class RuleTests(unittest.TestCase):
                          ["30% poorly drained soils (SSURGO map units)"])
         # One soils line at most, even when both shares are high.
         self.assertEqual(len(self.g(**soil(hydric_pct=40.0, poorly_drained_pct=40.0)).found), 1)
-        for clear in (soil(hydric_pct=soils.NONE_RATED, poorly_drained_pct=soils.NONE_RATED),
-                      {soils.DETAIL_KEY: soils.not_checked("outside the top 250")},
-                      {soils.DETAIL_KEY: None}):
-            with self.subTest(clear=clear):
-                self.assertEqual(self.g(**clear).grade, grade.A)   # not counted either way
+        # An answer that came back with no rating is checked: nothing to count.
+        self.assertEqual(self.g(**soil(hydric_pct=soils.NONE_RATED,
+                                       poorly_drained_pct=soils.NONE_RATED)).grade, grade.A)
+        # A failed, capped, switched-off or missing soils check is NOT clear.
+        failed = self.g(**{soils.DETAIL_KEY: soils.not_checked("soil service failed (503)")})
+        self.assertEqual((failed.grade, failed.not_checked),
+                         (grade.B, ["soils not checked (soil service failed (503))"]))
+        self.assertEqual(self.g(**{soils.DETAIL_KEY: None}).not_checked,
+                         ["soils not checked (no result)"])
+        self.assertEqual(self.g(**{soils.DETAIL_KEY: soils.Soils("some new state")}).grade,
+                         grade.B)
+
+    def test_slope_and_the_parcel_map(self):
+        failed = self.g(steep_pct=None, slope_error="giving up after 5 tries")
+        self.assertEqual((failed.grade, failed.not_checked), (grade.B, [
+            "slope check failed (the steep-ground screen was not applied)"]))
+        tiny = self.g(steep_pct=None, slope_skipped="x")
+        self.assertEqual(tiny.not_checked,
+                         ["slope not checked (under one lidar pixel of open ground)"])
+        self.assertEqual(self.g(steep_pct=None).not_checked, ["slope not checked"])
+        self.assertEqual(self.g(steep_pct=0.0).grade, grade.A)
+        off = self.g(acreage_mismatch=True)
+        self.assertEqual(off.grade, grade.B)
+        self.assertIn("parcel map disagrees with the tax record", off.not_checked[0])
+        fit = sitefit.Fit(sitefit.FITS, label="x", length_ft=1.0, width_ft=1.0, map_mismatch=True)
+        self.assertEqual(self.g(_envelope_detail=fit).grade, grade.B)
+
+    def test_same_owner_next_door(self):
+        door = self.g(**{grade.NEXT_DOOR_KEY: 2})
+        self.assertIn("the same owner holds 2 built-on parcels adjacent to this one, directly "
+                      "or through its other parcels", door.found[0])
+        for unknown in (None, True, -1, "2"):
+            with self.subTest(unknown=unknown):
+                lead = self.g(**{grade.NEXT_DOOR_KEY: unknown})
+                self.assertEqual((lead.grade, lead.not_checked),
+                                 (grade.B, ["same-owner adjacency not checked"]))
+        p = clear_parcel()
+        del p[grade.NEXT_DOOR_KEY]
+        self.assertEqual(grade.grade_parcel(p, S).not_checked,
+                         ["same-owner adjacency not checked"])
+        off = grade.Settings(owner_next_door=False)
+        self.assertEqual(grade.grade_parcel(clear_parcel(**{grade.NEXT_DOOR_KEY: None}),
+                                            off).grade, grade.A)
 
     def test_other_watch_items(self):
         on_site = self.g(contamination=[{"feet": 0, "name": "X", "kind": "Brownfields"}])
@@ -141,16 +191,20 @@ class RuleTests(unittest.TestCase):
         twice = self.g(road="Land-Locked", **{frontage.DETAIL_KEY: frontage.Frontage(
             frontage.NONE, feet=0, limited_feet=0, private_feet=0)})
         self.assertEqual(len(twice.found), 1)
-        door = self.g(**{grade.NEXT_DOOR_KEY: 2})
-        self.assertIn("the same owner holds 2 built-on parcels next door", door.found[0])
-        self.assertEqual(self.g(**{grade.NEXT_DOOR_KEY: True}).grade, grade.A)   # not a count
         recent = self.g(years_held=2.24)
-        self.assertEqual(recent.found, ["bought 2.2 years ago (a recent buyer rarely sells)"])
+        self.assertEqual(recent.found, ["last priced deed 2.2 years ago (a recent purchase, or "
+                                        "a transfer between related owners)"])
         self.assertEqual(self.g(years_held=5.0).grade, grade.A)
+        self.assertEqual(self.g(years_held=-0.3).grade, grade.A)   # a future-dated deed
         self.assertEqual(self.g(years_held=1.0, last_sale_price=0).grade, grade.A)  # no sale
         self.assertEqual(self.g(years_held=None).grade, grade.A)
 
     def test_switches_and_thresholds(self):
+        zero = grade.Settings(max_hydric_pct=0, max_poorly_drained_pct=0)   # 0 = off
+        wet = clear_parcel()
+        wet[soils.DETAIL_KEY] = soils.Soils(soils.CHECKED, hsg="D", hydric_pct=90.0,
+                                            poorly_drained_pct=90.0)
+        self.assertEqual(grade.grade_parcel(wet, zero).grade, grade.A)
         s = grade.Settings(owner_next_door=False, recent_purchase_years=0, min_frontage_ft=700,
                            max_hydric_pct=5)
         p = clear_parcel(years_held=1.0, **{grade.NEXT_DOOR_KEY: 3})
@@ -168,8 +222,6 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(ng.grade, grade.NOT_GRADED)
         self.assertEqual(ng.fields()["lead_grade"], "not graded: x only checked")
         self.assertEqual(len(ng.found), 1)            # what was found is still listed
-        hard = grade.grade_parcel(clear_parcel(entitlement="hard"), S, "x only checked")
-        self.assertEqual(hard.grade, grade.NOT_GRADED)
 
     def test_reads_only(self):
         p = clear_parcel()
@@ -183,7 +235,7 @@ class RuleTests(unittest.TestCase):
         self.assertEqual(grade._outside(251, caps),
                          "road frontage only checked for the top 250 ([frontage] max_parcels)")
         caps[0] = ("building fit", "fit", False, 0)
-        self.assertEqual(grade._outside(1, caps), "building fit switched off in settings")
+        self.assertEqual(grade._outside(1, caps), "building fit not run (switched off)")
 
     def test_settings(self):
         self.assertEqual(grade.settings({}), grade.Settings())
@@ -206,7 +258,7 @@ class RuleTests(unittest.TestCase):
         c = grade.brief_lines(grade.grade_parcel(
             clear_parcel(entitlement="unknown", years_held=1.0), S).fields())
         self.assertEqual(c[0], "**Lead grade C**")
-        self.assertTrue(c[1].startswith("- Found: bought 1.0 years ago"))
+        self.assertTrue(c[1].startswith("- Found: last priced deed 1.0 years ago"))
         self.assertTrue(c[2].startswith("- Not checked: zoning path not known"))
         b = grade.brief_lines(grade.grade_parcel(clear_parcel(entitlement="hard"), S).fields())
         self.assertEqual(b[0], "**Lead grade: blocked**")
@@ -228,10 +280,14 @@ class BuiltNextDoorTests(unittest.TestCase):
         self.assertEqual(owner_clusters.built_next_door("P4", res, built), [])      # no group
         self.assertEqual(owner_clusters.built_next_door("nope", res, built), [])
         line = owner_clusters.built_line(["P2"])
-        self.assertTrue(line.startswith("Same owner, adjacent and built on: 1 adjacent "
-                                        "same-owner parcel is already built on (P2)"))
+        self.assertTrue(line.startswith("Same owner, adjacent and built on: 1 same-owner parcel "
+                                        "adjacent to this one, directly or through each other, "
+                                        "is already built on (P2)"))
         many = owner_clusters.built_line([f"P{i}" for i in range(7)])
-        self.assertIn("7 adjacent same-owner parcels are", many)
+        self.assertIn("7 same-owner parcels adjacent to this one, directly or through each "
+                      "other, are already built on", many)
+        self.assertFalse(owner_clusters.adjacency_not_checked("P1", res))
+        self.assertFalse(owner_clusters.adjacency_not_checked("nope", res))
         self.assertIn("and 2 more", many)
 
 
@@ -334,9 +390,14 @@ class GradeRunTests(RunHarness):
                 for r in self.rows().values():
                     # Every check clear but the zoning (College Park has no
                     # machine-readable zoning): one item not checked.
-                    self.assertEqual(r["lead_grade"], "B")
                     self.assertEqual(r["lead_found"], "")
                     self.assertTrue(r["lead_not_checked"].startswith("zoning path not known"))
+                    if args:      # without the slope check nothing is graded
+                        self.assertEqual(r["lead_grade"], "not graded: the lidar slope check "
+                                                          "not run (switched off)")
+                        self.assertIn("slope not checked", r["lead_not_checked"])
+                    else:
+                        self.assertEqual(r["lead_grade"], "B")
                 for p in self.parcels:
                     self.assertIn(grade.DETAIL_KEY, p)
                     self.assertEqual(p[grade.NEXT_DOOR_KEY], 0)
@@ -399,12 +460,37 @@ class GradeRunTests(RunHarness):
         self.assertIn("1 not graded", text)
 
     def test_failed_service_is_not_checked_not_clear(self):
-        self.routes[frontage.IDENTIFY_URL] = lambda params: FakeResponse(status=503)
-        code, _ = self.main()
-        self.assertEqual(code, 0)
+        for url, words in ((frontage.IDENTIFY_URL, "road frontage not checked (road service "
+                                                   "failed"),
+                           (soils.SDA_URL, "soils not checked (soil service failed"),
+                           (checks.SLOPE_URL, "slope check failed (the steep-ground screen "
+                                              "was not applied)")):
+            with self.subTest(url=url):
+                self.parcels[:] = [county_parcel("14F0001 0001", A),
+                                   county_parcel("14F0002 0002", B, owner="TEST OWNER BETA")]
+                self.clear_cache()
+                good = self.routes[url]
+                self.routes[url] = lambda params: FakeResponse(status=503)
+                code, _ = self.main()
+                self.routes[url] = good
+                self.assertEqual(code, 0)
+                for r in self.rows().values():
+                    self.assertEqual(r["lead_grade"], "C")  # the zoning and this: not checked
+                    self.assertIn(words, r["lead_not_checked"])
+                text = (self.out / digest.FILE_NAME).read_text()
+                self.assertIn("A 0, B 0, C 2", text)
+
+    def test_capped_or_switched_off_soils_are_not_graded(self):
+        settings = self.tmp / "settings.toml"
+        text = (SCREENER / "settings.toml").read_text()
+        head, tail = text.split("[soils]", 1)
+        settings.write_text(head + "[soils]" + tail.replace("enabled = true",
+                                                            "enabled = false", 1))
+        self.serve(self.routes, self.downloads)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(run.main(["--settings", str(settings), "--out", str(self.out)]), 0)
         for r in self.rows().values():
-            self.assertEqual(r["lead_grade"], "C")         # zoning and frontage not checked
-            self.assertIn("road frontage not checked (road service failed", r["lead_not_checked"])
+            self.assertEqual(r["lead_grade"], "not graded: soils not run (switched off)")
 
     def test_built_next_door_flag_and_grade(self):
         side = square(*A).bounds[2] - A[0]
@@ -416,9 +502,11 @@ class GradeRunTests(RunHarness):
         rows = self.rows()
         self.assertNotIn("14F0001 0009", rows)             # built on: screened out
         a, b = rows["14F0001 0001"], rows["14F0002 0002"]
-        self.assertIn("Same owner, adjacent and built on: 1 adjacent same-owner parcel is "
-                      "already built on (14F0001 0009)", a["flags"])
-        self.assertIn("the same owner holds 1 built-on parcel next door", a["lead_found"])
+        self.assertIn("Same owner, adjacent and built on: 1 same-owner parcel adjacent to "
+                      "this one, directly or through each other, is already built on "
+                      "(14F0001 0009)", a["flags"])
+        self.assertIn("the same owner holds 1 built-on parcel adjacent to this one",
+                      a["lead_found"])
         self.assertEqual(a["lead_grade"], "C")
         self.assertEqual((b["lead_grade"], b["lead_found"]), ("B", ""))
         self.assertNotIn("built on", b["flags"])
@@ -447,6 +535,9 @@ class GradeRunTests(RunHarness):
             self.assertIn("not checked: zoning path not known", r)
             self.assertRegex(r, r"\[brief\]\(briefs/00\d_14F000\d_000\d\.md\)")
         self.assertIn("TEST / OWNER GAMMA (individual)", text)
+        # Link, HTML, code and emphasis markup in county text is neutralised.
+        hostile = digest._cell("[x](http://evil) <b>`a`</b> *b* _c_ \\| d")
+        self.assertEqual(hostile, "(x)(http://evil) (b)'a'(/b) b c // d")
         # briefs = 1, yet every listed lead has its brief and plan.
         names = sorted(f.name for f in (self.out / "briefs").iterdir())
         self.assertEqual(len([n for n in names if n.endswith(".md")]), 3)
@@ -503,19 +594,38 @@ class GradeRunTests(RunHarness):
 
 
 class StaleBriefTests(RunHarness):
-    def test_a_rerun_removes_the_earlier_runs_briefs_only(self):
+    def test_a_rerun_removes_only_what_the_earlier_run_wrote(self):
         self.parcels.append(county_parcel("14F0003 0003", C, owner="TEST OWNER GAMMA"))
         self.main()
         briefs = self.out / "briefs"
         first = sorted(f.name for f in briefs.iterdir())
         self.assertEqual(len(first), 6)
-        (briefs / "notes.txt").write_text("mine")
-        (briefs / "my plan.md").write_text("mine")
+        self.assertEqual(json.loads((self.out / report.BRIEFS_LIST).read_text()), first)
+        mine = ["notes.txt", "my plan.md", "2026_site_visit_notes.md", "100_acre_comparison.svg",
+                "001_14F0001_0001_my_notes.md"]       # some are named like a brief
+        for name in mine:
+            (briefs / name).write_text("mine")
         self.parcels[:] = [county_parcel("14F0002 0002", B, owner="TEST OWNER BETA")]
         self.main()
         names = sorted(f.name for f in briefs.iterdir())
-        self.assertEqual(names, ["001_14F0002_0002.md", "001_14F0002_0002.svg", "my plan.md",
-                                 "notes.txt"])
+        self.assertEqual(names, sorted(["001_14F0002_0002.md", "001_14F0002_0002.svg", *mine]))
+        self.assertEqual(json.loads((self.out / report.BRIEFS_LIST).read_text()),
+                         ["001_14F0002_0002.md", "001_14F0002_0002.svg"])
+
+    def test_a_tampered_or_missing_list_deletes_nothing_outside_briefs(self):
+        self.main()
+        outside = self.out / "ranked.csv"
+        victim = self.tmp / "victim.txt"
+        victim.write_text("keep")
+        (self.out / report.BRIEFS_LIST).write_text(json.dumps(
+            ["../ranked.csv", "../../victim.txt", "/etc/hostname", "", ".", 7]))
+        self.parcels[:] = [county_parcel("14F0002 0002", B, owner="TEST OWNER BETA")]
+        self.main()
+        self.assertTrue(outside.is_file())
+        self.assertEqual(victim.read_text(), "keep")
+        (self.out / report.BRIEFS_LIST).write_text("{not json")
+        self.main()                                   # unreadable list: nothing removed
+        self.assertTrue((self.out / "briefs" / "001_14F0002_0002.md").is_file())
 
 
 class FactsTests(RunHarness):
@@ -583,6 +693,26 @@ class FactsTests(RunHarness):
         rows = (self.tmp / "inputs" / "decisions.csv").read_text().splitlines()
         self.assertEqual(len(rows), 3)                      # header + two decisions
 
+    def test_a_facts_failure_never_costs_the_decision(self):
+        self.main()
+        # NaN is not standard JSON: the store refuses it, the decision is still recorded.
+        path = self.out / facts.FILE_NAME
+        path.write_text(path.read_text().replace('"rank": 1,', '"rank": NaN,', 1))
+        code, text = self.decide("14F0001 0001", "pursue")
+        self.assertEqual(code, 0, text)
+        self.assertIn("no report facts kept for this decision (could not be written", text)
+        self.assertFalse((self.tmp / "inputs" / facts.STORE_NAME).exists())   # no empty file
+        # An unwritable store (a folder in its place) does not block it either.
+        (self.tmp / "inputs" / facts.STORE_NAME).mkdir()
+        path.write_text(path.read_text().replace('"rank": NaN,', '"rank": 1,', 1))
+        code, text = self.decide("14F0002 0002", "pass")
+        self.assertEqual(code, 0, text)
+        self.assertIn("could not be written", text)
+        rows = (self.tmp / "inputs" / "decisions.csv").read_text().splitlines()
+        self.assertEqual(len(rows), 3)
+        features = (self.tmp / "inputs" / decide.STORE_NAME).read_text().splitlines()
+        self.assertEqual(len(features), 2)
+
     def test_store_path_is_ignored_by_git(self):
         import subprocess
         try:
@@ -633,6 +763,32 @@ class SlopeCacheTests(Offline):
         self.assertEqual(self.session.count(checks.SLOPE_URL), 3)
         self.assertEqual(len(list((self.tmp / "slope").rglob("*.json"))), 1)  # and kept again
 
+    def test_refresh_slope_falls_back_on_the_kept_answer_when_the_service_fails(self):
+        self.serve({checks.SLOPE_URL: lambda params: copy.deepcopy(GOOD_SLOPE)})
+        self.ask()
+        self.assertEqual(checks.slope_tally["asked"], 1)
+        self.patch(checks, "slope_cache_days", 0.0)         # --refresh-slope
+        self.serve({checks.SLOPE_URL: lambda params: FakeResponse(status=503)})
+        p = self.ask()
+        self.assertNotIn("slope_error", p)                  # screened on the kept reading
+        self.assertEqual(p["steep_pct"], 3.3)
+        self.assertEqual((checks.slope_tally["fell_back"], checks.slope_tally["asked"],
+                          checks.slope_tally["reused"]), (1, 0, 0))
+        # With nothing kept, a failing service is still a failed check.
+        self.clear_cache()
+        self.assertTrue(self.ask().get("slope_error"))
+
+    def test_tally_counts_reused_answers_and_their_oldest_date(self):
+        self.serve({checks.SLOPE_URL: lambda params: copy.deepcopy(GOOD_SLOPE)})
+        self.ask()
+        self.assertEqual((checks.slope_tally["reused"], checks.slope_tally["oldest"]), (0, None))
+        [kept] = list((self.tmp / "slope").rglob("*.json"))
+        old = time.time() - 30 * 86400
+        os.utime(kept, (old, old))
+        self.ask()
+        self.assertEqual((checks.slope_tally["reused"], checks.slope_tally["asked"]), (1, 0))
+        self.assertAlmostEqual(checks.slope_tally["oldest"], old, delta=2)
+
     def test_bad_answers_are_never_kept(self):
         self.serve({checks.SLOPE_URL: lambda params: {"statistics": []}})
         p = self.ask()
@@ -656,6 +812,8 @@ class SlopeCacheRunTests(RunHarness):
                            county_parcel("14F0002 0002", B, owner="TEST OWNER BETA")]
         self.main("--refresh")
         self.assertEqual(self.session.count(checks.SLOPE_URL), 0)
+        self.assertIn("Slope: 2 of 2 lidar answers were reused from cache/slope (oldest kept "
+                      + time.strftime("%Y-%m-%d", time.gmtime()), self.notes())
         self.parcels[:] = [county_parcel("14F0001 0001", A),
                            county_parcel("14F0002 0002", B, owner="TEST OWNER BETA")]
         self.main("--refresh-slope")

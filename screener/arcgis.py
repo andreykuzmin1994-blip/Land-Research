@@ -78,14 +78,10 @@ def request_json(url: str, params: dict[str, Any], *, retries: int = 5,
     params = {**params, "f": params.get("f", "json")}
     path = _cache_path(url, params, cache_dir)
     keep_days = cache_days if max_age_days is None else max_age_days
-    if use_cache and not fresh and keep_days > 0 and path.exists():
-        if time.time() - path.stat().st_mtime < keep_days * 86400:
-            try:
-                cached = json.loads(path.read_text())
-            except ValueError:  # damaged cache file: ask again
-                cached = None
-            if isinstance(cached, dict) and not (check and check(cached)):
-                return cached
+    if use_cache and not fresh:
+        hit = _read_cache(path, keep_days, check)
+        if hit is not None:
+            return hit[0]
 
     last: Exception | None = None
     bad = 0
@@ -114,6 +110,35 @@ def request_json(url: str, params: dict[str, Any], *, retries: int = 5,
                 raise BadAnswer(f"{exc} (asked {bad} times)") from None
             time.sleep(min(30.0, 2.0 ** attempt) + random.random())
     raise ArcGISError(f"giving up after {retries} tries: {url} ({last})")
+
+
+def _read_cache(path: Path, keep_days: float,
+                check: Callable[[dict[str, Any]], str | None] | None
+                ) -> tuple[dict[str, Any], float] | None:
+    """(answer, its file time) from the cache, or None when there is no
+    usable answer young enough. Never asks the service."""
+    try:
+        if keep_days <= 0 or not path.exists():
+            return None
+        mtime = path.stat().st_mtime
+        if time.time() - mtime >= keep_days * 86400:
+            return None
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):  # damaged or vanished cache file: ask again
+        return None
+    if isinstance(cached, dict) and not (check and check(cached)):
+        return cached, mtime
+    return None
+
+
+def cached_json(url: str, params: dict[str, Any], *, max_age_days: float,
+                check: Callable[[dict[str, Any]], str | None] | None = None,
+                cache_dir: Path | None = None) -> tuple[dict[str, Any], float] | None:
+    """The kept answer to a request and its file time, or None. Asks nothing:
+    for callers that must know whether an answer was reused, or that fall
+    back on a kept answer when the service fails."""
+    params = {**params, "f": params.get("f", "json")}
+    return _read_cache(_cache_path(url, params, cache_dir), max_age_days, check)
 
 
 def _chunks(seq: list[int], size: int) -> Iterable[list[int]]:
