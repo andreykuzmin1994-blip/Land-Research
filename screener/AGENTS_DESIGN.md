@@ -8,6 +8,29 @@ across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
+## Built so far (2026-11-10, branch `claude/funny-hopper-k8rgod`, not on `main`)
+
+| Plan step | State |
+|---|---|
+| 3. Lead grade | Built and independently reviewed (`grade.py`, `reviews/35_screener_lead_layer`). Thresholds are defaults the operator has not confirmed. |
+| `leads.md` digest | Built and reviewed (`digest.py`). |
+| 5. Decisions with facts | Built and reviewed (`facts.py`, `decide.py`). |
+| Storage: kept slope answers | Built and reviewed. A warm Fulton run is about 80 seconds instead of 55 minutes. |
+| Storage: data branch | `screener-data` holds the first run, its digest, the slope answers and two pilot lead checks. |
+| Scheduled weekly run | Created, but **cannot save results yet**: a scheduled session starts without push access to the repository. Operator decision pending. |
+| 4. Investigation | `quotecheck.py` and `INVESTIGATE.md` written and piloted on two leads (`reviews/35_screener_lead_layer/04_investigation_pilot.md`). **Not independently reviewed.** The skeptic step has not been run. |
+| 2. Enrichment contract | Not started. |
+| 6. Bigger answer key / more counties | Not started; a data feasibility check is under way. Rebuilding the key is a human-only step. |
+
+What the pilot changed in the plan: the zoning text (Municode) and the
+owner record (Secretary of State) cannot be read by a polite, plain fetch
+in these cities, so those two stay a person's job. What an agent can
+read quickly is the city's own agenda files, staff reports and
+development-authority releases, and that is where the most useful
+finding came from: a grade A lead already rezoned for a developer.
+
+The sections below are the plan as written before any of this was built.
+
 ## Where things stand
 
 - **Funnel works, in the cloud.** `python -m screener.run` ran from a
