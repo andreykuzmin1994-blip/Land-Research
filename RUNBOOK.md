@@ -10,6 +10,10 @@ The code is whatever is on `main`; the data is this branch
   Do not change `screener/settings.toml`. Do not open a pull request.
 - Push only to `screener-data`. The operator authorized this branch for
   run outputs and decisions on 2026-11-10.
+- The session needs push access to the repository. If `git push` is
+  refused, say so and stop: do not look for another route, and do not
+  give yourself access. The run's results are then lost with the
+  container, so report the main points in your final message.
 - A check the screener reports as "not checked" stays "not checked".
   Never skip a check, change a threshold or add a data source to get a
   run through.
@@ -30,11 +34,15 @@ The code is whatever is on `main`; the data is this branch
    mkdir -p screener/inputs
    cp ../screener-data/decisions/decisions.csv screener/inputs/decisions.csv
    [ -f ../screener-data/decisions/decision_features.jsonl ] && cp ../screener-data/decisions/decision_features.jsonl screener/inputs/
+   # Kept lidar slope answers (public data; they spare the run about 50 minutes).
+   # Harmless if the code on main does not use the folder yet.
+   mkdir -p screener/cache && rm -rf screener/cache/slope
+   [ -d ../screener-data/cache/slope ] && cp -r ../screener-data/cache/slope screener/cache/slope
    ```
 
-2. Run the screen in the background and wait for it to exit. A full,
-   uncached Fulton run takes about an hour (the lidar slope step alone is
-   about 40 minutes):
+2. Run the screen in the background and wait for it to exit. With the
+   kept slope answers a Fulton run takes a few minutes; without them
+   about an hour (the lidar slope step alone is about 50 minutes):
 
    ```bash
    python -m screener.run > ../run.log 2>&1
@@ -55,12 +63,19 @@ The code is whatever is on `main`; the data is this branch
    NAME=$(basename "$RUN")
    rm -rf "../screener-data/runs/$NAME"
    cp -r "$RUN" "../screener-data/runs/$NAME"
+   # Save the slope answers this run added (only if the run made the folder).
+   if [ -d screener/cache/slope ]; then
+     mkdir -p ../screener-data/cache && cp -r screener/cache/slope ../screener-data/cache/
+   fi
    ```
 
 5. Write `../screener-data/digests/<NAME>.md` (for a failed run, name it
    `fulton-<today>-failed.md`). Compare this run's `ranked.csv` with the
    previous run's (the latest earlier folder under `runs/`, if any). Keep
    it short and plain:
+   - if the run folder has a `leads.md`, lead with it: the grade counts
+     and the grade A table as it stands, then which A and B leads are new
+     since the previous run and which dropped out;
    - the funnel counts from `summary.md`;
    - parcels new to the top 50, with rank, score, acres, jurisdiction,
      zoning, entitlement, `envelope_fit`, `pond_fit`, `frontage_ft` and
