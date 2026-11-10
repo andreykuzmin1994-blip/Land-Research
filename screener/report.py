@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import plan, sitefit
+from . import detention, frontage, plan, sitefit, soils
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
@@ -17,7 +17,10 @@ RANKED_COLUMNS = [
     "site_address", "acres", "usable_after_slope", "entitlement", "zoning", "flu",
     "exit_label", "exit_miles", "rail_ft", "industrial_within_1mi", "flood_pct",
     "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft",
-    "largest_open_acres", "envelope_fit", "envelope_building_sf", "owner", "owner_type", "owner_mailing",
+    "largest_open_acres", "envelope_fit", "envelope_building_sf", "detention_pct", "pond_fit",
+    "soil_hsg", "soil_hydric_pct", "soil_poorly_drained_pct", "soil_dwellings_limited_pct",
+    "frontage_ft", "frontage_road", "frontage_limited_ft", "frontage_private_ft",
+    "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
 ]
@@ -98,7 +101,8 @@ def _money(v: Any) -> str:
 
 PLAN_CAPTION = ("_North up, drawn from the county parcel map: shaded blue is floodplain, "
                 "mapped wetlands and water, conservation easements and protected land; green "
-                "is the largest open part; the outlined block is the fitted building envelope. "
+                "is the largest open part; the outlined block is the fitted building envelope and "
+                "the teal block, when drawn, is the rough detention pond allowance. "
                 "Steep ground is not shown. A screening sketch, not a survey._")
 
 
@@ -140,6 +144,9 @@ def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None
         f"relief about {_fmt(p.get('relief_ft'))} ft (USGS lidar 2018-19, 10 m grid)",
         _earthwork_line(p),
         sitefit.brief_line(p),
+        detention.brief_line(p),
+        soils.brief_line(p),
+        frontage.brief_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
         *_plan_section(plan_file, plan_note),
@@ -161,6 +168,8 @@ def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None
     lines += [
         "", "## Next steps",
         f"- Confirm zoning and any conditions with {_planning_office(p['jurisdiction'])}",
+        "- Confirm a curb cut / driveway permit for truck access (GDOT for a state route, "
+        "the city or county for a local road): not checked by the screen",
         "- Ask the water/sewer provider about capacity and the nearest main",
         "- Pull title and recent deeds before approaching the owner",
         "- Drive the site: access, neighbours, visible fill or dumping",

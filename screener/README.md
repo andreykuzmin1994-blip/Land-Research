@@ -28,7 +28,7 @@ Results land in `screener/output/fulton-<date>/`:
 | File | What it is |
 |---|---|
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate and a building-fit check that aren't scored; see Earthwork and Site fit below) |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance, SSURGO soils and GDOT road frontage that aren't scored; see below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
 | `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name) |
 | `rejected.csv` | Every parcel screened out, with the reason |
@@ -145,6 +145,135 @@ feature or a screen, a human would add it to `build_eval.FEATURES`,
 rebuild `data/` and take `--new-baseline`; reading it from `rank.py` is
 not the way.
 
+**Detention pond (rough allowance).** Two more columns follow
+`envelope_building_sf`, and each brief has a "Detention pond" line:
+
+- `detention_pct`: the operator's prototype detention pond (400 x 200 ft
+  at the top of bank, 6 ft deep, 4:1 side slopes, about 9.1 acre-feet,
+  1.84 acres) as a percent of the parcel's open ground on the county map
+  (all parts). Empty when there is no open ground, or when detention is
+  off or outside `[detention] max_parcels`; still filled when only the
+  placement is not checked (for example the building fit is off).
+- `pond_fit`: `pond fits` when that rectangle was placed (copied
+  rotated-rectangle search) on the open ground left beside the fitted
+  building envelope, inside the 25 ft lot-line setback; `pond fits (no
+  building envelope placed)` when no envelope fit, so it was tried on the
+  open ground alone; `no pond room found` when it was checked and no
+  placement was found (a lower bound: the envelope is placed first at its
+  largest length, so a shorter building may leave room); `not checked:
+  <why>` when it wasn't (`[detention] enabled = false`, outside
+  `[detention] max_parcels`, the building fit not checked, a shape over the
+  vertex cap, or a geometry fault; each is counted in `summary.md`).
+
+The pond numbers and the volume formula are copied (not imported) from
+the repo root's `building_prototypes.json` ("detention") and `site_fit.py`;
+`tests/test_detention.py` fails if the root changes and the copy doesn't.
+This is a rough allowance for one fixed pond, **not a stormwater design**:
+no hydrology, no NOAA Atlas 14 rainfall, no runoff from the impervious
+area and no local detention rules. The pond may be placed right against
+the envelope with no room left for access, grading or a buffer. The real
+requirement may be larger,
+smaller, underground or shared. Steep ground is not located. It calls no
+web service, is computed after scoring, flags, the sort and the building
+fit (with or without `--no-slope`), and is in no score, screen or flag.
+When placed, the pond is drawn in teal on the site plan. Most parcels
+take a few milliseconds; the measured worst case (the same near-cap shape
+as the building fit, where nothing fits) is about 3 to 4 seconds more per
+parcel, and `[detention] max_parcels` caps it to the top N by rank.
+
+**Soils (USDA SSURGO).** Four more columns follow `pond_fit`, and each
+brief has a "Soils" line. After the sort, the fit and the pond, the
+screener sends one request per ranked parcel to USDA NRCS Soil Data
+Access (`post.rest`, `sdmdataaccess.sc.egov.usda.gov`): the SSURGO map
+units intersecting the parcel shape (WKT in lon/lat order), clipped to it
+by SDA, with each unit's clipped area and its `muaggatt` aggregate ratings.
+Shares are of the parcel's mapped soil area, by map unit:
+
+- `soil_hsg`: the hydrologic soil group (A, B, C, D or dual A/D, B/D,
+  C/D, "D unless drained") covering the most area, dominant condition.
+  Under urban land or water this can be a minority of the parcel: the
+  brief then says "largest rated group" instead of "mostly" and gives the
+  unrated share.
+- `soil_hydric_pct`: area-weighted share of hydric components.
+- `soil_poorly_drained_pct`: share mapped poorly or very poorly drained.
+- `soil_dwellings_limited_pct`: share rated "Very limited" for dwellings
+  without basements (NRCS's slab-on-grade building rating, the closest one
+  the aggregate table carries; "small commercial buildings" is per
+  component and is not asked for).
+
+Three states stay apart: a value; `none rated` when no unit on the parcel
+carries that rating (urban land, water); and `not checked: <why>` in
+`soil_hsg`, with the three share columns empty, when the check didn't run
+or failed (`[soils]` off or outside `max_parcels`, an HTTP error, SDA's
+empty `{}` or a header-only answer, a malformed row, an answer at SDA's
+100,000-row cap, or mapped soil covering under half or over 1.5 times the
+parcel shape). Bad answers are never cached. After 5 service failures in a
+row the rest of the run isn't asked (SDA is down nightly about
+00:00-02:00 Mountain); `summary.md` counts every reason. SSURGO is mapped
+at about 1:12,000 to 1:24,000: small wet spots, fill and inclusions go
+unmapped, and it is no geotechnical report or wetland delineation. Soils
+are in no score, screen or flag (`tests/test_soils.py` spies on every
+call). Access: SDA's robots.txt is absent (HTTP 404, checked 2026-11-10)
+and NRCS publishes `post.rest` as a public web service for ad hoc queries;
+the screener sends its own User-Agent, at most 3 requests at a time
+(`[soils] workers`, 1-3) and caches answers like every other source.
+`[soils] max_parcels` (250 by default) caps it to the top N by rank.
+
+**Road frontage (GDOT road centrelines).** Four more columns follow
+`soil_dwellings_limited_pct`, and each brief has a "Road frontage" line.
+After the sort, the fit, the pond and the soils, the screener sends one
+`identify` request per ranked parcel to GDOT's public Functional Class map
+service (`maps.itos.uga.edu/arcgis/rest/services/GDOT/GDOT_FunctionalClass`,
+GDOT's statewide road network as published by GDOT with UGA ITOS): every
+GDOT centreline in the parcel's box padded about 500 ft, on the seven
+functional-class layers (interstate, freeway/expressway, principal and
+minor arterial, major and minor collector, local road). The parcel line
+within 50 ft of a centreline counts as frontage on that road:
+
+- `frontage_ft`: parcel line within 50 ft of any public road that is not
+  access controlled and not private.
+- `frontage_road`: class and route of the road with the longest frontage
+  ("minor arterial, SR 14"). The layer has no street names, so a county or
+  city road shows its GDOT route id; the county's road type stays in the
+  brief's Access line.
+- `frontage_limited_ft`: parcel line within 50 ft of an interstate or
+  freeway/expressway, or of a ramp, collector-distributor road, ramp
+  connector, managed lane or Y-connector on any layer: access is
+  controlled and a driveway unlikely, so it is kept apart.
+- `frontage_private_ft`: parcel line within 50 ft of a road GDOT marks as
+  private: mapped, but not public access (check an access easement).
+
+The road's type is the first character of its GDOT route id (GDOT's
+FUNCTION_TYPE domain: 1 main line, 2 ramp, 3 collector distributor, 4
+ramp-CD connector, 5 frontage road, 6 alley, 7 managed facility, 8
+Y-connector, 9 private, P projected, Z other, R roundabout). Projected
+alignments (not built) are left out, and only a main line is labelled
+"SR N"; a ramp or other piece of a state route shows its GDOT route id.
+
+Three states stay apart: a number and a road; `0` with `none within 50 ft`
+(the brief gives the nearest road's distance and says "possibly
+land-locked"); and `not checked: <why>` in `frontage_road`, with all three
+numbers empty, when the check didn't run or failed (`[frontage]` off or
+outside `max_parcels`, an HTTP error, an answer without a results list, a
+road from another layer, without polyline geometry or not in WGS84, or an
+answer at the service's 1,000-result cap). Bad answers are never cached;
+after 5 service failures in a row the rest of the run isn't asked, and
+`summary.md` counts every reason. It is a screening measure: up to about
+50 ft at each end of a frontage can be a side line near the corner, a wide
+right-of-way or a misaligned parcel map can hide real frontage, and being
+near a road is not legal access. **A curb cut / driveway permit is not
+checked**: the brief's frontage line and its next steps say to confirm it
+with GDOT (state routes) or the city or county (local roads). The site
+plan draws the frontage in orange. The roads are not a map layer
+(`layers.LAYERS`) and not in the map checks, so nothing in the
+AutoResearch evaluation copies them; frontage is in no score, screen or
+flag (`tests/test_frontage.py` spies on every call). Access: the host's
+robots.txt is absent (HTTP 404, checked 2026-11-10), the service is public
+with no sign-in and no posted terms forbid automated use; the screener
+sends its own User-Agent, at most 3 requests at a time (`[frontage]
+workers`, 1-3) and caches answers like every other source. `[frontage]
+max_parcels` (250 by default) caps it to the top N by rank.
+
 **Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
 the county parcel map in the same flat local plane as the fit, north up,
 with a scale bar: the parcel outline, the constrained ground (floodplain,
@@ -221,6 +350,13 @@ reviewed), the meaning differences above, spatial clustering and privacy
   to count as adjacent (see Owner clusters below; flags only).
   `[fit] enabled` and `max_parcels` switch the building-fit check off or
   limit it to the top N ranked parcels (see Site fit; report only).
+  `[detention] enabled` and `max_parcels` do the same for the detention
+  pond allowance (see Detention pond; report only).
+  `[soils] enabled`, `max_parcels` and `workers` (1-3) do the same for the
+  SSURGO soils check (see Soils; report only, one web request per parcel).
+  `[frontage] enabled`, `max_parcels` and `workers` (1-3) do the same for
+  the GDOT road frontage check (see Road frontage; report only, one web
+  request per parcel).
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark
@@ -262,6 +398,8 @@ parcels (county GIS, 5-50 ac, chosen cities)
 | Interstate exits | GDOT |
 | Freight rail | BTS North American Rail Network |
 | Opportunity Zones | HUD |
+| Soils (report only) | USDA NRCS SSURGO via Soil Data Access |
+| Road frontage (report only) | GDOT Functional Class road centrelines (maps.itos.uga.edu) |
 
 ## What it can't tell you (check these by hand)
 
