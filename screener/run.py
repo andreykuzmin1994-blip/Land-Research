@@ -19,8 +19,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import (arcgis, checks, detention, layers, owner_clusters, report, scoring, screens,
-               sitefit, snapshot, soils)
+from . import (arcgis, checks, detention, frontage, layers, owner_clusters, report, scoring,
+               screens, sitefit, snapshot, soils)
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -182,6 +182,47 @@ def attach_soils(ranked: list[dict[str, Any]], enabled: bool, cap: int, workers:
                      "00:00-02:00 Mountain; re-run later for those parcels.")
 
 
+def attach_frontage(ranked: list[dict[str, Any]], enabled: bool, cap: int, workers: int,
+                    notes: list[str]) -> None:
+    """Ask GDOT's road centrelines about each ranked parcel (the top ``cap``
+    by rank; 0 = all) and attach the report fields. Called only after
+    scores, flags, the sort, the fit, the pond and the soils."""
+    todo = ranked if not enabled or not cap else ranked[:cap]
+    results: list[frontage.Frontage] = []
+    if enabled and todo:
+        log(f"Road frontage from GDOT road centrelines for {len(todo):,} parcels")
+        started = time.monotonic()
+        results = frontage.check_all([p.get("geometry") for p in todo], workers)
+        log(f"  frontage done ({time.monotonic() - started:.1f} s)")
+    reasons: collections.Counter = collections.Counter()
+    states: collections.Counter = collections.Counter()
+    for i, p in enumerate(ranked):
+        if not enabled:
+            f = frontage.not_checked("frontage switched off in settings")
+        elif i >= len(results):
+            f = frontage.not_checked(f"outside the top {cap} ([frontage] max_parcels)")
+        else:
+            f = results[i]
+        if f.state == frontage.NOT_CHECKED:
+            reasons[f.reason.split(" (")[0]] += 1
+        else:
+            states[f.state] += 1
+        p.update(f.fields())
+    if states:
+        notes.append(f"Road frontage (GDOT road centrelines, parcel line within "
+                     f"{frontage.BUFFER_FT:.0f} ft; curb cuts not checked): frontage on "
+                     f"{states[frontage.CHECKED]} of {len(ranked)} ranked parcels, "
+                     f"{frontage.NONE_LABEL} on {states[frontage.NONE]}")
+        if not states[frontage.CHECKED] and states[frontage.NONE] >= 3:
+            notes.append("No ranked parcel came back with road frontage. If that's unexpected, "
+                         "re-run with --refresh before relying on it.")
+    for why, n in sorted(reasons.items()):
+        notes.append(f"Road frontage not checked for {n} of {len(ranked)} ranked parcels: {why}")
+    if any(w.startswith(frontage.SERVICE_FAILED) or "failures in a row" in w for w in reasons):
+        notes.append("ROAD SERVICE FAILURES: the GDOT road centreline service did not answer "
+                     "for some parcels; re-run later for those parcels.")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--settings", type=Path, default=HERE / "settings.toml")
@@ -208,6 +249,7 @@ def main(argv: list[str] | None = None) -> int:
         fit_on, fit_max = fit_settings(cfg)
         pond_on, pond_max = fit_settings(cfg, "detention")
         soils_on, soils_max, soils_workers = soils.settings(cfg)
+        front_on, front_max, front_workers = frontage.settings(cfg)
     except ValueError as exc:
         ap.error(f"{args.settings}: {exc}")
 
@@ -377,6 +419,10 @@ def main(argv: list[str] | None = None) -> int:
     # SSURGO soils are live-only too: asked for only now, after the sort,
     # for the reports alone (soils.py). One SDA request per ranked parcel.
     attach_soils(survivors, soils_on, soils_max, soils_workers, notes)
+    # Road frontage is live-only too: GDOT centrelines asked for only now,
+    # after the sort, for the reports alone (frontage.py). Not a map layer:
+    # it stays out of map_checks and everything build_eval copies.
+    attach_frontage(survivors, front_on, front_max, front_workers, notes)
     # Same-owner lines, now that every sibling's final status is known.
     # Only p["flags"] (reports) gains them; scores and order are done.
     ranked_at = {p["parcel_id"]: p["rank"] for p in survivors}

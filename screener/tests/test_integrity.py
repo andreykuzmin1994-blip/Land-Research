@@ -29,7 +29,8 @@ import shapely
 from shapely.geometry import GeometryCollection, LineString, Point, Polygon, box
 from shapely.geometry.polygon import orient
 
-from screener import arcgis, checks, fulton, geo, layers, report, run, scoring, screens, soils
+from screener import (arcgis, checks, frontage, fulton, geo, layers, report, run, scoring,
+                      screens, soils)
 
 SETTINGS_FILE = Path(run.__file__).resolve().parent / "settings.toml"
 REAL_LOAD_CAMA = fulton.load_cama
@@ -63,6 +64,40 @@ def fake_sda(units=GOOD_SOIL_UNITS):
         m2 = geo.LocalProjection.around(shape)(shape).area
         return {"Table": [list(soils.HEADER)] + [
             [k, repr(share * m2), h, d, c, e] for k, share, h, d, c, e in units]}
+    return route
+
+
+def identify_bounds(params):
+    """The parcel's bounds inside a GDOT identify request (frontage._params
+    pads them by frontage.PAD_M)."""
+    env = json.loads(params["geometry"])
+    mid = (env["ymin"] + env["ymax"]) / 2
+    dx = frontage.PAD_M / (111_320.0 * math.cos(math.radians(mid)))
+    dy = frontage.PAD_M / 110_574.0
+    return env["xmin"] + dx, env["ymin"] + dy, env["xmax"] - dx, env["ymax"] - dy
+
+
+# Roads as (layerId, route_id, offset south of the parcel's south edge in m),
+# each running the parcel's full width: a minor arterial state route 10 m off.
+GOOD_ROADS = [(3, "1000100001400INC", 10.0)]
+
+
+def fake_roads(roads=GOOD_ROADS):
+    """A GDOT identify route in the shape of a live answer (2026-11-10)."""
+    def route(params):
+        assert params["layers"] == "all:0,1,2,3,4,5,6"
+        xmin, ymin, xmax, _ = identify_bounds(params)
+        out = []
+        for layer, rid, off in roads:
+            y = ymin - off / 110_574.0
+            out.append({"layerId": layer, "layerName": frontage.CLASSES[layer],
+                        "displayFieldName": "route_id", "value": rid,
+                        "attributes": {"OBJECTID": "1", "route_id": rid,
+                                       "SYSTEM_CODE": "1 - State Highway Routes"},
+                        "geometryType": "esriGeometryPolyline",
+                        "geometry": {"paths": [[[xmin - 0.001, y], [xmax + 0.001, y]]],
+                                     "spatialReference": {"wkid": 4326, "latestWkid": 4326}}})
+        return {"results": out}
     return route
 
 
@@ -489,6 +524,7 @@ class RunHarness(Offline):
         self.routes = {f"{layers.LAYERS[k].url}/query": v for k, v in world().items()}
         self.routes[checks.SLOPE_URL] = lambda params: GOOD_SLOPE
         self.routes[soils.SDA_URL] = fake_sda()
+        self.routes[frontage.IDENTIFY_URL] = fake_roads()
         self.downloads = {}
 
     def set_layer(self, key, fake):

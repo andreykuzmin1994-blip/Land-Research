@@ -68,3 +68,13 @@ max_parcels = 0      # check only the top N ranked parcels (0 = all)
 enabled = true
 max_parcels = 250    # check only the top N ranked parcels (0 = all)
 workers = 3          # parallel requests (1-3; kept below the shared 6)
+
+[frontage]
+# Road frontage from GDOT's public road centrelines (Functional Class map
+# service; a report fact only, not a score or a screen): the parcel line
+# within 50 ft of a centreline, the class and route of the longest-frontage
+# road, and frontage along interstates / freeways (no driveway access).
+# Curb cuts are not checked. One request per ranked parcel, after the sort.
+enabled = true
+max_parcels = 250    # check only the top N ranked parcels (0 = all)
+workers = 3          # parallel requests (1-3; kept below the shared 6)

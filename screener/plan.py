@@ -5,8 +5,9 @@ shape, the constrained ground (the parcel minus ``checks.map_checks``'
 ``_open_ground``: FEMA SFHA floodplain, NWI wetlands and water, NCED
 easements, PAD-US protected land), the largest open part, and the F6
 envelope (``sitefit.ENVELOPE_KEY``) when one fits, and the F7 detention
-pond (``detention.POND_KEY``) when one was placed. Plus a scale bar and a
-north arrow. Standard library only (shapely is already a dependency).
+pond (``detention.POND_KEY``) when one was placed, and the F10 road
+frontage (``frontage.LINE_KEY``, the parcel line within 50 ft of a GDOT
+road centreline) when one was found. Plus a scale bar and a north arrow. Standard library only (shapely is already a dependency).
 
 Report-only, like earthwork and the fit: ``report.write_all`` calls
 ``render`` after scores, flags and the sort, and ``render`` writes nothing
@@ -31,7 +32,7 @@ import shapely
 from shapely.errors import GEOSException
 from shapely.geometry import Polygon
 
-from . import detention, sitefit
+from . import detention, frontage, sitefit
 from .geo import FT_PER_M, LocalProjection, acres
 
 SIZE = 600          # plan square, px
@@ -46,6 +47,7 @@ _XML_BAD = re.compile("[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 PARCEL_FILL, OPEN_FILL, CONSTRAINED_FILL = "#f4f1ea", "#cfe8c4", "#9cc3e0"
 ENVELOPE_FILL, ENVELOPE_STROKE, INK = "#f2c9a0", "#b5534a", "#222222"
 POND_FILL, POND_STROKE = "#7fc4bd", "#1f6f68"
+FRONTAGE_STROKE = "#d9480f"
 
 
 def _n(v: float) -> str:
@@ -86,6 +88,18 @@ class _Frame:
                 if len(pts) >= 3:
                     rings.append("M" + " L".join(pts) + " Z")
         return " ".join(rings)
+
+    def lines(self, g) -> str:
+        """Open polylines (no Z) for the line parts of g."""
+        parts = []
+        for ln in getattr(g, "geoms", [g]):
+            if ln.geom_type == "LineString":
+                pts = [self.xy(x, y) for x, y, *_ in ln.coords]
+                if len(pts) >= 2:
+                    parts.append("M" + " L".join(pts))
+            elif hasattr(ln, "geoms"):
+                parts.append(self.lines(ln))
+        return " ".join(x for x in parts if x)
 
 
 def _feet(g, proj: LocalProjection):
@@ -141,9 +155,8 @@ def _pond_text(d: detention.Pond) -> str:
 
 def render(p: dict[str, Any]) -> tuple[str | None, str]:
     """(svg text, "") or (None, why not drawn). Reads only geometry,
-    _open_ground, constrained_pct, rank, parcel_id, the F6 keys and the F7
-    pond keys, and
-    writes nothing on p."""
+    _open_ground, constrained_pct, rank, parcel_id, the F6 keys, the F7
+    pond keys and the F10 frontage keys, and writes nothing on p."""
     g = p.get("geometry")
     if g is None or g.is_empty or not sitefit.polygon_parts(g):
         return None, "no parcel map shape"
@@ -196,6 +209,13 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
     for q in pond_parts:
         out.append(_shape(fr.path([q]), POND_FILL, POND_STROKE, 2.0, 0.9, "pond"))
     out.append(_shape(fr.path(parcel), "none", INK, 1.5, cls="parcel"))
+    fd: frontage.Frontage | None = p.get(frontage.DETAIL_KEY)
+    fline = p.get(frontage.LINE_KEY)
+    if fline is not None and not fline.is_empty:
+        d_line = fr.lines(_feet(fline, proj))
+        if d_line:
+            out.append(f'<path class="frontage" d="{d_line}" fill="none" '
+                       f'stroke="{FRONTAGE_STROKE}" stroke-width="5.0" stroke-linecap="round"/>')
     if f is not None and f.state == sitefit.FITS and env_parts:
         c = env_parts[0].centroid
         cx, cy = (float(v) for v in fr.xy(c.x, c.y).split(","))
@@ -235,7 +255,10 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
     rows.append((ENVELOPE_FILL, _fit_text(f)))
     if d is not None:     # absent only when report.write_all gets no F7 result
         rows.append((POND_FILL, _pond_text(d)))
-    strokes = {ENVELOPE_FILL: ENVELOPE_STROKE, POND_FILL: POND_STROKE}
+    if fd is not None:    # absent only when report.write_all gets no F10 result
+        rows.append((FRONTAGE_STROKE, frontage.plan_text(fd)))
+    strokes = {ENVELOPE_FILL: ENVELOPE_STROKE, POND_FILL: POND_STROKE,
+               FRONTAGE_STROKE: FRONTAGE_STROKE}
     for fill, label in rows:
         out.append(_swatch(y, fill, strokes.get(fill, INK)))
         for line in textwrap.wrap(label, WRAP) or [""]:

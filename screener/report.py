@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import detention, plan, sitefit, soils
+from . import detention, frontage, plan, sitefit, soils
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
@@ -19,6 +19,7 @@ RANKED_COLUMNS = [
     "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft",
     "largest_open_acres", "envelope_fit", "envelope_building_sf", "detention_pct", "pond_fit",
     "soil_hsg", "soil_hydric_pct", "soil_poorly_drained_pct", "soil_dwellings_limited_pct",
+    "frontage_ft", "frontage_road", "frontage_limited_ft",
     "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
@@ -145,6 +146,7 @@ def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None
         sitefit.brief_line(p),
         detention.brief_line(p),
         soils.brief_line(p),
+        frontage.brief_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
         *_plan_section(plan_file, plan_note),
@@ -166,6 +168,8 @@ def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None
     lines += [
         "", "## Next steps",
         f"- Confirm zoning and any conditions with {_planning_office(p['jurisdiction'])}",
+        "- Confirm a curb cut / driveway permit for truck access (GDOT for a state route, "
+        "the city or county for a local road): not checked by the screen",
         "- Ask the water/sewer provider about capacity and the nearest main",
         "- Pull title and recent deeds before approaching the owner",
         "- Drive the site: access, neighbours, visible fill or dumping",

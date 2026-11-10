@@ -28,7 +28,7 @@ Results land in `screener/output/fulton-<date>/`:
 | File | What it is |
 |---|---|
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance and SSURGO soils that aren't scored; see below) |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance, SSURGO soils and GDOT road frontage that aren't scored; see below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
 | `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name) |
 | `rejected.csv` | Every parcel screened out, with the reason |
@@ -219,6 +219,50 @@ the screener sends its own User-Agent, at most 3 requests at a time
 (`[soils] workers`, 1-3) and caches answers like every other source.
 `[soils] max_parcels` (250 by default) caps it to the top N by rank.
 
+**Road frontage (GDOT road centrelines).** Three more columns follow
+`soil_dwellings_limited_pct`, and each brief has a "Road frontage" line.
+After the sort, the fit, the pond and the soils, the screener sends one
+`identify` request per ranked parcel to GDOT's public Functional Class map
+service (`maps.itos.uga.edu/arcgis/rest/services/GDOT/GDOT_FunctionalClass`,
+GDOT's statewide road network as published by GDOT with UGA ITOS): every
+GDOT centreline in the parcel's box padded about 500 ft, on the seven
+functional-class layers (interstate, freeway/expressway, principal and
+minor arterial, major and minor collector, local road). The parcel line
+within 50 ft of a centreline counts as frontage on that road:
+
+- `frontage_ft`: parcel line within 50 ft of any road that is not an
+  interstate or freeway.
+- `frontage_road`: class and route of the road with the longest frontage
+  ("minor arterial, SR 14"). The layer has no street names, so a county or
+  city road shows its GDOT route id; the county's road type stays in the
+  brief's Access line.
+- `frontage_limited_ft`: parcel line within 50 ft of an interstate or
+  freeway: limited access, no driveway, so it is kept apart.
+
+Three states stay apart: a number and a road; `0` with `none within 50 ft`
+(the brief gives the nearest road's distance and says "possibly
+land-locked"); and `not checked: <why>` in `frontage_road`, with both
+numbers empty, when the check didn't run or failed (`[frontage]` off or
+outside `max_parcels`, an HTTP error, an answer without a results list, a
+road from another layer, without polyline geometry or not in WGS84, or an
+answer at the service's 1,000-result cap). Bad answers are never cached;
+after 5 service failures in a row the rest of the run isn't asked, and
+`summary.md` counts every reason. It is a screening measure: up to about
+50 ft at each end of a frontage can be a side line near the corner, a wide
+right-of-way or a misaligned parcel map can hide real frontage, and being
+near a road is not legal access. **A curb cut / driveway permit is not
+checked**: the brief's frontage line and its next steps say to confirm it
+with GDOT (state routes) or the city or county (local roads). The site
+plan draws the frontage in orange. The roads are not a map layer
+(`layers.LAYERS`) and not in the map checks, so nothing in the
+AutoResearch evaluation copies them; frontage is in no score, screen or
+flag (`tests/test_frontage.py` spies on every call). Access: the host's
+robots.txt is absent (HTTP 404, checked 2026-11-10), the service is public
+with no sign-in and no posted terms forbid automated use; the screener
+sends its own User-Agent, at most 3 requests at a time (`[frontage]
+workers`, 1-3) and caches answers like every other source. `[frontage]
+max_parcels` (250 by default) caps it to the top N by rank.
+
 **Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
 the county parcel map in the same flat local plane as the fit, north up,
 with a scale bar: the parcel outline, the constrained ground (floodplain,
@@ -299,6 +343,9 @@ reviewed), the meaning differences above, spatial clustering and privacy
   pond allowance (see Detention pond; report only).
   `[soils] enabled`, `max_parcels` and `workers` (1-3) do the same for the
   SSURGO soils check (see Soils; report only, one web request per parcel).
+  `[frontage] enabled`, `max_parcels` and `workers` (1-3) do the same for
+  the GDOT road frontage check (see Road frontage; report only, one web
+  request per parcel).
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark
@@ -341,6 +388,7 @@ parcels (county GIS, 5-50 ac, chosen cities)
 | Freight rail | BTS North American Rail Network |
 | Opportunity Zones | HUD |
 | Soils (report only) | USDA NRCS SSURGO via Soil Data Access |
+| Road frontage (report only) | GDOT Functional Class road centrelines (maps.itos.uga.edu) |
 
 ## What it can't tell you (check these by hand)
 
