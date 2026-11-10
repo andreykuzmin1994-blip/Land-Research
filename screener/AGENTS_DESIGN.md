@@ -156,7 +156,17 @@ Cloud runs need three things to outlive the container:
 | Run outputs | history, week-over-week "what's new", fact capture | small; contains owner names and mailing addresses (public record) |
 | `inputs/decisions.csv` and the decision stores | passed parcels stay passed; the only new learning signal | small; private, kept out of git today |
 
-Where they live is an operator decision (open questions below).
+Recommended (the repository is private, confirmed by the operator
+2026-11-10; awaiting the operator's go-ahead):
+
+- **Decisions and run outputs:** a dedicated data branch of this
+  repository that holds no code and is never merged into `main`. Each
+  scheduled run reads the decisions from it and commits its outputs to it.
+- **Cache: not kept.** Map data expires after 7 days (`cache_days`), so
+  a weekly run would refetch almost everything anyway, and 118 MB a week
+  would bloat the repository. A cold run of about an hour is acceptable
+  when nobody is waiting on it. Revisit if runs become daily or the
+  county count makes the slope step a problem.
 
 ### Watchdog
 
@@ -192,9 +202,9 @@ evaluation file; tests plus one reviewer is proportionate.
 
 ## Open questions for the operator
 
-- Where do the cache, run outputs and decisions live? Options: a private
-  branch of this repository, or external storage. Decisions and owner
-  details argue against anything public.
+- Go-ahead for the data branch described under Storage (it would hold
+  owner names, mailing addresses and your decisions, in the private
+  repository)?
 - How many leads a week is useful (sets the top N and the grade cut)?
 - Which blockers should the lead grade treat as hard (no public frontage?
   no pond room? a hydric-soil share above some level)?
