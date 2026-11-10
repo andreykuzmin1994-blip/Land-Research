@@ -20,8 +20,11 @@ the evaluation and changing zoning facts stay human.
   building fit, detention pond room, soils, road frontage and rough
   earthwork. All are report-only, attached after the sort, and none reaches
   the score or the evaluation. All 404 tests pass.
-- **Nothing consumes those facts.** A parcel with no road frontage ranks
-  where it did before; the reader has to find it in the brief.
+- **Nothing consumes those facts.** In the 2026-11-10 full run, of the
+  top 50 ranked parcels: 25 had no building envelope found, 10 had no
+  road frontage within 50 ft and 9 had no pond room. None of that moved a
+  rank; the reader has to find it in the brief. (Each "none found" is a
+  lower bound, not proof.)
 - **Decisions don't record them.** `decide.py` stores only the evaluation's
   features (`snapshot.py`), so later analysis can't ask whether frontage
   or soils predicted a pursue.
@@ -30,10 +33,16 @@ the evaluation and changing zoning facts stay human.
   `settings()` and failure-streak `check_all()`.
 - **Cloud runs start cold.** A cloud container is discarded after each
   run, and the cache (118 MB after one Fulton run) goes with it. Measured
-  2026-11-10 from the cloud: the lidar slope check ran at about 1.1 s per
-  parcel, so about 40 minutes for Fulton's 2,118 parcels. Soils and
-  frontage answered in about 1.5 s and 0.5 s per parcel and are capped at
-  the top 250.
+  2026-11-10 from the cloud: a full uncached Fulton run took 55 minutes,
+  about 48 of them in the lidar slope step (2,118 parcels; a second run
+  was using the same service for most of that time). Soils and frontage
+  for the top 250 took 75 s and 14 s.
+- **Briefs are long.** The top brief is about 870 words; each fact line
+  carries its full caveat. A digest has to summarise, not forward them.
+- **A same-day re-run leaves the earlier run's briefs in the folder.** A
+  30-parcel trial followed by the full run on the same day left the
+  trial's 15 briefs (same rank prefixes, different parcels) beside the
+  full run's 25. Not fixed here.
 - **Still not checked by anything:** utilities, zoning in four cities,
   zoning conditions, easements other than conservation, listing status,
   who is behind an LLC, curb cuts (`README.md` § "What it can't tell you").
@@ -152,7 +161,7 @@ Cloud runs need three things to outlive the container:
 
 | What | Why | Size / sensitivity |
 |---|---|---|
-| Cache (`screener/cache/`) | a warm run skips the 40-minute slope step | about 118 MB per county; public data |
+| Cache (`screener/cache/`) | a warm run skips the slope step (about 48 of 55 minutes) | about 118 MB per county; public data |
 | Run outputs | history, week-over-week "what's new", fact capture | small; contains owner names and mailing addresses (public record) |
 | `inputs/decisions.csv` and the decision stores | passed parcels stay passed; the only new learning signal | small; private, kept out of git today |
 
