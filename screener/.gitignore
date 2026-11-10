@@ -2,6 +2,8 @@
 # and your decisions file (contains owner info you looked up).
 cache/
 output/
+# Investigation working folders (INVESTIGATE.md): fetched pages and findings.
+leads/
 autoresearch/experiments.tsv
 # Everything in inputs/ but its README: decisions.csv, the decision-side
 # feature store (decision_features.jsonl), the decision-side report facts
