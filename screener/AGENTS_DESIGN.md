@@ -8,7 +8,42 @@ across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
-## Built so far (2026-11-10, branch `claude/funny-hopper-k8rgod`, not on `main`)
+## Next session: start here (written 2026-11-10 at merge)
+
+Everything below was merged to `main` in one pull request. Open items,
+most important first:
+
+1. **The evaluation rebuild is merged but not cleared.** Five as-of
+   years, the sale-before-building rule and the graded score are in, and
+   `--decide` refuses until two checks are finished: the adversarial
+   review and the keep-threshold check. Read
+   `reviews/36_screener_eval_cohorts_metric/04_status_at_merge.md` first.
+   If `05_adversarial_review.md` is missing there, look for follow-up
+   commits on branch `claude/funny-hopper-k8rgod`; if there are none, the
+   review and `python -m screener.autoresearch.evaluate --null-test`
+   must be run again. Do not run the AutoResearch loop from a session
+   that has opened `autoresearch/data/` or that folder.
+2. **Seven ranked parcels are probably already taken** (one rezoned site;
+   ranks 6, 10, 12, 32, 60, 114 and 177 in the 2026-11-10 run). See
+   `digests/fulton-2026-11-10.md` on the `screener-data` branch. The
+   operator has not yet marked them in `decisions.csv`.
+3. **`quotecheck.py` and `INVESTIGATE.md` have had no independent
+   review**, and the skeptic step has never been run
+   (`reviews/35_screener_lead_layer/04_investigation_pilot.md`).
+4. **Operator decisions still open:** whether a robots.txt answering 403
+   on a public ArcGIS host should be treated as the root system treats it
+   (it blocks `quotecheck` from the city's own GIS); whether to add the
+   owner the pilot flagged to the excluded-owner rules (`screens.py` /
+   `owners.py`, human-owned, needs a new baseline).
+5. **Runs are on demand.** Ask a session with the repository attached to
+   follow `RUNBOOK.md` on the `screener-data` branch. The weekly
+   scheduled task is switched off, not deleted.
+6. **Not started:** the shared enrichment contract (step 2 below); the 49
+   sites the answer key leaves out as built-but-not-sold; Gwinnett as a
+   held-out check and open-records requests for 2016 digests
+   (`reviews/35_screener_lead_layer/05_county_feasibility.md`).
+
+## Built so far (2026-11-10)
 
 | Plan step | State |
 |---|---|
@@ -20,7 +55,8 @@ the evaluation and changing zoning facts stay human.
 | Runs | **On demand** (operator decision, 2026-11-10): ask a Claude session with the repository attached to follow `RUNBOOK.md` on the `screener-data` branch. The weekly schedule made earlier is switched off; a scheduled session starts without push access to the repository and could not save its results. |
 | 4. Investigation | `quotecheck.py` and `INVESTIGATE.md` written and piloted on two leads (`reviews/35_screener_lead_layer/04_investigation_pilot.md`). **Not independently reviewed.** The skeptic step has not been run. |
 | 2. Enrichment contract | Not started. |
-| 6. Bigger answer key / more counties | Not started. No neighbouring county publishes a 2016 snapshot like Fulton's (`reviews/35_screener_lead_layer/05_county_feasibility.md`). Fulton itself publishes yearly snapshots for 2015-2021 and 2023-2026 (service names seen 2026-11-10; fields not checked). Rebuilding the key is a human-only step. |
+| Evaluation: more as-of years and a graded score | Built and merged, **not cleared**: see "Next session" above and `reviews/36_screener_eval_cohorts_metric`. 49 distinct sites (46 before), 38 dev / 11 test. |
+| 6. More counties | Not started. No neighbouring county publishes a 2016 snapshot like Fulton's (`reviews/35_screener_lead_layer/05_county_feasibility.md`). Fulton itself publishes yearly snapshots for 2015-2021 and 2023-2026 (service names seen 2026-11-10; fields not checked). Rebuilding the key is a human-only step. |
 
 What the pilot changed in the plan: the zoning text (Municode) and the
 owner record (Secretary of State) cannot be read by a polite, plain fetch

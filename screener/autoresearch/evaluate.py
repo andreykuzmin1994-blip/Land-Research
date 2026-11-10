@@ -121,6 +121,13 @@ MIN_GAIN = 2.0
 WIN_SHARE_TO_KEEP = 0.95
 SHOWN_DECIMALS = 1                           # what the loop is shown; comparisons are exact
 NULL_NOISE = (2.0, 4.0, 8.0)                 # --null-test: score-point noise levels tried
+# Why --decide refuses for now ("" = it does not). Set while a change to this
+# evaluation awaits its review; a human clears it in the change that records
+# the review's outcome. Scoring without --decide still works.
+REVIEW_PENDING = ("the 2026-11-10 rebuild of this evaluation (five as-of years, graded score) "
+                  "was merged before its adversarial review and its keep-threshold check were "
+                  "finished. No experiment may be kept or discarded against it yet. Stop and "
+                  "tell a human (screener/AGENTS_DESIGN.md, \"Next session\")")
 # Record fields the ranking never sees. The ranking is handed an allow-list
 # (the key's meta "features" and "banned"), so a new record field is hidden
 # unless it is added there; this tuple documents the known ones.
@@ -643,6 +650,8 @@ def _shown(x: float) -> float:
 
 
 def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int:
+    if REVIEW_PENDING:
+        return _refuse(REVIEW_PENDING + ".")
     head = _git("rev-parse", "--short", "HEAD")
     if not head:
         return _refuse("git did not give the current commit. Run this inside the repository.")

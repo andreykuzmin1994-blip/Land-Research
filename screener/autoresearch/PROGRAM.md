@@ -5,6 +5,12 @@ improves **one file**, `screener/rank.py`, and keeps a change only if the
 ranking gets better at finding land that owners actually sold to
 industrial developers.
 
+> **Do not run the loop yet (2026-11-10).** The evaluation below was
+> rebuilt and merged before its adversarial review and its keep-threshold
+> check were finished. `--decide` refuses until a human clears that
+> (`REVIEW_PENDING` in `evaluate.py`). If you are an agent asked to run
+> experiments: stop and tell the human. The thresholds below may change.
+
 ## The score
 
 `python -m screener.autoresearch.evaluate` asks one question five times,

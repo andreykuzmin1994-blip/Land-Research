@@ -208,6 +208,7 @@ class DecideMechanicsTests(unittest.TestCase):
         for p in (mock.patch.object(ev, "LOG_FILE", self.log),
                   mock.patch.object(ev, "BEST_FILE", self.best),
                   mock.patch.object(ev, "fingerprint", return_value="fp1"),
+                  mock.patch.object(ev, "REVIEW_PENDING", ""),
                   mock.patch.object(ev, "_is_ancestor", side_effect=lambda c: c in self.commits),
                   mock.patch.object(ev, "_git", side_effect=self.git),
                   mock.patch("sys.stdout", new_callable=io.StringIO)):
@@ -272,6 +273,15 @@ class DecideMechanicsTests(unittest.TestCase):
             self.assertIn("the evaluation set changed", self.out.getvalue())
             self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: -r["signal"]),
                                        True), 0)
+
+    def test_a_pending_review_refuses_every_decide_and_writes_nothing(self):
+        with mock.patch.object(ev, "REVIEW_PENDING", "review pending: stop"):
+            for new_baseline in (False, True):
+                self.assertEqual(ev.decide(self.records, self.pos,
+                                           self.dev(lambda r: -r["signal"]), new_baseline), 3)
+        self.assertIn("REFUSED: review pending: stop.", self.out.getvalue())
+        self.assertFalse(self.log.exists())
+        self.assertFalse(self.best.exists())
 
     def test_saved_best_must_hold_per_year_rankings(self):
         for bad in ('{"commit": "a", "order": ["k1"]}', '{"commit": "a", "order": {"x": ["k"]}}',

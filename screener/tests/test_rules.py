@@ -444,6 +444,7 @@ class DecideTests(unittest.TestCase):
                    mock.patch.object(ev, "LOG_FILE", self.log),
                    mock.patch.object(ev, "BEST_FILE", self.best),
                    mock.patch.object(ev, "fingerprint", return_value="fp1"),
+                   mock.patch.object(ev, "REVIEW_PENDING", ""),
                    mock.patch.object(ev, "_git", side_effect=lambda *a: self.repo.git(*a)),
                    mock.patch.object(ev, "_is_ancestor",
                                      side_effect=lambda c: self.repo.is_ancestor(c))]
