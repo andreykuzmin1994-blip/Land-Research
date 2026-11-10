@@ -19,7 +19,7 @@ and no secrets.
 
 ```bash
 pip install -r screener/requirements.txt     # requests + shapely
-python -m screener.run                       # full Fulton run, ~15-25 min the first time
+python -m screener.run                       # full Fulton run: about an hour the first time (measured 55 min, 2026-11-10), minutes after
 python -m screener.run --limit 200           # quick trial
 ```
 
@@ -27,17 +27,26 @@ Results land in `screener/output/fulton-<date>/`:
 
 | File | What it is |
 |---|---|
+| `leads.md` | **Start here.** The short reading list: grade A leads, then grade B, one table row each, with the caveats once at the foot (see Lead grade below) |
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance, SSURGO soils and GDOT road frontage that aren't scored; see below) |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance, SSURGO soils, GDOT road frontage and the lead grade that aren't scored; see below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
-| `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name) |
+| `briefs/` | One page per top parcel and per lead listed in `leads.md`: lead grade, site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name). A re-run into the same folder removes the earlier run's briefs |
 | `rejected.csv` | Every parcel screened out, with the reason |
 | `ranked.geojson` | The same survivors for GIS tools |
 | `features.json` | The evaluation's features for each ranked parcel, kept for your decisions (see Decisions below) |
+| `facts.json` | The report facts each ranked parcel's row showed (fit, pond, soils, frontage, grade, score), kept for your decisions; never an evaluation input (see Decisions below) |
 
 Map data is cached for 7 days and the county deed file for 30
 (`screener/cache/`), so re-runs take a few minutes. `--refresh` forces
-fresh downloads of both. If a map layer is down, or sends back a malformed
+fresh downloads of both. The lidar slope answers are kept apart, in
+`screener/cache/slope/`, for `[run] slope_cache_days` (3650 by default):
+the survey is from 2018-19 and does not change, and the slope step is
+most of an uncached run (about 49 of 55 minutes for Fulton, measured
+2026-11-10). `--refresh` leaves them alone; `--refresh-slope` asks the
+lidar service again for every parcel. A changed parcel shape or open
+ground is a new request either way. The folder is small (about 2 KB per
+parcel), so it can be copied to another machine to spare it the wait. If a map layer is down, or sends back a malformed
 or partial answer, the run stops rather than treat its parcels as clear.
 It also stops if the county parcels, deed file or industrial parcels can't
 be read. Bad answers aren't cached, so a re-run asks again; if the stop
@@ -274,6 +283,68 @@ sends its own User-Agent, at most 3 requests at a time (`[frontage]
 workers`, 1-3) and caches answers like every other source. `[frontage]
 max_parcels` (250 by default) caps it to the top N by rank.
 
+**Lead grade and `leads.md`.** Three more columns follow
+`frontage_private_ft`, each brief opens with a "Lead grade" block, and
+`leads.md` lists the leads by grade (`grade.py`, `digest.py`,
+`reviews/35_screener_lead_layer`):
+
+- `lead_grade`: `A`, `B`, `C`, `blocked`, or `not graded: <why>`.
+- `lead_found`: what the checks found against the parcel, in words.
+- `lead_not_checked`: the core checks that could not be read.
+
+The grade is one fixed rule over the facts above. It is **not a score and
+not a screen**: `ranked.csv` keeps the order the score gave it, and no
+parcel is removed. Four core checks each read clear, found or not checked:
+
+| Core check | Clear | Found | Not checked |
+|---|---|---|---|
+| Zoning path | `by_right`, `likely` | `possible` (rezoning needed); `hard` blocks | `unknown` |
+| Building fit | an envelope fits | `none found` | fit off, capped or faulted |
+| Detention pond (read only when an envelope fits) | `pond fits` | `no pond room found` | not checked |
+| Road frontage | at least `min_frontage_ft` (50) of public, not access-controlled frontage | less, or none within 50 ft | service failed, off or capped |
+
+Five watch items count only when found (an unchecked one is not counted
+either way): a hydric or poorly-drained soil share at or above
+`max_hydric_pct` / `max_poorly_drained_pct` (25); a listed contamination
+site on the parcel; the assessor's "land-locked" entry (when frontage did
+not already count); the same owner holding a built-on parcel next door;
+and a purchase within `recent_purchase_years` (5).
+
+`blocked` if the zoning path is `hard`; otherwise the number of found and
+not-checked items decides: none is **A**, one is **B**, two or more is
+**C**. A parcel outside a core check's `max_parcels` cap, or run with a
+core check switched off, reads `not graded: <why>` and still lists what
+was found. A check whose service failed is "not checked", never clear.
+
+Limits:
+
+- "Found" is what the screen found, with every limit of the check behind
+  it. "No building envelope found" is a lower bound for the copied
+  prototypes (the smallest needs a clear 400 x 445 ft), not proof nothing
+  can be built; frontage is measured to a road centreline; soils are
+  map-unit level.
+- The "built next door" item sees only same-owner parcels the run fetched
+  (5-50 acres, exact owner name and mailing address; see Owner clusters).
+  A plant on a smaller or larger parcel, or under another company name,
+  is not seen. Its flag line ("Same owner, adjacent and built on") stays
+  in the watch-outs even with `owner_next_door = false`.
+- The recent-purchase item reads the county deed file: a recent deed
+  between related companies counts as a purchase when it carries a price.
+- Nothing here knows whether a parcel is for sale, who is behind a
+  company, or what the utilities can serve.
+
+`leads.md` lists A leads in rank order, then B, at most `[grade]
+digest_max` (40), and each listed lead gets a brief even outside the top
+`briefs`. C, blocked and ungraded parcels are counted, not listed. County
+text in the table cannot add a column (pipes and line breaks are
+replaced). `[grade] enabled = false` writes `not graded` everywhere and
+an empty list.
+
+Like the facts it reads, the grade is attached only after scoring, the
+sort and every report check; `rank.py`, `scoring.py` and `screens.py`
+never see it (`tests/test_grade.py` spies on every call), and nothing in
+`autoresearch/` imports it.
+
 **Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
 the county parcel map in the same flat local plane as the fit, north up,
 with a scale bar: the parcel outline, the constrained ground (floodplain,
@@ -295,8 +366,11 @@ ground steeper than 15%), `min_usable_acres` and `max_improvement_value`.
 Comparing two runs then mixes data changes with code changes. To compare
 code, run both versions on the same cache (no `--refresh`, within
 `cache_days`), after checking that every source you compare was cached:
-map layers, county parcels and slope answers are kept for 7 days, the deed
-file for 30.
+map layers and county parcels are kept for 7 days, the deed file for 30,
+and slope answers for `slope_cache_days` (so `steep_pct`, and the
+steep-ground screen with it, no longer change from run to run for an
+unchanged parcel; `--refresh-slope` takes a fresh answer, which can
+differ).
 
 **Decisions and the feature snapshot.** Each run writes
 `features.json` next to `ranked.csv`: for every ranked parcel, its
@@ -318,6 +392,21 @@ out: their map checks are partial. `python -m screener.decide` copies a
 parcel's record, with the run's `meta`, into
 `screener/inputs/decision_features.jsonl` when you decide, so the features
 outlive the run folder.
+
+Each run also writes `facts.json`: for every ranked parcel, the report
+facts its row showed (`facts.COLUMNS`: rank and scores, zoning path,
+slope, earthwork, building fit, pond, soils, frontage, the lead grade,
+owner type and holding period), with the same run `meta`. It holds no
+geometry, owner name, mailing address, site address, flags or decision.
+`python -m screener.decide` copies a parcel's record into
+`screener/inputs/decision_facts.jsonl`, a separate file from
+`decision_features.jsonl`, so a later look at your marks can ask what
+was on screen when you made them (did grade A leads get pursued more
+often than C?). A run without `facts.json` (an older run folder) still
+records the decision and says no facts were kept. **These facts are never
+evaluation features**: the frozen evaluation did not measure them,
+nothing in `autoresearch/` reads either file, and Phase B (below) is
+built from `features.json` alone.
 
 Some names mean slightly different things live and in the evaluation:
 `usable_after_slope` is slope-adjusted live but equals `usable_acres` in
@@ -357,6 +446,11 @@ reviewed), the meaning differences above, spatial clustering and privacy
   `[frontage] enabled`, `max_parcels` and `workers` (1-3) do the same for
   the GDOT road frontage check (see Road frontage; report only, one web
   request per parcel).
+  `[grade]` holds the lead grade's switch, its thresholds
+  (`min_frontage_ft`, `max_hydric_pct`, `max_poorly_drained_pct`,
+  `owner_next_door`, `recent_purchase_years`) and `digest_max`, the most
+  leads `leads.md` lists (see Lead grade; report only, no web request).
+  `[run] slope_cache_days` is how long a lidar slope answer is reused.
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark

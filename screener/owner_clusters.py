@@ -265,6 +265,26 @@ def describe(pid: str, res: Result, status_of: Callable[[str], str],
     return lines
 
 
+def built_next_door(pid: str, res: Result, is_built: Callable[[str], bool]) -> list[str]:
+    """Ids of the same-owner parcels adjacent to pid (directly or in a
+    chain) that this run screened out as already built on. Empty when pid is
+    in no group. Like everything here, it sees only the parcels the run
+    fetched: a plant on a parcel outside the acreage band is not seen."""
+    m = res.members.get(pid)
+    if m is None:
+        return []
+    return [x for x in m.component if x != pid and is_built(x)]
+
+
+def built_line(built: list[str]) -> str:
+    """The flag line for built_next_door's result (call only when non-empty)."""
+    n = len(built)
+    shown = ", ".join(built[:MAX_LISTED]) + (f", and {n - MAX_LISTED} more" if n > MAX_LISTED else "")
+    return (f"{FLAG_PREFIX}, adjacent and built on: {n} adjacent same-owner parcel"
+            f"{'s are' if n != 1 else ' is'} already built on ({shown}). This may be spare "
+            "land of an operating site rather than land for sale")
+
+
 def summary_notes(res: Result) -> list[str]:
     """Counts only: no ids, names or addresses."""
     notes = []

@@ -6,6 +6,7 @@ briefs = 25          # one-page briefs for the top N parcels
 slope = true         # USGS lidar slope check, about 1 second per parcel
 workers = 6          # parallel slope requests
 cache_days = 7       # reuse downloaded map data for this many days
+slope_cache_days = 3650   # reuse lidar slope answers this long (the survey is from 2018-19); --refresh-slope asks again
 
 [area]
 min_acres = 5
@@ -79,3 +80,18 @@ workers = 3          # parallel requests (1-3; kept below the shared 6)
 enabled = true
 max_parcels = 250    # check only the top N ranked parcels (0 = all)
 workers = 3          # parallel requests (1-3; kept below the shared 6)
+
+[grade]
+# Lead grade (a report fact only; not a score or a screen, and the ranking
+# is unchanged): a fixed rule over the checks above sorts leads.md and adds
+# lead_grade / lead_found / lead_not_checked to ranked.csv. A = zoning path
+# by right or likely, a building envelope fits, a pond fits beside it,
+# public road frontage, and no watch item found; B = one item found or not
+# checked; C = two or more; blocked = entitlement "hard". See grade.py.
+enabled = true
+min_frontage_ft = 50          # less public road frontage than this counts as found
+max_hydric_pct = 25           # hydric soil share at or above this counts as found
+max_poorly_drained_pct = 25   # poorly drained soil share at or above this counts as found
+owner_next_door = true        # count "the same owner holds a built-on parcel next door"
+recent_purchase_years = 5     # count a purchase more recent than this (0 = off)
+digest_max = 40               # most leads listed in leads.md (A first, then B); each gets a brief

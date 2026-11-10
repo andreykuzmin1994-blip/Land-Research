@@ -44,6 +44,35 @@ SLOPE_PIXEL = json.dumps({"x": 10, "y": 10, "spatialReference": {"wkid": 3857}})
 # {"statistics": []} every time: a parcel-map problem, not a server failure,
 # so slope isn't asked for (SLOPE_SKIPPED) and nothing is retried.
 SLOPE_MIN_M2 = 100.0
+# Slope answers are kept apart from the other map data and far longer: the
+# lidar is a 2018-19 survey that does not change, the slope step is most of
+# an uncached run, and repeated requests for one shape do not always agree
+# (README, "Public data changes between days"), so a kept answer also keeps
+# the steep-ground screen steady from run to run. The key holds the request
+# (the open-ground shape, the rule and the pixel size): a changed shape is
+# a new request. run.py sets the lifetime from [run] slope_cache_days;
+# --refresh-slope sets it to 0 for one run. The folder is small (about 2 KB
+# per parcel), so it can be carried between machines.
+SLOPE_CACHE_DAYS = 3650.0
+slope_cache_days: float = SLOPE_CACHE_DAYS
+
+
+def slope_cache_dir():
+    """<cache>/slope, beside the shared <cache>/http (read at call time, so
+    tests that move the cache move this too)."""
+    return arcgis.CACHE_DIR.parent / "slope"
+
+
+def slope_days_setting(run_cfg: dict[str, Any]) -> float:
+    """[run] slope_cache_days, or the default when the key is absent (an
+    older settings file). ValueError for anything not a finite number of
+    days, 0 or more (0 = ask every run)."""
+    value = run_cfg.get("slope_cache_days", SLOPE_CACHE_DAYS)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) \
+            or not math.isfinite(value) or value < 0:
+        raise ValueError(f"[run] slope_cache_days must be a number of days, 0 or more "
+                         f"(got {value!r})")
+    return float(value)
 SLOPE_SKIPPED = "the parcel map leaves under one 10 m lidar pixel of open ground"
 
 
@@ -215,7 +244,7 @@ def slope_stats(geom) -> tuple[dict[str, Any], dict[str, Any] | None]:
         # Resample the 1 m lidar to ~10 m: at 1 m, ditches and stream banks
         # read as "steep" and overstate grading by 2-3x; relief is unchanged.
         "pixelSize": SLOPE_PIXEL,
-    }, check=_slope_problem)
+    }, check=_slope_problem, cache_dir=slope_cache_dir(), max_age_days=slope_cache_days)
     out = _slope_from(data)
     earthwork = None
     try:

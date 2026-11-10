@@ -17,6 +17,7 @@ import io
 import json
 import math
 import re
+import shutil
 import tempfile
 import threading
 import unittest
@@ -268,6 +269,8 @@ class Offline(unittest.TestCase):
         self.tmp = Path(tmp.name)
         self.patch(arcgis, "CACHE_DIR", self.tmp / "http")
         self.patch(arcgis, "cache_days", 7.0)
+        # run.main sets the slope lifetime from settings; put it back after.
+        self.patch(checks, "slope_cache_days", checks.SLOPE_CACHE_DAYS)
         self.patch(arcgis.time, "sleep", lambda s: None)
         self.patch(run, "DECISIONS_FILE", self.tmp / "decisions.csv")
         # A request that misses the fake session fails the test.
@@ -287,8 +290,14 @@ class Offline(unittest.TestCase):
         return session
 
     def cached(self):
-        """Every answer in the temp cache."""
-        return [json.loads(f.read_text()) for f in (self.tmp / "http").rglob("*.json")]
+        """Every answer in the temp cache (the shared folder and the slope folder)."""
+        return [json.loads(f.read_text()) for d in ("http", "slope")
+                for f in (self.tmp / d).rglob("*.json")]
+
+    def clear_cache(self):
+        """A cold cache: the shared answers and the kept slope answers."""
+        for d in ("http", "slope"):
+            shutil.rmtree(self.tmp / d, ignore_errors=True)
 
 
 class ZeroMatchTests(Offline):

@@ -51,16 +51,18 @@ class BadAnswer(ArcGISError):
     """HTTP 200 and no ArcGIS error, but not the answer the query asks for."""
 
 
-def _cache_path(url: str, params: dict[str, Any]) -> Path:
+def _cache_path(url: str, params: dict[str, Any], cache_dir: Path | None = None) -> Path:
     key = hashlib.sha256(
         (url + "?" + json.dumps(params, sort_keys=True, default=str)).encode()
     ).hexdigest()
-    return CACHE_DIR / key[:2] / f"{key}.json"
+    return (cache_dir or CACHE_DIR) / key[:2] / f"{key}.json"
 
 
 def request_json(url: str, params: dict[str, Any], *, retries: int = 5,
                  timeout: int = 90, use_cache: bool = True, fresh: bool = False,
-                 check: Callable[[dict[str, Any]], str | None] | None = None) -> dict[str, Any]:
+                 check: Callable[[dict[str, Any]], str | None] | None = None,
+                 cache_dir: Path | None = None,
+                 max_age_days: float | None = None) -> dict[str, Any]:
     """POST a form request and return JSON, with retry/backoff and caching.
 
     POST keeps long polygon geometries out of the URL. ArcGIS error bodies
@@ -68,12 +70,16 @@ def request_json(url: str, params: dict[str, Any], *, retries: int = 5,
     check(answer) says what is wrong with an answer, or None if nothing:
     a failing answer is tried BAD_ANSWER_TRIES times, then raises
     BadAnswer, and is never cached or served from the cache. fresh skips
-    the cached answer but caches the new one.
+    the cached answer but caches the new one. cache_dir and max_age_days
+    give one kind of answer its own folder and lifetime (the lidar slope
+    answers, checks.slope_stats); left out, the shared folder and
+    cache_days apply. The file name (the key) is the same in any folder.
     """
     params = {**params, "f": params.get("f", "json")}
-    path = _cache_path(url, params)
-    if use_cache and not fresh and cache_days > 0 and path.exists():
-        if time.time() - path.stat().st_mtime < cache_days * 86400:
+    path = _cache_path(url, params, cache_dir)
+    keep_days = cache_days if max_age_days is None else max_age_days
+    if use_cache and not fresh and keep_days > 0 and path.exists():
+        if time.time() - path.stat().st_mtime < keep_days * 86400:
             try:
                 cached = json.loads(path.read_text())
             except ValueError:  # damaged cache file: ask again

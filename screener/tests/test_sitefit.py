@@ -444,7 +444,7 @@ class FitRunTests(RunHarness):
         on = {pid: tuple(r[k] for k in keep) for pid, r in self.rows().items()}
         self.patch(sitefit, "fit_parcel", lambda *a, **k: sitefit.not_checked("patched off"))
         self.parcels[:] = fresh
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)   # same requests again
+        self.clear_cache()   # same requests again
         self.main()
         off = {pid: tuple(r[k] for k in keep) for pid, r in self.rows().items()}
         self.assertEqual(on, off)

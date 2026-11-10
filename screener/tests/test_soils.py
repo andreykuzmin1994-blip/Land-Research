@@ -37,7 +37,7 @@ class ParcelCheckTests(Offline):
     """soils.check_parcel against fake SDA answers."""
 
     def ask(self, route, geom=None):
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)  # good answers are cached
+        self.clear_cache()  # good answers are cached
         self.serve({soils.SDA_URL: route})
         return soils.check_parcel(geom if geom is not None else square(*A))
 
@@ -300,7 +300,7 @@ class SoilsRunTests(RunHarness):
                         for c in self.session.calls if c[0] != soils.SDA_URL)
         self.patch(soils, "check_parcel", lambda g: soils.not_checked("patched off"))
         self.parcels[:] = fresh
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)
+        self.clear_cache()
         self.main()
         off = {pid: tuple(r[k] for k in keep) for pid, r in self.rows().items()}
         self.assertEqual(on, off)

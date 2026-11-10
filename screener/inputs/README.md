@@ -43,7 +43,11 @@ here, so they outlive the run folder: a same-day re-run, deleting
 `output/`, or the parcel dropping out after a pass. The note stays in
 `decisions.csv` only. Rejected parcels have no feature snapshot, so a
 decision on one needs `--no-features` (the decision is written, without
-features). It is offline.
+features). It also copies the parcel's report facts from the run's
+`facts.json` (building fit, pond, soils, frontage, lead grade, score:
+what its row showed) into `decision_facts.jsonl` here, a separate file
+that is never an evaluation input; a run without `facts.json` records
+the decision anyway and says so. It is offline.
 
 ## Editing the file by hand
 

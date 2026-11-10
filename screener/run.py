@@ -19,8 +19,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import (arcgis, checks, detention, frontage, layers, owner_clusters, report, scoring,
-               screens, sitefit, snapshot, soils)
+from . import (arcgis, checks, detention, facts, frontage, grade, layers, owner_clusters, report,
+               scoring, screens, sitefit, snapshot, soils)
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -229,6 +229,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--limit", type=int, help="only screen the first N parcels (trial runs)")
     ap.add_argument("--no-slope", action="store_true", help="skip the lidar slope check")
     ap.add_argument("--refresh", action="store_true", help="ignore cached map data")
+    ap.add_argument("--refresh-slope", action="store_true",
+                    help="ask the lidar service again for every parcel (kept slope answers "
+                         "are otherwise reused; --refresh alone leaves them)")
     ap.add_argument("--out", type=Path, help="output folder (default screener/output/<county>-<date>)")
     args = ap.parse_args(argv)
 
@@ -250,9 +253,12 @@ def main(argv: list[str] | None = None) -> int:
         pond_on, pond_max = fit_settings(cfg, "detention")
         soils_on, soils_max, soils_workers = soils.settings(cfg)
         front_on, front_max, front_workers = frontage.settings(cfg)
+        grade_cfg = grade.settings(cfg)
+        slope_days = checks.slope_days_setting(run_cfg)
     except ValueError as exc:
         ap.error(f"{args.settings}: {exc}")
 
+    checks.slope_cache_days = 0.0 if args.refresh_slope else slope_days
     log(f"{county.NAME} County: fetching {area['min_acres']}-{area['max_acres']} acre parcels")
     try:
         parcels = county.fetch_parcels(area["min_acres"], area["max_acres"],
@@ -435,9 +441,23 @@ def main(argv: list[str] | None = None) -> int:
         if pid in out_why:
             return f"screened out: {out_why[pid]}"
         return "not screened in this trial run"
+    built_on = {p["parcel_id"] for p in rejected
+                if any(r.startswith("already built on") for r in p["reject_reasons"])}
     for p in survivors:
         p["flags"].extend(owner_clusters.describe(p["parcel_id"], owner_groups, status_of,
                                                   mismatch.__contains__))
+        built = owner_clusters.built_next_door(p["parcel_id"], owner_groups,
+                                               built_on.__contains__)
+        if built:
+            p["flags"].append(owner_clusters.built_line(built))
+        p[grade.NEXT_DOOR_KEY] = len(built)
+    # The lead grade reads the report facts above and is live-only like
+    # them: attached last, for the reports alone (grade.py). It changes no
+    # score and no order.
+    grade.attach(survivors, grade_cfg,
+                 [("building fit", "fit", fit_on, fit_max),
+                  ("detention pond", "detention", pond_on, pond_max),
+                  ("road frontage", "frontage", front_on, front_max)], notes)
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)
@@ -461,8 +481,15 @@ def main(argv: list[str] | None = None) -> int:
     summary = {"county": county.NAME, "run_date": today, "funnel": funnel,
                "reject_reasons": reasons.most_common(), "notes": notes}
     snapshot.clear(out_dir)  # never pair a new ranked.csv with an old snapshot
-    report.write_all(out_dir, survivors, rejected, summary, int(run_cfg.get("briefs", 25)))
+    facts.clear(out_dir)     # nor with old report facts
+    report.write_all(out_dir, survivors, rejected, summary, int(run_cfg.get("briefs", 25)),
+                     grade_cfg.digest_max if grade_cfg.enabled else 0)
     snapshot.write(out_dir, snap)
+    # The report facts (what each row and brief showed) are a separate file
+    # from the evaluation's feature snapshot and never feed it (facts.py).
+    facts.write(out_dir, facts.take(survivors, {
+        k: snap["meta"].get(k) for k in ("county", "run_date", "run_time", "limit", "slope",
+                                         "settings_sha256", "code_commit")}))
     log(f"Done: {len(survivors):,} ranked parcels -> {out_dir}")
     return 0
 
