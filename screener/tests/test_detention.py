@@ -160,10 +160,17 @@ class GeometryTests(unittest.TestCase):
         for f in (None, sitefit.not_checked("fit switched off in settings")):
             d = detention.place_pond(geom, geom, 0.0, f, None)
             self.assertEqual(d.text(), "not checked: building fit not checked")
-            self.assertIsNone(d.detention_pct)
+            self.assertIsNone(d.pond)
+            # The share needs only the open ground, so it is still reported.
+            self.assertTrue(9.0 < d.detention_pct < 9.5)
+            self.assertIn("% of the open ground",
+                          detention.brief_line({detention.DETAIL_KEY: d}))
         fits = sitefit.fit_parcel(geom, geom, 0.0)
         d = detention.place_pond(geom, geom, 0.0, fits, None)
         self.assertEqual(d.text(), "not checked: building envelope missing")
+        # Fully constrained fallback with the fit off: no share either.
+        d = detention.place_pond(geom, geom, 100.0, None, None)
+        self.assertEqual((d.state, d.detention_pct), (detention.NOT_CHECKED, None))
 
     def test_geos_fault_is_not_checked_and_other_errors_raise(self):
         geom = in_degrees(box(0, 0, 935, 935))
@@ -211,7 +218,8 @@ class GeometryTests(unittest.TestCase):
         self.assertTrue(lines["not"].startswith("- Detention pond: not checked (x)"))
         self.assertEqual(lines["off"], "- Detention pond: not checked (detention off)")
         for key in ("fits", "none", "not"):
-            for words in ("rough allowance", "no hydrology", "NOAA Atlas 14"):
+            for words in ("rough allowance", "no hydrology", "NOAA Atlas 14",
+                          "right against the envelope"):
                 self.assertIn(words, lines[key])
         for line in lines.values():
             self.assertNotIn("does not fit", line)
@@ -377,6 +385,8 @@ class PondRunTests(RunHarness):
         self.assertEqual(rows["14F0001 0001"]["pond_fit"], "pond fits")
         self.assertEqual(rows["14F0003 0003"]["pond_fit"], "no pond room found")
         self.assertNotEqual(rows["14F0003 0003"]["detention_pct"], "")
+        self.assertIn("Detention pond (rough allowance, no hydrology): pond fits on 2 of 3 "
+                      "ranked parcels, no pond room found on 1", self.notes())
         self.assertIn("beside the fitted building envelope", self.pond_line("14F0001 0001"))
         self.assertIn("no pond room found", self.pond_line("14F0003 0003"))
         for pid in rows:
@@ -397,6 +407,8 @@ class PondRunTests(RunHarness):
         self.assertEqual(self.run_with("enabled = false\n", table="fit"), 0)
         for r in self.rows().values():
             self.assertEqual(r["pond_fit"], "not checked: building fit not checked")
+            self.assertTrue(8.0 < float(r["detention_pct"]) < 10.5)
+        self.assertNotIn("Detention pond (rough allowance", self.notes())
         self.assertIn("Detention pond not checked for 2 of 2 ranked parcels: building fit "
                       "not checked", self.notes())
 

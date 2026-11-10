@@ -151,7 +151,9 @@ not the way.
 - `detention_pct`: the operator's prototype detention pond (400 x 200 ft
   at the top of bank, 6 ft deep, 4:1 side slopes, about 9.1 acre-feet,
   1.84 acres) as a percent of the parcel's open ground on the county map
-  (all parts). Empty when there is no open ground or it was not checked.
+  (all parts). Empty when there is no open ground, or when detention is
+  off or outside `[detention] max_parcels`; still filled when only the
+  placement is not checked (for example the building fit is off).
 - `pond_fit`: `pond fits` when that rectangle was placed (copied
   rotated-rectangle search) on the open ground left beside the fitted
   building envelope, inside the 25 ft lot-line setback; `pond fits (no
@@ -168,7 +170,9 @@ the repo root's `building_prototypes.json` ("detention") and `site_fit.py`;
 `tests/test_detention.py` fails if the root changes and the copy doesn't.
 This is a rough allowance for one fixed pond, **not a stormwater design**:
 no hydrology, no NOAA Atlas 14 rainfall, no runoff from the impervious
-area and no local detention rules; the real requirement may be larger,
+area and no local detention rules. The pond may be placed right against
+the envelope with no room left for access, grading or a buffer. The real
+requirement may be larger,
 smaller, underground or shared. Steep ground is not located. It calls no
 web service, is computed after scoring, flags, the sort and the building
 fit (with or without `--no-slope`), and is in no score, screen or flag.

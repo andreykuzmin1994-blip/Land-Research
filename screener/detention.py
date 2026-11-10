@@ -5,8 +5,9 @@ For each ranked parcel, after scoring, the sort and the F6 building fit:
 - ``detention_pct``: the copied detention pond's top-of-bank footprint
   (400 x 200 ft = 80,000 SF, about 1.84 acres) as a share of the parcel's
   open ground on the county map (``checks.map_checks``' ``_open_ground``,
-  every part, map acres). Empty when there is no open ground or when it is
-  not checked.
+  every part, map acres). Empty when there is no open ground or when
+  detention is off or capped; kept when only the placement is not checked
+  (the building fit off or capped), since it needs only the open ground.
 - ``pond_fit``: whether that pond rectangle can be placed on the open
   ground left after the F6 envelope, inside the same 25 ft lot-line
   setback, with the copied rotated-rectangle search (``sitefit.fit_lengths``
@@ -75,8 +76,9 @@ POND_SPECS = [(float(POND["W"]), [float(POND["L"])])]
 
 CAVEAT = ("a rough allowance for one fixed prototype pond, not a stormwater design: no "
           "hydrology, no NOAA Atlas 14 rainfall, no runoff from the building's impervious "
-          "area and no local detention rules; the real pond may be larger, smaller, "
-          "underground or shared")
+          "area and no local detention rules; the pond may sit right against the envelope "
+          "with no room left for access, grading or a buffer; the real pond may be larger, "
+          "smaller, underground or shared")
 
 
 @dataclass
@@ -124,20 +126,21 @@ def place_pond(geometry: BaseGeometry, open_ground: BaseGeometry | None,
 
 
 def _place(geometry, open_ground, constrained_pct, fit, envelope, setback_ft) -> Pond:
-    if fit is None or fit.state == sitefit.NOT_CHECKED:
-        return not_checked("building fit not checked")
-    if fit.state == sitefit.FITS and envelope is None:
-        return not_checked("building envelope missing")
     if open_ground is None:
         open_ground = geometry
-    if open_ground is geometry and (constrained_pct or 0) > 0:
-        return Pond(NONE_FOUND, reason="no open ground on the parcel map")
+    no_open = open_ground is geometry and (constrained_pct or 0) > 0
     proj = LocalProjection.around(geometry)
-    open_m = sitefit.polygon_parts(proj(open_ground))
+    open_m = [] if no_open else sitefit.polygon_parts(proj(open_ground))
     open_ac = sum(acres(q) for q in open_m)
-    if not open_m or open_ac <= 0:
+    # The share needs only the open ground, so it is kept even when the
+    # placement is not checked (the building fit off or capped).
+    pct = round(100.0 * POND_ACRES / open_ac, 1) if open_ac > 0 else None
+    if fit is None or fit.state == sitefit.NOT_CHECKED:
+        return not_checked("building fit not checked", pct)
+    if fit.state == sitefit.FITS and envelope is None:
+        return not_checked("building envelope missing", pct)
+    if pct is None:
         return Pond(NONE_FOUND, reason="no open ground on the parcel map")
-    pct = round(100.0 * POND_ACRES / open_ac, 1)
     beside = fit.state == sitefit.FITS
 
     inner = proj(geometry).buffer(-setback_ft / FT_PER_M)
@@ -180,7 +183,9 @@ def brief_line(p: dict[str, Any]) -> str:
     if d is None:
         return "- Detention pond: not checked (detention off)"
     if d.state == NOT_CHECKED:
-        return f"- Detention pond: not checked ({d.reason}); {CAVEAT}"
+        share = (f"; the {POND_ACRES:.2f}-acre pond would be {d.detention_pct:.1f}% of the "
+                 f"open ground" if d.detention_pct is not None else "")
+        return f"- Detention pond: not checked ({d.reason}){share}; {CAVEAT}"
     pond = (f"a {POND['L']} x {POND['W']} ft pond (top of bank; {POND['depth']} ft deep, "
             f"{POND['slope']}:1 side slopes, about {VOLUME_ACRE_FT:.1f} acre-feet; "
             f"{POND_ACRES:.2f} acres")

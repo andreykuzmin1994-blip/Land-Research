@@ -122,6 +122,7 @@ def attach_ponds(ranked: list[dict[str, Any]], enabled: bool, cap: int,
     its F6 envelope and attach the report fields. Called only after scores,
     flags, the sort and attach_fits."""
     reasons: collections.Counter = collections.Counter()
+    states: collections.Counter = collections.Counter()
     for i, p in enumerate(ranked, 1):
         if not enabled:
             d = detention.not_checked("detention switched off in settings")
@@ -133,7 +134,13 @@ def attach_ponds(ranked: list[dict[str, Any]], enabled: bool, cap: int,
                                      p.get(sitefit.ENVELOPE_KEY))
         if d.state == detention.NOT_CHECKED:
             reasons[d.reason.split(" (")[0]] += 1
+        else:
+            states[d.state] += 1
         p.update(d.fields())
+    if states:
+        notes.append(f"Detention pond (rough allowance, no hydrology): pond fits on "
+                     f"{states[detention.FITS]} of {len(ranked)} ranked parcels, no pond room "
+                     f"found on {states[detention.NONE_FOUND]}")
     for why, n in sorted(reasons.items()):
         notes.append(f"Detention pond not checked for {n} of {len(ranked)} ranked parcels: {why}")
 
