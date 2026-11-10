@@ -191,6 +191,9 @@ Shares are of the parcel's mapped soil area, by map unit:
 
 - `soil_hsg`: the hydrologic soil group (A, B, C, D or dual A/D, B/D,
   C/D, "D unless drained") covering the most area, dominant condition.
+  Under urban land or water this can be a minority of the parcel: the
+  brief then says "largest rated group" instead of "mostly" and gives the
+  unrated share.
 - `soil_hydric_pct`: area-weighted share of hydric components.
 - `soil_poorly_drained_pct`: share mapped poorly or very poorly drained.
 - `soil_dwellings_limited_pct`: share rated "Very limited" for dwellings

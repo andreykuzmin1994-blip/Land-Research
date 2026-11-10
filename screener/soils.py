@@ -291,14 +291,19 @@ def brief_line(p: dict[str, Any]) -> str:
         others = ", ".join(f"{k} {v:.0f}%" for k, v in sorted(s.hsg_shares.items(),
                                                              key=lambda kv: (-kv[1], kv[0]))
                            if k != s.hsg)
-        hsg = (f"hydrologic soil group mostly {s.hsg} ({s.hsg_shares[s.hsg]:.0f}% of the "
+        # "mostly" only when the group really covers most of the mapped soil;
+        # under urban land or water the largest rated group can be a minority.
+        lead = "mostly" if s.hsg_shares[s.hsg] > 50 else "largest rated group"
+        hsg = (f"hydrologic soil group {lead} {s.hsg} ({s.hsg_shares[s.hsg]:.0f}% of the "
                f"mapped soil" + (f"; also {others}" if others else "") + ")")
     parts = [hsg,
              f"hydric components {_pct(s.hydric_pct)}",
              f"poorly or very poorly drained {_pct(s.poorly_drained_pct)}",
              f"very limited for dwellings without basements (a slab-on-grade proxy) "
              f"{_pct(s.dwellings_limited_pct)}"]
-    unrated = [f"{k} {v:.0f}%" for k, v in s.unrated_pct.items() if v >= 1]
+    labels = {"hsg": "soil group", "hydric": "hydric", "drainage": "drainage",
+              "dwellings": "dwellings rating"}
+    unrated = [f"{labels.get(k, k)} {v:.0f}%" for k, v in s.unrated_pct.items() if v >= 1]
     tail = f"; unrated share of the mapped soil: {', '.join(unrated)}" if unrated else ""
     return (f"- Soils (USDA SSURGO, {s.units} map unit{'s' if s.units != 1 else ''}, "
             f"{s.coverage_pct:.0f}% of the parcel shape mapped): {'; '.join(parts)}{tail}. "

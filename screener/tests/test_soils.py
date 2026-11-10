@@ -191,6 +191,13 @@ class ParcelCheckTests(Offline):
         self.assertIn("no hydrologic soil group rated", none)
         self.assertIn("hydric components none rated", none)
         self.assertIn("unrated share of the mapped soil", none)
+        # A minority group under mostly unrated urban land is not "mostly" anything.
+        urban = [("1", 0.3, "B", "Well drained", "0", "Not limited"),
+                 ("2", 0.7, None, None, "0", "Not rated")]
+        minority = soils.brief_line({soils.DETAIL_KEY: self.ask(fake_sda(urban))})
+        self.assertIn("largest rated group B (30% of the mapped soil)", minority)
+        self.assertNotIn("mostly", minority)
+        self.assertIn("unrated share of the mapped soil: soil group 70%, drainage 70%, dwellings rating 70%", minority)
         self.assertEqual(soils.brief_line({soils.DETAIL_KEY: soils.not_checked("x y")}),
                          "- Soils: not checked (x y)")
         self.assertEqual(soils.brief_line({}), "- Soils: not checked (soils off)")
