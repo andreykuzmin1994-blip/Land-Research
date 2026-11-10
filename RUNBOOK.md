@@ -24,7 +24,7 @@ The code is whatever is on `main`; the data is this branch
 1. From the repository root, on `main`:
 
    ```bash
-   pip install -q -r screener/requirements.txt
+   python -m pip install -q -r screener/requirements.txt   # the interpreter that runs the screener
    git fetch origin screener-data
    git worktree add ../screener-data screener-data 2>/dev/null || git worktree add ../screener-data -b screener-data origin/screener-data
    mkdir -p screener/inputs
@@ -96,6 +96,7 @@ The code is whatever is on `main`; the data is this branch
    cd ../screener-data
    git add -A
    git commit -m "run: $NAME"
+   git pull --rebase origin screener-data
    git push origin screener-data
    ```
 
