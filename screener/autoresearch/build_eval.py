@@ -1,42 +1,56 @@
 """Build the frozen evaluation set the AutoResearch loop is scored on.
 
-A human runs this between runs, never the agent:
+A human runs this between runs, never the loop's agent:
 
     python -m screener.autoresearch.build_eval
 
-The question the metric asks: standing in January 2016, knowing only what
-public data showed then, would the ranking have put the land that the
-owners sold to industrial developers, who built on it by 2025, near the
-top?
+The question the metric asks, once for each as-of year in COHORTS:
+standing in January of that year, knowing only what public data showed
+then, would the ranking have put the land that its owners then sold to
+industrial developers, who built on it by 2025, near the top?
 
-Pool:      Fulton 5-50 acre parcels in the 2016 tax digest that pass the live
-           tool's ownership and land-only screens (screens.attribute_rejects),
-           minus owners whose names read like industrial developer vehicles
-           (that land was already off the market).
-Positives: pool parcels that the 2016 owner SOLD in 2016 or later at a real
-           price (>= MIN_PRICE in the county deed file; right-of-way deeds and
-           sales to a development authority don't count) AND that are at
-           least half covered by a 2025-digest parcel carrying $1M+ of
-           industrial improvements.
-Left out:  parcels built on by 2025 without such a sale (owner-users,
-           corporate successors, replatted ids) are dropped from the pool,
+Pool:      Fulton 5-50 acre parcels in that year's tax digest that pass the
+           live tool's ownership and land-only screens
+           (screens.attribute_rejects), minus owners whose names read like
+           industrial developer vehicles (that land was already off the
+           market).
+Positives: pool parcels that the as-of owner SOLD on or after 1 January of
+           the as-of year at a real price (>= MIN_PRICE in the county deed
+           file; right-of-way deeds and sales to a development authority
+           don't count), BEFORE the building: the sale must be dated before
+           1 January of the first digest year in which the parcel is at
+           least half covered by parcels carrying $1M+ of industrial
+           improvements (BUILT_YEARS; the label is that coverage in
+           LABEL_YEAR). A developer who bought the land, built, and sold the
+           finished building is not "an owner who sold land to a developer".
+Left out:  parcels built on by LABEL_YEAR without such a sale (owner-users,
+           corporate successors, replatted ids, sales after the building,
+           and sales whose order against the building can't be told because
+           the county published no 2022 digest) are dropped from the pool,
            not counted as misses.
-Features:  the 2016 digest + deed history before 2016 + layers that change
-           slowly (flood, 1980s wetlands, easements, exits, main-line rail).
-           Blank (None) because today's values were often changed FOR the
-           project or weren't knowable in 2016: zoning, utilities, road
-           type, slope (2018-19 lidar shows graded pads as flat),
-           contamination listings, Opportunity Zones (designated 2018),
-           and jurisdiction (Fulton re-coded its tax districts since).
-Split:     ~5 km grid cells, stratified: cells are taken in a fixed
-           pseudo-random order into the sealed test set until it holds
-           about a quarter of the positives (positives cluster in a few
-           corridors, so a plain random split is lopsided). Each record
-           keeps its cell as "block" for the clustered bootstrap.
+Features:  that year's digest + deed history before the as-of date + layers
+           that change slowly (flood, 1980s wetlands, easements, exits,
+           main-line rail). Blank (None) because today's values were often
+           changed FOR the project or weren't knowable then: zoning,
+           utilities, road type, slope (2018-19 lidar shows graded pads as
+           flat), contamination listings, Opportunity Zones (designated
+           2018), and jurisdiction (Fulton re-coded its tax districts).
+Sites:     the same parcel is in several years' pools. A positive record's
+           weight is 1 / (the number of years in which that parcel is a
+           positive), so every distinct site sums to 1 (labels file). A
+           parcel's map cell is fixed by the first year it appears in.
+Split:     ~5 km grid cells. The cells sealed for the test set are frozen
+           in data/test_blocks.json (their block ids) and are the same in
+           every year; every other cell is dev. No dev parcel may overlap
+           the ground of a test parcel in any year (such a parcel is
+           dropped). Each record keeps its cell as "block" for the
+           clustered bootstrap.
 
-Writes screener/autoresearch/data/fulton_2016_features.json.gz and
-fulton_2016_labels.json. Records carry no owner names, parcel ids or
-coordinates.
+Writes screener/autoresearch/data/fulton_<year>_features.json.gz and
+fulton_<year>_labels.json for each year. Records carry no owner names,
+parcel ids or coordinates (the keys and block ids are short hashes: they
+keep casual eyes off the answers, they are not a secret, since the county
+file is public).
 """
 
 from __future__ import annotations
@@ -48,10 +62,11 @@ import math
 import time
 import tomllib
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
-from shapely import unary_union
+from shapely import STRtree, unary_union
 
 from .. import arcgis, checks, fulton, layers, screens
 from ..geo import LocalProjection, esri_to_shape, expand, tile_envelopes
@@ -59,13 +74,25 @@ from ..layers import Index
 
 HERE = Path(__file__).resolve().parent
 DATA = HERE / "data"
+TEST_BLOCKS_FILE = DATA / "test_blocks.json"
 SNAPSHOTS = "https://services1.arcgis.com/AQDHTHDrZzfsFsB5/arcgis/rest/services"
-SNAP_AS_OF = f"{SNAPSHOTS}/Tax_Parcels2016/FeatureServer/0"
-SNAP_LABEL = f"{SNAPSHOTS}/Tax_Parcels_2025/FeatureServer/0"
-AS_OF = date(2016, 1, 1)
+# As-of years. Later years are left out: under five years to sell and build
+# is too short a window.
+COHORTS = (2015, 2016, 2017, 2018, 2019)
 LABEL_YEAR = 2025
+# Digest years used to date the building (the first one that shows it). The
+# county published no 2022 layer.
+BUILT_YEARS = (2015, 2016, 2017, 2018, 2019, 2020, 2021, 2023, 2024, 2025)
 MIN_PRICE = 50_000
-TEST_SHARE = 0.25
+TEST_SHARE = 0.25     # what the sealed cells were first picked to hold (stratified_test_cells)
+
+
+def snapshot_url(year: int) -> str:
+    """The county's digest layer for a year (2023 on are named with an underscore)."""
+    return f"{SNAPSHOTS}/Tax_Parcels{'_' if year >= 2023 else ''}{year}/FeatureServer/0"
+
+
+SNAP_LABEL = snapshot_url(LABEL_YEAR)
 
 # Industrial land-use codes in the Fulton digest (warehouse, manufacturing,
 # truck terminal...). 332/335/339 are left out: they also cover parking,
@@ -89,8 +116,13 @@ BANNED_AS_NONE = ["zoning", "flu", "entitlement", "entitlement_note", "water", "
                   "opportunity_zone", "jurisdiction"]
 
 
-def key_for(parcel_id: str) -> str:
-    return hashlib.sha256(f"fulton-{AS_OF.year}:{parcel_id}".encode()).hexdigest()[:16]
+def key_for(parcel_id: str, year: int = 2016) -> str:
+    """A record's key: per year, so one parcel has a different key in each."""
+    return hashlib.sha256(f"fulton-{year}:{parcel_id}".encode()).hexdigest()[:16]
+
+
+def block_for(cell: str) -> str:
+    return hashlib.sha256(cell.encode()).hexdigest()[:8]
 
 
 def cell_for(lon: float, lat: float) -> str:
@@ -98,9 +130,11 @@ def cell_for(lon: float, lat: float) -> str:
 
 
 def stratified_test_cells(cells: dict[str, list[int]], total_pos: int, total_pool: int) -> set[str]:
-    """cells: cell -> [pool count, positive count]. Fixed hash order, so the
-    split is reproducible; a cell joins the test set only if it keeps the
-    test set near TEST_SHARE of the positives and under 30% of the pool."""
+    """How the sealed cells were first picked (2016 key, 2026-10-29); kept
+    for the record. The build no longer calls it: the sealed cells are
+    frozen in TEST_BLOCKS_FILE. cells: cell -> [pool count, positive count].
+    Fixed hash order; a cell joins the test set only if it keeps the test
+    set near TEST_SHARE of the positives and under 30% of the pool."""
     target = round(TEST_SHARE * total_pos)
     test, tp, tn = set(), 0, 0
     for cell in sorted(cells, key=lambda c: hashlib.sha256(c.encode()).hexdigest()):
@@ -111,26 +145,123 @@ def stratified_test_cells(cells: dict[str, list[int]], total_pos: int, total_poo
     return test
 
 
+def sale_before(sales: list[dict[str, Any]], owner: str | None, after: date, before: date,
+                min_price: float) -> bool:
+    """Did `owner` sell the land at a real price on or after `after` and
+    before `before`? fulton.sold_after with an upper bound: a sale whose
+    buyer was a development authority (seen as the grantor of the next deed)
+    is a tax-abatement title transfer, not a market sale. The whole deed
+    list is read for the buyer, whatever the bound."""
+    deeds = sorted(sales, key=lambda s: s["date"])
+    for i, s in enumerate(deeds):
+        if (s["date"] < after or s["date"] >= before or s["price"] < min_price
+                or s["instrument"] in fulton.NON_TRANSFER_DEEDS
+                or not fulton.same_owner(s["old_owner"], owner)):
+            continue
+        buyer = next((d["old_owner"] for d in deeds[i + 1:]
+                      if not fulton.same_owner(d["old_owner"], owner)), None)
+        if buyer and fulton.owner_type(buyer) == "development_authority":
+            continue
+        return True
+    return False
+
+
+def built_window(first_year: int) -> tuple[date, date]:
+    """(surely before the building, surely not before it) for a building
+    first shown in the `first_year` digest. A sale before the first date
+    preceded the building; a sale on or after the second did not; between
+    them (only when the previous digest year is missing: 2022) the order
+    can't be told."""
+    i = BUILT_YEARS.index(first_year)
+    prev = BUILT_YEARS[i - 1] if i else first_year - 1
+    return date(prev + 1, 1, 1), date(first_year, 1, 1)
+
+
+def covered_share(geom: Any, built_idx: Index) -> float:
+    """Share of a parcel covered by industrial-improved parcels of one digest."""
+    proj = LocalProjection.around(geom)
+    parts = [s.intersection(geom) for s, _ in built_idx.candidates(geom)]
+    parts = [i for i in parts if not i.is_empty and i.area > 0]
+    return proj(unary_union(parts)).area / proj(geom).area if parts else 0.0
+
+
+def classify(shares: dict[int, float], sales: list[dict[str, Any]], owner: str | None,
+             as_of: date) -> str:
+    """One pool parcel's label in one cohort: "positive", "negative", or a
+    reason it is left out of the pool. shares: digest year -> covered share."""
+    if shares.get(LABEL_YEAR, 0.0) < 0.5:
+        return "negative"
+    first = next(y for y in BUILT_YEARS if shares.get(y, 0.0) >= 0.5)
+    surely_before, not_before = built_window(first)
+    if sale_before(sales, owner, as_of, surely_before, MIN_PRICE):
+        return "positive"
+    if sale_before(sales, owner, as_of, not_before, MIN_PRICE):
+        return "left out: sale and building can't be ordered (no 2022 digest)"
+    if sale_before(sales, owner, as_of, date.max, MIN_PRICE):
+        return "left out: sold after the building"
+    return "left out: built but not sold by the as-of owner"
+
+
+def snapshot_date_check(pool: list[dict[str, Any]], sales: dict[str, list[dict[str, Any]]],
+                        as_of: date) -> dict[str, list[int]]:
+    """Does the digest show owners as of about 1 January? For pool parcels
+    with exactly one priced transfer deed in the quarter before or after
+    the as-of date: [snapshot owner is the seller, snapshot owner is not].
+    A January snapshot shows the buyer for deeds before it and the seller
+    for deeds after it."""
+    out = {"quarter_before": [0, 0], "quarter_after": [0, 0]}
+    lo, hi = as_of - timedelta(days=92), as_of + timedelta(days=92)
+    for p in pool:
+        near = [s for s in sales.get(p["parcel_id"], [])
+                if lo <= s["date"] < hi and s["price"] > 0
+                and s["instrument"] not in fulton.NON_TRANSFER_DEEDS]
+        if len(near) != 1:
+            continue
+        side = "quarter_before" if near[0]["date"] < as_of else "quarter_after"
+        out[side][0 if fulton.same_owner(near[0]["old_owner"], p["owner"]) else 1] += 1
+    return out
+
+
 def log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def main() -> int:
-    cfg = tomllib.loads((HERE.parent / "settings.toml").read_text())
-    arcgis.cache_days = 30
+def load_test_blocks() -> set[str]:
+    """The sealed cells' block ids. Frozen: the build never re-picks them."""
+    try:
+        blocks = json.loads(TEST_BLOCKS_FILE.read_text())["test_blocks"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise SystemExit(f"{TEST_BLOCKS_FILE} is missing or unreadable ({exc}). It freezes the "
+                         "sealed test cells; restore it from git rather than rebuilding it.")
+    if not isinstance(blocks, list) or not blocks or not all(isinstance(b, str) for b in blocks):
+        raise SystemExit(f"{TEST_BLOCKS_FILE} holds no list of block ids")
+    return set(blocks)
+
+
+def fetch_built(year: int) -> Index:
+    """Parcels carrying $1M+ of industrial improvements in one digest year."""
+    built = arcgis.query_features(snapshot_url(year), BUILT_WHERE, "ParcelID,ClassCode,LUCode")
+    return Index([(s, f.get("attributes") or {}) for f in built
+                  if (s := esri_to_shape(f.get("geometry"))) is not None and not s.is_empty])
+
+
+def build_cohort(year: int, cfg: dict[str, Any], built: dict[int, Index]
+                 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """One as-of year's pool with features and labels. Returns the parcels
+    (each with "label") and the counts for the build log."""
+    as_of = date(year, 1, 1)
+    snap = snapshot_url(year)
     juris = set(cfg["area"]["jurisdictions"])
     scr = cfg["screens"]
-
-    log(f"{AS_OF.year} digest: 5-50 acre parcels")
-    pool = fulton.fetch_parcels(5, 50, juris, url=SNAP_AS_OF)
-    pool = [p for p in pool
+    log(f"{year} digest: 5-50 acre parcels")
+    fetched = fulton.fetch_parcels(5, 50, juris, url=snap)
+    pool = [p for p in fetched
             if not screens.attribute_rejects(p, scr, {}) and not p["industrial_named"]]
-    log(f"  {len(pool):,} parcels pass the ownership and land-only screens")
+    log(f"  {len(pool):,} of {len(fetched):,} parcels pass the ownership and land-only screens")
 
-    log("Deed history")
     owners = {p["parcel_id"]: p["owner"] for p in pool}
     sales, _ = fulton.read_cama(HERE.parent / "cache", set(owners))
-    cama = fulton.load_cama(HERE.parent / "cache", owners, as_of=AS_OF)
+    cama = fulton.load_cama(HERE.parent / "cache", owners, as_of=as_of)
     for p in pool:
         p.update({k: v for k, v in cama[p["parcel_id"]].items()
                   if k not in ("water", "sewer", "road", "topography", "fronting")})
@@ -142,64 +273,124 @@ def main() -> int:
     eval_layers = dict(layers.LAYERS)
     # Main lines and yards only: a spur or siding may have been built for the project.
     eval_layers["rail"] = replace(layers.LAYERS["rail"], where="NET IN ('M','Y')")
-    idx = {}
-    for key, layer in eval_layers.items():
-        log(f"Map layer: {layer.name}")
-        idx[key] = layers.fetch(layer, tiles, region)
-    log(f"Industrial parcels in the {AS_OF.year} digest")
-    industrial = fulton.fetch_industrial_points(url=SNAP_AS_OF)
+    idx = {key: layers.fetch(layer, tiles, region) for key, layer in eval_layers.items()}
+    industrial = fulton.fetch_industrial_points(url=snap)
     checks.map_checks(pool, idx, industrial, float(scr["contamination_buffer_ft"]))
 
-    log(f"{LABEL_YEAR} digest: industrial buildings worth $1M+")
-    built = arcgis.query_features(SNAP_LABEL, BUILT_WHERE, "ParcelID,Owner,ClassCode,LUCode")
-    built_idx = Index([(s, f.get("attributes") or {}) for f in built
-                       if (s := esri_to_shape(f.get("geometry"))) is not None and not s.is_empty])
-    log(f"  {len(built_idx):,} industrial-improved parcels")
-
-    records, positives, cells = [], [], {}
-    covered_not_sold = 0
+    counts: dict[str, Any] = {"fetched": len(fetched), "screened_pool": len(pool),
+                              "snapshot_date_check": snapshot_date_check(pool, sales, as_of),
+                              "by_jurisdiction": {}}
     for p in pool:
-        g = p["geometry"]
-        proj = LocalProjection.around(g)
-        parts = [s.intersection(g) for s, _ in built_idx.candidates(g)]
-        parts = [i for i in parts if not i.is_empty and i.area > 0]
-        share = proj(unary_union(parts)).area / proj(g).area if parts else 0.0
-        sold = fulton.sold_after(sales.get(p["parcel_id"], []), p["owner"], AS_OF, MIN_PRICE)
-        key = key_for(p["parcel_id"])
-        is_pos = share >= 0.5 and sold
-        if share >= 0.5 and not sold:
-            covered_not_sold += 1
-            continue
-        if is_pos:
-            positives.append(key)
-        cell = cell_for(p["lon"], p["lat"])
-        cells.setdefault(cell, [0, 0])
-        cells[cell][0] += 1
-        cells[cell][1] += int(is_pos)
+        counts["by_jurisdiction"][p["jurisdiction"]] = \
+            counts["by_jurisdiction"].get(p["jurisdiction"], 0) + 1
+        shares = {LABEL_YEAR: covered_share(p["geometry"], built[LABEL_YEAR])}
+        if shares[LABEL_YEAR] >= 0.5:      # only then does the building's first year matter
+            shares.update({y: covered_share(p["geometry"], built[y])
+                           for y in BUILT_YEARS if y != LABEL_YEAR})
+        p["label"] = classify(shares, sales.get(p["parcel_id"], []), p["owner"], as_of)
+        counts[p["label"]] = counts.get(p["label"], 0) + 1
         p["usable_after_slope"] = p["usable_acres"]  # no slope in the eval set
-        rec = {"key": key, "block": hashlib.sha256(cell.encode()).hexdigest()[:8], "split": cell}
-        rec.update({f: p.get(f) for f in FEATURES})
-        rec.update({f: None for f in BANNED_AS_NONE})
-        records.append(rec)
+    return pool, counts
 
-    test_cells = stratified_test_cells(cells, len(positives), len(records))
-    for rec in records:
-        rec["split"] = "test" if rec["split"] in test_cells else "dev"
+
+def main() -> int:
+    cfg = tomllib.loads((HERE.parent / "settings.toml").read_text())
+    arcgis.cache_days = 30
+    scr = cfg["screens"]
+    test_blocks = load_test_blocks()
+
+    log(f"Industrial buildings worth $1M+ in the digests of {BUILT_YEARS[0]}-{BUILT_YEARS[-1]}")
+    built = {y: fetch_built(y) for y in BUILT_YEARS}
+    log("  " + ", ".join(f"{y}: {len(built[y]):,}" for y in BUILT_YEARS))
+
+    cohorts: dict[int, list[dict[str, Any]]] = {}
+    counts: dict[int, dict[str, Any]] = {}
+    for year in COHORTS:
+        cohorts[year], counts[year] = build_cohort(year, cfg, built)
+
+    # One map cell per site: the cell of the first year the parcel is in.
+    cell_of: dict[str, str] = {}
+    for year in COHORTS:
+        for p in cohorts[year]:
+            cell_of.setdefault(p["parcel_id"], cell_for(p["lon"], p["lat"]))
+    is_test = {pid: block_for(cell) in test_blocks for pid, cell in cell_of.items()}
+
+    # No dev parcel may share ground with a test parcel in any year (a
+    # replatted or re-drawn parcel under a new id): such dev parcels are dropped.
+    kept = [p for year in COHORTS for p in cohorts[year] if not p["label"].startswith("left out")]
+    test_shapes = [p["geometry"] for p in kept if is_test[p["parcel_id"]]]
+    tree = STRtree(test_shapes) if test_shapes else None
+    straddle: set[str] = set()
+    for p in kept:
+        if is_test[p["parcel_id"]] or tree is None:
+            continue
+        g = p["geometry"]
+        for i in tree.query(g):
+            inter = g.intersection(test_shapes[int(i)])
+            if not inter.is_empty and inter.area > 0.01 * min(g.area, test_shapes[int(i)].area):
+                straddle.add(p["parcel_id"])
+                break
+
+    years_positive: dict[str, int] = {}
+    for p in kept:
+        if p["label"] == "positive" and p["parcel_id"] not in straddle:
+            years_positive[p["parcel_id"]] = years_positive.get(p["parcel_id"], 0) + 1
 
     DATA.mkdir(parents=True, exist_ok=True)
-    meta = {"as_of": AS_OF.isoformat(), "label_year": LABEL_YEAR, "built": date.today().isoformat(),
-            "pool": len(records), "min_price": MIN_PRICE, "features": FEATURES,
-            "banned": BANNED_AS_NONE, "screens": scr}
-    with gzip.open(DATA / f"fulton_{AS_OF.year}_features.json.gz", "wt") as fh:
-        json.dump({"meta": meta, "records": records}, fh)
-    (DATA / f"fulton_{AS_OF.year}_labels.json").write_text(json.dumps(
-        {"meta": meta, "positives": sorted(positives)}, indent=1))
-    pos = set(positives)
-    by_split = {s: sum(1 for r in records if r["split"] == s and r["key"] in pos)
-                for s in ("dev", "test")}
-    log(f"Pool {len(records):,}; positives {len(positives)} "
-        f"(dev {by_split['dev']}, test {by_split['test']}); "
-        f"{covered_not_sold} built on but not sold by the {AS_OF.year} owner (left out of the pool)")
+    seen_keys: set[str] = set()
+    summary = []
+    for year in COHORTS:
+        records, weights = [], {}
+        dropped = 0
+        for p in cohorts[year]:
+            pid = p["parcel_id"]
+            if p["label"].startswith("left out"):
+                continue
+            if pid in straddle:
+                dropped += 1
+                continue
+            key = key_for(pid, year)
+            if key in seen_keys:
+                raise SystemExit(f"duplicate record key in {year}: the keys must be unique")
+            seen_keys.add(key)
+            rec = {"key": key, "block": block_for(cell_of[pid]),
+                   "split": "test" if is_test[pid] else "dev", "cohort": year}
+            rec.update({f: p.get(f) for f in FEATURES})
+            rec.update({f: None for f in BANNED_AS_NONE})
+            records.append(rec)
+            if p["label"] == "positive":
+                weights[key] = round(1.0 / years_positive[pid], 6)
+        meta = {"as_of": date(year, 1, 1).isoformat(), "label_year": LABEL_YEAR,
+                "cohorts": list(COHORTS), "built_years": list(BUILT_YEARS),
+                "built": date.today().isoformat(), "pool": len(records), "min_price": MIN_PRICE,
+                "features": FEATURES, "banned": BANNED_AS_NONE, "screens": scr}
+        with gzip.open(DATA / f"fulton_{year}_features.json.gz", "wt") as fh:
+            json.dump({"meta": meta, "records": records}, fh)
+        (DATA / f"fulton_{year}_labels.json").write_text(json.dumps(
+            {"meta": meta, "positives": dict(sorted(weights.items()))}, indent=1))
+        by_split = {s: [sum(1 for r in records if r["split"] == s),
+                        sum(1 for r in records if r["split"] == s and r["key"] in weights),
+                        round(sum(weights[r["key"]] for r in records
+                                  if r["split"] == s and r["key"] in weights), 2)]
+                    for s in ("dev", "test")}
+        left = {k: v for k, v in counts[year].items() if k.startswith("left out")}
+        log(f"{year}: pool {len(records):,}; positives {len(weights)} "
+            f"(dev {by_split['dev'][1]}, test {by_split['test'][1]}); "
+            f"sites dev {by_split['dev'][2]}, test {by_split['test'][2]}; "
+            f"dropped for sharing ground with a test parcel: {dropped}")
+        for why, n in sorted(left.items()):
+            log(f"    {n} {why}")
+        chk = counts[year]["snapshot_date_check"]
+        log(f"    snapshot date check [owner is seller, owner is not]: deeds in the quarter "
+            f"before {chk['quarter_before']}, after {chk['quarter_after']}")
+        summary.append((year, by_split))
+    dev_sites = sum(b["dev"][2] for _, b in summary)
+    test_sites = sum(b["test"][2] for _, b in summary)
+    log(f"All years: {len(years_positive)} distinct positive sites "
+        f"(dev {dev_sites:.1f}, test {test_sites:.1f}); test share of sites "
+        f"{test_sites / (dev_sites + test_sites):.0%}")
+    log("Pool by jurisdiction and year: " + json.dumps(
+        {str(y): counts[y]["by_jurisdiction"] for y in COHORTS}, sort_keys=True))
     return 0
 
 

@@ -503,7 +503,7 @@ class RunTests(RunHarness):
             with self.subTest(args=args):
                 # Empty the HTTP cache before each run so both runs make
                 # (and log) the same requests rather than reading the cache.
-                shutil.rmtree(self.tmp / "http", ignore_errors=True)
+                self.clear_cache()
                 self.parcels[:] = copy.deepcopy(self.fresh)
                 self.main(*args)
                 calls_on = self.requests()
@@ -513,7 +513,7 @@ class RunTests(RunHarness):
                       for pid, r in self.rows().items()}
                 self.assertTrue(any(self.owner_lines(r) for r in self.rows().values()))
                 with unittest.mock.patch.object(oc, "build", lambda *a, **k: oc.Result()):
-                    shutil.rmtree(self.tmp / "http", ignore_errors=True)
+                    self.clear_cache()
                     self.parcels[:] = copy.deepcopy(self.fresh)
                     self.main(*args)
                 off = {pid: (r["rank"], r["score"], r["why_site"], r["why_seller"], r["flags"])

@@ -211,6 +211,7 @@ class EarthworkSlopeCheckTests(Offline):
         # A fresh cache each call: subtests reuse one geometry (one cache key).
         self.calls = getattr(self, "calls", 0) + 1
         self.patch(arcgis, "CACHE_DIR", self.tmp / f"http{self.calls}")
+        self.clear_cache()                      # the kept slope answers too
         self.serve({checks.SLOPE_URL: lambda params: copy.deepcopy(answer)})
         p = {"parcel_id": "P1", "geometry": geometry or square(*A)}
         estimates = checks.slope_checks([p], workers=1)

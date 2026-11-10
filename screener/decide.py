@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import run, snapshot
+from . import facts, run, snapshot
 
 STORE_NAME = "decision_features.jsonl"
 CONSEQUENCE = {
@@ -160,6 +160,20 @@ def append_store(entry: dict[str, Any]) -> None:
         fh.write(json.dumps(entry, allow_nan=False) + "\n")
 
 
+def facts_store_file() -> Path:
+    return run.DECISIONS_FILE.with_name(facts.STORE_NAME)
+
+
+def append_facts(entry: dict[str, Any]) -> None:
+    """The report facts shown when the mark was made, in their own store:
+    never mixed with the evaluation's features (facts.py)."""
+    line = json.dumps(entry, allow_nan=False) + "\n"   # before the file is touched
+    path = facts_store_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        fh.write(line)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("parcel_id", help="exactly as in ranked.csv; quote it if it has spaces")
@@ -198,6 +212,9 @@ def main(argv: list[str] | None = None) -> int:
                   + ", ".join(snapshot.FEATURES))
         header = decisions_header()
         day = date.today().isoformat()
+        facts_meta, fact_records, facts_problem = facts.records_for(run_dir, pid)
+        if facts_problem:
+            print(f"no report facts kept for this decision ({facts_problem})")
         print(f"{pid}: {args.decision}: {CONSEQUENCE[args.decision]}")
         # Features first: a crash after this leaves features without a
         # decision row (harmless), never a decision whose features are lost.
@@ -206,6 +223,17 @@ def main(argv: list[str] | None = None) -> int:
             "parcel_id": pid, "decision": args.decision, "date": day,
             "run": run_dir.name, "run_meta": meta, "records": records,
         })
+        if fact_records:
+            # The facts are an extra: a failure here must never cost the
+            # decision row (the features above are already kept).
+            try:
+                append_facts({
+                    "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                    "parcel_id": pid, "decision": args.decision, "date": day,
+                    "run": run_dir.name, "run_meta": facts_meta, "records": fact_records,
+                })
+            except (OSError, ValueError, TypeError) as exc:
+                print(f"no report facts kept for this decision (could not be written: {exc})")
         append_decision(header, pid, args.decision, day, note)
     except Refuse as exc:
         print(f"refused: {exc}", file=sys.stderr)

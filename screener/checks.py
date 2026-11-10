@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
@@ -44,6 +45,47 @@ SLOPE_PIXEL = json.dumps({"x": 10, "y": 10, "spatialReference": {"wkid": 3857}})
 # {"statistics": []} every time: a parcel-map problem, not a server failure,
 # so slope isn't asked for (SLOPE_SKIPPED) and nothing is retried.
 SLOPE_MIN_M2 = 100.0
+# Slope answers are kept apart from the other map data and far longer: the
+# lidar is a 2018-19 survey that does not change, the slope step is most of
+# an uncached run, and repeated requests for one shape do not always agree
+# (README, "Public data changes between days"), so a kept answer also keeps
+# the steep-ground screen steady from run to run. The key holds the request
+# (the open-ground shape, the rule and the pixel size): a changed shape is
+# a new request. run.py sets the lifetime from [run] slope_cache_days;
+# --refresh-slope sets it to 0 for one run. The folder is small (about 2 KB
+# per parcel), so it can be carried between machines.
+SLOPE_CACHE_DAYS = 3650.0
+slope_cache_days: float = SLOPE_CACHE_DAYS
+# What the last slope_checks call did, for the run's summary note: answers
+# reused from the folder, asked of the service, taken from the folder
+# because a fresh request failed, and the file time of the oldest one used.
+slope_tally: dict[str, Any] = {"reused": 0, "asked": 0, "fell_back": 0, "oldest": None}
+_tally_lock = threading.Lock()
+
+
+def _tally(kind: str, mtime: float | None = None) -> None:
+    with _tally_lock:
+        slope_tally[kind] += 1
+        if mtime is not None and (slope_tally["oldest"] is None or mtime < slope_tally["oldest"]):
+            slope_tally["oldest"] = mtime
+
+
+def slope_cache_dir():
+    """<cache>/slope, beside the shared <cache>/http (read at call time, so
+    tests that move the cache move this too)."""
+    return arcgis.CACHE_DIR.parent / "slope"
+
+
+def slope_days_setting(run_cfg: dict[str, Any]) -> float:
+    """[run] slope_cache_days, or the default when the key is absent (an
+    older settings file). ValueError for anything not a finite number of
+    days, 0 or more (0 = ask every run)."""
+    value = run_cfg.get("slope_cache_days", SLOPE_CACHE_DAYS)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) \
+            or not math.isfinite(value) or value < 0:
+        raise ValueError(f"[run] slope_cache_days must be a number of days, 0 or more "
+                         f"(got {value!r})")
+    return float(value)
 SLOPE_SKIPPED = "the parcel map leaves under one 10 m lidar pixel of open ground"
 
 
@@ -208,14 +250,35 @@ def slope_stats(geom) -> tuple[dict[str, Any], dict[str, Any] | None]:
     must keep it off the parcel until after scoring (slope_checks, run.main).
     An answer without usable histograms raises arcgis.BadAnswer.
     """
-    data = arcgis.request_json(SLOPE_URL, {
+    params = {
         "geometry": json.dumps(_esri_polygon(geom)),
         "geometryType": "esriGeometryPolygon",
         "renderingRule": SLOPE_RULE,
         # Resample the 1 m lidar to ~10 m: at 1 m, ditches and stream banks
         # read as "steep" and overstate grading by 2-3x; relief is unchanged.
         "pixelSize": SLOPE_PIXEL,
-    }, check=_slope_problem)
+    }
+    folder = slope_cache_dir()
+    kept = arcgis.cached_json(SLOPE_URL, params, max_age_days=slope_cache_days,
+                              check=_slope_problem, cache_dir=folder)
+    if kept is not None:
+        data = kept[0]
+        _tally("reused", kept[1])
+    else:
+        try:
+            data = arcgis.request_json(SLOPE_URL, params, check=_slope_problem, fresh=True,
+                                       cache_dir=folder, max_age_days=slope_cache_days)
+            _tally("asked")
+        except arcgis.ArcGISError:
+            # The service failed. A kept answer of any age (one --refresh-slope
+            # or the lifetime set aside) beats leaving the steep-ground screen
+            # unapplied to a parcel that had a good reading.
+            old = arcgis.cached_json(SLOPE_URL, params, max_age_days=math.inf,
+                                     check=_slope_problem, cache_dir=folder)
+            if old is None:
+                raise
+            data = old[0]
+            _tally("fell_back", old[1])
     out = _slope_from(data)
     earthwork = None
     try:
@@ -419,6 +482,8 @@ def slope_checks(parcels: list[dict[str, Any]], workers: int,
         p.update(fields)
         return earthwork
 
+    with _tally_lock:
+        slope_tally.update(reused=0, asked=0, fell_back=0, oldest=None)
     done = 0
     out: list[dict[str, Any] | None] = []
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:

@@ -367,7 +367,7 @@ class PondRunTests(RunHarness):
         on = {pid: tuple(r[k] for k in keep) for pid, r in self.rows().items()}
         self.patch(detention, "place_pond", lambda *a, **k: detention.not_checked("patched off"))
         self.parcels[:] = fresh
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)
+        self.clear_cache()
         self.main()
         off = {pid: tuple(r[k] for k in keep) for pid, r in self.rows().items()}
         self.assertEqual(on, off)

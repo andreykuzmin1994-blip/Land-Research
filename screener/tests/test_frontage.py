@@ -54,7 +54,7 @@ class ParcelCheckTests(Offline):
     """frontage.check_parcel against fake identify answers."""
 
     def ask(self, route, geom=None):
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)  # good answers are cached
+        self.clear_cache()  # good answers are cached
         self.serve({frontage.IDENTIFY_URL: route})
         return frontage.check_parcel(geom if geom is not None else square(*A))
 
@@ -434,7 +434,7 @@ class FrontageRunTests(RunHarness):
                         for c in self.session.calls if c[0] != frontage.IDENTIFY_URL)
         self.patch(frontage, "check_parcel", lambda g: frontage.not_checked("patched off"))
         self.parcels[:] = fresh
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)
+        self.clear_cache()
         self.main()
         off = {pid: tuple(r[k] for k in keep) for pid, r in self.rows().items()}
         self.assertEqual(on, off)

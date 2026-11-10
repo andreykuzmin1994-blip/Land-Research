@@ -1,0 +1,22 @@
+{
+ "note": "Block ids of the map cells sealed for the test split. Frozen from the 2016 key built 2026-10-29 (reviews/36_screener_eval_cohorts_metric). Never re-picked: a cell is test in every as-of year or in none.",
+ "frozen": "2026-11-10",
+ "test_blocks": [
+  "0edd83a3",
+  "1b61994e",
+  "1cf897ff",
+  "26b68c8d",
+  "3699cf47",
+  "36d95b5d",
+  "37a447c7",
+  "3b707757",
+  "3e73597e",
+  "3f130408",
+  "3f3472c6",
+  "44045d99",
+  "490201fc",
+  "560574f0",
+  "59de48d1",
+  "b6b19fe7"
+ ]
+}

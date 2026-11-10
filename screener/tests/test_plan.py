@@ -293,7 +293,7 @@ class PlanRunTests(RunHarness):
         self.patch(plan, "render", lambda p: (None, "patched off"))
         self.parcels[:] = fresh
         shutil.rmtree(self.out)
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)
+        self.clear_cache()
         self.main()
         for n, b in outputs.items():
             self.assertEqual((self.out / n).read_bytes(), b, n)
@@ -308,7 +308,7 @@ class PlanRunTests(RunHarness):
         self.assertTrue(list((self.out / "briefs").glob("*.svg")))
         self.patch(plan, "render", lambda p: (None, "patched off"))
         self.parcels[:] = fresh
-        shutil.rmtree(self.tmp / "http", ignore_errors=True)
+        self.clear_cache()
         self.main()                                    # same output folder, kept
         self.assertFalse(list((self.out / "briefs").glob("*.svg")))
 

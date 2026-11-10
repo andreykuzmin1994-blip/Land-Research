@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import detention, frontage, plan, sitefit, soils
+from . import detention, digest, frontage, grade, plan, sitefit, soils
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
@@ -20,6 +20,7 @@ RANKED_COLUMNS = [
     "largest_open_acres", "envelope_fit", "envelope_building_sf", "detention_pct", "pond_fit",
     "soil_hsg", "soil_hydric_pct", "soil_poorly_drained_pct", "soil_dwellings_limited_pct",
     "frontage_ft", "frontage_road", "frontage_limited_ft", "frontage_private_ft",
+    "lead_grade", "lead_found", "lead_not_checked",
     "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
@@ -38,8 +39,27 @@ def _cell(v: Any) -> Any:
     return "" if v is None else v
 
 
+# The brief and plan files the last run into this folder wrote, so a re-run
+# removes exactly those it does not write again (and nothing a person put
+# in briefs/).
+BRIEFS_LIST = ".briefs-written.json"
+
+
+def _last_written(out_dir: Path) -> set[str]:
+    try:
+        names = json.loads((out_dir / BRIEFS_LIST).read_text())
+    except (OSError, ValueError):
+        return set()
+    if not isinstance(names, list):
+        return set()
+    # Plain file names only: nothing in the list can point outside briefs/.
+    return {n for n in names if isinstance(n, str) and n == Path(n).name and n not in ("", ".", "..")}
+
+
 def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[str, Any]],
-              summary: dict[str, Any], top_n: int) -> None:
+              summary: dict[str, Any], top_n: int, lead_limit: int = 0) -> None:
+    """Every report of a run. Briefs are written for the top_n by rank and
+    for the leads the digest lists (grade.py, at most lead_limit)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     for p in ranked:
         p["maps_link"] = maps_link(p)
@@ -70,7 +90,13 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
 
     briefs = out_dir / "briefs"
     briefs.mkdir(exist_ok=True)
-    for p in ranked[:top_n]:
+    listed = digest.select(ranked, lead_limit)
+    with_brief = list(ranked[:top_n])
+    seen = {id(p) for p in with_brief}
+    with_brief += [p for p in listed if id(p) not in seen]
+    written: set[str] = set()
+    brief_names: dict[int, str] = {}
+    for p in with_brief:
         stem = f"{p['rank']:03d}_{_safe_name(p['parcel_id'])}"
         path, svg_path = briefs / f"{stem}.md", briefs / f"{stem}.svg"
         for f in (path, svg_path):
@@ -85,7 +111,23 @@ def write_all(out_dir: Path, ranked: list[dict[str, Any]], rejected: list[dict[s
             svg_path.unlink(missing_ok=True)    # no stale plan from an earlier run
         path.write_text(brief(p, plan_file=svg_path.name if svg is not None else None,
                               plan_note=why or None))
+        written.add(path.name)
+        if svg is not None:
+            written.add(svg_path.name)
+        brief_names[id(p)] = path.name
+    # A same-day re-run reuses the folder: remove the briefs and plans the
+    # earlier run wrote and this one did not (same rank prefixes, other
+    # parcels). Only files on that run's own list are touched.
+    for name in sorted(_last_written(out_dir) - written):
+        old = briefs / name
+        if old.is_file():
+            old.unlink()
+    tmp = out_dir / (BRIEFS_LIST + ".tmp")
+    tmp.write_text(json.dumps(sorted(written)))
+    tmp.replace(out_dir / BRIEFS_LIST)
 
+    (out_dir / digest.FILE_NAME).write_text(digest.leads_md(
+        summary["county"], summary["run_date"], ranked, lead_limit, brief_names))
     (out_dir / "summary.md").write_text(_summary_md(summary, ranked[:10]))
 
 
@@ -122,6 +164,8 @@ def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None
         f"{p['learned_score']}, seller motivation {p['motivation_score']}) · "
         f"parcel `{p['parcel_id']}` · "
         f"[map]({p['maps_link']}) · county record: {p.get('assessor_portal', '')}",
+        "",
+        *grade.brief_lines(p),
         "",
         "## The site",
         f"- {p['acres']:.1f} acres; about {p.get('usable_after_slope', p['usable_acres']):.1f} "

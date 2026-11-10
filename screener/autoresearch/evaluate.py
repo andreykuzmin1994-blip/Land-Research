@@ -7,30 +7,48 @@ the files in data/. Usage:
     python -m screener.autoresearch.evaluate --decide    # score, keep/discard, log it
     python -m screener.autoresearch.evaluate --test      # sealed test split (humans only)
     python -m screener.autoresearch.evaluate --control   # what random ranking scores
+    python -m screener.autoresearch.evaluate --null-test # how often the keep rule keeps noise (humans)
 
-Metric: hits@K = how many parcels the 2016 owner sold to someone who built
-an industrial building by 2025 land in the ranking's top K, where K is 2%
-of the pool (about what a person can actually review). The hard screens
-frozen into the evaluation set apply: a parcel they reject can't be a hit.
+The key (build_eval.py): for each as-of year in COHORTS, the parcels that
+year's owner then sold, before any building, to someone who built an
+industrial building by 2025. The same site is in several years; a positive
+record's weight makes every distinct site sum to 1.
 
-Parcels are ranked by rank.learned_score. The fixed part of the live score
-(scoring.py: zoning, slope, utilities, incentives) is blank in the
-evaluation set, so it is the same for every parcel and can't change the
-order.
+Metric, per as-of year and summed. Parcels are ranked within their year by
+rank.learned_score. K is 2% of the year's pool (about what a person can
+actually review).
+- hits: positives in the top K, by weight.
+- graded: each positive earns credit by where it ranks: 1 in the top K,
+  falling on a log scale to 0.5 at about 3.2 x K and to 0 at 10 x K (the
+  top 20% or so). Below that it earns nothing. In units of sites.
+The hard screens frozen into the evaluation set apply: a parcel they
+reject earns nothing. The fixed part of the live score (scoring.py:
+zoning, slope, utilities, incentives) is blank in the evaluation set, so
+it is the same for every parcel and can't change the order.
 
-Keep rule (--decide): the experiment must add at least one hit over the
-best kept run AND win in at least 90% of clustered bootstrap resamples.
-Each resample draws whole ~5 km map cells, because positives come in
-clusters, and scores both rankings on the same draw.
+Keep rule (--decide): graded must be at least MIN_GAIN above the best kept
+run, hits must not be lower, AND the new ranking's graded must beat the
+best kept run's in at least WIN_SHARE_TO_KEEP of clustered bootstrap
+resamples. Each resample draws whole ~5 km map cells, every year of a cell
+together, because positives come in clusters and a site repeats across
+years; both rankings are scored on the same draw. The thresholds were set
+with --null-test so that a change that is not an improvement is rarely
+kept (reviews/36_screener_eval_cohorts_metric).
+
+Scores are printed and logged to one decimal. Comparisons use the exact
+values, recomputed from the best kept run's saved ranking.
 
 Guards. Before rank.py is imported, a static check (rank_problems) must
-pass, or nothing is scored. --decide also refuses (exit 3, logs nothing)
-on uncommitted changes or untracked files under screener/, a commit that
-touches anything but screener/rank.py, a score that isn't a finite number
-in 0-100, or a best kept run whose experiments.tsv row or
-best_ranking.json is missing or doesn't match. A human then records a new
-baseline (--new-baseline), which starts a new chain: later experiments are
-compared with it, not with older runs.
+pass, or nothing is scored. The ranking is handed only the feature fields
+named in the key's meta, never a key, year, cell or weight. --decide also
+refuses (exit 3, logs nothing) on uncommitted changes or untracked files
+under screener/, a commit that touches anything but screener/rank.py, a
+score that isn't a finite number in 0-100, a log written for another
+version of this evaluator, a first run on a key the log has never seen
+while it holds other keys' runs, or a best kept run whose experiments.tsv
+row or best_ranking.json is missing or doesn't match. A human then records
+a new baseline (--new-baseline), which starts a new chain: later
+experiments are compared with it, not with older runs.
 """
 
 from __future__ import annotations
@@ -60,8 +78,26 @@ from pathlib import Path
 from .. import screens
 
 HERE = Path(__file__).resolve().parent
-FEATURES_FILE = HERE / "data" / "fulton_2016_features.json.gz"
-LABELS_FILE = HERE / "data" / "fulton_2016_labels.json"
+DATA = HERE / "data"
+# The as-of years of the key, named here (not found by a glob): a missing
+# file is an error, never a smaller key.
+COHORTS = (2015, 2016, 2017, 2018, 2019)
+TEST_BLOCKS_FILE = DATA / "test_blocks.json"
+
+
+def features_file(year: int) -> Path:
+    return DATA / f"fulton_{year}_features.json.gz"
+
+
+def labels_file(year: int) -> Path:
+    return DATA / f"fulton_{year}_labels.json"
+
+
+def data_files() -> list[Path]:
+    return [f for year in COHORTS for f in (features_file(year), labels_file(year))] \
+        + [TEST_BLOCKS_FILE]
+
+
 LOG_FILE = HERE / "experiments.tsv"          # append-only, untracked
 BEST_FILE = HERE / "best_ranking.json"       # ranking of the best kept run, untracked
 RANK_FILE = HERE.parent / "rank.py"
@@ -69,16 +105,33 @@ RANK_FILE = HERE.parent / "rank.py"
 # The "## <branch>" header line shows that git answered.
 STATUS_ARGS = ("status", "--porcelain", "--branch", "--untracked-files=all", "--", "screener")
 NEW_BASELINE = "python -m screener.autoresearch.evaluate --decide --new-baseline"
-LOG_COLUMNS = ["time", "commit", "parent", "fingerprint", "hits", "positives", "k",
-               "recall", "win_share", "status", "description"]
+LOG_COLUMNS = ["time", "commit", "parent", "fingerprint", "graded", "hits", "sites",
+               "positives", "k", "win_share", "status", "description"]
 # Files whose change alters what the score means. Changing one needs a
 # human-recorded new baseline (--new-baseline).
 EVAL_FILES = ("screener/autoresearch/evaluate.py", "screener/autoresearch/data/",
               "screener/screens.py")
 K_SHARE = 0.02
+# Credit falls to 0 at CREDIT_SPAN x K: nothing ranked below about the top
+# 20% is paid for, so lifting sites through the unread middle earns nothing.
+CREDIT_SPAN = 10.0
 BOOTSTRAP = 500
-WIN_SHARE_TO_KEEP = 0.9
-HIDDEN = ("key", "split", "block")           # never passed to the ranking
+# Set with --null-test on the key as built (reviews/36): see there before changing.
+MIN_GAIN = 2.0
+WIN_SHARE_TO_KEEP = 0.95
+SHOWN_DECIMALS = 1                           # what the loop is shown; comparisons are exact
+NULL_NOISE = (2.0, 4.0, 8.0)                 # --null-test: score-point noise levels tried
+# Why --decide refuses for now ("" = it does not). Set while a change to this
+# evaluation awaits its review; a human clears it in the change that records
+# the review's outcome. Scoring without --decide still works.
+REVIEW_PENDING = ("the 2026-11-10 rebuild of this evaluation (five as-of years, graded score) "
+                  "was merged before its adversarial review and its keep-threshold check were "
+                  "finished. No experiment may be kept or discarded against it yet. Stop and "
+                  "tell a human (screener/AGENTS_DESIGN.md, \"Next session\")")
+# Record fields the ranking never sees. The ranking is handed an allow-list
+# (the key's meta "features" and "banned"), so a new record field is hidden
+# unless it is added there; this tuple documents the known ones.
+HIDDEN = ("key", "split", "block", "cohort")
 # What rank.py may import (PROGRAM.md: pure, no I/O). math is for smooth curves.
 RANK_IMPORTS = ("__future__", "math", "typing")
 # typing is for annotations only. Its other names build classes, metaclasses
@@ -102,112 +155,268 @@ RANK_FRAME_ATTR = re.compile(r"(gi|cr|ag|tb|f|co)_")
 # builtins. Defence in depth only: a computed string gets past it.
 RANK_BANNED_STRING_NAMES = {"open", "exec", "eval", "compile", "__import__", "globals", "locals",
                             "vars", "getattr", "setattr", "delattr", "breakpoint"}
-RANK_BANNED_STRINGS = ("autoresearch/data", "fulton_2016", "experiments.tsv", "best_ranking")
+RANK_BANNED_STRINGS = ("autoresearch/data", "fulton_20", "test_blocks", "experiments.tsv",
+                       "best_ranking")
 # What to use instead, in refusal messages.
 RANK_HINTS = {"type": " (use isinstance)", "format": " (use an f-string)",
               "format_map": " (use an f-string)", "print": " (put reasons in why_site / why_seller)"}
 
 
-def load() -> tuple[list[dict], set[str], dict]:
-    with gzip.open(FEATURES_FILE, "rt") as fh:
-        data = json.load(fh)
-    labels = json.loads(LABELS_FILE.read_text())
-    return data["records"], set(labels["positives"]), data["meta"]
+class EvalSetError(Exception):
+    """The evaluation files are missing, unreadable or disagree with each other."""
+
+
+_SAME_IN_EVERY_YEAR = ("features", "banned", "screens", "label_year", "min_price", "cohorts",
+                       "built_years")
+
+
+def load() -> tuple[list[dict], dict[str, float], dict]:
+    """(records of every as-of year, weight of each positive key, meta).
+    Every year must be present and built together."""
+    records: list[dict] = []
+    weights: dict[str, float] = {}
+    meta0: dict | None = None
+    for year in COHORTS:
+        try:
+            with gzip.open(features_file(year), "rt") as fh:
+                data = json.load(fh)
+            labels = json.loads(labels_file(year).read_text())
+            meta, recs, pos = data["meta"], data["records"], labels["positives"]
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise EvalSetError(f"the {year} evaluation files are missing or unreadable ({exc})")
+        if meta0 is None:
+            meta0 = meta
+            if tuple(meta.get("cohorts") or ()) != COHORTS:
+                raise EvalSetError(f"the key was built for years {meta.get('cohorts')}, "
+                                f"this evaluator expects {list(COHORTS)}")
+        elif any(meta.get(k) != meta0.get(k) for k in _SAME_IN_EVERY_YEAR):
+            raise EvalSetError(f"the {year} files were not built together with the {COHORTS[0]} files")
+        if any(r.get("cohort") != year for r in recs) or not isinstance(pos, dict):
+            raise EvalSetError(f"the {year} files are not in this evaluator's format")
+        records += recs
+        weights.update({k: float(w) for k, w in pos.items()})
+    assert meta0 is not None
+    return records, weights, meta0
 
 
 def fingerprint() -> str:
-    """Identifies the evaluation set; rows from a different set never compare."""
+    """Identifies the evaluation set (file names and contents); rows from a
+    different set never compare."""
     h = hashlib.sha256()
-    for path in (FEATURES_FILE, LABELS_FILE):
+    for path in data_files():
+        h.update(path.name.encode() + b"\0")
         h.update(path.read_bytes())
     return h.hexdigest()[:12]
+
+
+def _weights(positives) -> dict[str, float]:
+    """A weight per positive key. A plain set of keys counts 1 each."""
+    if isinstance(positives, dict):
+        return positives
+    return {k: 1.0 for k in positives}
 
 
 def _tiebreak(key: str) -> str:
     return hashlib.sha256(key.encode()).hexdigest()
 
 
-def ranking(records: list[dict], split: str, scorer, settings: dict
-            ) -> tuple[list[str], tuple, int]:
-    """Keys of the split's parcels that pass the screens, best first, the
-    (min, max) finite score seen, and how many scores were NaN or infinite.
-    One NaN anywhere scrambles the sort, so those rank last and --decide
-    refuses the run."""
-    scored, nonfinite = [], 0
+def ranking(records: list[dict], split: str, scorer, settings: dict,
+            fields: tuple[str, ...] | list[str] | None = None
+            ) -> tuple[dict[int, list[str]], tuple, int]:
+    """Per as-of year, the keys of the split's parcels that pass the screens,
+    best first; the (min, max) finite score seen; and how many scores were
+    NaN or infinite. The scorer is handed only `fields` of a record (default:
+    every field not in HIDDEN, for hand-built test pools; evaluate() passes
+    the key's allow-list). One NaN anywhere scrambles the sort, so those
+    rank last and --decide refuses the run."""
+    scored: dict[int, list[tuple]] = {}
+    nonfinite = 0
     for r in records:
         if r["split"] != split or screens.site_rejects(r, settings):
             continue
-        features = {k: v for k, v in r.items() if k not in HIDDEN}
+        if fields is None:
+            features = {k: v for k, v in r.items() if k not in HIDDEN}
+        else:
+            features = {k: r.get(k) for k in fields}
         score = float(scorer(features)["score"])
         if not math.isfinite(score):
             nonfinite += 1
             score = -math.inf
-        scored.append((-score, _tiebreak(r["key"]), r["key"]))
-    scored.sort()
-    finite = [-s for s, _, _ in scored if math.isfinite(s)]
+        scored.setdefault(r.get("cohort", 0), []).append((-score, _tiebreak(r["key"]), r["key"]))
+    finite = [-s for rows in scored.values() for s, _, _ in rows if math.isfinite(s)]
     span = (min(finite), max(finite)) if finite else (0.0, 0.0)
-    return [key for _, _, key in scored], span, nonfinite
+    return {c: [key for _, _, key in sorted(rows)] for c, rows in scored.items()}, span, nonfinite
 
 
-def hits_at_k(order: list[str], pool_keys: list[str], positives: set[str]) -> tuple[int, int]:
-    """Hits in the top K of `order` restricted to `pool_keys` (with repeats)."""
-    k = max(1, round(K_SHARE * len(pool_keys)))
+def credit(ahead: int, k: int) -> float:
+    """What a positive earns with `ahead` pool parcels ranked above it: 1 in
+    the top k, then 1 - log(position / k) / log(CREDIT_SPAN), never below 0."""
+    if ahead < k:
+        return 1.0
+    return max(0.0, 1.0 - math.log((ahead + 1) / k) / math.log(CREDIT_SPAN))
+
+
+def _counts(pool_keys: list[str]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for key in pool_keys:
         counts[key] = counts.get(key, 0) + 1
-    hits, taken = 0, 0
-    for key in order:
-        n = counts.get(key, 0)
-        if not n:
+    return counts
+
+
+def score_orders(orders: dict[int, list[str]], counts: dict[int, dict[str, int]],
+                 weights: dict[str, float]) -> tuple[float, float, int]:
+    """(hits, graded, K summed over years) of per-year rankings against
+    per-year pools given as key -> copies (a bootstrap draw repeats keys).
+    A parcel missing from a ranking (screened out) earns nothing."""
+    hits = graded = 0.0
+    k_total = 0
+    for cohort, pool in counts.items():
+        size = sum(pool.values())
+        if not size:
             continue
-        use = min(n, k - taken)
-        if key in positives:
-            hits += use
-        taken += use
-        if taken >= k:
-            break
+        k = max(1, round(K_SHARE * size))
+        k_total += k
+        stop = k * CREDIT_SPAN
+        ahead = 0
+        for key in orders.get(cohort, ()):
+            n = pool.get(key, 0)
+            if not n:
+                continue
+            w = weights.get(key)
+            if w:
+                hits += w * max(0, min(n, k - ahead))
+                graded += w * sum(credit(ahead + i, k) for i in range(n))
+            ahead += n
+            if ahead >= stop:
+                break
+    return hits, graded, k_total
+
+
+def hits_at_k(order: list[str], pool_keys: list[str], positives) -> tuple[float, int]:
+    """Hits in the top K of one ranking restricted to `pool_keys` (with repeats)."""
+    hits, _, k = score_orders({0: order}, {0: _counts(pool_keys)}, _weights(positives))
     return hits, k
 
 
-def evaluate(records: list[dict], positives: set[str], split: str,
-             scorer=None, settings: dict | None = None) -> dict:
+def split_pools(records: list[dict], split: str) -> dict[int, dict[str, int]]:
+    """Per as-of year, the split's pool as key -> 1."""
+    pools: dict[int, dict[str, int]] = {}
+    for r in records:
+        if r["split"] == split:
+            pools.setdefault(r.get("cohort", 0), {})[r["key"]] = 1
+    return pools
+
+
+def evaluate(records: list[dict], positives, split: str, scorer=None,
+             settings: dict | None = None,
+             fields: tuple[str, ...] | list[str] | None = None) -> dict:
+    """Score one split. "hits" and "graded" are exact (decide compares them);
+    main() rounds what it prints."""
     if scorer is None:
         scorer = importlib.import_module("screener.rank").learned_score
     if settings is None:
         settings = load_meta_screens()
-    pool = [r["key"] for r in records if r["split"] == split]
-    pos = {k for k in pool if k in positives}
-    order, span, nonfinite = ranking(records, split, scorer, settings)
-    hits, k = hits_at_k(order, pool, pos)
+    weights = _weights(positives)
+    pools = split_pools(records, split)
+    in_split = {key for pool in pools.values() for key in pool}
+    pos = {k for k in in_split if weights.get(k)}
+    orders, span, nonfinite = ranking(records, split, scorer, settings, fields)
+    hits, graded, k = score_orders(orders, pools, weights)
+    ranked = {key for order in orders.values() for key in order}
+    sites = sum(weights[k] for k in pos)
     return {
-        "split": split, "pool": len(pool), "positives": len(pos), "k": k, "hits": hits,
-        "recall": round(hits / len(pos), 3) if pos else 0.0,
-        "positives_screened_out": len(pos - set(order)),
+        "split": split, "pool": len(in_split), "positives": len(pos),
+        "sites": round(sites, 2), "k": k, "hits": hits, "graded": graded,
+        "recall": round(graded / sites, 3) if sites else 0.0,
+        "positives_screened_out": len(pos - ranked),
         "score_range": [round(span[0], 1), round(span[1], 1)], "nonfinite_scores": nonfinite,
-        "order": order,
+        "order": orders,
     }
 
 
+def load_meta() -> dict:
+    with gzip.open(features_file(COHORTS[0]), "rt") as fh:
+        return json.load(fh)["meta"]
+
+
 def load_meta_screens() -> dict:
-    with gzip.open(FEATURES_FILE, "rt") as fh:
-        return json.load(fh)["meta"]["screens"]
+    return load_meta()["screens"]
 
 
-def paired_win_share(records: list[dict], positives: set[str], new: list[str],
-                     best: list[str], split: str = "dev") -> float:
-    """Share of clustered bootstrap draws in which `new` beats `best`."""
-    blocks: dict[str, list[str]] = {}
+def _blocks(records: list[dict], split: str) -> dict[str, dict[int, list[str]]]:
+    """block -> year -> keys: a cell is drawn with every year it holds."""
+    blocks: dict[str, dict[int, list[str]]] = {}
     for r in records:
         if r["split"] == split:
-            blocks.setdefault(r["block"], []).append(r["key"])
+            blocks.setdefault(r["block"], {}).setdefault(r.get("cohort", 0), []).append(r["key"])
+    return blocks
+
+
+def _draws(blocks: dict[str, dict[int, list[str]]], rng: random.Random):
+    """BOOTSTRAP clustered resamples, each as year -> key -> copies."""
     names = sorted(blocks)
-    rng = random.Random(7)
-    wins = 0
     for _ in range(BOOTSTRAP):
-        draw = [key for _ in names for key in blocks[rng.choice(names)]]
-        if hits_at_k(new, draw, positives)[0] > hits_at_k(best, draw, positives)[0]:
+        counts: dict[int, dict[str, int]] = {}
+        for _ in names:
+            for cohort, keys in blocks[rng.choice(names)].items():
+                pool = counts.setdefault(cohort, {})
+                for key in keys:
+                    pool[key] = pool.get(key, 0) + 1
+        yield counts
+
+
+def paired_win_share(records: list[dict], positives, new: dict[int, list[str]],
+                     best: dict[int, list[str]], split: str = "dev") -> float:
+    """Share of clustered bootstrap draws in which `new` has more graded
+    credit than `best`, both scored on the same draw."""
+    weights = _weights(positives)
+    wins = 0
+    for counts in _draws(_blocks(records, split), random.Random(7)):
+        if score_orders(new, counts, weights)[1] > score_orders(best, counts, weights)[1] + 1e-9:
             wins += 1
     return wins / BOOTSTRAP
+
+
+def keep_verdict(records: list[dict], positives, new: dict[int, list[str]],
+                 best: dict[int, list[str]], split: str = "dev") -> dict:
+    """The keep rule, on exact values: both rankings scored here, now."""
+    weights = _weights(positives)
+    pools = split_pools(records, split)
+    new_hits, new_graded, _ = score_orders(new, pools, weights)
+    best_hits, best_graded, _ = score_orders(best, pools, weights)
+    share = paired_win_share(records, weights, new, best, split)
+    keep = (new_graded - best_graded >= MIN_GAIN - 1e-9 and new_hits >= best_hits - 1e-9
+            and share >= WIN_SHARE_TO_KEEP)
+    return {"keep": keep, "gain": new_graded - best_graded, "hits_change": new_hits - best_hits,
+            "win_share": share, "best_graded": best_graded, "best_hits": best_hits}
+
+
+def null_test(records: list[dict], positives, base: dict[str, float], trials: int,
+              noise: float, split: str = "dev") -> dict:
+    """How often the keep rule keeps a change that is not an improvement.
+    Each trial compares two rankings made the same way: the scores in
+    `base` (key -> score) plus independent noise of `noise` score points.
+    Neither is better, so every keep is a false keep."""
+    by_cohort: dict[int, list[str]] = {}
+    for r in records:
+        if r["split"] == split and r["key"] in base:
+            by_cohort.setdefault(r.get("cohort", 0), []).append(r["key"])
+    rng = random.Random(36)
+
+    def noisy() -> dict[int, list[str]]:
+        return {c: sorted(keys, key=lambda k: (-(base[k] + rng.gauss(0.0, noise)), _tiebreak(k)))
+                for c, keys in by_cohort.items()}
+
+    kept, gains = 0, []
+    for _ in range(trials):
+        verdict = keep_verdict(records, positives, noisy(), noisy(), split)
+        kept += verdict["keep"]
+        gains.append(verdict["gain"])
+    gains.sort()
+    return {"noise": noise, "trials": trials, "false_keeps": kept,
+            "false_keep_rate": round(kept / trials, 4),
+            "gain_p5_p95": [round(gains[int(0.05 * (trials - 1))], 2),
+                            round(gains[int(0.95 * (trials - 1))], 2)]}
 
 
 def rank_problems(source: str | bytes) -> list[str]:
@@ -373,6 +582,19 @@ def _rows() -> list[dict]:
         return list(csv.DictReader(fh, delimiter="\t"))
 
 
+def _log_header_problem() -> str | None:
+    """Why the existing log can't be appended to (None if it can, or there is none)."""
+    if not LOG_FILE.exists() or LOG_FILE.stat().st_size == 0:
+        return None
+    with open(LOG_FILE, newline="") as fh:
+        header = next(csv.reader(fh, delimiter="\t"), None)
+    if header != LOG_COLUMNS:
+        return (f"{LOG_FILE.name} was written by another version of this evaluator (its "
+                "columns differ). A human must move it aside (keep it: it is the record of "
+                f"earlier runs) and record a new baseline: {NEW_BASELINE}")
+    return None
+
+
 def _kept_rows(fp: str) -> list[dict]:
     """Baseline and keep rows for this evaluation set, in log order."""
     return [r for r in _rows() if r["status"] in ("baseline", "keep") and r["fingerprint"] == fp]
@@ -388,7 +610,10 @@ def _best_kept(rows: list[dict]) -> dict | None:
         return None
     chain = [rows[start]] + [r for r in rows[start + 1:]
                              if r["status"] == "keep" and _is_ancestor(r["commit"])]
-    return max(reversed(chain), key=lambda r: int(r["hits"]))
+    # Every keep beat the run before it by at least MIN_GAIN, so the last
+    # row of the chain is the best. (The logged scores are rounded and are
+    # never compared: decide() rescoring the saved ranking is.)
+    return chain[-1]
 
 
 def _saved_best() -> dict | None:
@@ -397,7 +622,13 @@ def _saved_best() -> dict | None:
         saved = json.loads(BEST_FILE.read_text())
     except (OSError, ValueError):
         return None
-    return saved if isinstance(saved, dict) and isinstance(saved.get("order"), list) else None
+    if not isinstance(saved, dict) or not isinstance(saved.get("order"), dict):
+        return None
+    try:   # JSON keys are text; the as-of years are whole numbers
+        saved["order"] = {int(c): [str(k) for k in keys] for c, keys in saved["order"].items()}
+    except (TypeError, ValueError):
+        return None
+    return saved
 
 
 def _append(row: dict) -> None:
@@ -414,7 +645,13 @@ def _refuse(msg: str) -> int:
     return 3
 
 
-def decide(records: list[dict], positives: set[str], dev: dict, new_baseline: bool) -> int:
+def _shown(x: float) -> float:
+    return round(x, SHOWN_DECIMALS)
+
+
+def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int:
+    if REVIEW_PENDING:
+        return _refuse(REVIEW_PENDING + ".")
     head = _git("rev-parse", "--short", "HEAD")
     if not head:
         return _refuse("git did not give the current commit. Run this inside the repository.")
@@ -427,6 +664,9 @@ def decide(records: list[dict], positives: set[str], dev: dict, new_baseline: bo
         return _refuse("uncommitted changes or untracked files under screener/ "
                        f"({', '.join(line[3:] for line in git_status[1:4])}). Commit the "
                        "experiment first; rank.py may not use any other file.")
+    header_problem = _log_header_problem()
+    if header_problem:
+        return _refuse(header_problem)
     # A human may re-record an already scored commit (the best kept run).
     if not new_baseline and any(r["commit"] == head and r["fingerprint"] == fp for r in _rows()):
         return _refuse(f"commit {head} was already scored. Make a new experiment commit.")
@@ -449,6 +689,10 @@ def decide(records: list[dict], positives: set[str], dev: dict, new_baseline: bo
             return _refuse("best_ranking.json is from this evaluation set, but experiments.tsv has "
                            "no kept run for it. A human must record a new baseline: "
                            f"{NEW_BASELINE}")
+        if best is None and _rows():
+            # The log holds runs, all of another evaluation set: the key changed.
+            return _refuse("the evaluation set changed since the runs in experiments.tsv. A "
+                           f"human must record a new baseline: {NEW_BASELINE}")
     if best is not None:
         touched = [f for f in _git("diff", "--name-only", "HEAD~1", "HEAD").splitlines() if f]
         if touched != ["screener/rank.py"]:
@@ -469,22 +713,24 @@ def decide(records: list[dict], positives: set[str], dev: dict, new_baseline: bo
     if best is None:
         status, why, share = "baseline", "recorded as the baseline for this evaluation set", ""
     else:
-        best_order = saved["order"]
-        gain = dev["hits"] - int(best["hits"])
-        share = paired_win_share(records, positives, dev["order"], best_order)
-        if gain >= 1 and share >= WIN_SHARE_TO_KEEP:
-            status, why = "keep", (f"+{gain} hits over best kept ({best['hits']}); wins "
-                                   f"{share:.0%} of resamples")
+        # Both rankings are scored here, on exact values; the log's rounded
+        # numbers are never compared.
+        v = keep_verdict(records, positives, dev["order"], saved["order"])
+        detail = (f"graded {_shown(dev['graded'])} vs best kept {_shown(v['best_graded'])} "
+                  f"({v['gain']:+.1f}); hits {_shown(dev['hits'])} vs {_shown(v['best_hits'])}; "
+                  f"wins {v['win_share']:.0%} of resamples")
+        if v["keep"]:
+            status, why = "keep", detail
         else:
-            status, why = "discard", (f"{dev['hits']} hits vs best kept {best['hits']}; wins "
-                                      f"{share:.0%} of resamples (needs +1 and "
-                                      f"{WIN_SHARE_TO_KEEP:.0%})")
-        share = f"{share:.3f}"
+            status, why = "discard", (f"{detail} (needs +{MIN_GAIN:g} graded, hits not lower, "
+                                      f"and {WIN_SHARE_TO_KEEP:.0%})")
+        share = f"{v['win_share']:.3f}"
 
     _append({
         "time": time.strftime("%Y-%m-%d %H:%M:%S"), "commit": head, "parent": parent,
-        "fingerprint": fp, "hits": dev["hits"], "positives": dev["positives"], "k": dev["k"],
-        "recall": dev["recall"], "win_share": share, "status": status,
+        "fingerprint": fp, "graded": _shown(dev["graded"]), "hits": _shown(dev["hits"]),
+        "sites": dev["sites"], "positives": dev["positives"], "k": dev["k"],
+        "win_share": share, "status": status,
         "description": _git("log", "-1", "--format=%s"),
     })
     if status in ("baseline", "keep"):
@@ -500,12 +746,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--decide", action="store_true", help="compare to the best kept run and log")
     ap.add_argument("--test", action="store_true", help="also score the sealed test split")
     ap.add_argument("--control", action="store_true", help="what random ranking scores")
+    ap.add_argument("--null-test", type=int, nargs="?", const=200, default=0, metavar="TRIALS",
+                    help="(humans only) how often the keep rule keeps a change that is not an "
+                         "improvement, at several noise levels (slow: minutes)")
     ap.add_argument("--new-baseline", action="store_true",
                     help="(humans only) record the current ranking as a fresh baseline")
     args = ap.parse_args(argv)
 
-    if not FEATURES_FILE.exists():
-        print("No evaluation set yet: run `python -m screener.autoresearch.build_eval` first.")
+    if not all(f.exists() for f in data_files()):
+        print("No complete evaluation set: run `python -m screener.autoresearch.build_eval` "
+              "first (it needs data/test_blocks.json from git).")
         return 2
     if not args.control:
         # Before anything imports rank.py: a refused file never runs.
@@ -513,29 +763,59 @@ def main(argv: list[str] | None = None) -> int:
         if problems:
             return _refuse("screener/rank.py breaks PROGRAM.md rules 1-3, so it was not run: "
                            + "; ".join(problems[:5]))
-    records, positives, _ = load()
-    public = lambda res: {k: v for k, v in res.items() if k != "order"}
+    try:
+        records, positives, meta = load()
+    except EvalSetError as exc:
+        print(f"The evaluation set can't be used: {exc}. Re-run "
+              "`python -m screener.autoresearch.build_eval` (humans).")
+        return 2
+    fields = list(meta["features"]) + list(meta["banned"])
+    settings = meta["screens"]
+
+    def public(res: dict) -> dict:
+        out = {k: v for k, v in res.items() if k != "order"}
+        out["hits"], out["graded"] = _shown(res["hits"]), _shown(res["graded"])
+        return out
 
     if args.control:
-        dev = evaluate(records, positives, "dev", scorer=lambda f: {"score": 0.0})
-        ranked_pos = dev["positives"] - dev["positives_screened_out"]
-        ranked = len(dev["order"])
-        expected = dev["k"] * ranked_pos / ranked if ranked else 0.0
-        draws = []
+        base = evaluate(records, positives, "dev", scorer=lambda f: {"score": 0.0},
+                        settings=settings, fields=fields)
+        hits, graded = [], []
         for seed in range(200):
             rng = random.Random(seed)
-            draws.append(evaluate(records, positives, "dev",
-                                  scorer=lambda f: {"score": rng.random()})["hits"])
-        draws.sort()
-        print(json.dumps({"control": {"k": dev["k"], "expected_hits": round(expected, 2),
-                                      "mean_hits": round(sum(draws) / len(draws), 2),
-                                      "p5_p95": [draws[10], draws[189]]}}))
+            res = evaluate(records, positives, "dev", scorer=lambda f: {"score": rng.random()},
+                           settings=settings, fields=fields)
+            hits.append(res["hits"])
+            graded.append(res["graded"])
+        hits.sort()
+        graded.sort()
+        print(json.dumps({"control": {
+            "k": base["k"], "sites": base["sites"],
+            "mean_graded": round(sum(graded) / len(graded), 2),
+            "graded_p5_p95": [round(graded[10], 2), round(graded[189], 2)],
+            "mean_hits": round(sum(hits) / len(hits), 2),
+            "hits_p5_p95": [round(hits[10], 2), round(hits[189], 2)]}}))
         return 0
 
-    dev = evaluate(records, positives, "dev")
+    dev = evaluate(records, positives, "dev", settings=settings, fields=fields)
+    if args.null_test:
+        if args.null_test < 20:
+            print("--null-test needs at least 20 trials")
+            return 2
+        scorer = importlib.import_module("screener.rank").learned_score
+        base = {}
+        for r in records:
+            if r["split"] == "dev" and not screens.site_rejects(r, settings):
+                score = float(scorer({k: r.get(k) for k in fields})["score"])
+                base[r["key"]] = score if math.isfinite(score) else 0.0
+        print(json.dumps({"keep_rule": {"min_gain": MIN_GAIN, "win_share": WIN_SHARE_TO_KEEP,
+                                        "hits_may_not_fall": True},
+                          "null_test": [null_test(records, positives, base, args.null_test, n)
+                                        for n in NULL_NOISE]}))
+        return 0
     out = {"dev": public(dev)}
     if args.test:
-        out["test"] = public(evaluate(records, positives, "test"))
+        out["test"] = public(evaluate(records, positives, "test", settings=settings, fields=fields))
     print(json.dumps(out))
     if args.new_baseline and not args.decide:
         print("--new-baseline only applies with --decide")
