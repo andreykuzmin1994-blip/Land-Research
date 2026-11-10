@@ -14,15 +14,30 @@ Everything below was merged to `main` in one pull request. Open items,
 most important first:
 
 1. **The evaluation rebuild is merged but not cleared.** Five as-of
-   years, the sale-before-building rule and the graded score are in, and
-   `--decide` refuses until two checks are finished: the adversarial
-   review and the keep-threshold check. Read
-   `reviews/36_screener_eval_cohorts_metric/04_status_at_merge.md` first.
-   If `05_adversarial_review.md` is missing there, look for follow-up
-   commits on branch `claude/funny-hopper-k8rgod`; if there are none, the
-   review and `python -m screener.autoresearch.evaluate --null-test`
-   must be run again. Do not run the AutoResearch loop from a session
-   that has opened `autoresearch/data/` or that folder.
+   years, the sale-before-building rule and the graded score are on
+   `main`, and `--decide` refuses (`REVIEW_PENDING` in `evaluate.py`).
+   Both checks have now reported, on branch `claude/funny-hopper-k8rgod`
+   (not on `main`):
+   - `reviews/36_screener_eval_cohorts_metric/05_adversarial_review.md`:
+     **GO with fixes, three must-fix.** (a) The printed feedback is fine
+     enough to find the known sites by trial: `recall` to three decimals,
+     the win share on the DECISION line, and unlimited unlogged scoring
+     of an uncommitted `rank.py`. (b) The keep rule misses its 2%
+     false-keep target, and `--null-test` understates the rate because it
+     varies each year of a site independently. (c) A baseline can be
+     recorded, and the bar removed, without a human (no log file; an
+     empty `order` in `best_ranking.json`; `__init__.py` files outside
+     `EVAL_FILES`). Five should-fix items follow, among them: the
+     "before the building" clock runs late, and one dev site is counted
+     three times under different parcel ids.
+   - `06_threshold_calibration.md`: at +2.0 / 95% the false-keep rate is
+     0-1% for modest changes and about 5% for heavy reshuffles. The two
+     notes disagree on the remedy (a higher gain floor against a 99% win
+     share with more resamples); the review's null is the stricter one.
+   Lift the stop only in one reviewed change that fixes the must-fix
+   items, settles the thresholds and records both. Do not run the
+   AutoResearch loop from a session that has opened `autoresearch/data/`
+   or that folder.
 2. **Seven ranked parcels are probably already taken** (one rezoned site;
    ranks 6, 10, 12, 32, 60, 114 and 177 in the 2026-11-10 run). See
    `digests/fulton-2026-11-10.md` on the `screener-data` branch. The
