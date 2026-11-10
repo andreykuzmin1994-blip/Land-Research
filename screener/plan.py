@@ -4,7 +4,8 @@ Drawn per parcel from what the run already holds: the county parcel map
 shape, the constrained ground (the parcel minus ``checks.map_checks``'
 ``_open_ground``: FEMA SFHA floodplain, NWI wetlands and water, NCED
 easements, PAD-US protected land), the largest open part, and the F6
-envelope (``sitefit.ENVELOPE_KEY``) when one fits. Plus a scale bar and a
+envelope (``sitefit.ENVELOPE_KEY``) when one fits, and the F7 detention
+pond (``detention.POND_KEY``) when one was placed. Plus a scale bar and a
 north arrow. Standard library only (shapely is already a dependency).
 
 Report-only, like earthwork and the fit: ``report.write_all`` calls
@@ -30,7 +31,7 @@ import shapely
 from shapely.errors import GEOSException
 from shapely.geometry import Polygon
 
-from . import sitefit
+from . import detention, sitefit
 from .geo import FT_PER_M, LocalProjection, acres
 
 SIZE = 600          # plan square, px
@@ -44,6 +45,7 @@ _XML_BAD = re.compile("[^\t\n\r\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 
 PARCEL_FILL, OPEN_FILL, CONSTRAINED_FILL = "#f4f1ea", "#cfe8c4", "#9cc3e0"
 ENVELOPE_FILL, ENVELOPE_STROKE, INK = "#f2c9a0", "#b5534a", "#222222"
+POND_FILL, POND_STROKE = "#7fc4bd", "#1f6f68"
 
 
 def _n(v: float) -> str:
@@ -126,9 +128,21 @@ def _fit_text(f: sitefit.Fit | None) -> str:
     return f"Building fit: not checked ({f.reason})"
 
 
+def _pond_text(d: detention.Pond) -> str:
+    if d.state == detention.FITS:
+        where = ("beside the envelope" if d.beside_envelope else
+                 "(no building envelope placed)")
+        return (f"Detention pond {detention.POND['L']} x {detention.POND['W']} ft {where}: "
+                "rough allowance, no hydrology")
+    if d.state == detention.NONE_FOUND:
+        return "Detention pond: no pond room found (a lower bound)"
+    return f"Detention pond: not checked ({d.reason})"
+
+
 def render(p: dict[str, Any]) -> tuple[str | None, str]:
     """(svg text, "") or (None, why not drawn). Reads only geometry,
-    _open_ground, constrained_pct, rank, parcel_id and the F6 keys, and
+    _open_ground, constrained_pct, rank, parcel_id, the F6 keys and the F7
+    pond keys, and
     writes nothing on p."""
     g = p.get("geometry")
     if g is None or g.is_empty or not sitefit.polygon_parts(g):
@@ -169,12 +183,18 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
     env = p.get(sitefit.ENVELOPE_KEY)
     env_parts = sitefit.polygon_parts(_feet(env, proj)) if env is not None else []
 
+    d: detention.Pond | None = p.get(detention.DETAIL_KEY)
+    pond = p.get(detention.POND_KEY)
+    pond_parts = sitefit.polygon_parts(_feet(pond, proj)) if pond is not None else []
+
     title = f"Site plan #{p.get('rank', '')} parcel {p.get('parcel_id', '')}"
     out = [_shape(fr.path(parcel), PARCEL_FILL, cls="parcel-fill"),
            _shape(fr.path(largest), OPEN_FILL, cls="largest-open"),
            _shape(fr.path(constrained), CONSTRAINED_FILL, opacity=0.8, cls="constrained")]
     for q in env_parts:
         out.append(_shape(fr.path([q]), ENVELOPE_FILL, ENVELOPE_STROKE, 2.0, 0.8, "envelope"))
+    for q in pond_parts:
+        out.append(_shape(fr.path([q]), POND_FILL, POND_STROKE, 2.0, 0.9, "pond"))
     out.append(_shape(fr.path(parcel), "none", INK, 1.5, cls="parcel"))
     if f is not None and f.state == sitefit.FITS and env_parts:
         c = env_parts[0].centroid
@@ -213,8 +233,11 @@ def _render(p: dict[str, Any], g) -> tuple[str | None, str]:
         rows.append((OPEN_FILL, "Largest open part: none" if has_open else
                      "Largest open part: not checked"))
     rows.append((ENVELOPE_FILL, _fit_text(f)))
+    if d is not None:     # absent only when report.write_all gets no F7 result
+        rows.append((POND_FILL, _pond_text(d)))
+    strokes = {ENVELOPE_FILL: ENVELOPE_STROKE, POND_FILL: POND_STROKE}
     for fill, label in rows:
-        out.append(_swatch(y, fill, ENVELOPE_STROKE if fill == ENVELOPE_FILL else INK))
+        out.append(_swatch(y, fill, strokes.get(fill, INK)))
         for line in textwrap.wrap(label, WRAP) or [""]:
             out.append(_text(MARGIN + 20, y, line))
             y += LINE

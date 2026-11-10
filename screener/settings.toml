@@ -49,3 +49,12 @@ adjacency_gap_ft = 10
 # screen). The copied prototype envelopes are fixed in sitefit.py.
 enabled = true
 max_parcels = 0      # fit only the top N ranked parcels (0 = all)
+
+[detention]
+# Stormwater detention allowance (a report fact only; not a score or a
+# screen): places the copied 400 x 200 ft prototype pond (detention.py) on
+# the open ground left beside the fitted building envelope. A rough
+# allowance: no hydrology, no Atlas 14 rainfall, no local detention rules.
+# No web service is called.
+enabled = true
+max_parcels = 0      # check only the top N ranked parcels (0 = all)

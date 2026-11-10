@@ -19,7 +19,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from . import arcgis, checks, layers, owner_clusters, report, scoring, screens, sitefit, snapshot
+from . import (arcgis, checks, detention, layers, owner_clusters, report, scoring, screens,
+               sitefit, snapshot)
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -74,17 +75,17 @@ def reason_key(reason: str) -> str:
     return key.split(" (")[0]
 
 
-def fit_settings(cfg: dict[str, Any]) -> tuple[bool, int]:
-    """[fit] enabled (default true) and max_parcels (default 0 = no cap; the
-    top N by rank are fitted, the rest read "not checked"). Deterministic:
-    there is no time budget."""
-    fit = cfg.get("fit", {}) or {}
+def fit_settings(cfg: dict[str, Any], table: str = "fit") -> tuple[bool, int]:
+    """[fit] (or [detention]) enabled (default true) and max_parcels (default
+    0 = no cap; the top N by rank are checked, the rest read "not checked").
+    Deterministic: there is no time budget."""
+    fit = cfg.get(table, {}) or {}
     enabled = fit.get("enabled", True)
     cap = fit.get("max_parcels", 0)
     if not isinstance(enabled, bool):
-        raise ValueError("[fit] enabled must be true or false")
+        raise ValueError(f"[{table}] enabled must be true or false")
     if isinstance(cap, bool) or not isinstance(cap, int) or cap < 0:
-        raise ValueError("[fit] max_parcels must be a whole number, 0 or more")
+        raise ValueError(f"[{table}] max_parcels must be a whole number, 0 or more")
     return enabled, cap
 
 
@@ -115,6 +116,28 @@ def attach_fits(ranked: list[dict[str, Any]], enabled: bool, cap: int,
         notes.append(f"Building fit not checked for {n} of {len(ranked)} ranked parcels: {why}")
 
 
+def attach_ponds(ranked: list[dict[str, Any]], enabled: bool, cap: int,
+                 notes: list[str]) -> None:
+    """Place the detention pond on each ranked parcel (in rank order) beside
+    its F6 envelope and attach the report fields. Called only after scores,
+    flags, the sort and attach_fits."""
+    reasons: collections.Counter = collections.Counter()
+    for i, p in enumerate(ranked, 1):
+        if not enabled:
+            d = detention.not_checked("detention switched off in settings")
+        elif cap and i > cap:
+            d = detention.not_checked(f"outside the top {cap} ([detention] max_parcels)")
+        else:
+            d = detention.place_pond(p["geometry"], p.get("_open_ground"),
+                                     p.get("constrained_pct"), p.get("_envelope_detail"),
+                                     p.get(sitefit.ENVELOPE_KEY))
+        if d.state == detention.NOT_CHECKED:
+            reasons[d.reason.split(" (")[0]] += 1
+        p.update(d.fields())
+    for why, n in sorted(reasons.items()):
+        notes.append(f"Detention pond not checked for {n} of {len(ranked)} ranked parcels: {why}")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--settings", type=Path, default=HERE / "settings.toml")
@@ -139,6 +162,7 @@ def main(argv: list[str] | None = None) -> int:
     earthwork: dict[int, dict[str, Any] | None] = {}
     try:
         fit_on, fit_max = fit_settings(cfg)
+        pond_on, pond_max = fit_settings(cfg, "detention")
     except ValueError as exc:
         ap.error(f"{args.settings}: {exc}")
 
@@ -302,6 +326,9 @@ def main(argv: list[str] | None = None) -> int:
     # The building fit is live-only too: computed only now, after the sort,
     # and attached for the reports alone (sitefit.py).
     attach_fits(survivors, fit_on, fit_max, notes)
+    # The detention allowance is live-only too, placed beside the fitted
+    # envelope (detention.py). Runs with and without the slope check.
+    attach_ponds(survivors, pond_on, pond_max, notes)
     # Same-owner lines, now that every sibling's final status is known.
     # Only p["flags"] (reports) gains them; scores and order are done.
     ranked_at = {p["parcel_id"]: p["rank"] for p in survivors}

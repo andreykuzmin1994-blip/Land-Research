@@ -145,6 +145,38 @@ feature or a screen, a human would add it to `build_eval.FEATURES`,
 rebuild `data/` and take `--new-baseline`; reading it from `rank.py` is
 not the way.
 
+**Detention pond (rough allowance).** Two more columns follow
+`envelope_building_sf`, and each brief has a "Detention pond" line:
+
+- `detention_pct`: the operator's prototype detention pond (400 x 200 ft
+  at the top of bank, 6 ft deep, 4:1 side slopes, about 9.1 acre-feet,
+  1.84 acres) as a percent of the parcel's open ground on the county map
+  (all parts). Empty when there is no open ground or it was not checked.
+- `pond_fit`: `pond fits` when that rectangle was placed (copied
+  rotated-rectangle search) on the open ground left beside the fitted
+  building envelope, inside the 25 ft lot-line setback; `pond fits (no
+  building envelope placed)` when no envelope fit, so it was tried on the
+  open ground alone; `no pond room found` when it was checked and no
+  placement was found (a lower bound: the envelope is placed first at its
+  largest length, so a shorter building may leave room); `not checked:
+  <why>` when it wasn't (`[detention] enabled = false`, outside
+  `[detention] max_parcels`, the building fit not checked, a shape over the
+  vertex cap, or a geometry fault; each is counted in `summary.md`).
+
+The pond numbers and the volume formula are copied (not imported) from
+the repo root's `building_prototypes.json` ("detention") and `site_fit.py`;
+`tests/test_detention.py` fails if the root changes and the copy doesn't.
+This is a rough allowance for one fixed pond, **not a stormwater design**:
+no hydrology, no NOAA Atlas 14 rainfall, no runoff from the impervious
+area and no local detention rules; the real requirement may be larger,
+smaller, underground or shared. Steep ground is not located. It calls no
+web service, is computed after scoring, flags, the sort and the building
+fit (with or without `--no-slope`), and is in no score, screen or flag.
+When placed, the pond is drawn in teal on the site plan. Most parcels
+take a few milliseconds; the measured worst case (the same near-cap shape
+as the building fit, where nothing fits) is about 3 to 4 seconds more per
+parcel, and `[detention] max_parcels` caps it to the top N by rank.
+
 **Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
 the county parcel map in the same flat local plane as the fit, north up,
 with a scale bar: the parcel outline, the constrained ground (floodplain,
@@ -221,6 +253,8 @@ reviewed), the meaning differences above, spatial clustering and privacy
   to count as adjacent (see Owner clusters below; flags only).
   `[fit] enabled` and `max_parcels` switch the building-fit check off or
   limit it to the top N ranked parcels (see Site fit; report only).
+  `[detention] enabled` and `max_parcels` do the same for the detention
+  pond allowance (see Detention pond; report only).
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark
