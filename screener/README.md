@@ -237,7 +237,8 @@ within 50 ft of a centreline counts as frontage on that road:
   city road shows its GDOT route id; the county's road type stays in the
   brief's Access line.
 - `frontage_limited_ft`: parcel line within 50 ft of an interstate or
-  freeway: limited access, no driveway, so it is kept apart.
+  freeway/expressway: access is controlled and a driveway unlikely, so it
+  is kept apart.
 
 Three states stay apart: a number and a road; `0` with `none within 50 ft`
 (the brief gives the nearest road's distance and says "possibly

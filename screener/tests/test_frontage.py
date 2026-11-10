@@ -103,16 +103,28 @@ class ParcelCheckTests(Offline):
         self.assertEqual((f.state, f.feet), (frontage.NONE, 0))
         self.assertAlmostEqual(f.limited_feet, along(5.0), delta=2)
         line = frontage.brief_line(f.fields())
-        self.assertIn("along an interstate or freeway (limited access: no driveway)", line)
+        self.assertIn("along an interstate or freeway/expressway (access controlled: a driveway is unlikely)", line)
         self.assertIn("only interstates or freeways nearby", line)
 
     def test_longest_road_wins_and_ties_are_deterministic(self):
         f = self.ask(fake_roads([(6, "1121200054600INC", 5.0), (3, "1000100001400INC", 10.0)]))
         self.assertEqual(f.state, frontage.CHECKED)
-        self.assertEqual(f.road, "local road, GDOT route 1121200054600INC")   # tie: by label
+        self.assertEqual(f.road, "local road, GDOT route 1121200054600")   # tie: by label
         self.assertEqual([lab for lab, _ in f.roads],
-                         ["local road, GDOT route 1121200054600INC", "minor arterial, SR 14"])
+                         ["local road, GDOT route 1121200054600", "minor arterial, SR 14"])
         self.assertAlmostEqual(f.feet, along(5.0), delta=2)   # union, not the sum
+
+    def test_divided_road_carriageways_are_one_road(self):
+        f = self.ask(fake_roads([(6, "1121200054600INC", 5.0), (6, "1121200054600DEC", 12.0)]))
+        self.assertEqual(f.state, frontage.CHECKED)
+        self.assertEqual([lab for lab, _ in f.roads], ["local road, GDOT route 1121200054600"])
+
+    def test_a_measuring_failure_is_not_checked(self):
+        def boom(geometry, results):
+            raise shapely.errors.GEOSException("TopologyException: side location conflict")
+        self.patch(frontage, "measure", boom)
+        f = self.ask(fake_roads())
+        self.assert_not_checked(f, "could not measure the road answer")
 
     def assert_not_checked(self, f, words):
         self.assertEqual(f.state, frontage.NOT_CHECKED)
@@ -134,6 +146,11 @@ class ParcelCheckTests(Offline):
             "text coordinates": ({"results": [result(paths=[[["a", 1], [2, 3]]])]},
                                  "malformed"),
             "no paths at all": ({"results": [result(paths=[])]}, "malformed"),
+            "NaN coordinates": ({"results": [result(paths=[[[float("nan"), 33.5],
+                                                           [-84.4, 33.5]]])]}, "malformed"),
+            "infinite coordinates": ({"results": [result(paths=[[[-84.6, float("inf")],
+                                                                [-84.4, 33.5]]])]},
+                                     "malformed"),
         }
         for name, (answer, words) in cases.items():
             with self.subTest(name):
@@ -172,7 +189,7 @@ class ParcelCheckTests(Offline):
                          "principal arterial, SR 14 AL")
         self.assertEqual(frontage.road_label(0, "1000100040200INC"), "interstate, SR 402")
         self.assertEqual(frontage.road_label(6, "1121200054600INC"),
-                         "local road, GDOT route 1121200054600INC")
+                         "local road, GDOT route 1121200054600")
         self.assertEqual(frontage.road_label(6, None), "local road, unnamed route")
         self.assertEqual(frontage.road_label(6, "=cmd|' /C calc'!A0 <b>"),
                          "local road, GDOT route CMDCCALCA0B")

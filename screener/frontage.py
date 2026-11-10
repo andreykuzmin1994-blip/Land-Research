@@ -13,7 +13,8 @@ roads.) The parcel line within ``BUFFER_FT`` (50 ft) of a centreline counts
 as frontage on that road, measured in the parcel's local plane:
 
 - ``frontage_ft``: parcel line within 50 ft of any road that is not an
-  interstate or freeway (those are limited access: no driveway).
+  interstate or freeway/expressway (access controlled: a driveway is
+  unlikely).
 - ``frontage_road``: class and route of the road with the longest frontage
   ("minor arterial, SR 14"; a county or city road shows its GDOT route id,
   since the layer carries no street names), or ``none within 50 ft``, or
@@ -50,6 +51,7 @@ per parcel, cached like every other answer.
 
 from __future__ import annotations
 
+import math
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -58,6 +60,7 @@ from typing import Any
 
 import shapely
 from shapely.geometry import LineString, MultiLineString, MultiPolygon, Polygon
+from shapely.errors import GEOSException
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
@@ -128,7 +131,10 @@ def not_checked(reason: str) -> Frontage:
 
 
 def road_label(layer_id: int, route_id: Any) -> str:
-    """"minor arterial, SR 14" or "local road, GDOT route 1121200054600INC"."""
+    """"minor arterial, SR 14" or "local road, GDOT route 1121200054600".
+
+    The 3-letter direction (INC / DEC) is dropped, so the two carriageways
+    of a divided road count as one road."""
     cls = CLASSES[layer_id]
     rid = _SAFE.sub("", str(route_id or "").upper())[:20]
     if not rid:
@@ -136,6 +142,8 @@ def road_label(layer_id: int, route_id: Any) -> str:
     if _ROUTE_ID.match(rid) and rid[4] == "1":
         suffix = rid[11:13]
         return f"{cls}, SR {int(rid[5:11])}" + (f" {suffix}" if suffix != "00" else "")
+    if _ROUTE_ID.match(rid):
+        rid = rid[:13]
     return f"{cls}, GDOT route {rid}"
 
 
@@ -157,7 +165,8 @@ def _answer_problem(data: dict[str, Any]) -> str | None:
             return "the roads did not come back in WGS84"
         try:
             ok = all(len(path) >= 2 and all(len(pt) >= 2 and all(
-                isinstance(v, (int, float)) and not isinstance(v, bool) for v in pt[:2])
+                isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+                for v in pt[:2])
                 for pt in path) for path in g["paths"])
         except TypeError:
             ok = False
@@ -246,7 +255,10 @@ def check_parcel(geometry: BaseGeometry | None) -> Frontage:
         return not_checked(f"no usable road answer ({_short(exc)})")
     except arcgis.ArcGISError as exc:
         return not_checked(f"{SERVICE_FAILED} ({_short(exc)})")
-    return measure(geometry, data["results"])
+    try:
+        return measure(geometry, data["results"])
+    except (GEOSException, ValueError) as exc:     # never crash the run on odd geometry
+        return not_checked(f"could not measure the road answer ({str(exc)[:80]})")
 
 
 def _short(exc: Exception) -> str:
@@ -306,8 +318,8 @@ def brief_line(p: dict[str, Any]) -> str:
         return "- Road frontage: not checked (frontage off)"
     if f.state == NOT_CHECKED:
         return f"- Road frontage: not checked ({f.reason}). {CURB_CUT}"
-    limited = (f"; {f.limited_feet:,} ft along an interstate or freeway (limited access: "
-               "no driveway)" if f.limited_feet else "")
+    limited = (f"; {f.limited_feet:,} ft along an interstate or freeway/expressway (access "
+               "controlled: a driveway is unlikely)" if f.limited_feet else "")
     if f.state == NONE:
         if f.reason:
             where = f.reason
@@ -316,7 +328,8 @@ def brief_line(p: dict[str, Any]) -> str:
         else:
             where = "only interstates or freeways nearby"
         return (f"- Road frontage (GDOT road centrelines): {NONE_LABEL} ({where}){limited}; "
-                f"possibly land-locked, check access easements. {CAVEAT}. {CURB_CUT}")
+                f"possibly land-locked or on a road GDOT doesn't map (a private drive), check "
+                f"access easements. {CAVEAT}. {CURB_CUT}")
     others = ", ".join(f"{label} {ft:,} ft" for label, ft in f.roads[1:4])
     more = f" (+{len(f.roads) - 4} more)" if len(f.roads) > 4 else ""
     return (f"- Road frontage (GDOT road centrelines): about {f.feet:,} ft; longest on "
