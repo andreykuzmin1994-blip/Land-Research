@@ -28,7 +28,7 @@ Results land in `screener/output/fulton-<date>/`:
 | File | What it is |
 |---|---|
 | `summary.md` | The funnel (how many parcels each screen removed), top 10, common reject reasons |
-| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate and a building-fit check that aren't scored; see Earthwork and Site fit below) |
+| `ranked.csv` | Every surviving parcel, best first, with the facts behind its score (plus a rough cut/fill estimate, a building-fit check, a detention allowance and SSURGO soils that aren't scored; see below) |
 | `map.html` | Open in a browser: survivors coloured by score, click for details |
 | `briefs/` | One page per top parcel: site, owner, why it ranks, watch-outs, next steps, plus a `.svg` site plan beside each brief (same file name) |
 | `rejected.csv` | Every parcel screened out, with the reason |
@@ -181,6 +181,41 @@ take a few milliseconds; the measured worst case (the same near-cap shape
 as the building fit, where nothing fits) is about 3 to 4 seconds more per
 parcel, and `[detention] max_parcels` caps it to the top N by rank.
 
+**Soils (USDA SSURGO).** Four more columns follow `pond_fit`, and each
+brief has a "Soils" line. After the sort, the fit and the pond, the
+screener sends one request per ranked parcel to USDA NRCS Soil Data
+Access (`post.rest`, `sdmdataaccess.sc.egov.usda.gov`): the SSURGO map
+units intersecting the parcel shape (WKT in lon/lat order), clipped to it
+by SDA, with each unit's clipped area and its `muaggatt` aggregate ratings.
+Shares are of the parcel's mapped soil area, by map unit:
+
+- `soil_hsg`: the hydrologic soil group (A, B, C, D or dual A/D, B/D,
+  C/D, "D unless drained") covering the most area, dominant condition.
+- `soil_hydric_pct`: area-weighted share of hydric components.
+- `soil_poorly_drained_pct`: share mapped poorly or very poorly drained.
+- `soil_dwellings_limited_pct`: share rated "Very limited" for dwellings
+  without basements (NRCS's slab-on-grade building rating, the closest one
+  the aggregate table carries; "small commercial buildings" is per
+  component and is not asked for).
+
+Three states stay apart: a value; `none rated` when no unit on the parcel
+carries that rating (urban land, water); and `not checked: <why>` in
+`soil_hsg`, with the three share columns empty, when the check didn't run
+or failed (`[soils]` off or outside `max_parcels`, an HTTP error, SDA's
+empty `{}` or a header-only answer, a malformed row, an answer at SDA's
+100,000-row cap, or mapped soil covering under half or over 1.5 times the
+parcel shape). Bad answers are never cached. After 5 service failures in a
+row the rest of the run isn't asked (SDA is down nightly about
+00:00-02:00 Mountain); `summary.md` counts every reason. SSURGO is mapped
+at about 1:12,000 to 1:24,000: small wet spots, fill and inclusions go
+unmapped, and it is no geotechnical report or wetland delineation. Soils
+are in no score, screen or flag (`tests/test_soils.py` spies on every
+call). Access: SDA's robots.txt is absent (HTTP 404, checked 2026-11-10)
+and NRCS publishes `post.rest` as a public web service for ad hoc queries;
+the screener sends its own User-Agent, at most 3 requests at a time
+(`[soils] workers`, 1-3) and caches answers like every other source.
+`[soils] max_parcels` (250 by default) caps it to the top N by rank.
+
 **Site plan (`briefs/*.svg`).** Each brief links a plain SVG drawn from
 the county parcel map in the same flat local plane as the fit, north up,
 with a scale bar: the parcel outline, the constrained ground (floodplain,
@@ -259,6 +294,8 @@ reviewed), the meaning differences above, spatial clustering and privacy
   limit it to the top N ranked parcels (see Site fit; report only).
   `[detention] enabled` and `max_parcels` do the same for the detention
   pond allowance (see Detention pond; report only).
+  `[soils] enabled`, `max_parcels` and `workers` (1-3) do the same for the
+  SSURGO soils check (see Soils; report only, one web request per parcel).
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
   Passed and listed parcels drop out of future runs; `maybe` is a mark
@@ -300,6 +337,7 @@ parcels (county GIS, 5-50 ac, chosen cities)
 | Interstate exits | GDOT |
 | Freight rail | BTS North American Rail Network |
 | Opportunity Zones | HUD |
+| Soils (report only) | USDA NRCS SSURGO via Soil Data Access |
 
 ## What it can't tell you (check these by hand)
 

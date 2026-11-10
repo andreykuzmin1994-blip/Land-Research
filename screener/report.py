@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from . import detention, plan, sitefit
+from . import detention, plan, sitefit, soils
 from .checks import geojson_geometry
 
 RANKED_COLUMNS = [
@@ -18,6 +18,7 @@ RANKED_COLUMNS = [
     "exit_label", "exit_miles", "rail_ft", "industrial_within_1mi", "flood_pct",
     "wetland_pct", "steep_pct", "relief_ft", "earthwork_cy", "mean_cut_fill_ft",
     "largest_open_acres", "envelope_fit", "envelope_building_sf", "detention_pct", "pond_fit",
+    "soil_hsg", "soil_hydric_pct", "soil_poorly_drained_pct", "soil_dwellings_limited_pct",
     "owner", "owner_type", "owner_mailing",
     "owner_state", "years_held", "last_sale_date", "last_sale_price", "land_value",
     "opportunity_zone", "flags", "why_site", "why_seller", "decision", "maps_link",
@@ -143,6 +144,7 @@ def brief(p: dict[str, Any], plan_file: str | None = None, plan_note: str | None
         _earthwork_line(p),
         sitefit.brief_line(p),
         detention.brief_line(p),
+        soils.brief_line(p),
         f"- Water / sewer per assessor: {p.get('water') or 'unknown'} / {p.get('sewer') or 'unknown'}",
         f"- Opportunity Zone: {'yes' if p.get('opportunity_zone') else 'no'}",
         *_plan_section(plan_file, plan_note),

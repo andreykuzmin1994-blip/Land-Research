@@ -58,3 +58,13 @@ max_parcels = 0      # fit only the top N ranked parcels (0 = all)
 # No web service is called.
 enabled = true
 max_parcels = 0      # check only the top N ranked parcels (0 = all)
+
+[soils]
+# SSURGO soils from USDA Soil Data Access (a report fact only; not a score or
+# a screen): dominant hydrologic soil group and the shares mapped hydric,
+# poorly drained, and very limited for dwellings without basements. One
+# request per ranked parcel, after the sort; the service is down nightly
+# about 00:00-02:00 Mountain time.
+enabled = true
+max_parcels = 250    # check only the top N ranked parcels (0 = all)
+workers = 3          # parallel requests (1-3; kept below the shared 6)

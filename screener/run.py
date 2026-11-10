@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from . import (arcgis, checks, detention, layers, owner_clusters, report, scoring, screens,
-               sitefit, snapshot)
+               sitefit, snapshot, soils)
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -145,6 +145,43 @@ def attach_ponds(ranked: list[dict[str, Any]], enabled: bool, cap: int,
         notes.append(f"Detention pond not checked for {n} of {len(ranked)} ranked parcels: {why}")
 
 
+def attach_soils(ranked: list[dict[str, Any]], enabled: bool, cap: int, workers: int,
+                 notes: list[str]) -> None:
+    """Ask USDA Soil Data Access about each ranked parcel (the top ``cap``
+    by rank; 0 = all) and attach the report fields. Called only after
+    scores, flags, the sort, the fit and the pond."""
+    todo = ranked if not enabled or not cap else ranked[:cap]
+    results: list[soils.Soils] = []
+    if enabled and todo:
+        log(f"Soils from USDA Soil Data Access for {len(todo):,} parcels")
+        started = time.monotonic()
+        results = soils.check_all([p.get("geometry") for p in todo], workers)
+        log(f"  soils done ({time.monotonic() - started:.1f} s)")
+    reasons: collections.Counter = collections.Counter()
+    checked = 0
+    for i, p in enumerate(ranked):
+        if not enabled:
+            s = soils.not_checked("soils switched off in settings")
+        elif i >= len(results):
+            s = soils.not_checked(f"outside the top {cap} ([soils] max_parcels)")
+        else:
+            s = results[i]
+        if s.state == soils.NOT_CHECKED:
+            reasons[s.reason.split(" (")[0]] += 1
+        else:
+            checked += 1
+        p.update(s.fields())
+    if checked:
+        notes.append(f"Soils (USDA SSURGO via Soil Data Access, map-unit level, not a "
+                     f"geotechnical report): checked for {checked} of {len(ranked)} ranked parcels")
+    for why, n in sorted(reasons.items()):
+        notes.append(f"Soils not checked for {n} of {len(ranked)} ranked parcels: {why}")
+    if reasons and any(w.startswith(soils.SERVICE_FAILED) or "failures in a row" in w
+                       for w in reasons):
+        notes.append("SOIL SERVICE FAILURES: USDA Soil Data Access is down nightly about "
+                     "00:00-02:00 Mountain; re-run later for those parcels.")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--settings", type=Path, default=HERE / "settings.toml")
@@ -170,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         fit_on, fit_max = fit_settings(cfg)
         pond_on, pond_max = fit_settings(cfg, "detention")
+        soils_on, soils_max, soils_workers = soils.settings(cfg)
     except ValueError as exc:
         ap.error(f"{args.settings}: {exc}")
 
@@ -336,6 +374,9 @@ def main(argv: list[str] | None = None) -> int:
     # The detention allowance is live-only too, placed beside the fitted
     # envelope (detention.py). Runs with and without the slope check.
     attach_ponds(survivors, pond_on, pond_max, notes)
+    # SSURGO soils are live-only too: asked for only now, after the sort,
+    # for the reports alone (soils.py). One SDA request per ranked parcel.
+    attach_soils(survivors, soils_on, soils_max, soils_workers, notes)
     # Same-owner lines, now that every sibling's final status is known.
     # Only p["flags"] (reports) gains them; scores and order are done.
     ranked_at = {p["parcel_id"]: p["rank"] for p in survivors}

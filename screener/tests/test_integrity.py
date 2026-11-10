@@ -25,10 +25,11 @@ from pathlib import Path
 from unittest import mock
 
 import requests
+import shapely
 from shapely.geometry import GeometryCollection, LineString, Point, Polygon, box
 from shapely.geometry.polygon import orient
 
-from screener import arcgis, checks, fulton, geo, layers, report, run, scoring, screens
+from screener import arcgis, checks, fulton, geo, layers, report, run, scoring, screens, soils
 
 SETTINGS_FILE = Path(run.__file__).resolve().parent / "settings.toml"
 REAL_LOAD_CAMA = fulton.load_cama
@@ -43,6 +44,26 @@ GOOD_SLOPE = {
     "statistics": [{"mean": 256.0}, {"mean": 6.0}],
 }
 EMPTY_SLOPE = {"statistics": []}  # a real 3DEP answer (HTTP 200) seen in the cache
+# Map units as (mukey, share of the parcel, hydgrpdcd, drclassdcd, hydclprs,
+# engdwobdcd), in the shape of a live SDA answer (2026-11-10, Fulton).
+GOOD_SOIL_UNITS = [("1654021", 0.75, "B", "Well drained", "0", "Very limited"),
+                   ("1654028", 0.25, "C/D", "Poorly drained", "40", "Not limited")]
+
+
+def sda_wkt(params):
+    """The parcel WKT inside an SDA query (as soils.QUERY embeds it)."""
+    return re.search(r"STGeomFromText\('([^']+)'", params["query"]).group(1)
+
+
+def fake_sda(units=GOOD_SOIL_UNITS):
+    """An SDA post.rest route: each unit's area is its share of the shape."""
+    def route(params):
+        assert params["format"] == "JSON+COLUMNNAME"
+        shape = shapely.from_wkt(sda_wkt(params))
+        m2 = geo.LocalProjection.around(shape)(shape).area
+        return {"Table": [list(soils.HEADER)] + [
+            [k, repr(share * m2), h, d, c, e] for k, share, h, d, c, e in units]}
+    return route
 
 
 class FakeResponse:
@@ -467,6 +488,7 @@ class RunHarness(Offline):
         self.patch(fulton, "fetch_industrial_points", self.industrial)
         self.routes = {f"{layers.LAYERS[k].url}/query": v for k, v in world().items()}
         self.routes[checks.SLOPE_URL] = lambda params: GOOD_SLOPE
+        self.routes[soils.SDA_URL] = fake_sda()
         self.downloads = {}
 
     def set_layer(self, key, fake):
