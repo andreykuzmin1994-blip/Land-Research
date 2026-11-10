@@ -1,0 +1,211 @@
+{
+ "schema": 1,
+ "parcel_id": "09F070000320927",
+ "run": "fulton-2026-11-10",
+ "sections": {
+  "zoning": {
+   "verdict": "conditional",
+   "claims": [
+    {
+     "text": "A city ordinance (ORD2026-010, case Z26-008) rezoning this parcel was adopted on 24 March 2026, after a first reading on 10 March 2026. This is the scanned, signed copy in the city's ordinance archive.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/ArchivedAgenda/_03242026-796",
+     "retrieved": "2026-11-10",
+     "quote": "First Reading: March 10, 2026 Second Reading: March 24, 2026 THIS ORDINANCE was adopted this 24th day of March 2026."
+    },
+    {
+     "text": "The ordinance names this parcel id (09F070000320927, '0 Irwin Road') and rezones it with six others from AG-1 to M-1 for 1.6 million square feet of warehouse space. This is the copy now posted in the city's ordinance list; it gives 161.77 acres, where the scanned signed copy gives 191.20 acres.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806",
+     "retrieved": "2026-11-10",
+     "quote": "Z26-008 - AN ORDINANCE TO REZONE 161.77+/- ACRES OF LAND, LOCATED AT 555 & 0 SPENCE ROAD; 0 OLD SENIOA ROAD; 0 IRWIN ROAD; 0 FAYETTEVILLE ROAD (PARCEL IDS: 09F070000320927, 09F100200471269, 09F070000320661, 09F100100460651, 09F100100460610, 09F100100460636 & 09F110300450881) FROM THE AG-1 (AGRICULTURAL) ZONING DISTRICT TO THE M-1 (LIGHT INDUSTRIAL) ZONING DISTRICT TO DEVELOP A 1.6 MILLION SQUARE FEET OF WAREHOUSE SPACE FOR LIGHT-INDUSTRIAL USES"
+    },
+    {
+     "text": "The M-1 zoning is conditional: the ordinance says building permits are issued only in compliance with its attached conditions of approval.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806",
+     "retrieved": "2026-11-10",
+     "quote": "and this Ordinance contains attached conditions of approval, building permits shall be issued only in compliance with the attached conditions."
+    },
+    {
+     "text": "The attached conditions include LEED certification, joining the South Fulton Community Improvement District and a $400,000 parks contribution.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806",
+     "retrieved": "2026-11-10",
+     "quote": "3. Building construction will be LEED Certified. 4. Property will be designated into the South Fulton Community Improvement District. 5. $400,000 contribution to be made to City towards future park projects in the District"
+    },
+    {
+     "text": "A further condition binds the owner or developer to the road and access conditions of the state (GRTA) decision on the regional-impact review of the project, DRI 4313, subject to GDOT approval.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806",
+     "retrieved": "2026-11-10",
+     "quote": "The owner or developer must adhere to all \"General Conditions of Approval\" listed in Attachment \"A\" of the GRTA (Georgia Regional Transportation Authority) Notice of Decision for DRI MAPCO Industrial Site (DRI#: 4313)"
+    },
+    {
+     "text": "City planning staff describe the M-1 district as meant for warehousing and distribution among other light industrial uses. This is staff's statement of the district's intent in the rezoning report, not the use table of the code itself, which could not be fetched.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The M-1 District is intended to provide locations for light industrial uses and industrial parks which meet the needs for processing, manufacturing, fabricating, warehousing, distributing, research, flex office-warehouse uses, and office uses associated with industrial uses."
+    },
+    {
+     "text": "The June 2025 staff report says a stream buffer variance is needed for the applicant's plan (a tributary of Whitewater Creek crosses the east side of the assemblage) and that none had been applied for at that time.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "A stream buffer variance is needed for this project, but an application hasn't been submitted to staff at this time."
+    },
+    {
+     "text": "The applicant also asked for a variance cutting the rear zoning buffer from 100 ft to 50 ft. The pages read do not show whether it was granted.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The applicant also requests a concurrent variance from Section 405.01 to reduce the rear buffer from 100 feet to 50-feet."
+    }
+   ],
+   "open_items": [
+    "Read the M-1 use table and standards in the city's zoning ordinance (Code Appendix C, on Municode): is warehouse / distribution permitted by right, and is any use (truck terminal, cold storage, outdoor storage) subject to a special use permit? The code could not be fetched for this check.",
+    "Ask the City Clerk for the final signed ORD2026-010 with Appendix A (legal description) and Appendix B (conditions). Three copies are posted and they differ (191.20 vs 161.77 acres; condition 5 says 'land disturbance permit' in one and 'building permit' in another). Which governs, and is all of this parcel inside the legal description?",
+    "Do the conditions (LEED, CID, $400,000, the GRTA road conditions) run with the land for any buyer and any plan, or only for the applicant's three-building plan?",
+    "Was the concurrent variance CV24-010 (rear buffer 100 ft to 50 ft) granted? Has a stream buffer variance or a US Army Corps permit been applied for or issued?",
+    "The signed copy's vote line reads 'adopted on March 24, 2025' while the line below reads 2026: confirm the date with the Clerk."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "text": "City staff state that the parcel's future land use designation in the 2021 comprehensive plan is Industrial Zone and that it supports M-1.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The subject property has a future land use designation of Industrial Zone as designated in the 2021 South Fulton Comprehensive Plan, which supports the proposed zoning classification and density."
+    },
+    {
+     "text": "That designation is recent: the land was planned as suburban neighbourhood until a future land use amendment adopted on 22 April 2025.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "CDP25-002, for the same properties, was adopted on April 22, 2025, for a future land use amendment from Suburban I Neighborhood to Industrial Zone."
+    },
+    {
+     "text": "A rezoning case on this parcel was filed and heard in the last five years: Z24-026 / CV24-010, for a 1.8 million square foot light-industrial complex (Planning Commission, 18 June 2025).",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The applicant requesting a rezoning from AG-1 (Agricultural District) to M-1 (Light Industrial) on an assemblage of parcels at 555 Spence Rd, 0 Old Senioa Rd, 0 Irwin Rd, 0 Spence Rd, & 0 Fayetteville Rodd to develop a 1.8 million square foot complex spread over 3 buildings for light-industrial uses."
+    },
+    {
+     "text": "The regional plan points the other way: the regional-impact review found the project not aligned with the Atlanta Regional Commission's plan, which treats the area as Developing Suburbs.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The DRI review found that the project is not aligned with Atlanta Regional Commission (ARC)'s Atlanta Region's Plan, which designates this property as Developing Suburbs."
+    },
+    {
+     "text": "Neighbours raised traffic, tenant and quality-of-life objections at the applicant's community meeting.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The following issues and concerns were expressed by the guests: traffic, potential tenants, and the impacts the development will have on neighboring residences' quality of life and property values."
+    },
+    {
+     "text": "The one moratorium found in a search of the city's site concerns data centres, not warehouses; on 12 May 2026 it was extended to 9 September 2026. Whether it was extended again was not checked.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_05122026-1832",
+     "retrieved": "2026-11-10",
+     "quote": "including all provisions of Resolution RES2025-094, be extended until September 9, 2026."
+    }
+   ],
+   "open_items": [
+    "The city's zoning-cases page lists Z24-026 with an 18 June 2025 staff report and no council decision, and the rezoning then came through a council ordinance (Z26-008) in March 2026. What happened to Z24-026 in between (denial, lawsuit, settlement)? Is any appeal or challenge to ORD2026-010 pending?",
+    "Confirm on the city's current adopted future land use map (a 2026 comprehensive plan update exists) that the parcel is still Industrial Zone.",
+    "Get the ARC final report and the GRTA Notice of Decision for DRI 4313 and read the road conditions (Old Senoia Road paving, turn lanes on SR 74 and SR 92).",
+    "Has the data-centre moratorium been extended past 9 September 2026, and has the city adopted or proposed any moratorium or text amendment on warehouses since March 2026?"
+   ]
+  },
+  "utilities": {
+   "verdict": "nearby",
+   "claims": [
+    {
+     "text": "SEWER ONLY. Fulton County's wastewater pipe map layer returns pipe records within 1,500 ft of the parcel's centre point (33.550782, -84.572769): by my count of the response, 21 segments, mostly active 8-inch county gravity lines in the Morning Creek basin. The radius is from the centre of a 47.5-acre parcel, not from its boundary, so this shows sewer nearby, not at the site.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/4/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json",
+     "retrieved": "2026-11-10",
+     "quote": "\"Basin\":\"MORNING CREEK\",\"SubBasin\":\"MC62\",\"UpSize\":\"8\",\"UpMaterial\":\"PVC\""
+    },
+    {
+     "text": "A nearby segment's record reads: 8-inch pipe, not private ('Private':'0'), service area code FC, city name FULTON COUNTY.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/4/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json",
+     "retrieved": "2026-11-10",
+     "quote": "\"Enabled\":1,\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FULTON COUNTY\""
+    },
+    {
+     "text": "One of the nearby segments carries a survey comment (survey date field 1161734400000, i.e. October 2006) that its downstream manhole was surcharged: a flag to raise when asking about capacity.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/4/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json",
+     "retrieved": "2026-11-10",
+     "quote": "\"DnComment\":\"DOWN MH IS SURCHARGED\",\"DnSurvevDate\":1161734400000"
+    },
+    {
+     "text": "WATER NOT SHOWN. The same county service's Water Pipe layer returns no record within 1,500 ft of the parcel's centre point (the response's feature list is empty). The county may not be the water provider here; no water provider's own map was found.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/18/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json",
+     "retrieved": "2026-11-10",
+     "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"
+    },
+    {
+     "text": "City staff did not know the load the project would put on utilities when they reviewed the rezoning.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "The extent of burden the development of 1.8 square million feet of warehousing facilities will have on existing utilities is unknown to staff at this time."
+    }
+   ],
+   "open_items": [
+    "Capacity (always open): ask Fulton County Public Works whether the Morning Creek / Whitewater Creek sewer lines near the site can take the flow, and where the tap point would be. One nearby segment has an old 'downstream manhole is surcharged' note.",
+    "Who supplies water here (City of Atlanta, City of Fairburn or the county), and where is the nearest main? The county's water pipe layer shows nothing within 1,500 ft of the parcel centre.",
+    "How far is the nearest sewer manhole from the parcel line, and does I-85, a creek or the rail line lie between? The check used a radius from the parcel centre, not the boundary."
+   ]
+  },
+  "market": {
+   "verdict": "signs_under_contract",
+   "claims": [
+    {
+     "text": "The rezoning of this parcel was applied for by a developer acting as agent, not by the tax-roll owner. This shows a developer pursuing the land; it does not show a purchase contract.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
+     "retrieved": "2026-11-10",
+     "quote": "Applicant Information: KMT Partners LLC c/o Greg Boler c/o Henry Bailey Jr., Esq. Status of Applicant: Agent"
+    },
+    {
+     "text": "The county development authority (Develop Fulton) announced on 29 April 2026 that its board approved a bond inducement for the same developer's project. The release does not list parcel ids.",
+     "source_url": "https://www.developfultoncounty.com/uploads/about-us-news_47_1005894727.pdf",
+     "retrieved": "2026-11-10",
+     "quote": "Develop Fulton's Board of Directors recently approved a bond inducement resolution supporting Project MAPCO, a proposed $220 million Class A industrial development in the City of South Fulton"
+    },
+    {
+     "text": "That release puts the project on roughly 160 acres at Old Senoia Road and Spence Road, which matches the 161.77 acres and street names of the ordinance that lists this parcel.",
+     "source_url": "https://www.developfultoncounty.com/uploads/about-us-news_47_1005894727.pdf",
+     "retrieved": "2026-11-10",
+     "quote": "Project MAPCO will deliver approximately 1.6 million square feet of modern logistics and light manufacturing space across three buildings on roughly 160 acres at Old Senoia Road and Spence Road."
+    },
+    {
+     "text": "The release gives an estimated closing in the third quarter of 2026, which is before the date of this check. Whether it closed is not shown on any page read.",
+     "source_url": "https://www.developfultoncounty.com/uploads/about-us-news_47_1005894727.pdf",
+     "retrieved": "2026-11-10",
+     "quote": "The estimated closing date of Project MAPCO is Q3 of 2026."
+    },
+    {
+     "text": "The release says an anchor tenant is already lined up.",
+     "source_url": "https://www.developfultoncounty.com/uploads/about-us-news_47_1005894727.pdf",
+     "retrieved": "2026-11-10",
+     "quote": "project leaders confirmed that one of the anchor tenants is a global company with more than $50 billion in annual revenue that is expanding its existing footprint in Georgia"
+    }
+   ],
+   "open_items": [
+    "Has the land sale closed? Pull the latest deeds for this parcel and its six neighbours at the Fulton County Clerk of Superior Court. The county tax parcel record still showed the 2012 owner on 2026-11-10, but the tax roll lags deeds.",
+    "Is the developer's contract or option on this specific parcel still live, and is any part of the assemblage (for example the third building's land) open to another buyer?",
+    "Did Develop Fulton pass a final bond resolution for the project after the April 2026 inducement?",
+    "Places looked: the city's rezoning report and ordinance, and Develop Fulton's news release. Not looked: legal notices, county or city surplus lists, deed records. Listing sites were not used."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "text": "County record only: on the day of this check the county tax parcel layer still showed the same company owner and out-of-state mailing address as the brief. The Secretary of State record could not be read, so the kind of entity is not established.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070000320927%27&outFields=ParcelID,Owner,OwnerAddr1,OwnerAddr2,Address,LandAcres,LUCode,ClassCode,TaxDist&returnGeometry=false&f=json",
+     "retrieved": "2026-11-10",
+     "quote": "\"ParcelID\":\"09F070000320927\",\"Owner\":\"MAPCO FARMS LLC \",\"OwnerAddr1\":\"5761 CEDAR GROVE CIR\",\"OwnerAddr2\":\"PLANO TX 75093\""
+    }
+   ],
+   "open_items": [
+    "Look the owner up by hand on the Georgia Secretary of State business search (ecorp.sos.ga.gov): status, formation date, principal office, registered agent, and whether it is a Georgia or a foreign (Texas) company. The site answered an automated request with a browser challenge, and its search is a form.",
+    "What is the relationship between the owner and the developer that applied for the rezoning (the project carries the owner's name)? Seller, partner or the same people?",
+    "Ask the city for the rezoning application file: who signed as owner, and with what authority?"
+   ]
+  }
+ }
+}

@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "parcel_id": "09F070100320322",
+  "run": "fulton-2026-11-10",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "The city's City Ordinances page does not print the zoning text; it only gives a link out to the zoning ordinance. (The link target, the Municode library, was not readable by a plain fetch: see open items.)",
+          "source_url": "https://www.fairburn.com/411/City-Ordinances",
+          "retrieved": "2026-11-10",
+          "quote": "Click Here to access the zoning ordinance for the City of Fairburn."
+        },
+        {
+          "text": "Fairburn's own zoning / future land use GIS layer lists this parcel as C-2, with the previous-zoning field empty. The record has no field for zoning conditions or an overlay district.",
+          "source_url": "https://services8.arcgis.com/ZvMgtqecACHwgXJb/arcgis/rest/services/Current_Zoning_FLU/FeatureServer/0/query?where=ParcelID%3D%2709F070100320322%27&outFields=*&returnGeometry=false&f=html",
+          "retrieved": "2026-11-10",
+          "quote": "ZoningCurr: C-2 ZoningPrev: FLU: Office/Industrial"
+        }
+      ],
+      "open_items": [
+        "Does the C-2 General Commercial district text (Fairburn zoning ordinance, Chapter 80; the 2025 comprehensive plan's zoning audit cites Sec. 80-84(c) for the C-2 use list) permit warehouse, distribution or light industrial use, by right or by use permit? Not read: the code is only on library.municode.com, which answered a plain fetch with HTTP 403 (a bot challenge), as did api.municode.com. A person with a browser can read it in minutes.",
+        "Is the parcel inside the GA Highway 74 overlay district (the 2025 plan names a 'GA Highway 74 Overlay' and a 'US Highway 29 Overlay'), and what does the overlay add or forbid? Not checked: no machine-readable overlay map was found.",
+        "Were any conditions attached to the C-2 zoning (a '-C' case)? The city GIS record shows only 'C-2' and an empty previous-zoning field; ask Fairburn Planning & Zoning for a zoning verification letter.",
+        "The official zoning map PDF on the city site is the map adopted July 22, 2013; confirm the current zoning with the city rather than from that PDF."
+      ]
+    },
+    "plans": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "The state's plan library holds a 2025 plan update for Fairburn, newer than the 2021 update.",
+          "source_url": "https://dca.georgia.gov/fairburn-city-comprehensive-plan",
+          "retrieved": "2026-11-10",
+          "quote": "Plan Update 2021 (PDF, 10.88 MB) Plan Update 2025 (PDF, 151.26 MB)"
+        },
+        {
+          "text": "'Office/Industrial', the future land use label the brief reports for this parcel, is a character area of the 2021 plan update. In that plan it covers industrial uses including warehouses.",
+          "source_url": "https://dca.georgia.gov/document/plans/plan-update-2021-28/download",
+          "retrieved": "2026-11-10",
+          "quote": "The Office/Industrial Character Areas lie along the I-85 corridor. These areas consist of a mix of light and heavy industrial uses, as well as office uses. Industrial uses may include manufacturing, processing plants, factories, warehouses, and wholesale trade facilities."
+        },
+        {
+          "text": "The 2021 plan lists O&I, M-1 and M-2 as the zoning districts of the Office/Industrial character area. C-2, this parcel's zoning, is not in that list.",
+          "source_url": "https://dca.georgia.gov/document/plans/plan-update-2021-28/download",
+          "retrieved": "2026-11-10",
+          "quote": "Zoning districts within the Office & Industrial Character Areas include O&I, M-1, and M-2."
+        },
+        {
+          "text": "The 2025 comprehensive plan says it was adopted by City Council in October 2025, so it is the plan now in force and supersedes the 2021 update.",
+          "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+          "retrieved": "2026-11-10",
+          "quote": "review and was adopted by City Council in October 2025."
+        },
+        {
+          "text": "The 2025 plan's land use strategies say to limit additional development in the SR 74/Senoia Road corridor until a specific plan for that area exists. The parcel is on Senoia Road about 0.4 mile from the I-85 / SR 74 interchange; whether it counts as inside 'the corridor' is not stated.",
+          "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+          "retrieved": "2026-11-10",
+          "quote": "With the exception of projects already underway/approved, limit additional development in the SR 74/Senoia Road corridor until a specific plan for the area is established."
+        },
+        {
+          "text": "The 2025 plan has no 'Office/Industrial' category. Its future development categories near this location include Highway Mixed-Use (along SR 74/Senoia Road; warehousing is not among its development types), Light Industrial and Industrial. Which one covers this parcel is drawn only on a map image and was not determined.",
+          "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+          "retrieved": "2026-11-10",
+          "quote": "Located along SR 74/Senoia Road, this area is a regional commercial and mixed-use"
+        },
+        {
+          "text": "The 2025 plan directs future industrial growth to areas already served by truck routes and infrastructure.",
+          "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+          "retrieved": "2026-11-10",
+          "quote": "Direct any future industrial growth to areas already served by established truck routes and infrastructure."
+        },
+        {
+          "text": "The city's current list of pending zoning and development cases shows four cases. None is at 601 Senoia Rd, on Senoia Road, or names this parcel id.",
+          "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+          "retrieved": "2026-11-10",
+          "quote": "Durham Lakes (Gas Station) Gas Station Concept Plan 101 Durham Lake Pkwy On Hold, Under Review Rivertown (Gas Station) Gas Station Rezoning and Variance 6900 Rivertown Rd On Hold, Under Review DRB Campbell Commons Single Family Detached Rezoning R-3 to R-CT Campbellton Fairburn Road, Fairburn GA 30213 (parcel#09F180200131441) Mayor and City Council 10/26/2026 NexMetro Acquisitions, LLC (c/o Steven L. Jones, McKagen Jones) Multi Family Residential, Conservation, and Institutional Rezoning OI and AG to PD -Planned Development and Variance 0 Milam Road, Fairburn, GA, Parcels: 09F020400070093 & 09F020400070143 Mayor and City Council 11/09/2026"
+        },
+        {
+          "text": "A second, older pending-cases page on the city site (meeting dates in September 2025) lists four cases. One is on Senoia Road: a final plat at 7810 Senoia Rd for a restaurant. None is at 601 Senoia Rd.",
+          "source_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+          "retrieved": "2026-11-10",
+          "quote": "T5 Data Center Data Center Concept Plan Gullatt Rd. On Hold - DRI required Durham Lakes (Gas Station) Gas Station Concept Plan 101 Durham Lake Pkwy. PZ Meeting - 09/02/2025 Curry Bend (Commercial and Residential) Commercial and Residential Final Plat 0 Bohannon Road & 6560 Bohannon Road PZ Meeting - 09/02/2025 Chick-fil-A Restaurant / Construction Complete Final Plat 7810 Senoia Rd. Mayor and City Council - 09/02/2025"
+        }
+      ],
+      "open_items": [
+        "Which future development category of the 2025 comprehensive plan (adopted October 2025 per the plan) covers this parcel: Highway Mixed-Use, Light Industrial, Industrial or another? The screener's 'Office/Industrial' label is a 2021-plan category; the city GIS layer may not have been updated to the 2025 map. Ask Fairburn Planning & Zoning, or read the map pages of the plan PDF by eye.",
+        "Does the 2025 plan's strategy to limit additional development in the SR 74/Senoia Road corridor until an area plan exists apply to this parcel, and has the city acted on it (a moratorium, a corridor study)? No moratorium was found, but only the two pending-cases pages were checked; council agendas and minutes were not.",
+        "Under the 2021 plan, Office/Industrial areas go with O&I, M-1 and M-2 zoning, not C-2: would the city support a rezoning from C-2 to M-1 here?",
+        "Rezoning history on or beside the parcel in the last five years was not checked beyond the two pending-cases pages (which show only open cases). Ask the city for closed cases on Senoia Road near I-85.",
+        "The 2025 plan PDF is 158 MB (151 MB on the state's site), over the quote checker's 25 MB limit, so quotes from it cannot be verified by the tool."
+      ]
+    },
+    "utilities": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "The City of Fairburn is itself the water and sewer provider for most customers, but says not every service reaches every area.",
+          "source_url": "https://www.fairburn.com/185/Utilities-Department",
+          "retrieved": "2026-11-10",
+          "quote": "The City provides electricity, water, sewer, sanitation (refuse pickup), and services to most of its residential and business customers either directly or through agreements with outside contractors. Not all services are available in all areas."
+        },
+        {
+          "text": "The 2025 comprehensive plan treats water and sewer capacity as something still to be funded and updated.",
+          "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+          "retrieved": "2026-11-10",
+          "quote": "Explore state and federal funding programs to update sewer and water capacity."
+        }
+      ],
+      "open_items": [
+        "Where are the nearest city water main and sanitary sewer line to 601 Senoia Rd, and what sizes? No published water or sewer line map or capital plan showing lines was found on the city's Utilities and Water Division pages; ask Fairburn Utilities.",
+        "Is there water and sewer capacity for a roughly 150,000 SF warehouse here? Only the utility can say.",
+        "The city says 'Not all services are available in all areas': confirm sewer, not only water, serves this parcel (the assessor field reads 'All public / unknown')."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {
+          "text": "The city's current pending zoning and development cases page lists four cases; none is at 601 Senoia Rd or names this parcel id, so no rezoning application naming a buyer for this parcel is shown there.",
+          "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+          "retrieved": "2026-11-10",
+          "quote": "Durham Lakes (Gas Station) Gas Station Concept Plan 101 Durham Lake Pkwy On Hold, Under Review Rivertown (Gas Station) Gas Station Rezoning and Variance 6900 Rivertown Rd On Hold, Under Review DRB Campbell Commons Single Family Detached Rezoning R-3 to R-CT Campbellton Fairburn Road, Fairburn GA 30213 (parcel#09F180200131441) Mayor and City Council 10/26/2026 NexMetro Acquisitions, LLC (c/o Steven L. Jones, McKagen Jones) Multi Family Residential, Conservation, and Institutional Rezoning OI and AG to PD -Planned Development and Variance 0 Milam Road, Fairburn, GA, Parcels: 09F020400070093 & 09F020400070143 Mayor and City Council 11/09/2026"
+        },
+        {
+          "text": "The older pending-cases page (September 2025 dates) also shows nothing at 601 Senoia Rd.",
+          "source_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+          "retrieved": "2026-11-10",
+          "quote": "T5 Data Center Data Center Concept Plan Gullatt Rd. On Hold - DRI required Durham Lakes (Gas Station) Gas Station Concept Plan 101 Durham Lake Pkwy. PZ Meeting - 09/02/2025 Curry Bend (Commercial and Residential) Commercial and Residential Final Plat 0 Bohannon Road & 6560 Bohannon Road PZ Meeting - 09/02/2025 Chick-fil-A Restaurant / Construction Complete Final Plat 7810 Senoia Rd. Mayor and City Council - 09/02/2025"
+        },
+        {
+          "text": "Fulton County's parcel layer, in its tax year 2027 record, still names the same owner as the brief: no change of owner shows there.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070100320322%27&outFields=*&returnGeometry=false&f=html",
+          "retrieved": "2026-11-10",
+          "quote": "ParcelID: 09F070100320322 TaxYear: 2027 Address: 601 SENOIA RD"
+        }
+      ],
+      "open_items": [
+        "Places looked: the City of Fairburn's two pending zoning and development cases pages, and Fulton County's parcel layer. Nothing found there. This is not 'not for sale'.",
+        "Not looked: broker listing sites (CoStar, LoopNet and Crexi are off limits), legal notices in the county's legal organ, council and planning commission agenda packets, and recorded deeds or options (the state deed index needs a sign-in). A person should check a broker sign on site and the deed index.",
+        "The same owner holds adjoining parcels (67.9 ac together per the brief): ask whether any of them is being marketed as an assemblage."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "Fulton County's parcel record names the owner as a limited liability limited partnership with a mailing address in Palmetto, GA, and carries no improvement value (land only).",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070100320322%27&outFields=*&returnGeometry=false&f=html",
+          "retrieved": "2026-11-10",
+          "quote": "Owner: SHUGART FAMILY PARTNERSHIP LLLP OwnerAddr1: 1380 COLLINSWORTH RD OwnerAddr2: PALMETTO GA 30268-9427 TaxDist: 25D TotAssess: 139200 LandAssess: 139200 ImprAssess: 0"
+        }
+      ],
+      "open_items": [
+        "What does the Georgia Secretary of State record show for the owner entity: status (active, dissolved), date formed, principal office, registered agent, general partner? Not read: ecorp.sos.ga.gov answers a plain fetch (even of robots.txt) with HTTP 403 and a browser challenge. A person can look it up by hand in a browser.",
+        "The name contains 'FAMILY PARTNERSHIP', which suggests a family holding vehicle, but that is a reading of the name, not a record: confirm from the Secretary of State filing who the general partner is and who can sign.",
+        "Pull the vesting deed (the brief gives a last recorded sale of 2009-05-02) and check for liens or options before any approach."
+      ]
+    }
+  }
+}

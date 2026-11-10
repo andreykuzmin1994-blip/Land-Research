@@ -43,12 +43,13 @@
 
 - Same-owner groups: 521 groups of 2 or more parcels (1853 parcels, largest 152) share an exact tax-roll owner name and mailing address among the 5366 parcels of 5-50 ac fetched (before any screen or trial limit); 395 adjacent sets (touching or within 10 ft), 302 inside the band and 93 larger. Different spellings or addresses of one owner are not joined
 - 1 of 2118 parcels that pass the map screens have under one 10 m lidar pixel (100 m²) of open ground on the county parcel map, so their map checks can't be trusted and slope was not checked (each is flagged). The map shape is the problem, not a failed check: compare the county parcel map with the tax record.
+- Slope: 2117 of 2118 lidar answers were reused from cache/slope (oldest kept 2026-11-10), 0 asked now. A kept answer is one reading from a service whose answers for the same shape do not always agree (README, "Public data changes between days"); --refresh-slope takes new readings.
 - Detention pond (rough allowance, no hydrology): pond fits on 1122 of 1581 ranked parcels, no pond room found on 459
 - Soils (USDA SSURGO via Soil Data Access, map-unit level, not a geotechnical report): checked for 250 of 1581 ranked parcels
 - Soils not checked for 1331 of 1581 ranked parcels: outside the top 250
 - Road frontage (GDOT road centrelines, parcel line within 50 ft; curb cuts not checked): frontage on 198 of 1581 ranked parcels, none within 50 ft on 52
 - Road frontage not checked for 1331 of 1581 ranked parcels: outside the top 250
-- Lead grade (a fixed rule over this screen's checks; not a score or a screen, the ranking is unchanged): A 14, B 97, C 139, blocked 0 of 1581 ranked parcels; see leads.md
-- Lead grade not given for 1331 of 1581 ranked parcels: road frontage only checked for the top 250 ([frontage] max_parcels)
+- Lead grade (a fixed rule over this screen's checks; not a score or a screen, the ranking is unchanged): A 14, B 96, C 140, blocked 390 of 1581 ranked parcels; see leads.md
+- Lead grade not given for 941 of 1581 ranked parcels: soils only checked for the top 250 ([soils] max_parcels)
 - 531 ranked parcels have no machine-readable zoning (Chattahoochee Hills 397, Palmetto 84, College Park 32, East Point 15, Hapeville 2, Union City 1): check with the city
 - Wetlands come from the 1980s National Wetlands Inventory and miss small and forested wetlands; floodplain from FEMA NFHL (Mar 2026 snapshot)

@@ -13,6 +13,7 @@ repository private.
 | `decisions/decision_features.jsonl` | Written by `python -m screener.decide` (absent until first used). |
 | `runs/<county>-<date>/` | One folder per run: `leads.md` (start here), `summary.md`, `ranked.csv`, `briefs/`, `map.html`, `rejected.csv`, `ranked.geojson`, `features.json`, `facts.json`. |
 | `digests/<county>-<date>.md` | What changed since the previous run. Start here. |
+| `leads/<parcel>/` | An agent's check of one lead: `lead.md` (start there) and its quote-checked findings. The fetched pages are not kept here. |
 | `cache/slope/` | Kept lidar slope answers (public data, about 2 KB per parcel). They spare each run about 50 minutes. |
 | `RUNBOOK.md` | The steps the scheduled session follows. |
 
