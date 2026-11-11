@@ -344,7 +344,15 @@ def quote_is_from_url(quote: str, url: str) -> bool:
     if any(len(w) >= ECHO_TOKEN_CHARS and sum(ch.isalpha() for ch in w) >= 8 and w in in_url
            for w in words):
         return True
-    runs = {tuple(in_url[i:i + ECHO_WORDS]) for i in range(len(in_url) - ECHO_WORDS + 1)}
+    # The address's words in order, and its parameter values alone in order
+    # (a page may join ?a=..&b=..&c=.. into one sentence).
+    try:
+        values = _tokens(_decoded(" ".join(
+            v for _, v in urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query))))
+    except ValueError:
+        values = []
+    runs = {tuple(seq[i:i + ECHO_WORDS]) for seq in (in_url, values)
+            for i in range(len(seq) - ECHO_WORDS + 1)}
     for i in range(len(words) - ECHO_WORDS + 1):
         run = tuple(words[i:i + ECHO_WORDS])
         if run in runs and sum(1 for w in run if sum(ch.isalpha() for ch in w) >= 4) >= 2:
@@ -861,7 +869,7 @@ def _plain(text: Any, limit: int = 600) -> str:
     or markdown that could pass for a quote, a link or a heading. In lead.md
     only this code writes those."""
     t = clean(text, limit * 2)
-    t = re.sub(r"(?i)\b(?:https?|ftp)://\S+|\bwww\.\S+", "[address removed]", t)
+    t = re.sub(r"(?i)\b(?:https?|ftp)://\S+|\bwww\.\S+", "(address removed)", t)
     t = t.translate(str.maketrans({'"': "'", "\u201c": "'", "\u201d": "'", "\u00ab": "'",
                                    "\u00bb": "'", "`": "'", "[": "(", "]": ")", "<": "(",
                                    ">": ")", "*": "", "_": " ", "#": "", "|": "/"}))
