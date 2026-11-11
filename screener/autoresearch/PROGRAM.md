@@ -103,13 +103,13 @@ readable.
    variations to find out which parcels are the answers: every scoring,
    with or without `--decide`, is logged with a hash of `rank.py`, and a
    human reads the log.
-3a. A score depends only on the record it is given. No counters, caches
-   or other state between calls: the evaluator asks for every score twice,
-   in two different orders, and refuses the run if any differs.
 3. Keep `learned_score` pure and general. No lookups of specific values
    that single out a handful of parcels (exact acreages, land values or
    codes chosen to hit known answers). Prefer smooth curves and
    explainable signals.
+   A score depends only on the record it is given: no counters, caches
+   or other state between calls. The evaluator asks for every score
+   twice, in two different orders, and refuses the run if any differs.
 4. One idea per experiment. Examples: reshape the access curve, weight
    industrial context more, use land class (commercial / industrial tracts),
    rethink which seller signals matter, combine signals (access ×
