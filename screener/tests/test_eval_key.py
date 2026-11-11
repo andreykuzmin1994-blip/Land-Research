@@ -340,6 +340,90 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual(ev._saved_best()["order"], {2015: ["k1"]})
 
 
+class MainTests(unittest.TestCase):
+    """main() on the committed key, with a spy for rank.learned_score and the
+    log in a temporary folder. Reads no feature of any positive."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.log = Path(self.tmp.name, "experiments.tsv")
+        self.seen: set[tuple[str, ...]] = set()
+
+        def spy(features):
+            self.seen.add(tuple(sorted(features)))
+            return {"score": 50.0 + (features.get("acres") or 0.0) / 7.0}
+
+        for p in (mock.patch.object(ev, "LOG_FILE", self.log),
+                  mock.patch.object(ev, "BEST_FILE", Path(self.tmp.name, "best_ranking.json")),
+                  mock.patch("screener.rank.learned_score", spy)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def run_main(self, *argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = ev.main(list(argv))
+        return code, out.getvalue()
+
+    def rows(self):
+        with open(self.log, newline="") as fh:
+            return list(csv.DictReader(fh, delimiter="\t"))
+
+    def test_rank_py_is_handed_exactly_the_allow_list(self):
+        code, _ = self.run_main()
+        self.assertEqual(code, 0)
+        meta = ev.load_meta()
+        self.assertEqual(self.seen, {tuple(sorted(meta["features"] + meta["banned"]))})
+        self.assertFalse(set(ev.HIDDEN) & set(meta["features"] + meta["banned"]))
+
+    def test_a_look_shows_one_decimal_and_leaves_a_row(self):
+        code, text = self.run_main()
+        shown = json.loads(text)["dev"]
+        for name in ("graded", "hits"):
+            self.assertEqual(shown[name], round(shown[name], 1))
+        self.assertFalse({"recall", "order", "score_span"} & set(shown))
+        self.assertEqual(shown["unstable_scores"], 0)
+        row, = self.rows()
+        self.assertEqual((row["status"], row["win_share"]), ("look", ""))
+        self.assertRegex(row["description"], r"^rank\.py [0-9a-f]{12}( \(uncommitted\))?$")
+        self.assertEqual(float(row["graded"]), shown["graded"])
+        self.run_main()
+        self.assertEqual([r["status"] for r in self.rows()], ["look", "look"])
+
+    def test_a_look_is_refused_when_it_cannot_be_logged(self):
+        self.log.write_text("time\tcommit\tstatus\n")
+        code, text = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn("REFUSED", text)
+        self.assertNotIn("graded", text)
+
+    def test_looks_are_not_decisions(self):
+        self.run_main()
+        self.assertEqual(ev._decisions(), [])
+        self.assertEqual(ev._kept_rows(ev.fingerprint()), [])
+
+    def test_a_score_that_changes_between_passes_is_refused_in_every_mode(self):
+        calls = []
+
+        def counter(features):
+            calls.append(1)
+            return {"score": float(len(calls) % 97)}
+
+        with mock.patch("screener.rank.learned_score", counter):
+            for argv in ((), ("--test",), ("--decide",), ("--null-test", "20")):
+                code, text = self.run_main(*argv)
+                self.assertEqual(code, 3, argv)
+                self.assertIn("a different score the second time", text)
+                self.assertNotIn("graded", text)
+        self.assertFalse(self.log.exists())
+
+    def test_new_baseline_needs_decide(self):
+        code, text = self.run_main("--new-baseline")
+        self.assertEqual(code, 2)
+        self.assertFalse(self.log.exists())
+
+
 class BuildRuleTests(unittest.TestCase):
     A, DEV, REIT = "SMITH JOHN", "ACME LAND HOLDINGS LLC", "BIG REIT LP"
 
