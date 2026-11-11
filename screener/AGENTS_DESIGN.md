@@ -1,44 +1,56 @@
 # Scaling the screener to autonomous leads — plan (proposal)
 
-Status: **proposal, nothing in it is built.** Revised 2026-11-10 after
-PR 41 (F7 detention, F9 soils, F10 road frontage) merged.
+Status: a proposal written before anything was built; "Built so far"
+below says what exists now. Revised 2026-11-10 after PR 41 (F7 detention,
+F9 soils, F10 road frontage) merged, and 2026-11-11.
 
 Goal: a weekly list of **sourced, ranked leads** for industrial land,
 across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
-## Next session: start here (written 2026-11-10 at merge)
+## Next session: start here (written 2026-11-11)
 
-Everything below was merged to `main` in one pull request. Open items,
-most important first:
+Open items, most important first:
 
-1. **The evaluation rebuild is merged but not cleared.** Five as-of
-   years, the sale-before-building rule and the graded score are in, and
-   `--decide` refuses until two checks are finished: the adversarial
-   review and the keep-threshold check. Read
-   `reviews/36_screener_eval_cohorts_metric/04_status_at_merge.md` first.
-   If `05_adversarial_review.md` is missing there, look for follow-up
-   commits on branch `claude/funny-hopper-k8rgod`; if there are none, the
-   review and `python -m screener.autoresearch.evaluate --null-test`
-   must be run again. Do not run the AutoResearch loop from a session
-   that has opened `autoresearch/data/` or that folder.
-2. **Seven ranked parcels are probably already taken** (one rezoned site;
-   ranks 6, 10, 12, 32, 60, 114 and 177 in the 2026-11-10 run). See
-   `digests/fulton-2026-11-10.md` on the `screener-data` branch. The
-   operator has not yet marked them in `decisions.csv`.
-3. **`quotecheck.py` and `INVESTIGATE.md` have had no independent
-   review**, and the skeptic step has never been run
-   (`reviews/35_screener_lead_layer/04_investigation_pilot.md`).
-4. **Operator decisions still open:** whether a robots.txt answering 403
-   on a public ArcGIS host should be treated as the root system treats it
-   (it blocks `quotecheck` from the city's own GIS); whether to add the
-   owner the pilot flagged to the excluded-owner rules (`screens.py` /
-   `owners.py`, human-owned, needs a new baseline).
-5. **Runs are on demand.** Ask a session with the repository attached to
-   follow `RUNBOOK.md` on the `screener-data` branch. The weekly
-   scheduled task is switched off, not deleted.
-6. **Not started:** the shared enrichment contract (step 2 below); the 49
+1. **The evaluation is reviewed and fixed in code, but the stop is still
+   on.** The answer key could not be rebuilt on 2026-11-11: Georgia DOT's
+   exits layer was down. `--decide` refuses until the key is rebuilt
+   under the new builder rules and the keep thresholds are measured on
+   it. The checklist is the last section of
+   `reviews/36_screener_eval_cohorts_metric/07_fixes_thresholds_and_what_is_left.md`
+   (rebuild, check the key, re-run `--null-test`, refresh the numbers in
+   `PROGRAM.md` and `README.md`, then clear `REVIEW_PENDING`). Do not run
+   the AutoResearch loop from a session that has opened
+   `autoresearch/data/` or that folder: it reads only `PROGRAM.md`.
+2. **One operator decision on the key** (`07`, "Open decision"): whether
+   the rule that leaves out recent buyers should start before 2015. As
+   decided it starts on 1 January 2015; a handful of 2015-2017 positives
+   are owners who bought in 2012-2014.
+3. **The quote checker's third round has had no independent check**
+   (`reviews/35_screener_lead_layer/09_quotecheck_fixes_and_skeptic_run.md`).
+   The first two rounds were checked; the third answers the second check.
+   Four operator decisions are listed there (an allow-list of government
+   hosts, other listing sites, a contact address in the User-Agent, the
+   ArcGIS robots.txt question).
+4. **Both pilot leads now have a skeptic verdict** (`leads/` on the
+   `screener-data` branch): #6 `killed` (a developer's project; no sale
+   shown yet), #44 `weakened` (its plan label was replaced in 2025). The
+   seven parcels of the #6 assemblage are marked `maybe`. For a person:
+   pull the deeds for those seven; ask Fairburn Planning what the 2025
+   plan and the C-2 text allow at #44.
+5. **Still open from before:** whether to add the owner the pilot flagged
+   to the excluded-owner rules (`screens.py` / `owners.py`, human-owned,
+   needs a new baseline).
+6. **Runs are on demand.** Ask a session with the repository attached to
+   follow `RUNBOOK.md` on the `screener-data` branch. A run needs the
+   same Georgia DOT layer, so it fails while that server is down. The
+   weekly scheduled task is switched off, not deleted.
+7. **The loop's log does not survive a cloud session.** `experiments.tsv`
+   and `best_ranking.json` are untracked; a new container has neither and
+   `--decide` then stops for a human baseline. Decide where a batch's
+   log is kept before starting one.
+8. **Not started:** the shared enrichment contract (step 2 below); the
    sites the answer key leaves out as built-but-not-sold; Gwinnett as a
    held-out check and open-records requests for 2016 digests
    (`reviews/35_screener_lead_layer/05_county_feasibility.md`).
@@ -53,9 +65,9 @@ most important first:
 | Storage: kept slope answers | Built and reviewed. A warm Fulton run is about 80 seconds instead of 55 minutes. |
 | Storage: data branch | `screener-data` holds the first run, its digest, the slope answers and two pilot lead checks. |
 | Runs | **On demand** (operator decision, 2026-11-10): ask a Claude session with the repository attached to follow `RUNBOOK.md` on the `screener-data` branch. The weekly schedule made earlier is switched off; a scheduled session starts without push access to the repository and could not save its results. |
-| 4. Investigation | `quotecheck.py` and `INVESTIGATE.md` written and piloted on two leads (`reviews/35_screener_lead_layer/04_investigation_pilot.md`). **Not independently reviewed.** The skeptic step has not been run. |
+| 4. Investigation | `quotecheck.py` and `INVESTIGATE.md` piloted on two leads, reviewed twice and rewritten in three rounds; the third round is not yet checked (`reviews/35_screener_lead_layer`, 06 to 09). The skeptic step has run once on both pilot leads (2026-11-11). `lead.md` is written by the code. |
 | 2. Enrichment contract | Not started. |
-| Evaluation: more as-of years and a graded score | Built and merged, **not cleared**: see "Next session" above and `reviews/36_screener_eval_cohorts_metric`. 49 distinct sites (46 before), 38 dev / 11 test. |
+| Evaluation: more as-of years and a graded score | Built, reviewed and fixed in code (2026-11-11); **not cleared**: the key must be rebuilt under the new rules first (see "Next session" above and `reviews/36_screener_eval_cohorts_metric`, 05 to 07). The key in `data/` is still the one merged on 2026-11-10: 49 distinct sites, 38 dev / 11 test. |
 | 6. More counties | Not started. No neighbouring county publishes a 2016 snapshot like Fulton's (`reviews/35_screener_lead_layer/05_county_feasibility.md`). Fulton itself publishes yearly snapshots for 2015-2021 and 2023-2026 (service names seen 2026-11-10; fields not checked). Rebuilding the key is a human-only step. |
 
 What the pilot changed in the plan: the zoning text (Municode) and the
