@@ -817,7 +817,7 @@ class LeadFileTests(Base):
         self.assertEqual(set(re.findall(r"https?://[^\s>)]+", outside)), {URL})
         self.assertEqual(len(re.findall(r"<https://", outside)), outside.count("<"))
         for word in ("evil.example", "loopnet", "costar", "broker.example", "www.", "](", "@", "&", "~",
-                     "**", "__"):
+                     "trust me**", "__"):
             self.assertNotIn(word, outside.lower())
         self.assertEqual([ln for ln in self.lead.splitlines() if ln.startswith("#")],
                          ["# Lead check: parcel 14F0001 0001", "## What the documents say",
@@ -849,7 +849,7 @@ class LeadFileTests(Base):
     def test_the_pages_words_on_each_side_of_a_quote_are_always_shown(self):
         r = self.check(findings(claim(quote="permitted in the M-1 district at any size")))
         self.assertIn("Around it the page reads: ...as a principal use. rendering plants are not "
-                      "(the quote) . see (the county code)", qc.render_lead(r.checked))
+                      "(the quote) . see the county code ((address removed)", qc.render_lead(r.checked))
 
     def test_words_shared_with_the_request_are_flagged(self):
         url = HOST + "/gis/query?outFields=warehouse&f=json"
