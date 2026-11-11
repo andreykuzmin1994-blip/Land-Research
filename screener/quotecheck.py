@@ -1,12 +1,13 @@
-"""Check an investigation's findings against the pages they cite
-(reviews/35_screener_lead_layer; the rules are in INVESTIGATE.md).
+"""Check an investigation's findings against the pages they cite, and write
+the lead's reading file (reviews/35_screener_lead_layer; the rules are in
+INVESTIGATE.md).
 
     python -m screener.quotecheck screener/leads/<parcel>/findings.json
-    python -m screener.quotecheck screener/leads/<parcel>/findings.json --lead screener/leads/<parcel>/lead.md
+    python -m screener.quotecheck screener/leads/<parcel>/findings.json --with-skeptic --findings-sha256 <hash>
 
 An investigating agent writes ``findings.json``: per checklist section a
 verdict and claims, each claim with the URL it rests on and an exact quote
-from that page. A skeptic agent may later write ``skeptic.json`` beside it.
+from that page. A skeptic agent later writes ``skeptic.json`` beside it.
 This tool, not an agent, fetches each URL and keeps a claim only if its
 quote is on the page. It writes ``findings.checked.json``:
 
@@ -15,12 +16,27 @@ quote is on the page. It writes ``findings.checked.json``:
 - a section left with no kept claim has its verdict set to ``unknown``,
   whatever the agent wrote: a verdict with no surviving evidence is not a
   finding. A skeptic with no kept claim is marked ``supported: false``;
-- each fetched page is recorded (when, final address, size, SHA-256).
+- each fetched page is recorded (when, final address, size, SHA-256), and
+  so are the SHA-256 of the input files.
+
+It also writes ``lead.md`` from the checked file. Nobody writes that file
+by hand: in it, every passage in double quotation marks is a kept quote
+and every link is a kept claim's address, because this code put them
+there. The agents' own words (claim text, objections, open items, and the
+launching session's one-line ``headline.txt``) are labelled as theirs and
+have their quotation marks and web addresses taken out.
+
+The two runs. The first run (no flag) is for the investigator's file
+alone and refuses when a ``skeptic.json`` is already there. It prints the
+SHA-256 of ``findings.json``. The run after the skeptic takes
+``--with-skeptic`` and that hash, and refuses if ``findings.json`` has
+changed since: the skeptic's disputes name claims by position.
 
 Every run fetches every page again. A copy is saved in ``pages/`` beside
 the findings as a record; a file already there is never used as the page
-(an agent can write in that folder). The old ``findings.checked.json`` is
-removed before anything else, so a failed run leaves none.
+(an agent can write in that folder). The old ``findings.checked.json`` and
+``lead.md`` are removed before anything else, so a failed run leaves
+neither. Output files are created new and never written through a link.
 
 What it proves is narrow: the quoted words were on the page at that URL
 when this tool fetched it. It does not prove the page is right, current
@@ -28,34 +44,40 @@ or authoritative, or that the claim follows from the quote. That is the
 skeptic's job and then a person's. Claim text, objections and open items
 are the agents' own words and are not checked.
 
-What a kept quote must pass (reviews/35 .../06_quotecheck_review.md):
+What a kept quote must pass (reviews/35 .../06 and 07):
 - the quote is not made of words from its own URL (a page that echoes its
-  request would otherwise let the agent write the "page");
+  request would otherwise let the agent write the "page"): 25 characters
+  in a row, three words in a row, or one long word shared with the address
+  drops the claim. This cannot be made airtight (a query can name an
+  output field in two short words), so each kept claim lists the words it
+  shares with its address for the skeptic to weigh;
 - it sits on the page between word boundaries ("allowed" is not found in
-  "disallowed"), and the 80 characters on each side are saved with the
-  claim, so a cut "not" shows;
+  "disallowed", nor "5 feet" in "21.5 feet"), and the 80 characters on
+  each side are saved with the claim, so a cut "not" shows;
 - form fields, drop-down lists, templates and the page title do not count
-  as page text; nor do scripts, styles or comments;
-- in a PDF the quote must be inside one page.
+  as page text; nor do scripts, styles or comments. Only a reply that says
+  it is HTML or XML is read as markup; anything else is plain text;
+- in a PDF the quote must be inside one page. Reading order is tried
+  first; a quote found only in layout order (which can read across
+  columns) is kept and marked ``pdf_order: layout``.
+Known and not closed: text hidden by a style sheet, struck-through text
+and invisible PDF text still count as page text.
 
 Fetching rules: GET only, http(s) only, no cookies, no sign-ins. Never an
 address that names CoStar, LoopNet or Crexi anywhere in it (their terms
 prohibit automated use), so not through an archive, cache or reader
-either. Only public internet addresses. robots.txt is read first and
-honoured (wildcards included); a robots.txt that cannot be read (other
-than "not found") means the page is not fetched, a 403 included. At least
-one second between requests to a host, or the host's own Crawl-delay when
-it asks for more (a host asking for more than 30 seconds is not fetched).
+either. (A short link or an encoded address that hides the name cannot be
+seen here; redirects off the cited host are not followed.) Only public
+internet addresses. robots.txt is read first and honoured (wildcards
+included); a robots.txt that cannot be read (other than "not found")
+means the page is not fetched, a 403 included. At least one second
+between requests to a site, or the host's own Crawl-delay when it asks
+for more (a host asking for more than 30 seconds is not fetched).
 Redirects are followed by hand, at most five, each hop under all of these
 rules; a redirect to another host is not followed (cite that address
 instead). Size caps. The screener's own User-Agent. PDFs are read with
 the ``pdftotext`` command when it is installed and are otherwise not
 verifiable (the claim is dropped and says so).
-
-``--lead`` also checks a ``lead.md`` against the checked file: every
-quoted passage of 20 or more characters must be inside a kept quote, every
-link must be a kept claim's address, and each verdict it gives must be
-the checked one. Exit code 1 if it finds a problem.
 
 Offline in tests: every request goes through ``Fetcher.open_once``, which
 tests replace. Stdlib only.
@@ -69,6 +91,7 @@ import html
 import http.client
 import ipaddress
 import json
+import os
 import re
 import shutil
 import socket
@@ -91,21 +114,27 @@ SCHEMA = 1
 FINDINGS_NAME = "findings.json"
 SKEPTIC_NAME = "skeptic.json"
 CHECKED_NAME = "findings.checked.json"
+LEAD_NAME = "lead.md"
+HEADLINE_NAME = "headline.txt"       # the launching session's one line (optional)
 PAGES_DIR = "pages"
 MIN_QUOTE_CHARS = 25
 MAX_QUOTE_CHARS = 1200
 MAX_PDF_BYTES = 200_000_000      # adopted comprehensive plans run past 150 MB
 MAX_HTML_BYTES = 10_000_000      # anything that is not a PDF
 MAX_ROBOTS_BYTES = 500_000
-MAX_CLAIMS = 200
-MAX_URLS = 60                    # distinct pages fetched in one run
+MAX_CLAIMS = 200                 # the investigator's
+MAX_URLS = 60                    # distinct pages of the investigator's claims in one run
+MAX_SKEPTIC_CLAIMS = 60          # the skeptic's own allowance, so the first pass
+MAX_SKEPTIC_URLS = 40            # cannot use it up
+MAX_HEADLINE_CHARS = 400
 MAX_REDIRECTS = 5
 HOST_DELAY_S = 1.0
 MAX_CRAWL_DELAY_S = 30.0         # a host asking for more is not fetched
 TIMEOUT_S = 60
 PDFTOTEXT_TIMEOUT_S = 300
 CONTEXT_CHARS = 80
-LEAD_QUOTE_CHARS = 20
+ECHO_WORDS = 3                   # this many quote words in a row in the address: an echo
+ECHO_TOKEN_CHARS = 12            # or one word this long (with 8+ letters)
 UNKNOWN = "unknown"
 # Never fetched: their terms prohibit automated use (README, "What it can't
 # tell you"; CLAUDE.md "NEVER scrape CoStar"). A name anywhere in the
@@ -132,6 +161,19 @@ CLAIM_KEYS = {"text", "source_url", "retrieved", "quote"}
 # Text inside these elements is not page text: code, and the places a page
 # echoes what the request typed (form fields, lists, the title).
 SKIPPED_TAGS = ("script", "style", "noscript", "template", "textarea", "select", "title")
+# Tags that sit inside a word or a sentence: no space is put where they are,
+# so "dis<b>allowed</b>" stays one word.
+INLINE_TAGS = ("a", "abbr", "b", "bdi", "bdo", "cite", "code", "del", "dfn", "em", "font", "i",
+               "ins", "kbd", "mark", "q", "s", "samp", "small", "span", "strike", "strong", "sub",
+               "sup", "u", "var", "wbr")
+# The character sets a page may declare; anything else is read as UTF-8.
+CHARSETS = {"utf-8": "utf-8", "utf8": "utf-8", "windows-1252": "cp1252", "cp1252": "cp1252",
+            "iso-8859-1": "cp1252", "latin-1": "cp1252", "latin1": "cp1252",
+            "us-ascii": "utf-8", "ascii": "utf-8", "utf-16": "utf-16"}
+# Words that turn a sentence round: lead.md shows them when they come just
+# before a quote on the page.
+NEGATIONS = ("not", "no", "never", "non", "un", "dis", "without", "except", "neither", "nor",
+             "prohibited", "prohibits", "denied", "unless")
 
 
 class Invalid(Exception):
@@ -157,7 +199,8 @@ class Fetched:
 
 @dataclass
 class Page:
-    units: list[tuple[int, str]] = field(default_factory=list)   # (PDF page or 0, normalised text)
+    # (PDF page or 0, "reading" / "layout" / "", normalised text)
+    units: list[tuple[int, str, str]] = field(default_factory=list)
     problem: str = ""         # why there is no text
     record: dict[str, Any] = field(default_factory=dict)
 
@@ -173,24 +216,28 @@ class _Text(HTMLParser):
     def handle_starttag(self, tag: str, attrs: Any) -> None:
         if tag in SKIPPED_TAGS:
             self._skip += 1
-        self.parts.append(" ")
+        if tag not in INLINE_TAGS:
+            self.parts.append(" ")
 
     def handle_endtag(self, tag: str) -> None:
         if tag in SKIPPED_TAGS and self._skip:
             self._skip -= 1
-        self.parts.append(" ")
+        if tag not in INLINE_TAGS:
+            self.parts.append(" ")
 
     def handle_data(self, data: str) -> None:
         if not self._skip:
             self.parts.append(data)
 
 
-_PUNCT = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"',
-                        "–": "-", "—": "-", "−": "-"})
+_PUNCT = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2212": "-",
+                        **{chr(c): "-" for c in range(0x2010, 0x2016)}})
 # Control and format characters other than whitespace: soft hyphens,
-# zero-width characters, direction marks, terminal escapes.
-_INVISIBLE = re.compile("[\u0000-\u0008\u000e-\u001f\u007f-\u009f­؜᠎"
-                        "​-‏‪-‮⁠-⁤⁦-⁯﻿]")
+# zero-width characters, direction marks, terminal escapes, surrogates and
+# Unicode tag characters. Written as escapes: they are invisible in a file.
+_INVISIBLE = re.compile("[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u00ad\u061c\u180e"
+                        "\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff"
+                        "\ud800-\udfff\U000e0000-\U000e007f]")
 
 
 def normalise(text: str) -> str:
@@ -230,11 +277,16 @@ def site_of(url: str) -> str:
 
 
 def _decoded(url: str) -> str:
-    """The address with percent-escapes undone (three rounds), case folded."""
+    """The address with percent-escapes undone until nothing changes (ten
+    rounds at most), HTML entities undone, then normalised: soft hyphens,
+    zero-width characters and look-alike letters do not hide a name."""
     out = url
-    for _ in range(3):
-        out = urllib.parse.unquote_plus(out)
-    return out.casefold()
+    for _ in range(10):
+        again = html.unescape(urllib.parse.unquote_plus(out))
+        if again == out:
+            break
+        out = again
+    return normalise(out)
 
 
 def url_problem(url: Any) -> str:
@@ -261,13 +313,43 @@ def url_problem(url: Any) -> str:
     return ""
 
 
+def _tokens(text: str) -> list[str]:
+    return re.findall(r"[^\W_]+", text)
+
+
+def words_shared_with_url(quote: str, url: str) -> list[str]:
+    """The quote's words of four or more letters that are also in its
+    address, in the quote's order. Saved with a kept claim for the skeptic."""
+    in_url = set(_tokens(_decoded(url)))
+    seen: list[str] = []
+    for word in _tokens(normalise(quote)):
+        if sum(ch.isalpha() for ch in word) >= 4 and word in in_url and word not in seen:
+            seen.append(word)
+    return seen
+
+
 def quote_is_from_url(quote: str, url: str) -> bool:
-    """True when MIN_QUOTE_CHARS in a row of the quote are in the address:
-    a page that echoes its request would show them back."""
+    """Is the quote made of its own address? True when the address holds
+    MIN_QUOTE_CHARS in a row of the quote, ECHO_WORDS of its words in a row
+    (two of them of four letters or more), or one of its words of
+    ECHO_TOKEN_CHARS or more with eight letters or more. A page that shows
+    its request back would show them."""
     nq = normalise(quote)
-    forms = {normalise(_decoded(url)), normalise(urllib.parse.unquote(url))}
-    return any(nq[i:i + MIN_QUOTE_CHARS] in form
-               for form in forms for i in range(max(1, len(nq) - MIN_QUOTE_CHARS + 1)))
+    plain = normalise(urllib.parse.unquote(url))
+    decoded = _decoded(url)
+    if any(nq[i:i + MIN_QUOTE_CHARS] in form for form in (decoded, plain)
+           for i in range(max(1, len(nq) - MIN_QUOTE_CHARS + 1))):
+        return True
+    words, in_url = _tokens(nq), _tokens(decoded)
+    if any(len(w) >= ECHO_TOKEN_CHARS and sum(ch.isalpha() for ch in w) >= 8 and w in in_url
+           for w in words):
+        return True
+    runs = {tuple(in_url[i:i + ECHO_WORDS]) for i in range(len(in_url) - ECHO_WORDS + 1)}
+    for i in range(len(words) - ECHO_WORDS + 1):
+        run = tuple(words[i:i + ECHO_WORDS])
+        if run in runs and sum(1 for w in run if sum(ch.isalpha() for ch in w) >= 4) >= 2:
+            return True
+    return False
 
 
 class Robots:
@@ -291,6 +373,8 @@ class Robots:
                     open_group = True
                 groups[-1][0].append(value.split("/")[0].strip().lower())
                 continue
+            if key not in ("allow", "disallow", "crawl-delay"):
+                continue                      # Sitemap and the like: not part of any group
             open_group = False
             if not groups:
                 continue
@@ -311,15 +395,35 @@ class Robots:
     def _norm(path: str) -> str:
         return urllib.parse.quote(urllib.parse.unquote(path), safe="/?=&*$:@!+,;~%-._()'")
 
+    @staticmethod
+    def _matches(pattern: str, path: str) -> bool:
+        """Does a robots pattern match from the start of the path? `*` is any
+        run of characters, a closing `$` the end of the path. Matched piece
+        by piece, leftmost first, so a long rule cannot stall the run."""
+        anchored = pattern.endswith("$")
+        pieces = (pattern[:-1] if anchored else pattern).split("*")
+        if not path.startswith(pieces[0]):
+            return False
+        at = len(pieces[0])
+        if len(pieces) == 1:
+            return at == len(path) if anchored else True
+        for piece in pieces[1:-1]:
+            found = path.find(piece, at)
+            if found == -1:
+                return False
+            at = found + len(piece)
+        last = pieces[-1]
+        if anchored:
+            return len(path) - len(last) >= at and path.endswith(last)
+        return path.find(last, at) != -1
+
     def allows(self, url: str) -> bool:
         parts = urllib.parse.urlsplit(url)
         path = self._norm((parts.path or "/") + ("?" + parts.query if parts.query else ""))
         best = (-1, True)
         for allow, pattern in self.rules:
             pat = self._norm(pattern)
-            anchored = pat.endswith("$")
-            regex = ".*".join(re.escape(piece) for piece in pat.rstrip("$").split("*"))
-            if re.match(regex + ("$" if anchored else ""), path):
+            if self._matches(pat, path):
                 best = max(best, (len(pat), allow))
         return best[1]
 
@@ -380,6 +484,9 @@ class Fetcher:
                     raise FetchError(f"larger than {min(cap, MAX_HTML_BYTES):,} bytes and not a PDF")
                 if len(body) > cap:
                     raise FetchError(f"larger than {cap:,} bytes")
+                declared = headers.get("content-length", "").strip()
+                if declared.isdigit() and len(body) < int(declared):
+                    raise FetchError("the reply was cut short")
                 return resp.status, headers, body
         except urllib.error.HTTPError as exc:
             if exc.code in (301, 302, 303, 307, 308):
@@ -400,8 +507,7 @@ class Fetcher:
         for hop in range(MAX_REDIRECTS + 1):
             why = url_problem(url)
             if not why and site_of(url) != site:
-                why = (f"it is on another host ({clean(host_of(url), 80)}); cite the final "
-                       "address instead")
+                why = "it is on another host; cite the final address instead"
             why = why or self.address_problem(url) or (self.allowed(url) if robots else "")
             if why:
                 raise FetchError(why if hop == 0 else f"it redirects to an address not fetched: {why}")
@@ -416,17 +522,17 @@ class Fetcher:
                 except ValueError:
                     raise FetchError(f"HTTP {status} to an unreadable address") from None
                 continue
-            return Fetched(body, headers.get("content-type", "").lower(), url, status)
+            return Fetched(body, headers.get("content-type", "").lower(), url[:2000], status)
         raise FetchError(f"more than {MAX_REDIRECTS} redirects")
 
     def wait(self, url: str) -> None:
         """Sleep until this host may be asked again (called before each request)."""
-        host = host_of(url)
-        delay = self._delay.get(host, HOST_DELAY_S)
-        pause = delay - (self._clock() - self._last.get(host, -delay))
+        site = site_of(url)                   # www.x and x are one site to pace
+        delay = self._delay.get(site, HOST_DELAY_S)
+        pause = delay - (self._clock() - self._last.get(site, -delay))
         if pause > 0:
             self._sleep(pause)
-        self._last[host] = self._clock()
+        self._last[site] = self._clock()
 
     def allowed(self, url: str) -> str:
         """'' when robots.txt allows the fetch, else why not."""
@@ -443,7 +549,8 @@ class Fetcher:
         if rules.delay > MAX_CRAWL_DELAY_S:
             return (f"robots.txt asks for {rules.delay:g} s between requests "
                     f"(over {MAX_CRAWL_DELAY_S:g} s): not fetched")
-        self._delay[host_of(url)] = max(HOST_DELAY_S, rules.delay)
+        site = site_of(url)
+        self._delay[site] = max(HOST_DELAY_S, rules.delay, self._delay.get(site, 0.0))
         return ""
 
     def _read_robots(self, root: str) -> Robots | str:
@@ -456,13 +563,14 @@ class Fetcher:
         return Robots(got.body.decode("utf-8-sig", "replace"))
 
 
-def _pdf_units(path: Path) -> list[tuple[int, str]] | str:
-    """Per PDF page, its text in layout order and in reading order; or why not."""
+def _pdf_units(path: Path) -> list[tuple[int, str, str]] | str:
+    """Per PDF page, its text in reading order and then in layout order
+    (which keeps tables but can read across columns); or why not."""
     tool = shutil.which("pdftotext")
     if tool is None:
         return "a PDF, and pdftotext is not installed: not verifiable here"
-    units: list[tuple[int, str]] = []
-    for mode in (["-layout"], []):
+    units: list[tuple[int, str, str]] = []
+    for order, mode in (("reading", []), ("layout", ["-layout"])):
         try:
             out = subprocess.run([tool, *mode, str(path), "-"], capture_output=True,
                                  timeout=PDFTOTEXT_TIMEOUT_S, check=False)
@@ -473,21 +581,33 @@ def _pdf_units(path: Path) -> list[tuple[int, str]] | str:
         for number, text in enumerate(out.stdout.decode("utf-8", "replace").split("\f"), 1):
             text = normalise(text)
             if text:
-                units.append((number, text))
+                units.append((number, order, text))
     return units or "the PDF has no text (a scan without OCR?)"
 
 
-def _charset(body: bytes, ctype: str) -> str:
-    """The page's declared character set, if Python knows it; else UTF-8."""
-    found = re.search(r"charset\s*=\s*[\"']?([\w.:-]+)", ctype) or re.search(
-        r"charset\s*=\s*[\"']?([\w.:-]+)", body[:4096].decode("ascii", "replace"), re.I)
-    if found:
-        try:
-            "".encode(found.group(1))
-            return found.group(1)
-        except LookupError:
-            pass
-    return "utf-8"
+def _charset(body: bytes, ctype: str, markup: bool) -> str:
+    """The character set to read a page in: the reply header's, or (markup
+    only) a <meta> tag's, when it is one of CHARSETS; else UTF-8. Never a
+    name found loose in the text: a page that echoes its request could
+    otherwise choose how its own bytes are read."""
+    found = re.search(r"charset\s*=\s*[\"']?([\w.:-]+)", ctype)
+    if not found and markup:
+        found = re.search(r"<meta[^>]{0,200}?charset\s*=\s*[\"']?([\w.:-]+)",
+                          body[:4096].decode("ascii", "replace"), re.I)
+    return CHARSETS.get(found.group(1).lower(), "utf-8") if found else "utf-8"
+
+
+def _safe_write(path: Path, data: bytes) -> None:
+    """Create `path` new with `data`. Whatever had that name (a link an agent
+    left there included) is removed, never written through."""
+    tmp = path.with_name(path.name + ".part")
+    for old in (tmp, path):
+        if old.is_symlink() or old.exists():
+            old.unlink()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o644)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+    os.replace(tmp, path)
 
 
 def load_page(url: str, pages: Path, fetcher: Fetcher) -> Page:
@@ -496,21 +616,21 @@ def load_page(url: str, pages: Path, fetcher: Fetcher) -> Page:
         got = fetcher.fetch(url)
     except FetchError as exc:
         return Page(problem=f"could not be fetched: {exc}")
-    is_pdf = got.body[:5] == b"%PDF-" or "pdf" in got.ctype
+    is_pdf = b"%PDF-" in got.body[:1024] or "pdf" in got.ctype
     path = pages / (page_name(url) + (".pdf" if is_pdf else ".html"))
     try:
+        if pages.is_symlink():
+            return Page(problem="could not be saved (pages is a link, not a folder)")
         pages.mkdir(parents=True, exist_ok=True)
         for old in pages.glob(page_name(url) + ".*"):
             old.unlink()
-        tmp = path.with_suffix(path.suffix + ".part")
-        tmp.write_bytes(got.body)
-        tmp.replace(path)
+        _safe_write(path, got.body)
     except OSError as exc:
         return Page(problem=f"could not be saved ({type(exc).__name__})")
     record = {
         "file": f"{PAGES_DIR}/{path.name}",
         "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "final_url": got.final_url, "status": got.status, "bytes": len(got.body),
+        "final_url": clean(got.final_url, 2000), "status": got.status, "bytes": len(got.body),
         "sha256": hashlib.sha256(got.body).hexdigest(),
     }
     if is_pdf:
@@ -518,31 +638,48 @@ def load_page(url: str, pages: Path, fetcher: Fetcher) -> Page:
         if isinstance(units, str):
             return Page(problem=units, record=record)
         return Page(units=units, record=record)
-    text = normalise(html_text(got.body.decode(_charset(got.body, got.ctype), "replace")))
+    # Markup only when the reply says so: a JSON or text reply is read as it
+    # is, so "&#101;" in it is not turned into a letter.
+    markup = "html" in got.ctype or "xml" in got.ctype
+    raw = got.body.decode(_charset(got.body, got.ctype, markup), "replace")
+    text = normalise(html_text(raw) if markup else raw)
     if not text:
         return Page(problem="the page has no text", record=record)
-    return Page(units=[(0, text)], record=record)
+    return Page(units=[(0, "", text)], record=record)
 
 
 def _wordlike(ch: str) -> bool:
     return ch.isalnum() or ch in "-_"
 
 
+def _cut(quote_edge: str, beside: str, beyond: str) -> bool:
+    """Does the quote stop inside a word or a number? quote_edge is the
+    quote's first (or last) character, beside the page character next to
+    it, beyond the one after that."""
+    if not _wordlike(quote_edge):
+        return False
+    if _wordlike(beside):
+        return True
+    return quote_edge.isdigit() and beside in ".," and beyond.isdigit()   # 21.5, 2,500,000
+
+
 def find_quote(quote: str, page: Page) -> dict[str, Any] | None:
     """Where the quote sits on the page, between word boundaries: the text
-    around it (and the PDF page), or None when it is not there."""
+    around it (and the PDF page and text order), or None when it is not
+    there."""
     nq = normalise(quote)
-    for number, text in page.units:
+    for number, order, text in page.units:
         at = text.find(nq)
         while at != -1:
             end = at + len(nq)
-            cut_front = _wordlike(nq[0]) and at > 0 and _wordlike(text[at - 1])
-            cut_back = _wordlike(nq[-1]) and end < len(text) and _wordlike(text[end])
-            if not cut_front and not cut_back:
+            front = _cut(nq[0], text[at - 1] if at else " ", text[at - 2] if at > 1 else " ")
+            back = _cut(nq[-1], text[end] if end < len(text) else " ",
+                        text[end + 1] if end + 1 < len(text) else " ")
+            if not front and not back:
                 found: dict[str, Any] = {"context_before": text[max(0, at - CONTEXT_CHARS):at],
                                          "context_after": text[end:end + CONTEXT_CHARS]}
                 if number:
-                    found["pdf_page"] = number
+                    found["pdf_page"], found["pdf_order"] = number, order
                 return found
             at = text.find(nq, at + 1)
     return None
@@ -595,7 +732,7 @@ def _header(doc: Any, keys: set[str], what: str) -> None:
     if extra:
         raise Invalid(f"{what} has a field that is not allowed: {clean(extra[0], 40)!r} "
                       f"(allowed: {', '.join(sorted(keys))})")
-    if doc.get("schema") != SCHEMA or isinstance(doc.get("schema"), bool):
+    if type(doc.get("schema")) is not int or doc["schema"] != SCHEMA:
         raise Invalid(f"{what}: schema must be {SCHEMA}")
     if not isinstance(doc.get("parcel_id"), str) or not doc["parcel_id"].strip():
         raise Invalid(f"{what}: no parcel_id")
@@ -646,8 +783,10 @@ def validate(findings: Any, skeptic_doc: Any = None) -> list[tuple[str, dict[str
         if unknown:
             raise Invalid(f"skeptic: disputes names a claim that does not exist "
                           f"({clean(unknown[0], 40)})")
+        if len(skeptic.get("claims", [])) > MAX_SKEPTIC_CLAIMS:
+            raise Invalid(f"skeptic: more than {MAX_SKEPTIC_CLAIMS} claims")
         out.append((SKEPTIC, skeptic))
-    if sum(len(body.get("claims", [])) for _, body in out) > MAX_CLAIMS:
+    if sum(len(body.get("claims", [])) for name, body in out if name != SKEPTIC) > MAX_CLAIMS:
         raise Invalid(f"more than {MAX_CLAIMS} claims")
     return out
 
@@ -660,6 +799,7 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
         checked[SKEPTIC] = json.loads(json.dumps(skeptic_doc[SKEPTIC]))
     result = Result(checked=checked)
     cache: dict[str, Page] = {}
+    asked: dict[bool, set[str]] = {False: set(), True: set()}    # is the skeptic's -> its pages
     for name, body in sections:
         target = checked[SKEPTIC] if name == SKEPTIC else checked["sections"][name]
         kept = []
@@ -669,9 +809,12 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
             found = None
             if not why:
                 url = urllib.parse.urldefrag(claim["source_url"])[0]
-                if url not in cache and len(cache) >= MAX_URLS:
-                    why = f"more than {MAX_URLS} different pages in one run"
+                mine = asked[name == SKEPTIC]
+                most = MAX_SKEPTIC_URLS if name == SKEPTIC else MAX_URLS
+                if url not in mine and len(mine) >= most:
+                    why = f"more than {most} different pages in one run"
                 else:
+                    mine.add(url)
                     if url not in cache:
                         try:
                             cache[url] = load_page(url, pages, fetcher)
@@ -689,6 +832,8 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
                                        "claim": claim if isinstance(claim, dict) else repr(claim)})
             else:
                 kept.append({"id": claim_id, **claim, **found,
+                             "words_shared_with_url": words_shared_with_url(
+                                 claim["quote"], claim["source_url"]),
                              "page_file": cache[url].record["file"]})
         target["claims"] = kept
         result.kept += len(kept)
@@ -710,36 +855,112 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
     return result
 
 
-def lead_problems(lead: str, checked: dict[str, Any]) -> list[str]:
-    """What a lead.md says that the checked file does not back."""
-    bodies = dict(checked.get("sections") or {})
-    if isinstance(checked.get(SKEPTIC), dict):
-        bodies[SKEPTIC] = checked[SKEPTIC]
-    claims = [c for body in bodies.values() for c in body.get("claims", [])]
-    quotes = [normalise(c["quote"]) for c in claims]
-    urls = {c["source_url"] for c in claims}
-    problems = []
-    for passage in re.findall(r'"([^"]{%d,}?)"|“([^”]{%d,}?)”' % (LEAD_QUOTE_CHARS, LEAD_QUOTE_CHARS),
-                              lead):
-        words = normalise(passage[0] or passage[1])
-        if len(words) >= LEAD_QUOTE_CHARS and not any(words in q for q in quotes):
-            problems.append(f"quoted words that are in no kept quote: \"{clean(words, 70)}\"")
-    for url in re.findall(r"\]\(\s*<?(https?://[^)\s>]+)", lead):
-        if url not in urls:
-            problems.append(f"a link that is no kept claim's address: {clean(url, 110)}")
-    for name, body in bodies.items():
-        allowed = SKEPTIC_VERDICTS if name == SKEPTIC else SECTIONS.get(name, ())
-        said = [v for v in re.findall(r"(?i)\b%s\b[^\n`]{0,40}`([a-z_]+)`" % re.escape(name), lead)
-                if v in allowed]
-        if not said:
-            problems.append(f"no verdict given for {name} (write it as {name}: `{body.get('verdict')}`)")
-        elif any(v != body.get("verdict") for v in said):
-            problems.append(f"{name}: lead.md says `{said[0]}`, the checked file says "
-                            f"`{body.get('verdict')}`")
-    return problems
+def _plain(text: Any, limit: int = 600) -> str:
+    """An agent's (or a page's) words made safe to sit in lead.md: one line,
+    no control characters, no web addresses, and no double quotation marks
+    or markdown that could pass for a quote, a link or a heading. In lead.md
+    only this code writes those."""
+    t = clean(text, limit * 2)
+    t = re.sub(r"(?i)\b(?:https?|ftp)://\S+|\bwww\.\S+", "[address removed]", t)
+    t = t.translate(str.maketrans({'"': "'", "\u201c": "'", "\u201d": "'", "\u00ab": "'",
+                                   "\u00bb": "'", "`": "'", "[": "(", "]": ")", "<": "(",
+                                   ">": ")", "*": "", "_": " ", "#": "", "|": "/"}))
+    t = re.sub(r"\s+", " ", t).strip()
+    return t[:limit] + (" (cut)" if len(t) > limit else "")
 
 
-def _read_json(path: Path) -> Any:
+def _link(url: str) -> str:
+    return "<" + urllib.parse.quote(url, safe=":/?#[]@!$&'()*+,;=%~-._") + ">"
+
+
+def _claim_lines(claim: dict[str, Any]) -> list[str]:
+    """One kept claim: the agent's words, then the quote and its address."""
+    quote = clean(claim["quote"], MAX_QUOTE_CHARS).replace('"', "'")
+    where = f", PDF page {claim['pdf_page']}" if claim.get("pdf_page") else ""
+    lines = [f"- {_plain(claim['text'])} ({claim['id']})",
+             f"  - On the page: \"{quote}\" ({_link(claim['source_url'])}{where})"]
+    before = _tokens(claim.get("context_before", ""))[-3:]
+    if any(word in NEGATIONS for word in before):
+        lines.append(f"  - Read it in place: just before these words the page says "
+                     f"'{_plain(' '.join(before), 60)}'.")
+    if claim.get("pdf_order") == "layout":
+        lines.append("  - Found only in the PDF's layout order, which can read across "
+                     "columns: open the page.")
+    if claim.get("words_shared_with_url"):
+        lines.append("  - Some of these words are also in the address ("
+                     + _plain(", ".join(claim["words_shared_with_url"][:6]), 80)
+                     + "): check the page did not just show the request back.")
+    return lines
+
+
+def render_lead(checked: dict[str, Any], headline: str = "") -> str:
+    """lead.md, written from the checked file alone. Double quotation marks
+    and links appear only where this function puts a kept quote and its
+    address; everything an agent wrote goes through _plain()."""
+    qc, sections = checked["quotecheck"], checked["sections"]
+    out = [f"# Lead check: parcel {_plain(checked['parcel_id'], 60)}"
+           + (f", run {_plain(checked['run'], 60)}" if checked.get("run") else ""), ""]
+    if headline.strip():
+        out += ["**In one line (the launching session's reading, not checked):** "
+                + _plain(headline, MAX_HEADLINE_CHARS), ""]
+    out += ["Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. "
+            "Words in double quotation marks were on the linked page when it was fetched "
+            f"({qc['checked_at']}). Everything else is an agent's own reading, not checked.", "",
+            "## What the documents say", ""]
+    for name in SECTIONS:
+        body = sections.get(name)
+        if body is None:
+            out += [f"**{name.capitalize()}: not looked at.**", ""]
+            continue
+        note = (f" The investigator wrote `{body['verdict_as_written']}`, but none of its "
+                "quotes was found on its page." if "verdict_as_written" in body else "")
+        out += [f"**{name.capitalize()}: `{body['verdict']}`.**{note}"]
+        claims = body["claims"]
+        if claims:
+            out += _claim_lines(claims[0])
+            if len(claims) > 1:
+                out += [f"- and {len(claims) - 1} more kept claims in the checked file."]
+        out += [""]
+    out += ["## Skeptic", ""]
+    skeptic = checked.get(SKEPTIC)
+    if skeptic is None:
+        out += ["Not run yet.", ""]
+    else:
+        backing = ("backed by quotes of its own, below" if skeptic["supported"] else
+                   "the skeptic's opinion only: none of its own quotes was found on its page")
+        out += [f"**Skeptic: `{skeptic['verdict']}`** ({backing}).", "",
+                "The skeptic's objection, in its own words: " + _plain(skeptic["objection"], 1200),
+                ""]
+        if skeptic.get("disputes"):
+            out += ["It disputes these first-pass claims: "
+                    + _plain(", ".join(skeptic["disputes"]), 300) + ".", ""]
+        for claim in skeptic["claims"][:4]:
+            out += _claim_lines(claim)
+        if len(skeptic["claims"]) > 4:
+            out += [f"- and {len(skeptic['claims']) - 4} more kept claims in the checked file."]
+        out += [""]
+    unknown = [n for n in SECTIONS if n not in sections or sections[n]["verdict"] == UNKNOWN]
+    out += ["## What the check proves", "",
+            f"`quotecheck` kept {qc['kept']} claims and dropped {qc['dropped']}"
+            + (f"; it set to `unknown`: {', '.join(qc['downgraded'])}" if qc["downgraded"] else "")
+            + ". A kept claim proves only that its quote was on its page when fetched. It "
+            "does not prove the page is current, or that the claim follows from the quote. "
+            + (f"Still `unknown`: {', '.join(unknown)}." if unknown else ""), "",
+            "## Questions for a person (the agents' own, not checked)", ""]
+    bodies = list(sections.items()) + ([(SKEPTIC, skeptic)] if skeptic else [])
+    items = [(name, item) for name, body in bodies for item in body.get("open_items") or []]
+    for name, item in items[:14]:
+        out += [f"- ({name}) {_plain(item, 400)}"]
+    if len(items) > 14:
+        out += [f"- and {len(items) - 14} more in the checked file."]
+    if not items:
+        out += ["None written down."]
+    return "\n".join(out) + "\n"
+
+
+def _read_json(path: Path) -> tuple[Any, str]:
+    """(the document, the SHA-256 of the file). Refuses repeated fields and
+    numbers that are not finite (they would break the writing at the end)."""
     def no_repeats(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         keys = [k for k, _ in pairs]
         if len(keys) != len(set(keys)):
@@ -749,41 +970,75 @@ def _read_json(path: Path) -> Any:
     def no_constant(name: str) -> Any:
         raise ValueError(f"{name} is not a JSON value")
 
+    def finite(text: str) -> float:
+        value = float(text)
+        if value != value or value in (float("inf"), float("-inf")):
+            raise ValueError("a number is too large")
+        return value
+
     try:
-        return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=no_repeats,
-                          parse_constant=no_constant)
+        raw = path.read_bytes()
+        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=no_repeats,
+                         parse_constant=no_constant, parse_float=finite)
     except (OSError, ValueError, RecursionError) as exc:
         raise Invalid(f"{path.name} is unreadable ({clean(exc, 120)})") from exc
+    return doc, hashlib.sha256(raw).hexdigest()
 
 
 def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("findings", type=Path, help="a lead's findings.json")
-    ap.add_argument("--lead", type=Path, metavar="LEAD_MD",
-                    help="also check this lead.md against the checked file")
+    ap.add_argument("--with-skeptic", action="store_true",
+                    help=f"the run after the skeptic: check {SKEPTIC_NAME} too")
+    ap.add_argument("--findings-sha256", metavar="HASH", default="",
+                    help="with --with-skeptic: the hash the first run printed for findings.json")
     args = ap.parse_args(argv)
     path: Path = args.findings
-    out = path.with_name(CHECKED_NAME)
-    try:
-        out.unlink(missing_ok=True)     # a failed run must not leave an old result
-    except OSError as exc:
-        print(f"refused: the old {CHECKED_NAME} could not be removed ({type(exc).__name__})",
-              file=sys.stderr)
-        return 2
+    folder = path.parent
+    out, lead = folder / CHECKED_NAME, folder / LEAD_NAME
     try:
         if path.name != FINDINGS_NAME:
             raise Invalid(f"the file to check is named {FINDINGS_NAME}")
-        findings = _read_json(path)
-        skeptic_path = path.with_name(SKEPTIC_NAME)
-        skeptic_doc = _read_json(skeptic_path) if skeptic_path.exists() else None
-        result = check(findings, path.parent / PAGES_DIR, fetcher or Fetcher(), skeptic_doc)
+        for old in (out, lead):            # a failed run must not leave an old result
+            try:
+                if old.is_symlink() or old.exists():
+                    old.unlink()
+            except OSError as exc:
+                raise Invalid(f"the old {old.name} could not be removed "
+                              f"({type(exc).__name__})") from exc
+        findings, findings_hash = _read_json(path)
+        skeptic_path = folder / SKEPTIC_NAME
+        skeptic_doc, skeptic_hash = None, ""
+        if args.with_skeptic:
+            if args.findings_sha256.strip().lower() != findings_hash:
+                raise Invalid(f"{FINDINGS_NAME} is not the file the first run checked (its "
+                              f"SHA-256 is {findings_hash}; --findings-sha256 must give the "
+                              "hash that run printed). The skeptic disputes claims by "
+                              "position, so the file may not change between the runs")
+            if not skeptic_path.is_file() or skeptic_path.is_symlink():
+                raise Invalid(f"--with-skeptic, but there is no {SKEPTIC_NAME}")
+            skeptic_doc, skeptic_hash = _read_json(skeptic_path)
+        elif skeptic_path.exists() or skeptic_path.is_symlink():
+            raise Invalid(f"there is already a {SKEPTIC_NAME} here. The first run is for the "
+                          "investigator's file alone: remove it (the skeptic has not run "
+                          "yet), or pass --with-skeptic and --findings-sha256 for the run "
+                          "after the skeptic")
+        result = check(findings, folder / PAGES_DIR, fetcher or Fetcher(), skeptic_doc)
+        result.checked["quotecheck"]["inputs"] = {
+            FINDINGS_NAME: findings_hash, **({SKEPTIC_NAME: skeptic_hash} if skeptic_doc else {})}
+        headline = ""
+        headline_path = folder / HEADLINE_NAME
+        if headline_path.is_file() and not headline_path.is_symlink():
+            headline = headline_path.read_text(encoding="utf-8", errors="replace")
+        _safe_write(out, json.dumps(result.checked, indent=1, allow_nan=False).encode("utf-8"))
+        _safe_write(lead, render_lead(result.checked, headline).encode("utf-8"))
     except Invalid as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
-    tmp = out.with_suffix(".json.part")
-    tmp.write_text(json.dumps(result.checked, indent=1, allow_nan=False), encoding="utf-8")
-    tmp.replace(out)
+    except OSError as exc:
+        print(f"refused: a file could not be written ({type(exc).__name__})", file=sys.stderr)
+        return 2
     print(f"{result.kept} claims kept, {len(result.dropped)} dropped"
           + (f"; verdict set to unknown for: {', '.join(result.downgraded)}"
              if result.downgraded else ""))
@@ -792,20 +1047,10 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
         print(f"skeptic ({SKEPTIC_NAME}): {result.checked[SKEPTIC]['verdict']}; it {backed} "
               "kept quote of its own")
     for d in result.dropped:
-        print(f"  dropped ({d['id']}): {clean(d['reason'])}")
-    print(f"written: {out}")
-    if args.lead is None:
-        return 0
-    try:
-        problems = lead_problems(args.lead.read_text(encoding="utf-8"), result.checked)
-    except (OSError, ValueError) as exc:
-        print(f"refused: {args.lead.name} is unreadable ({type(exc).__name__})", file=sys.stderr)
-        return 2
-    for p in problems:
-        print(f"  {args.lead.name}: {p}")
-    print(f"{args.lead.name}: {len(problems)} problems" if problems
-          else f"{args.lead.name}: agrees with the checked file")
-    return 1 if problems else 0
+        print(f"  dropped ({clean(d['id'], 40)}): {clean(d['reason'])}")
+    print(f"written: {out} and {lead.name}")
+    print(f"{FINDINGS_NAME} sha256: {findings_hash}")
+    return 0
 
 
 if __name__ == "__main__":
