@@ -10,10 +10,10 @@ repository private.
 | Path | What it is |
 |---|---|
 | `decisions/decisions.csv` | Your pursue / pass / maybe / listed marks. Every run reads it. |
-| `decisions/decision_features.jsonl` | Written by `python -m screener.decide` (absent until first used). |
+| `decisions/decision_features.jsonl`, `decisions/decision_facts.jsonl` | Written by `python -m screener.decide`: what the run showed for each parcel you marked. |
 | `runs/<county>-<date>/` | One folder per run: `leads.md` (start here), `summary.md`, `ranked.csv`, `briefs/`, `map.html`, `rejected.csv`, `ranked.geojson`, `features.json`, `facts.json`. |
 | `digests/<county>-<date>.md` | What changed since the previous run. Start here. |
-| `leads/<parcel>/` | An agent's check of one lead: `lead.md` (start there) and its quote-checked findings. The fetched pages are not kept here. |
+| `leads/<parcel>/` | Two agents' check of one lead (an investigator, then a skeptic): `lead.md` (start there; written by `quotecheck`, not by hand), `findings.checked.json` (every kept and dropped claim), and the agents' own files. The fetched pages are not kept here. |
 | `cache/slope/` | Kept lidar slope answers (public data, about 2 KB per parcel). They spare each run about 50 minutes. |
 | `RUNBOOK.md` | The steps a session follows when you ask it to run the screen. |
 
