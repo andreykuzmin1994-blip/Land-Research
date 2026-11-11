@@ -23,11 +23,22 @@ Positives: pool parcels that the as-of owner SOLD on or after 1 January of
            improvements (BUILT_YEARS; the label is that coverage in
            LABEL_YEAR). A developer who bought the land, built, and sold the
            finished building is not "an owner who sold land to a developer".
+           The digests date a building only to the year, so that rule alone
+           still let through a buyer who built and resold within a year or
+           so (reviews/36, 05, finding 4). So the as-of owner must also be
+           the owner from before the key's window: a built parcel that
+           anyone bought at a real price on or after 1 January of the first
+           as-of year and before this as-of date is left out for this year.
+           Its earlier years, under the owner who sold it, still count.
 Left out:  parcels built on by LABEL_YEAR without such a sale (owner-users,
            corporate successors, replatted ids, sales after the building,
-           and sales whose order against the building can't be told because
-           the county published no 2022 digest) are dropped from the pool,
-           not counted as misses.
+           buyers inside the window, and sales whose order against the
+           building can't be told because the county published no 2022
+           digest) are dropped from the pool, not counted as misses. So is
+           any parcel, built or not, with a priced deed in the first quarter
+           of the as-of year whose seller is not the digest's owner: the
+           digest is from somewhat after 1 January and already shows the
+           buyer, whose record would be paired with the seller's history.
 Features:  that year's digest + deed history before the as-of date + layers
            that change slowly (flood, 1980s wetlands, easements, exits,
            main-line rail). Blank (None) because today's values were often
@@ -47,7 +58,10 @@ Split:     ~5 km grid cells. The cells sealed for the test set are frozen
            clustered bootstrap.
 
 Writes screener/autoresearch/data/fulton_<year>_features.json.gz and
-fulton_<year>_labels.json for each year. Records carry no owner names,
+fulton_<year>_labels.json for each year. The labels file also gives each
+positive record a site hash ("sites"); tests/test_eval_key.py checks on the
+built files that a site's weights sum to 1 and that it sits in one cell and
+one split. The ranking never sees the labels file. Records carry no owner names,
 parcel ids or coordinates (the keys and block ids are short hashes: they
 keep casual eyes off the answers, they are not a secret, since the county
 file is public).
@@ -84,6 +98,12 @@ LABEL_YEAR = 2025
 # county published no 2022 layer.
 BUILT_YEARS = (2015, 2016, 2017, 2018, 2019, 2020, 2021, 2023, 2024, 2025)
 MIN_PRICE = 50_000
+# The key's window opens on 1 January of the first as-of year: a built parcel
+# bought at a real price since then is in a developer's or middleman's hands.
+WINDOW_START = date(COHORTS[0], 1, 1)
+# How long after 1 January a digest may still have been exported (the
+# snapshot date check found first-quarter buyers in every year's digest).
+SNAPSHOT_SLACK = timedelta(days=92)
 TEST_SHARE = 0.25     # what the sealed cells were first picked to hold (stratified_test_cells)
 
 
@@ -119,6 +139,11 @@ BANNED_AS_NONE = ["zoning", "flu", "entitlement", "entitlement_note", "water", "
 def key_for(parcel_id: str, year: int = 2016) -> str:
     """A record's key: per year, so one parcel has a different key in each."""
     return hashlib.sha256(f"fulton-{year}:{parcel_id}".encode()).hexdigest()[:16]
+
+
+def site_for(parcel_id: str) -> str:
+    """A site's hash in the labels file: the same in every year."""
+    return hashlib.sha256(f"fulton-site:{parcel_id}".encode()).hexdigest()[:16]
 
 
 def block_for(cell: str) -> str:
@@ -167,11 +192,13 @@ def sale_before(sales: list[dict[str, Any]], owner: str | None, after: date, bef
 
 
 def built_window(first_year: int) -> tuple[date, date]:
-    """(surely before the building, surely not before it) for a building
-    first shown in the `first_year` digest. A sale before the first date
-    preceded the building; a sale on or after the second did not; between
-    them (only when the previous digest year is missing: 2022) the order
-    can't be told."""
+    """(before the digests show the building, surely not before it) for a
+    building first shown in the `first_year` digest. A sale before the first
+    date came before any digest showed the building, which is not the same
+    as before the building: a digest shows a building months to a year
+    after it is finished (bought_in_window covers that gap). A sale on or
+    after the second date did not precede it; between them (only when the
+    previous digest year is missing: 2022) the order can't be told."""
     i = BUILT_YEARS.index(first_year)
     prev = BUILT_YEARS[i - 1] if i else first_year - 1
     return date(prev + 1, 1, 1), date(first_year, 1, 1)
@@ -185,12 +212,48 @@ def covered_share(geom: Any, built_idx: Index) -> float:
     return proj(unary_union(parts)).area / proj(geom).area if parts else 0.0
 
 
+def _real_transfer(deed: dict[str, Any], owner: str | None, min_price: float) -> bool:
+    """A priced deed (above min_price) by which someone other than `owner` sold."""
+    return (deed["price"] > min_price and deed["instrument"] not in fulton.NON_TRANSFER_DEEDS
+            and not fulton.same_owner(deed["old_owner"], owner))
+
+
+def digest_shows_buyer(sales: list[dict[str, Any]], owner: str | None, as_of: date) -> bool:
+    """Is the digest's owner the buyer of a first-quarter sale? True when no
+    priced deed of the first day with one, in the SNAPSHOT_SLACK after the
+    as-of date, has the digest's owner as its seller (a January owner would
+    be the seller of the quarter's first sale)."""
+    quarter = sorted((s for s in sales if as_of <= s["date"] < as_of + SNAPSHOT_SLACK
+                      and s["price"] > 0 and s["instrument"] not in fulton.NON_TRANSFER_DEEDS),
+                     key=lambda s: s["date"])
+    # Only the quarter's first priced deed says who owned the land in
+    # January: when the January owner sells and the buyer resells within the
+    # quarter, the second deed's seller is not the digest's owner either.
+    # Deeds of the same day have no order in the file, so any of that day's
+    # sellers may be the January owner.
+    first_day = [s for s in quarter if s["date"] == quarter[0]["date"]] if quarter else []
+    return bool(first_day) and not any(fulton.same_owner(s["old_owner"], owner)
+                                       for s in first_day)
+
+
+def bought_in_window(sales: list[dict[str, Any]], owner: str | None, as_of: date) -> bool:
+    """Did the land change hands at a real price inside the key's window
+    before the as-of date? The seller of such a deed is not the as-of owner,
+    so the as-of owner (or someone between) is its buyer."""
+    return any(WINDOW_START <= s["date"] < as_of and _real_transfer(s, owner, MIN_PRICE - 0.01)
+               for s in sales)
+
+
 def classify(shares: dict[int, float], sales: list[dict[str, Any]], owner: str | None,
              as_of: date) -> str:
     """One pool parcel's label in one cohort: "positive", "negative", or a
     reason it is left out of the pool. shares: digest year -> covered share."""
+    if digest_shows_buyer(sales, owner, as_of):
+        return "left out: the digest shows the buyer of a first-quarter sale"
     if shares.get(LABEL_YEAR, 0.0) < 0.5:
         return "negative"
+    if bought_in_window(sales, owner, as_of):
+        return f"left out: bought at a real price since {WINDOW_START.year}"
     first = next(y for y in BUILT_YEARS if shares.get(y, 0.0) >= 0.5)
     surely_before, not_before = built_window(first)
     if sale_before(sales, owner, as_of, surely_before, MIN_PRICE):
@@ -293,6 +356,53 @@ def build_cohort(year: int, cfg: dict[str, Any], built: dict[int, Index]
     return pool, counts
 
 
+def site_cells(cohorts: dict[int, list[dict[str, Any]]]) -> dict[str, str]:
+    """One map cell per site: the cell of the first year the parcel is in,
+    whatever its centroid does in later years."""
+    cell_of: dict[str, str] = {}
+    for year in sorted(cohorts):
+        for p in cohorts[year]:
+            cell_of.setdefault(p["parcel_id"], cell_for(p["lon"], p["lat"]))
+    return cell_of
+
+
+def dev_on_test_ground(kept: list[dict[str, Any]], is_test: dict[str, bool]) -> set[str]:
+    """Dev parcel ids that share ground with a test parcel in any year (a
+    replatted or re-drawn parcel under a new id). They are dropped: no dev
+    record may sit on sealed ground."""
+    test_shapes = [p["geometry"] for p in kept if is_test[p["parcel_id"]]]
+    if not test_shapes:
+        return set()
+    tree = STRtree(test_shapes)
+    straddle: set[str] = set()
+    for p in kept:
+        if is_test[p["parcel_id"]]:
+            continue
+        g = p["geometry"]
+        for i in tree.query(g):
+            inter = g.intersection(test_shapes[int(i)])
+            if not inter.is_empty and inter.area > 0.01 * min(g.area, test_shapes[int(i)].area):
+                straddle.add(p["parcel_id"])
+                break
+    return straddle
+
+
+def positive_years(kept: list[dict[str, Any]], straddle: set[str]) -> dict[str, int]:
+    """parcel id -> the number of years in which it is a positive record.
+    A positive record's weight is 1 over this, so a site sums to 1."""
+    years: dict[str, int] = {}
+    for p in kept:
+        if p["label"] == "positive" and p["parcel_id"] not in straddle:
+            years[p["parcel_id"]] = years.get(p["parcel_id"], 0) + 1
+    return years
+
+
+def write_gz(path: Path, doc: Any) -> None:
+    """Gzip without a timestamp: the same content gives the same bytes."""
+    with open(path, "wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as fh:
+        fh.write(json.dumps(doc).encode())
+
+
 def main() -> int:
     cfg = tomllib.loads((HERE.parent / "settings.toml").read_text())
     arcgis.cache_days = 30
@@ -308,39 +418,19 @@ def main() -> int:
     for year in COHORTS:
         cohorts[year], counts[year] = build_cohort(year, cfg, built)
 
-    # One map cell per site: the cell of the first year the parcel is in.
-    cell_of: dict[str, str] = {}
-    for year in COHORTS:
-        for p in cohorts[year]:
-            cell_of.setdefault(p["parcel_id"], cell_for(p["lon"], p["lat"]))
+    # The county replaces its deed file every year: record which one this was.
+    deed_file = hashlib.sha256((HERE.parent / "cache" / "fulton_cama.zip").read_bytes()).hexdigest()
+    cell_of = site_cells(cohorts)
     is_test = {pid: block_for(cell) in test_blocks for pid, cell in cell_of.items()}
-
-    # No dev parcel may share ground with a test parcel in any year (a
-    # replatted or re-drawn parcel under a new id): such dev parcels are dropped.
     kept = [p for year in COHORTS for p in cohorts[year] if not p["label"].startswith("left out")]
-    test_shapes = [p["geometry"] for p in kept if is_test[p["parcel_id"]]]
-    tree = STRtree(test_shapes) if test_shapes else None
-    straddle: set[str] = set()
-    for p in kept:
-        if is_test[p["parcel_id"]] or tree is None:
-            continue
-        g = p["geometry"]
-        for i in tree.query(g):
-            inter = g.intersection(test_shapes[int(i)])
-            if not inter.is_empty and inter.area > 0.01 * min(g.area, test_shapes[int(i)].area):
-                straddle.add(p["parcel_id"])
-                break
-
-    years_positive: dict[str, int] = {}
-    for p in kept:
-        if p["label"] == "positive" and p["parcel_id"] not in straddle:
-            years_positive[p["parcel_id"]] = years_positive.get(p["parcel_id"], 0) + 1
+    straddle = dev_on_test_ground(kept, is_test)
+    years_positive = positive_years(kept, straddle)
 
     DATA.mkdir(parents=True, exist_ok=True)
     seen_keys: set[str] = set()
     summary = []
     for year in COHORTS:
-        records, weights = [], {}
+        records, weights, sites = [], {}, {}
         dropped = 0
         for p in cohorts[year]:
             pid = p["parcel_id"]
@@ -360,14 +450,16 @@ def main() -> int:
             records.append(rec)
             if p["label"] == "positive":
                 weights[key] = round(1.0 / years_positive[pid], 6)
+                sites[key] = site_for(pid)
         meta = {"as_of": date(year, 1, 1).isoformat(), "label_year": LABEL_YEAR,
                 "cohorts": list(COHORTS), "built_years": list(BUILT_YEARS),
                 "built": date.today().isoformat(), "pool": len(records), "min_price": MIN_PRICE,
+                "window_start": WINDOW_START.isoformat(), "deed_file_sha256": deed_file,
                 "features": FEATURES, "banned": BANNED_AS_NONE, "screens": scr}
-        with gzip.open(DATA / f"fulton_{year}_features.json.gz", "wt") as fh:
-            json.dump({"meta": meta, "records": records}, fh)
+        write_gz(DATA / f"fulton_{year}_features.json.gz", {"meta": meta, "records": records})
         (DATA / f"fulton_{year}_labels.json").write_text(json.dumps(
-            {"meta": meta, "positives": dict(sorted(weights.items()))}, indent=1))
+            {"meta": meta, "positives": dict(sorted(weights.items())),
+             "sites": dict(sorted(sites.items()))}, indent=1))
         by_split = {s: [sum(1 for r in records if r["split"] == s),
                         sum(1 for r in records if r["split"] == s and r["key"] in weights),
                         round(sum(weights[r["key"]] for r in records

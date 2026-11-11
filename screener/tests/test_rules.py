@@ -13,6 +13,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import date
@@ -305,19 +306,42 @@ class NonFiniteScoreTests(unittest.TestCase):
         def scorer(f):
             return {"score": float("nan") if f["signal"] == 101 else float(f["signal"])}
 
-        res = ev.evaluate(records, positives, "dev", scorer=scorer, settings=SETTINGS)
+        res = ev.evaluate(records, positives, "dev", scorer=scorer, settings=SETTINGS,
+                          fields=("signal",))
         self.assertEqual(res["nonfinite_scores"], 1)
         self.assertTrue(all(math.isfinite(x) for x in res["score_range"]))
         for bad in (float("inf"), float("-inf")):
             res = ev.evaluate(records, positives, "dev", scorer=lambda f, b=bad: {"score": b},
-                              settings=SETTINGS)
+                              settings=SETTINGS, fields=("signal",))
             self.assertEqual(res["nonfinite_scores"], 150)
 
     def test_finite_scores_report_zero(self):
         records, positives = _pool()
         res = ev.evaluate(records, positives, "dev", scorer=lambda f: {"score": f["signal"]},
-                          settings=SETTINGS)
+                          settings=SETTINGS, fields=("signal",))
         self.assertEqual(res["nonfinite_scores"], 0)
+        self.assertEqual(res["unstable_scores"], 0)
+
+    def test_a_score_that_depends_on_the_call_is_counted(self):
+        records, positives = _pool()
+        calls = []
+
+        def counter(f):
+            calls.append(1)
+            return {"score": float(len(calls) % 90)}
+
+        res = ev.evaluate(records, positives, "dev", scorer=counter, settings=SETTINGS,
+                          fields=("signal",))
+        self.assertGreater(res["unstable_scores"], 100)
+        self.assertEqual(len(calls), 300)              # 150 dev records, each asked twice
+        seen = {}
+
+        def remembers(f):
+            return {"score": float(seen.setdefault(f["signal"], len(seen)) % 90)}
+
+        again = ev.evaluate(records, positives, "dev", scorer=remembers, settings=SETTINGS,
+                            fields=("signal",))
+        self.assertEqual(again["unstable_scores"], 0)  # stable within a run: the guard is not a sandbox
 
 
 CURRENT_RANK = ev.RANK_FILE.read_text() if hasattr(ev, "RANK_FILE") else ""
@@ -403,8 +427,10 @@ class FakeRepo:
     def git(self, *args):
         if self.broken:
             return ""
+        args = tuple(a for a in args if a == "--" or not a.startswith("--no-"))
         names = [c for c, _ in self.history]
         under = "--" in args and args[args.index("--") + 1:] == ("screener",)
+        only = args[args.index("--") + 1:] if "--" in args else ()
         if args[:2] == ("rev-parse", "--short"):
             back = 1 if args[2] == "HEAD~1" else 0
             return names[-1 - back] if len(names) > back else ""
@@ -416,9 +442,15 @@ class FakeRepo:
             if args[2] == "HEAD~1":
                 files = self.history[-1][1]
             else:
-                after = self.history[names.index(args[2]) + 1:] if args[2] in names else []
+                end = names.index(args[3]) + 1 if len(args) > 3 and args[3] in names else len(names)
+                after = self.history[names.index(args[2]) + 1:end] if args[2] in names else []
                 files = sorted({f for _, fs in after for f in fs})
+            if only and not under:                       # a single file asked about
+                return "\n".join(f for f in files if f in only)
             return "\n".join(f for f in files if not under or f.startswith("screener/"))
+        if args[0] == "log" and "--format=%h" in args:
+            first, last = args[-1].split("..")
+            return "\n".join(names[names.index(first) + 1:names.index(last) + 1])
         if args[0] == "log":
             return "exp: test"
         return ""
@@ -465,9 +497,13 @@ class DecideTests(unittest.TestCase):
 
     def run_decide(self, hits, order=None, new_baseline=False, **extra):
         # The keep decision is made from the rankings themselves (rescored in
-        # decide); "hits" and "graded" here are only what gets logged.
-        dev = {"hits": float(hits), "graded": float(hits), "sites": 10.0, "positives": 10,
-               "k": 3, "score_range": [0.0, 90.0], "order": {0: order or self.bad},
+        # decide), and the logged score must be the ranking's own: `hits` only
+        # names the case.
+        orders = {0: order or self.bad}
+        real_hits, graded, _ = ev.score_orders(orders, ev.split_pools(self.records, "dev"),
+                                               ev._weights(self.positives))
+        dev = {"hits": real_hits, "graded": graded, "sites": 10.0, "positives": 10,
+               "k": 3, "score_range": [0.0, 90.0], "order": orders,
                "nonfinite_scores": 0}
         dev.update(extra)
         return ev.decide(self.records, self.positives, dev, new_baseline)
@@ -484,7 +520,7 @@ class DecideTests(unittest.TestCase):
 
     def baseline_then_experiment(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.repo.commit("bbb")
 
     def test_first_run_records_baseline_then_keeps(self):
@@ -501,7 +537,7 @@ class DecideTests(unittest.TestCase):
             with self.subTest(old_hits=old_hits):
                 self.fresh()
                 self.repo.commit("aaa")
-                self.assertEqual(self.run_decide(old_hits), 0)
+                self.assertEqual(self.run_decide(old_hits, new_baseline=True), 0)
                 self.repo.commit("bbb", "screener/autoresearch/evaluate.py", "screener/screens.py")
                 self.assert_refused_without_writes()
                 self.assertEqual(self.run_decide(new_hits, new_baseline=True), 0)
@@ -531,7 +567,7 @@ class DecideTests(unittest.TestCase):
 
     def test_rows_outside_history_are_refused(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.repo.history = [("xxx", ["screener/rank.py"])]          # branch from before aaa
         self.repo.commit("yyy")
         self.assert_refused_without_writes()
@@ -543,7 +579,7 @@ class DecideTests(unittest.TestCase):
 
     def test_new_baseline_allowed_on_a_scored_commit(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.assertEqual(self.run_decide(2), 3)
         self.assertEqual(self.run_decide(2, new_baseline=True), 0)
 
@@ -560,9 +596,147 @@ class DecideTests(unittest.TestCase):
 
     def test_commit_must_touch_only_rank(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.repo.commit("bbb", "helper.py", "screener/rank.py")
         self.assert_refused_without_writes()
+
+    def test_only_a_human_records_a_baseline_the_first_one_included(self):
+        self.repo.commit("aaa")
+        self.assert_refused_without_writes()                     # no log at all
+        self.assertIn("no baseline for this evaluation set", sys.stdout.getvalue())
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
+        self.repo.commit("bbb")
+        self.log.unlink()
+        self.best.unlink()                                       # a new container, or rm
+        self.assert_refused_without_writes()
+        self.log.write_text("")                                  # a zero-byte log
+        self.assert_refused_without_writes()
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
+        self.assertEqual(self.statuses(), ["baseline"])          # header written to the empty file
+
+    def test_no_other_file_under_screener_may_change_since_the_best_run(self):
+        for other in ("screener/autoresearch/__init__.py", "screener/__init__.py",
+                      "screener/scoring.py", "screener/autoresearch/data/fulton_2015_labels.json"):
+            with self.subTest(other):
+                self.fresh()
+                self.baseline_then_experiment()
+                self.repo.history[-1] = ("bbb", [other])         # an earlier commit slipped it in
+                self.repo.commit("ccc")                          # HEAD itself touches only rank.py
+                self.assert_refused_without_writes()
+                self.assertIn("files other than screener/rank.py changed", sys.stdout.getvalue())
+        self.fresh()
+        self.baseline_then_experiment()
+        self.repo.history[-1] = ("bbb", ["README.md"])           # outside screener/: not its business
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+
+    def test_a_decision_shows_rounded_scores_and_no_win_share(self):
+        self.baseline_then_experiment()
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+        self.repo.commit("ddd")                                  # left in place, then another
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertEqual(self.statuses(), ["baseline", "keep", "discard", "discard"])
+        self.assertNotIn("wins", text)
+        self.assertNotRegex(text, r"\d%\s+of resamples\)?;")
+        decisions = [ln for ln in text.splitlines() if ln.startswith(("DECISION: KEEP",
+                                                                      "DECISION: DISCARD"))]
+        self.assertEqual(len(decisions), 3)
+        for line in decisions:
+            self.assertRegex(line, r"graded \d+\.\d vs best kept \d+\.\d \([+-]\d+\.\d\); "
+                                   r"hits \d+\.\d vs \d+\.\d( \(needs .*\))?$")
+        # The log, which the loop does not open, keeps the exact share.
+        self.assertRegex(ev._rows()[-1]["win_share"], r"^\d\.\d{3}$")
+        # The reset takes back the experiment and nothing else.
+        hints = [ln for ln in text.splitlines() if ln.startswith("Revert the experiment")]
+        self.assertEqual(hints, ["Revert the experiment: git reset --hard bbb"] * 2)
+        # ccc was a discard left in place, so undoing ddd means going back past it.
+        self.assertIn("this also takes back 1 earlier discarded experiment(s)", text)
+        self.assertNotIn("Do not reset", text)
+
+    def test_no_reset_is_printed_when_it_would_remove_a_commit_that_is_not_a_discard(self):
+        for human_first in (True, False):
+            with self.subTest(human_first=human_first):
+                self.fresh()
+                self.baseline_then_experiment()                   # aaa baseline, bbb
+                human = ("hhh", ["screener/README.md"])
+                if human_first:
+                    self.repo.history[-1] = human
+                    self.repo.commit("bbb")
+                self.assertEqual(self.run_decide(3, order=self.bad), 0)       # bbb: discard, left
+                if not human_first:
+                    self.repo.history.append(human)
+                self.repo.commit("ccc")
+                self.assertEqual(self.run_decide(3, order=self.bad), 0)
+                last = sys.stdout.getvalue().rstrip().splitlines()[-1]
+                self.assertTrue(last.startswith("Do not reset. Stop and ask a human"), last)
+                self.assertNotIn("git reset --hard", last)
+
+    def test_the_reset_hint_keeps_a_humans_commit_made_since_the_best_run(self):
+        self.baseline_then_experiment()
+        self.repo.history[-1] = ("bbb", ["screener/README.md", "screener/tests/test_rules.py"])
+        self.repo.commit("ccc")                                  # the experiment
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertIn("DECISION: DISCARD", text)
+        self.assertTrue(text.rstrip().endswith("Revert the experiment: git reset --hard bbb"))
+        self.assertNotIn("also removes", text)
+
+    def test_documents_and_tests_may_change_since_the_best_run(self):
+        self.baseline_then_experiment()
+        self.repo.history[-1] = ("bbb", ["screener/README.md", "screener/autoresearch/PROGRAM.md",
+                                         "screener/tests/test_rules.py"])
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+        self.assertEqual(self.statuses(), ["baseline", "keep"])
+
+    def test_a_best_ranking_that_does_not_give_its_logged_score_is_refused(self):
+        self.repo.commit("aaa")
+        self.assertEqual(self.run_decide(3, order=self.good, new_baseline=True), 0)
+        self.repo.commit("bbb")
+        saved = json.loads(self.best.read_text())
+        for order in ({}, {"0": self.bad}, {"0": self.good[:5]}):
+            with self.subTest(str(order)[:20]):
+                self.best.write_text(json.dumps(dict(saved, order=order)))
+                self.assert_refused_without_writes()
+                self.assertIn("does not give the score logged", sys.stdout.getvalue())
+
+    def test_a_new_baseline_says_what_it_replaces(self):
+        self.baseline_then_experiment()
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)          # a discard, left in place
+        self.assertEqual(self.run_decide(3, order=self.bad, new_baseline=True), 0)
+        text = sys.stdout.getvalue()
+        self.assertIn("NOTE: the best kept run before this was aaa", text)
+        self.assertIn("rank.py DIFFERS from it", text)
+        self.repo.commit("ccc", "screener/README.md")
+        self.assertEqual(self.run_decide(3, order=self.bad, new_baseline=True), 0)
+        self.assertIn("rank.py is the same as there.", sys.stdout.getvalue())
+        self.assertIn("DECISION: BASELINE — recorded as the baseline for this evaluation set: "
+                      "graded ", sys.stdout.getvalue())
+
+    def test_the_gain_shown_is_the_difference_of_the_rounded_scores(self):
+        self.baseline_then_experiment()
+        verdict = {"keep": False, "gain": 0.14, "hits_change": 0.0, "win_share": 0.65,
+                   "best_graded": 0.0, "best_hits": 0.0}
+        with mock.patch.object(ev, "keep_verdict", return_value=verdict):
+            dev = {"hits": 0.04, "graded": 0.04, "sites": 10.0, "positives": 10, "k": 3,
+                   "score_range": [0.0, 90.0], "order": {0: self.good}, "nonfinite_scores": 0}
+            self.assertEqual(ev.decide(self.records, self.positives, dev, False), 0)
+        line = [ln for ln in sys.stdout.getvalue().splitlines() if "DISCARD" in ln][-1]
+        self.assertIn("graded 0.0 vs best kept 0.0 (+0.0); hits 0.0 vs 0.0 (needs", line)
+        self.assertNotIn("0.1", line)
+        self.assertNotIn("65", line)
+
+    def test_unstable_scores_are_refused(self):
+        self.repo.commit("aaa")
+        self.assert_refused_without_writes(new_baseline=True, unstable_scores=2)
+
+    def test_scores_just_outside_0_100_are_refused_on_exact_values(self):
+        self.repo.commit("aaa")
+        self.assert_refused_without_writes(new_baseline=True, score_span=[0.0, 100.04])
+        self.assert_refused_without_writes(new_baseline=True, score_span=[-0.04, 90.0])
 
     def test_nonfinite_scores_are_refused(self):
         self.repo.commit("aaa")

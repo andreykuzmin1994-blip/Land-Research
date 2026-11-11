@@ -256,9 +256,11 @@ class EvaluateTests(unittest.TestCase):
 
     def test_perfect_and_inverse_scorers(self):
         perfect = self.ev.evaluate(self.records, self.positives, "dev",
-                                   scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
+                                   scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS,
+                                   fields=("signal",))
         inverse = self.ev.evaluate(self.records, self.positives, "dev",
-                                   scorer=lambda f: {"score": -f["signal"]}, settings=SETTINGS)
+                                   scorer=lambda f: {"score": -f["signal"]}, settings=SETTINGS,
+                                   fields=("signal",))
         self.assertEqual(perfect["k"], 3)  # 2% of 150 dev parcels
         self.assertEqual(perfect["hits"], 3)
         self.assertEqual(inverse["hits"], 0)
@@ -271,9 +273,10 @@ class EvaluateTests(unittest.TestCase):
             seen.append(set(features))
             return {"score": 0.0}
 
-        self.ev.evaluate(self.records, self.positives, "dev", scorer=spy, settings=SETTINGS)
+        self.ev.evaluate(self.records, self.positives, "dev", scorer=spy, settings=SETTINGS,
+                         fields=("signal", "exit_miles"))
         self.assertTrue(seen)
-        self.assertTrue(all(not ({"key", "split", "block"} & s) for s in seen))
+        self.assertTrue(all(s == {"signal", "exit_miles"} for s in seen))
 
     def test_hits_at_k_counts_repeats(self):
         order = ["a", "b", "c", "d"]
@@ -284,9 +287,11 @@ class EvaluateTests(unittest.TestCase):
 
     def test_paired_win_share(self):
         perfect = self.ev.evaluate(self.records, self.positives, "dev",
-                                   scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
+                                   scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS,
+                                   fields=("signal",))
         inverse = self.ev.evaluate(self.records, self.positives, "dev",
-                                   scorer=lambda f: {"score": -f["signal"]}, settings=SETTINGS)
+                                   scorer=lambda f: {"score": -f["signal"]}, settings=SETTINGS,
+                                   fields=("signal",))
         share = self.ev.paired_win_share(self.records, self.positives,
                                          perfect["order"], inverse["order"])
         self.assertGreater(share, 0.9)
@@ -296,7 +301,8 @@ class EvaluateTests(unittest.TestCase):
             if r["key"] in self.positives:
                 r["flood_pct"] = 90.0
         res = self.ev.evaluate(self.records, self.positives, "dev",
-                               scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
+                               scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS,
+                                   fields=("signal",))
         self.assertEqual(res["hits"], 0)
         self.assertEqual(res["positives_screened_out"], 10)
 

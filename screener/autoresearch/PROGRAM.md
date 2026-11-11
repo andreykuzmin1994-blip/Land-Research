@@ -5,11 +5,13 @@ improves **one file**, `screener/rank.py`, and keeps a change only if the
 ranking gets better at finding land that owners actually sold to
 industrial developers.
 
-> **Do not run the loop yet (2026-11-10).** The evaluation below was
-> rebuilt and merged before its adversarial review and its keep-threshold
-> check were finished. `--decide` refuses until a human clears that
-> (`REVIEW_PENDING` in `evaluate.py`). If you are an agent asked to run
-> experiments: stop and tell the human. The thresholds below may change.
+> **Do not run the loop yet (2026-11-11).** The evaluation below has been
+> reviewed and its findings fixed in code, but the answer key in `data/`
+> has not yet been rebuilt under the rules written here, so the pool
+> sizes, site counts and baseline below still describe the old key.
+> `--decide` refuses until a human clears that (`REVIEW_PENDING` in
+> `evaluate.py`). If you are an agent asked to run experiments: stop and
+> tell the human.
 
 ## The score
 
@@ -28,13 +30,18 @@ someone who built an industrial building on it by 2025?
   least half covered by a 2025-digest parcel carrying $1M+ of industrial
   improvements. Right-of-way deeds and sales to a development authority
   don't count. A developer selling a finished building doesn't count
-  either: that is not land an owner sold to a developer.
+  either: that is not land an owner sold to a developer. Nor does anyone
+  who bought the parcel at a real price since 1 January 2015: a site
+  counts under the owner who held it before then, in the years that owner
+  still had it.
 - **Sites, not records.** The same site is in several years (164 positive
   records, 49 distinct sites). Each positive record is weighted so that
   every distinct site adds up to 1.
 - **Left out:** parcels that got industrial buildings without such a sale
   (owner-users, corporate successors, replatted ids, sales after the
-  building) are dropped from the pool entirely, so they count neither way.
+  building, buyers since 2015) are dropped from the pool entirely, so they
+  count neither way. So is any parcel sold in the first quarter of the
+  as-of year when the digest already shows the buyer.
 - **Splits:** dev (38 sites) is what the loop sees. Test (11 sites) is
   sealed: a human checks it every ~20 kept experiments. The split is by
   ~5 km map cell, the same cells in every year, so test sites are in
@@ -45,8 +52,10 @@ someone who built an industrial building on it by 2025?
   - `hits`: sites in the top 2% of their year's pool (K, about 44
     parcels a year on dev).
   - `graded`: each site earns credit by where it ranks: full credit in
-    the top 2%, half at about the top 6%, nothing below about the top
-    20%. This is the number a change is judged on.
+    the top 2%, half at about the top 6%, nothing below the top 20% of
+    the pool (the pool counts parcels the screens reject, so that is
+    nearer the top quarter of the parcels actually ranked). This is the
+    number a change is judged on.
 - **Fixed size:** K is fixed at 2% of the pool, so inflating scores can't
   help. Only ranking real sites higher does. The hard screens are frozen
   into the evaluation set.
@@ -92,10 +101,21 @@ readable.
    `best_ranking.json`, and never open `reviews/36_screener_eval_cohorts_metric/`
    (it discusses how the key was built). The score is the only feedback.
    A session that has read any of these must not write `exp:` commits.
+   Score an idea once, with `--decide`, after committing it. The loop
+   runs `--decide` and nothing else: never a plain look, `--test`,
+   `--control` or `--null-test`. Do not score variations to find out
+   which parcels are the answers: every scoring of `rank.py` that shows
+   a number is logged with a hash of the file, a refused `--decide`
+   shows none, and a human reads the log.
 3. Keep `learned_score` pure and general. No lookups of specific values
    that single out a handful of parcels (exact acreages, land values or
    codes chosen to hit known answers). Prefer smooth curves and
    explainable signals.
+   A score depends only on the record it is given: no counters, caches
+   or other state between calls, and nothing that differs from one run
+   of Python to the next (the order of a set, an object's address). The
+   evaluator has a fresh copy of `rank.py`, in a new process, score every
+   record again in another order, and refuses the run if any differs.
 4. One idea per experiment. Examples: reshape the access curve, weight
    industrial context more, use land class (commercial / industrial tracts),
    rethink which seller signals matter, combine signals (access ×
@@ -105,8 +125,8 @@ readable.
 
 ### What `rank.py` may not use
 
-The evaluator reads `rank.py`'s source and refuses it, before importing
-it and in every mode, if it uses any of:
+The evaluator reads `rank.py`'s source and refuses it, before running it,
+if it uses any of:
 
 - imports other than `__future__`, `math` and `typing` (and from `typing`
   only `Any`, `Optional`, `Union`, `Mapping`, `Sequence`, `Iterable`,
@@ -114,7 +134,7 @@ it and in every mode, if it uses any of:
   `TYPE_CHECKING`, for annotations);
 - `open`, `eval`, `exec`, `compile`, `getattr`, `globals`, `vars`, `type`,
   `print`, `str.format`, and other builtins that read files, run code or
-  read attributes by name;
+  read attributes by name; `hash` and `id` (they change from run to run);
 - private names (`_x`), dunder names, frame or code attributes, dunder
   methods, class keywords such as `metaclass=`, and `match` statements;
 - `global` / `nonlocal`, or changing an attribute of an imported module;
@@ -129,15 +149,18 @@ The zoning, slope, utilities and incentive terms live in
 ## The loop
 
 On the current working branch, with no uncommitted changes. The frozen
-key in `data/` is committed with the code.
+key in `data/` is committed with the code. A human records the baseline
+before the loop starts (`--decide --new-baseline`, on the commit the loop
+starts from); the loop never does.
 
 ```bash
-python -m screener.autoresearch.evaluate --decide   # first run records the baseline
-# then, for each experiment:
+# for each experiment:
 #   edit screener/rank.py (one idea)
 git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
-#   DISCARD -> run the exact `git reset --hard <parent>` it prints
+#   DISCARD -> run the exact `git reset --hard <commit>` it prints (it
+#              takes back discarded experiments and nothing else). If it
+#              prints "Do not reset" instead, stop and ask a human.
 #   KEEP    -> carry on from here
 #   REFUSED -> see below
 ```
@@ -146,24 +169,35 @@ When `--decide` prints REFUSED, it logs nothing:
 
 - commit, untracked-file or purity refusals: fix the commit or `rank.py`
   and run it again;
-- NaN, infinite or out-of-range scores: fix `rank.py`;
-- "the evaluation itself changed", or a best-run record
-  (`best_ranking.json`) that is missing or doesn't match: **stop and ask a
-  human.** The loop never runs `--new-baseline`. If `best_ranking.json`
-  was lost, a human checks out the best kept commit and re-records it with
-  `--decide --new-baseline`.
+- NaN, infinite, out-of-range or changing scores: fix `rank.py`;
+- "there is no baseline", "files other than screener/rank.py changed",
+  "the evaluation set changed", "none is in this branch's history",
+  "another version of this evaluator", "built before the 2026-11-11
+  builder rules", modules "outside screener/", or a best-run record
+  (`best_ranking.json`) that is missing, doesn't match or doesn't give
+  its logged score: **stop and ask a human.** The loop never runs
+  `--new-baseline`.
+  The log and the best-run record are not in git, so a new cloud session
+  starts without them: that is a stop, not something to work around. If
+  `best_ranking.json` was lost, a human checks out the best kept commit
+  and re-records it with `--decide --new-baseline`.
 
 A change is kept only if `graded` is at least 2.0 above the best kept
 run, `hits` is not lower, **and** it beats the best kept run in at least
-95% of clustered bootstrap resamples (whole map cells are resampled, every
+99% of clustered bootstrap resamples (whole map cells are resampled, every
 year of a cell together, because sites cluster and repeat across years).
-The scores you are shown are rounded to one decimal; the comparison uses
-exact values. Every run is appended to
-`screener/autoresearch/experiments.tsv` (untracked, append-only).
+You are shown the two scores rounded to one decimal and their difference,
+nothing finer; the comparison uses exact values. Every decision (keep or
+discard) is appended to `screener/autoresearch/experiments.tsv`
+(untracked, append-only); a refused run is not.
 
-If a human changes the evaluation itself (`evaluate.py`, `screens.py` or
-`data/`), `--decide` refuses until a human runs
-`python -m screener.autoresearch.evaluate --decide --new-baseline`.
+If a human changes anything under `screener/` other than `rank.py`
+(`evaluate.py`, `screens.py`, `data/`, any other code or data file;
+documents and `tests/` aside), `--decide` refuses until a human runs
+`python -m screener.autoresearch.evaluate --decide --new-baseline`. That
+command prints the best kept run it replaces and whether `rank.py`
+differs from it: a baseline recorded on top of an unjudged change accepts
+that change.
 
 Run a bounded batch ("run 15 experiments"), not an endless loop. Then
 report the kept changes and the dev score, and ask a human to run
@@ -172,10 +206,11 @@ the live ranking, because the live tool scores with the same `rank.py`.
 
 ## Known limits (state them in reports)
 
-- 38 dev sites in 12 map cells. The bar (+2.0 graded and 95% of
-  resamples) is set so that a change that is not an improvement is rarely
-  kept; it also means small real improvements are often discarded. Expect
-  a handful of keeps, not dozens.
+- A few dozen dev sites in about ten map cells. The bar (+2.0 graded and
+  99% of resamples) is set so that a change that is not an improvement is
+  kept about 2% of the time or less; it also means small real
+  improvements are often discarded. Expect a handful of keeps, not
+  dozens.
 - The five years are five views of mostly the same sites. They steady the
   score; they are not five times the evidence.
 - Flood maps, exits and rail main lines are today's versions, not the
@@ -184,6 +219,17 @@ the live ranking, because the live tool scores with the same `rank.py`.
 - Each year's digest is the county's snapshot from about January, not
   exactly 1 January: a sale in the first weeks of a year may already show
   the buyer.
+- A site counts only under an owner from before 2015. Two things follow.
+  A developer who bought before 2015, built, and sold the finished
+  building within about a year can still be counted as a seller in 2015
+  or 2016 (the digests date a building only to the year). And in every
+  year after 2015, no answer is a parcel bought at a real price since
+  2015, while never-built parcels bought since then stay in the pool as
+  misses: pushing recently bought land down earns a little (a few tenths
+  of a graded point) for a reason that is partly how the key is built.
+  A human reading kept changes should distrust a gain that comes from a
+  cliff in `years_held`, `last_sale_price` or `sales_count` under about
+  four years.
 - The key rewards "sold to a developer who built". Land that would have
   been perfect but wasn't sold looks like a miss. Long-held land that never
   traded is the opportunity the live tool hunts for, so don't let the

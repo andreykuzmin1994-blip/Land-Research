@@ -71,7 +71,7 @@ class ScoreTests(unittest.TestCase):
         # One site, positive in both years, ranked first in each: one site of credit.
         weights = {"2015-099": 0.5, "2016-099": 0.5}
         res = ev.evaluate(records, weights, "dev", scorer=lambda f: {"score": f["signal"]},
-                          settings=SETTINGS)
+                          settings=SETTINGS, fields=("signal",))
         self.assertEqual((res["positives"], res["sites"]), (2, 1.0))
         self.assertAlmostEqual(res["hits"], 1.0)
         self.assertAlmostEqual(res["graded"], 1.0)
@@ -102,12 +102,17 @@ class ScoreTests(unittest.TestCase):
         ev.evaluate(records, set(), "dev", scorer=spy, settings=SETTINGS,
                     fields=("signal", "flood_pct", "not_in_record"))
         self.assertEqual(set(seen), {("flood_pct", "not_in_record", "signal")})
+        with self.assertRaises(TypeError):          # no default: the old deny-list is gone
+            ev.evaluate(records, set(), "dev", scorer=spy, settings=SETTINGS)
+        with self.assertRaises(TypeError):
+            ev.ranking(records, "dev", spy, SETTINGS)
 
     def test_screened_out_positive_earns_nothing(self):
         records = pool()
         next(r for r in records if r["key"] == "2015-099")["flood_pct"] = 90.0
         res = ev.evaluate(records, {"2015-099": 1.0}, "dev",
-                          scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
+                          scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS,
+                          fields=("signal",))
         self.assertEqual((res["hits"], res["graded"], res["positives_screened_out"]), (0, 0, 1))
 
     def test_bootstrap_copies(self):
@@ -182,7 +187,8 @@ class KeepRuleTests(unittest.TestCase):
     def test_thresholds_are_the_reviewed_ones(self):
         # Changing these needs the null test re-run and recorded (reviews/36).
         self.assertEqual((ev.MIN_GAIN, ev.WIN_SHARE_TO_KEEP, ev.CREDIT_SPAN, ev.K_SHARE,
-                          ev.BOOTSTRAP), (2.0, 0.95, 10.0, 0.02, 500))
+                          ev.BOOTSTRAP), (2.0, 0.99, 10.0, 0.02, 500))
+        self.assertGreaterEqual(ev.NULL_TRIALS, 1000)
 
     def test_null_test_is_deterministic_and_counts_false_keeps(self):
         base = {r["key"]: r["signal"] / 2.0 for r in self.records}
@@ -190,8 +196,47 @@ class KeepRuleTests(unittest.TestCase):
             a = ev.null_test(self.records, self.pos, base, 6, 4.0)
             b = ev.null_test(self.records, self.pos, base, 6, 4.0)
         self.assertEqual(a, b)
-        self.assertEqual((a["trials"], a["noise"]), (6, 4.0))
+        self.assertEqual((a["trials"], a["noise"], a["mode"]), (6, 4.0, "independent"))
         self.assertTrue(0 <= a["false_keeps"] <= 6)
+
+    def test_null_test_compares_two_different_rankings_and_ties_are_not_wins(self):
+        base = {r["key"]: r["signal"] / 2.0 for r in self.records}
+        seen = []
+        real = ev.keep_verdict
+
+        def spy(records, positives, new, best, split="dev"):
+            seen.append(new != best)
+            return real(records, positives, new, best, split)
+
+        with mock.patch.object(ev, "BOOTSTRAP", 5), mock.patch.object(ev, "keep_verdict", spy):
+            for mode in ev.NULL_MODES:
+                ev.null_test(self.records, self.pos, base, 3, 8.0, mode=mode)
+        self.assertEqual(seen, [True] * 6)
+        with self.assertRaises(ValueError):
+            ev.null_test(self.records, self.pos, base, 3, 8.0, mode="other")
+        # A ranking never beats itself: a tie is not a win.
+        self.assertEqual(ev.paired_win_share(self.records, self.pos, self.perfect, self.perfect), 0.0)
+
+    def test_cell_shared_noise_moves_a_cell_together_in_every_year(self):
+        base = {r["key"]: 50.0 for r in self.records}
+        orders = []
+        with mock.patch.object(ev, "keep_verdict",
+                               side_effect=lambda rec, pos, new, best, split="dev": (
+                                   orders.extend([new, best]) or {"keep": False, "gain": 0.0})):
+            ev.null_test(self.records, self.pos, base, 1, 1000.0, mode="cell-shared")
+        block = {r["key"]: r["block"] for r in self.records}
+
+        def best_cell(order):
+            places: dict[str, list[int]] = {}
+            for place, key in enumerate(order):
+                places.setdefault(block[key], []).append(place)
+            return min(places, key=lambda b: sum(places[b]))
+
+        # Half the noise is one draw per cell, the same in every year, so the
+        # cell that comes out on top is the same cell in both years.
+        self.assertEqual(best_cell(orders[0][2015]), best_cell(orders[0][2016]))
+        self.assertEqual(best_cell(orders[1][2015]), best_cell(orders[1][2016]))
+        self.assertNotEqual(orders[0][2015], orders[1][2015])
 
 
 class DecideMechanicsTests(unittest.TestCase):
@@ -222,7 +267,7 @@ class DecideMechanicsTests(unittest.TestCase):
         if args[0] == "status":
             return "## main"
         if args[0] == "diff":
-            return "screener/rank.py" if args[2] == "HEAD~1" else ""
+            return "screener/rank.py" if "HEAD~1" in args else ""
         return "exp: test"
 
     def dev(self, sort_key):
@@ -235,7 +280,8 @@ class DecideMechanicsTests(unittest.TestCase):
                 "score_range": [0.0, 90.0], "order": orders, "nonfinite_scores": 0}
 
     def test_baseline_keep_and_discard_with_rounded_log(self):
-        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), False), 0)
+        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), False), 3)
+        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), True), 0)
         self.commits.append("bbb")
         self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: -r["signal"]), False), 0)
         self.commits.append("ccc")
@@ -251,7 +297,8 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual((saved["commit"], sorted(saved["order"])), ("bbb", ["2015", "2016"]))
         text = self.out.getvalue()
         self.assertIn("DECISION: KEEP", text)
-        self.assertIn("needs +2 graded, hits not lower, and 95%", text)
+        self.assertIn("needs +2 graded, hits not lower, and a win in 99% of resamples", text)
+        self.assertNotIn("wins", text)
 
     def test_a_log_from_the_old_evaluator_is_refused(self):
         self.log.write_text("time\tcommit\tparent\tfingerprint\thits\tpositives\tk\trecall\t"
@@ -265,7 +312,7 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), True), 3)
 
     def test_a_changed_key_needs_a_human_baseline(self):
-        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), False), 0)
+        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), True), 0)
         self.commits.append("bbb")
         with mock.patch.object(ev, "fingerprint", return_value="fp2"):
             self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: -r["signal"]),
@@ -291,6 +338,399 @@ class DecideMechanicsTests(unittest.TestCase):
                 self.assertIsNone(ev._saved_best())
         self.best.write_text('{"commit": "a", "order": {"2015": ["k1"]}}')
         self.assertEqual(ev._saved_best()["order"], {2015: ["k1"]})
+
+
+class MainTests(unittest.TestCase):
+    """main() on the committed key, with a spy for rank.learned_score and the
+    log in a temporary folder. Reads no feature of any positive."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.log = Path(self.tmp.name, "experiments.tsv")
+        self.seen: set[tuple[str, ...]] = set()
+
+        def spy(features):
+            self.seen.add(tuple(sorted(features)))
+            return {"score": 50.0 + (features.get("acres") or 0.0) / 7.0}
+
+        self.spy = spy
+        for p in (mock.patch.object(ev, "LOG_FILE", self.log),
+                  mock.patch.object(ev, "BEST_FILE", Path(self.tmp.name, "best_ranking.json")),
+                  mock.patch.object(ev, "foreign_modules", return_value=[]),
+                  mock.patch.object(ev, "load_scorer", side_effect=lambda source: self.spy),
+                  mock.patch.object(ev, "second_pass", return_value=None)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def run_main(self, *argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = ev.main(list(argv))
+        return code, out.getvalue()
+
+    def rows(self):
+        with open(self.log, newline="") as fh:
+            return list(csv.DictReader(fh, delimiter="\t"))
+
+    def test_rank_py_is_handed_exactly_the_allow_list(self):
+        code, _ = self.run_main()
+        self.assertEqual(code, 0)
+        meta = ev.load_meta()
+        self.assertEqual(self.seen, {tuple(sorted(meta["features"] + meta["banned"]))})
+        self.assertFalse(set(ev.HIDDEN) & set(meta["features"] + meta["banned"]))
+
+    def test_a_look_shows_one_decimal_and_leaves_a_row(self):
+        code, text = self.run_main()
+        shown = json.loads(text)["dev"]
+        for name in ("graded", "hits"):
+            self.assertEqual(shown[name], round(shown[name], 1))
+        self.assertFalse({"recall", "order", "score_span"} & set(shown))
+        self.assertEqual(shown["unstable_scores"], 0)
+        row, = self.rows()
+        self.assertEqual((row["status"], row["win_share"]), ("look", ""))
+        self.assertRegex(row["description"], r"^rank\.py [0-9a-f]{12}( \(uncommitted\))?$")
+        self.assertEqual(float(row["graded"]), shown["graded"])
+        self.run_main()
+        self.assertEqual([r["status"] for r in self.rows()], ["look", "look"])
+
+    def test_a_look_is_refused_when_it_cannot_be_logged(self):
+        self.log.write_text("time\tcommit\tstatus\n")
+        code, text = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn("REFUSED", text)
+        self.assertNotIn("graded", text)
+
+    def test_a_look_at_an_uncommitted_rank_py_says_so(self):
+        real = ev._git
+        with mock.patch.object(ev, "_git", side_effect=lambda *a: (
+                " M screener/rank.py" if a[0] == "status" else real(*a))):
+            self.run_main()
+        self.assertTrue(self.rows()[-1]["description"].endswith(" (uncommitted)"))
+        with mock.patch.object(ev, "_git", side_effect=lambda *a: (
+                "" if a[0] == "status" else real(*a))):
+            self.run_main()
+        self.assertNotIn("uncommitted", self.rows()[-1]["description"])
+
+    def test_looks_are_not_decisions(self):
+        self.run_main()
+        self.assertEqual(ev._decisions(), [])
+        self.assertEqual(ev._kept_rows(ev.fingerprint()), [])
+
+    def test_a_score_that_changes_between_passes_is_refused_in_every_mode(self):
+        calls = []
+
+        def counter(features):
+            calls.append(1)
+            return {"score": float(len(calls) % 97)}
+
+        self.spy = counter
+        with mock.patch.object(ev, "REVIEW_PENDING", ""), \
+                mock.patch.object(ev, "BUILDER_META", ()):
+            for argv in ((), ("--test",), ("--decide",), ("--null-test", "20")):
+                code, text = self.run_main(*argv)
+                self.assertEqual(code, 3, argv)
+                self.assertIn("a different score the second time", text)
+                self.assertNotIn("graded", text)
+        self.assertFalse(self.log.exists())
+        # The sealed split is held to it too.
+        real = ev.evaluate
+
+        def only_test_unstable(*a, **kw):
+            out = real(*a, **kw)
+            out["unstable_scores"] = 3 if a[2] == "test" else 0
+            return out
+        self.spy = lambda f: {"score": 50.0}
+        with mock.patch.object(ev, "evaluate", only_test_unstable):
+            code, text = self.run_main("--test")
+        self.assertEqual(code, 3)
+        self.assertNotIn("graded", text)
+
+    def test_a_refused_decide_shows_no_score_and_test_does_not_go_with_it(self):
+        with mock.patch.object(ev, "REVIEW_PENDING", ""), \
+                mock.patch.object(ev, "BUILDER_META", ()), \
+                mock.patch.object(ev, "_git", return_value=""):       # git gives nothing: refused
+            code, text = self.run_main("--decide")
+        self.assertEqual(code, 3)
+        self.assertTrue(text.startswith("REFUSED"))
+        self.assertNotIn("graded", text)
+        self.assertNotIn("hits", text)
+        self.assertFalse(self.log.exists())
+        code, text = self.run_main("--decide", "--test")
+        self.assertEqual(code, 2)
+        self.assertNotIn("graded", text)
+        with mock.patch.object(ev, "REVIEW_PENDING", "pending"):
+            code, text = self.run_main("--decide")
+        self.assertEqual((code, text), (3, "REFUSED: pending.\n"))
+
+    def test_a_key_from_before_the_builder_rules_decides_nothing(self):
+        real = ev.load
+
+        def old_key():
+            records, positives, meta = real()
+            return records, positives, {k: v for k, v in meta.items() if k not in ev.BUILDER_META}
+
+        with mock.patch.object(ev, "REVIEW_PENDING", ""), mock.patch.object(ev, "load", old_key):
+            code, text = self.run_main("--decide", "--new-baseline")
+            self.assertEqual(code, 3)
+            self.assertIn("built before the 2026-11-11 builder rules", text)
+            self.assertEqual(self.run_main()[0], 0)                    # a look still works
+        self.assertEqual([r["status"] for r in self.rows()], ["look"])
+
+    def test_a_null_test_leaves_a_row_before_it_runs(self):
+        with mock.patch.object(ev.concurrent.futures, "ProcessPoolExecutor",
+                               side_effect=RuntimeError("stopped here")):
+            with self.assertRaises(RuntimeError):
+                self.run_main("--null-test", "20")
+        self.assertEqual([r["status"] for r in self.rows()], ["null"])
+
+    def test_main_uses_the_fresh_process_pass_and_says_when_it_cannot_run(self):
+        asked = []
+        with mock.patch.object(ev, "second_pass",
+                               return_value=lambda rows: asked.append(len(rows)) or
+                               [float(self.spy(row)["score"]) for row in rows]):
+            self.assertEqual(self.run_main()[0], 0)
+        self.assertEqual(len(asked), 1)
+        self.assertGreater(asked[0], 5000)
+        with mock.patch.object(ev, "second_pass", return_value=lambda rows: None):
+            code, text = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn("could not run, so nothing was scored", text)
+        self.assertNotIn("different score", text)
+        self.assertEqual(len(self.rows()), 1)
+
+    def test_the_unstable_refusal_gives_no_count(self):
+        self.spy = lambda f, box=[]: box.append(1) or {"score": float(len(box) % 97)}
+        code, text = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn("gave some records a different score", text)
+        self.assertNotRegex(text, r"\d")
+
+    def test_a_module_from_the_repository_outside_screener_refuses_every_mode(self):
+        with mock.patch.object(ev, "foreign_modules", return_value=["random", "csv"]):
+            for argv in ((), ("--control",), ("--decide",), ("--null-test", "20")):
+                code, text = self.run_main(*argv)
+                self.assertEqual(code, 3, argv)
+                self.assertIn("outside screener/ (random, csv)", text)
+        self.assertFalse(self.log.exists())
+
+    def test_new_baseline_needs_decide(self):
+        code, text = self.run_main("--new-baseline")
+        self.assertEqual(code, 2)
+        self.assertFalse(self.log.exists())
+
+
+class BuiltKeyTests(unittest.TestCase):
+    """The committed key, as the 2026-11-11 builder writes it. Reads keys,
+    cells, splits, weights and site hashes: no feature of any record."""
+
+    def setUp(self):
+        self.meta = ev.load_meta()
+        if not all(self.meta.get(k) for k in ev.BUILDER_META):
+            self.skipTest("the key in data/ has not been rebuilt with the 2026-11-11 builder "
+                          "rules yet (evaluate --decide refuses it)")
+        self.records, self.weights, _ = ev.load()
+        self.sites = {}
+        for year in ev.COHORTS:
+            self.sites.update(json.loads(ev.labels_file(year).read_text())["sites"])
+
+    def test_meta_names_the_window_and_the_deed_file(self):
+        self.assertEqual(self.meta["window_start"], be.WINDOW_START.isoformat())
+        self.assertRegex(self.meta["deed_file_sha256"], r"^[0-9a-f]{64}$")
+        for year in ev.COHORTS:
+            with gzip.open(ev.features_file(year), "rb") as fh:
+                self.assertEqual(fh.read(0), b"")
+            self.assertEqual(ev.features_file(year).read_bytes()[4:8], b"\0\0\0\0")   # no gzip time
+
+    def test_every_positive_has_a_site_and_a_sites_weights_sum_to_one(self):
+        self.assertEqual(set(self.sites), set(self.weights))
+        totals: dict[str, float] = {}
+        for key, site in self.sites.items():
+            totals[site] = totals.get(site, 0.0) + self.weights[key]
+        for site, total in totals.items():
+            self.assertAlmostEqual(total, 1.0, places=4, msg=site)
+
+    def test_a_site_sits_in_one_cell_and_one_split(self):
+        where = {r["key"]: (r["block"], r["split"]) for r in self.records}
+        places: dict[str, set] = {}
+        for key, site in self.sites.items():
+            places.setdefault(site, set()).add(where[key])
+        self.assertTrue(all(len(p) == 1 for p in places.values()))
+        test_blocks = set(json.loads(ev.TEST_BLOCKS_FILE.read_text())["test_blocks"])
+        for block, split in where.values():
+            self.assertEqual(split == "test", block in test_blocks)
+
+
+class CheckedBytesTests(unittest.TestCase):
+    """The rank.py that is checked is the rank.py that runs, and a fresh
+    copy of it scores every record the same."""
+
+    SOURCE = (b"def learned_score(p):\n"
+              b"    return {'score': 30.0 + (p.get('acres') or 0.0)}\n")
+
+    def test_the_scorer_is_made_from_the_bytes_not_from_the_import_cache(self):
+        import importlib
+        import os
+        import screener.rank as live
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp, "rank.py")
+            for weight in (30, 90):                           # same size, same second
+                fake.write_bytes(self.SOURCE.replace(b"30.0", b"%d.0" % weight))
+                os.utime(fake, (1_700_000_000, 1_700_000_000))
+                with mock.patch.object(ev, "RANK_FILE", fake):
+                    scorer = ev.load_scorer(fake.read_bytes())
+                self.assertEqual(scorer({"acres": 1.0})["score"], weight + 1.0)
+        self.assertIs(importlib.import_module("screener.rank"), live)   # the import is untouched
+        self.assertNotIn("p.get('acres')", Path(live.__file__).read_text())
+
+    def test_rank_source_gives_the_checked_bytes_and_refuses_a_link(self):
+        problems, source = ev.rank_source()
+        self.assertEqual((problems, source), ([], ev.RANK_FILE.read_bytes()))
+        self.assertEqual(ev.rank_import_problems(), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            target, link = Path(tmp, "elsewhere.py"), Path(tmp, "rank.py")
+            target.write_bytes(self.SOURCE)
+            link.symlink_to(target)
+            with mock.patch.object(ev, "RANK_FILE", link), \
+                    mock.patch.object(ev, "_rank_origin", return_value=str(link)):
+                problems, source = ev.rank_source()
+        self.assertEqual((source, len(problems)), (b"", 1))
+        self.assertIn("link", problems[0])
+
+    def second_pass_unstable(self, body: bytes) -> int:
+        source = b"SEEN = {}\nBOX = []\n\ndef learned_score(p):\n" + body
+        records = pool(years=(2015,), per_year=40)
+        for i, r in enumerate(records):
+            r["acres"] = float(i)
+        scorer = ev.load_scorer(source)
+        return ev.ranking(records, "dev", scorer, SETTINGS, ("acres",),
+                          ev.second_pass(source))[3]
+
+    def test_a_fresh_process_catches_what_a_second_call_cannot(self):
+        honest = b"    return {'score': 10.0 + p['acres'] / 3.0}\n"
+        memo = b"    return {'score': float(SEEN.setdefault(p['acres'], len(SEEN)))}\n"
+        counter = b"    BOX.append(1)\n    return {'score': float(len(BOX))}\n"
+        salted = b"    return {'score': float(sorted({'a', 'b', 'c', 'd', 'e', 'f', 'g'}, key=repr)[0] != list({'a', 'b', 'c', 'd', 'e', 'f', 'g'})[0]) + float(len(repr(BOX)) + len(repr(p.get)) % 7)}\n"
+        raises = b"    return {'score': 1.0 / (len(SEEN) - len(SEEN))}\n"
+        self.assertEqual(self.second_pass_unstable(honest), 0)
+        self.assertGreater(self.second_pass_unstable(memo), 30)      # index of first sight
+        self.assertGreater(self.second_pass_unstable(counter), 30)
+        del salted
+        with self.assertRaises(ZeroDivisionError):
+            self.second_pass_unstable(raises)
+
+    def test_a_second_pass_that_cannot_run_counts_every_record(self):
+        records = pool(years=(2015,), per_year=40)
+        recheck = ev.second_pass(self.SOURCE)
+        scorer = ev.load_scorer(self.SOURCE)
+
+        class Done:
+            def __init__(self, code, out):
+                self.returncode, self.stdout = code, out
+
+        good = json.dumps([float(31).hex()] * 40)
+        for outcome in (OSError("no python"), Done(1, good), Done(0, "not json"),
+                        Done(0, json.dumps([float(31).hex()] * 39))):
+            with self.subTest(str(outcome)[:30]), mock.patch.object(
+                    ev.subprocess, "run", side_effect=[outcome]
+                    if isinstance(outcome, Exception) else None,
+                    return_value=None if isinstance(outcome, Exception) else outcome):
+                with self.assertRaises(ev.SecondPassFailed):
+                    ev.ranking(records, "dev", scorer, SETTINGS, ("acres",), recheck)
+        with self.assertRaises(ev.SecondPassFailed):
+            ev.ranking(records, "dev", scorer, SETTINGS, ("acres",), lambda rows: [1.0])
+
+    def test_a_row_that_raises_in_the_fresh_process_counts_as_different(self):
+        source = b"def learned_score(p):\n    return {'score': 10.0 / (p['acres'] - 7.0)}\n"
+        scores = ev.second_pass(source)([{"acres": 1.0}, {"acres": 7.0}, {"acres": 9.0}])
+        self.assertEqual(scores, [10.0 / -6.0, math.inf, 5.0])
+
+    def test_nan_twice_is_not_a_difference(self):
+        records = pool(years=(2015,), per_year=40)
+        result = ev.ranking(records, "dev", lambda f: {"score": float("nan")}, SETTINGS,
+                            ("signal",))
+        self.assertEqual((result[2], result[3]), (40, 0))
+
+    def test_the_fresh_process_gets_no_pythonpath(self):
+        captured = {}
+
+        def run(cmd, **kw):
+            captured.update(kw["env"])
+            raise OSError
+        with mock.patch.dict("os.environ", {"PYTHONPATH": ".", "PYTHONSTARTUP": "x.py"}), \
+                mock.patch.object(ev.subprocess, "run", run):
+            self.assertIsNone(ev.second_pass(self.SOURCE)([{"acres": 1.0}]))
+        self.assertNotIn("PYTHONPATH", captured)
+        self.assertNotIn("PYTHONSTARTUP", captured)
+
+    def test_the_second_pass_uses_another_order_and_another_hash_seed(self):
+        records = pool(years=(2015,), per_year=40)
+        seen = []
+        ev.ranking(records, "dev", lambda f: {"score": 1.0}, SETTINGS, ("signal",),
+                   lambda rows: seen.extend(r["signal"] for r in rows) or [1.0] * len(rows))
+        self.assertEqual(sorted(seen), [float(i) for i in range(40)])
+        self.assertNotEqual(seen, [float(i) for i in range(40)])
+        again = []
+        ev.ranking(records, "dev", lambda f: {"score": 1.0}, SETTINGS, ("signal",),
+                   lambda rows: again.extend(r["signal"] for r in rows) or [1.0] * len(rows))
+        self.assertNotEqual(seen, again)                       # drawn fresh each run
+        captured = {}
+
+        def run(cmd, **kw):
+            captured.update(kw["env"], cmd=cmd, cwd=kw["cwd"])
+            raise OSError
+        with mock.patch.object(ev.subprocess, "run", run):
+            ev.second_pass(self.SOURCE)([{"acres": 1.0}])
+        self.assertIn(captured["PYTHONHASHSEED"], ("1", "2"))
+        self.assertNotEqual(captured["PYTHONHASHSEED"], __import__("os").environ.get("PYTHONHASHSEED"))
+        self.assertIn("-P", captured["cmd"])
+
+    def test_foreign_modules_sees_a_repository_file_outside_screener(self):
+        import sys
+        import types
+        self.assertEqual(ev.foreign_modules(), [])
+        before = ev.foreign_modules()
+        stray = types.ModuleType("stray_csv")
+        stray.__file__ = str(ev.ROOT / "csv.py")
+        fine = types.ModuleType("fine_mod")
+        fine.__file__ = str(ev.ROOT / "screener" / "x.py")
+        venv = types.ModuleType("venv_mod")
+        venv.__file__ = str(ev.ROOT / ".venv" / "lib" / "site-packages" / "y.py")
+        with mock.patch.dict(sys.modules, {"stray_csv": stray, "fine_mod": fine, "venv_mod": venv}):
+            self.assertEqual(sorted(set(ev.foreign_modules()) - set(before)), ["stray_csv"])
+        # A root-level file named like a standard module is seen whatever it
+        # says about itself once loaded.
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in ("csv.py", "json.pyc", "prepare.py", ".gitignore", "CSV.txt",
+                         "math" + __import__("importlib.machinery").machinery.EXTENSION_SUFFIXES[0]):
+                Path(tmp, name).write_text("")
+            for folder in ("random", "venv", "site", "types", "screener", "tests"):
+                Path(tmp, folder).mkdir()
+            Path(tmp, "random", "__init__.py").write_text("")
+            with mock.patch.object(ev, "ROOT", Path(tmp)):
+                found = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
+            self.assertEqual(len(found), 4)
+            self.assertEqual([n for n in found if not n.startswith("math")],
+                             ["csv.py", "json.pyc", "random"])
+
+    def test_git_runs_in_the_repository_root(self):
+        seen = []
+
+        class Done:
+            stdout, returncode = "ok\n", 0
+
+        def run(cmd, **kw):
+            seen.append(kw.get("cwd"))
+            return Done()
+        with mock.patch.object(ev.subprocess, "run", run):
+            self.assertEqual(ev._git("status"), "ok")
+            self.assertTrue(ev._is_ancestor("abc"))
+        self.assertEqual(seen, [str(ev.ROOT), str(ev.ROOT)])
+        self.assertTrue((ev.ROOT / "screener" / "rank.py").is_file())
+
+    def test_hash_and_id_are_refused(self):
+        for src in ("x = hash('a')\n", "y = id(object())\n"):
+            self.assertTrue(ev.rank_problems(src), src)
 
 
 class BuildRuleTests(unittest.TestCase):
@@ -323,9 +763,77 @@ class BuildRuleTests(unittest.TestCase):
                              "positive", year)
         for year in (2018, 2019):                # the developer owns it and later sells the building
             self.assertEqual(be.classify(shares, self.chain(), self.DEV, date(year, 1, 1)),
-                             "left out: sold after the building", year)
+                             "left out: bought at a real price since 2015", year)
         self.assertEqual(be.classify(shares, self.chain(), self.REIT, date(2021, 1, 1)),
-                         "left out: built but not sold by the as-of owner")
+                         "left out: bought at a real price since 2015")
+        # A developer who bought before the window, built, and sold the building.
+        early = [deed("2013-06-01", 900000, self.A), deed("2020-09-01", 30000000, self.DEV)]
+        self.assertEqual(be.classify(shares, early, self.DEV, date(2019, 1, 1)),
+                         "left out: sold after the building")
+        self.assertEqual(be.classify(shares, early, self.REIT, date(2021, 1, 1)),
+                         "left out: bought at a real price since 2015")
+
+    def test_a_buyer_inside_the_window_is_never_the_seller(self):
+        """reviews/36, 05, finding 4: the landowner sells in June 2016; the
+        developer builds in 2018 and sells the finished building in November
+        2018; the 2019 digest is the first to show the building. The digests
+        alone put the developer's sale "before the building"."""
+        shares = {y: (1.0 if y >= 2019 else 0.0) for y in be.BUILT_YEARS}
+        sales = [deed("2001-05-01", 90000, "OLD FARM OWNER"), deed("2016-06-15", 900000, self.A),
+                 deed("2018-11-20", 30000000, self.DEV)]
+        for year in (2015, 2016):
+            self.assertEqual(be.classify(shares, sales, self.A, date(year, 1, 1)), "positive", year)
+        for year in (2017, 2018):
+            self.assertEqual(be.classify(shares, sales, self.DEV, date(year, 1, 1)),
+                             "left out: bought at a real price since 2015", year)
+        self.assertTrue(be.sale_before(sales, self.DEV, date(2017, 1, 1), date(2019, 1, 1), 50000))
+        # A middleman's land flip is left out the same way (operator decision, 2026-11-11).
+        flip = [deed("2015-03-01", 400000, self.A), deed("2016-08-01", 900000, "FLIPPER LLC")]
+        self.assertEqual(be.classify(shares, flip, "FLIPPER LLC", date(2016, 1, 1)),
+                         "left out: bought at a real price since 2015")
+        # What does not make a buyer: a deed before the window, a token price,
+        # a right-of-way deed, the owner's own deed, a deed on or after the as-of date.
+        for other in ([deed("2014-12-31", 900000, "X")], [deed("2015-06-01", 49999, "X")],
+                      [deed("2015-06-01", 900000, "X", "Right of Way/Dept of Trans")],
+                      [deed("2015-06-01", 900000, self.A)], [deed("2016-06-01", 900000, "X")]):
+            self.assertFalse(be.bought_in_window(other, self.A, date(2016, 1, 1)), other)
+        self.assertTrue(be.bought_in_window([deed("2015-01-01", 50000, "X")], self.A,
+                                            date(2016, 1, 1)))
+        # A parcel that was never built on stays a negative whoever bought it.
+        none = {y: 0.0 for y in be.BUILT_YEARS}
+        self.assertEqual(be.classify(none, sales, self.DEV, date(2018, 1, 1)), "negative")
+
+    def test_a_first_quarter_buyer_shown_by_the_digest_is_left_out_built_or_not(self):
+        why = "left out: the digest shows the buyer of a first-quarter sale"
+        built = {y: (1.0 if y >= 2019 else 0.0) for y in be.BUILT_YEARS}
+        none = {y: 0.0 for y in be.BUILT_YEARS}
+        feb = [deed("2017-02-10", 900000, self.A)]
+        for shares in (built, none):
+            self.assertEqual(be.classify(shares, feb, "BUYER LLC", date(2017, 1, 1)), why)
+        # The January owner is the seller of that deed: the record is sound.
+        self.assertEqual(be.classify(built, feb, self.A, date(2017, 1, 1)), "positive")
+        self.assertEqual(be.classify(none, feb, self.A, date(2017, 1, 1)), "negative")
+        # The January owner sells and the buyer resells within the quarter:
+        # only the first deed says who owned it in January.
+        resold = [deed("2017-02-10", 900000, self.A), deed("2017-03-15", 950000, "BUYER LLC")]
+        self.assertEqual(be.classify(built, resold, self.A, date(2017, 1, 1)), "positive")
+        self.assertEqual(be.classify(built, resold, "BUYER LLC", date(2017, 1, 1)), why)
+        # Two deeds on one day have no order in the file: either way round,
+        # the January owner is the seller of one of them.
+        same_day = [deed("2017-02-10", 950000, "BUYER LLC"), deed("2017-02-10", 900000, self.A)]
+        for sales in (same_day, same_day[::-1]):
+            self.assertEqual(be.classify(built, sales, self.A, date(2017, 1, 1)), "positive")
+            self.assertEqual(be.classify(built, sales, "THIRD PARTY LLC", date(2017, 1, 1)), why)
+        # A deed dated 1 January itself counts, and the price need not reach MIN_PRICE.
+        self.assertEqual(be.classify(none, [deed("2017-01-01", 900000, self.A)], "BUYER LLC",
+                                     date(2017, 1, 1)), why)
+        self.assertEqual(be.classify(none, [deed("2017-02-10", 40000, self.A)], "BUYER LLC",
+                                     date(2017, 1, 1)), why)
+        # Outside the quarter, unpriced, or a right-of-way deed: not a sign of a late digest.
+        for sales in ([deed("2017-04-03", 900000, self.A)], [deed("2016-12-31", 900000, self.A)],
+                      [deed("2017-02-10", 0, self.A)],
+                      [deed("2017-02-10", 900000, self.A, "Right of Way/Dept of Trans")]):
+            self.assertEqual(be.classify(none, sales, "BUYER LLC", date(2017, 1, 1)), "negative")
 
     def test_never_built_is_a_negative_and_owner_user_is_left_out(self):
         none = {y: 0.0 for y in be.BUILT_YEARS}
@@ -367,6 +875,42 @@ class BuildRuleTests(unittest.TestCase):
                  "p4": [deed("2016-12-01", 5, "A"), deed("2017-01-05", 5, "B")]}
         self.assertEqual(be.snapshot_date_check(parcels, sales, as_of),
                          {"quarter_before": [0, 1], "quarter_after": [1, 1]})
+
+    def test_one_cell_per_site_from_its_first_year(self):
+        cohorts = {2016: [{"parcel_id": "p1", "lon": -84.52, "lat": 33.61},
+                          {"parcel_id": "p2", "lon": -84.52, "lat": 33.61}],
+                   2015: [{"parcel_id": "p1", "lon": -84.48, "lat": 33.61}],
+                   2017: [{"parcel_id": "p1", "lon": -84.61, "lat": 33.70}]}
+        cells = be.site_cells(cohorts)
+        self.assertEqual(cells["p1"], be.cell_for(-84.48, 33.61))      # 2015, not a later centroid
+        self.assertEqual(cells["p2"], be.cell_for(-84.52, 33.61))
+        self.assertNotEqual(cells["p1"], cells["p2"])
+
+    def test_a_dev_parcel_on_test_ground_is_dropped(self):
+        from shapely.geometry import box
+        kept = [{"parcel_id": "t1", "geometry": box(0, 0, 10, 10)},
+                {"parcel_id": "d1", "geometry": box(5, 5, 12, 12)},     # the same ground, a new id
+                {"parcel_id": "d2", "geometry": box(10, 0, 20, 10)},    # only shares an edge
+                {"parcel_id": "d3", "geometry": box(40, 40, 50, 50)}]
+        is_test = {"t1": True, "d1": False, "d2": False, "d3": False}
+        self.assertEqual(be.dev_on_test_ground(kept, is_test), {"d1"})
+        self.assertEqual(be.dev_on_test_ground(kept[1:], is_test), set())
+
+    def test_a_sites_weights_sum_to_one(self):
+        kept = [{"parcel_id": "p1", "label": "positive"}, {"parcel_id": "p1", "label": "positive"},
+                {"parcel_id": "p1", "label": "negative"}, {"parcel_id": "p2", "label": "positive"},
+                {"parcel_id": "p3", "label": "positive"}, {"parcel_id": "p4", "label": "negative"}]
+        self.assertEqual(be.positive_years(kept, {"p3"}), {"p1": 2, "p2": 1})
+
+    def test_the_features_file_has_the_same_bytes_every_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a, b = Path(tmp, "a.gz"), Path(tmp, "b.gz")
+            be.write_gz(a, {"records": [1, 2]})
+            with mock.patch("time.time", return_value=2_000_000_000.0):
+                be.write_gz(b, {"records": [1, 2]})
+            self.assertEqual(a.read_bytes(), b.read_bytes())
+            with gzip.open(a, "rt") as fh:
+                self.assertEqual(json.load(fh), {"records": [1, 2]})
 
     def test_keys_and_urls(self):
         self.assertEqual(be.key_for("14F0001 0001"), be.key_for("14F0001 0001", 2016))
