@@ -127,6 +127,10 @@ MAX_URLS = 60                    # distinct pages of the investigator's claims i
 MAX_SKEPTIC_CLAIMS = 60          # the skeptic's own allowance, so the first pass
 MAX_SKEPTIC_URLS = 40            # cannot use it up
 MAX_HEADLINE_CHARS = 400
+# lead.md is a page to read, not the record: how much of the agents' words it carries.
+LEAD_TEXT_CHARS = 280
+LEAD_SKEPTIC_CLAIMS = 2
+LEAD_OPEN_ITEMS = 8
 MAX_REDIRECTS = 5
 HOST_DELAY_S = 1.0
 MAX_CRAWL_DELAY_S = 30.0         # a host asking for more is not fetched
@@ -885,7 +889,7 @@ def _claim_lines(claim: dict[str, Any]) -> list[str]:
     """One kept claim: the agent's words, then the quote and its address."""
     quote = clean(claim["quote"], MAX_QUOTE_CHARS).replace('"', "'")
     where = f", PDF page {claim['pdf_page']}" if claim.get("pdf_page") else ""
-    lines = [f"- {_plain(claim['text'])} ({claim['id']})",
+    lines = [f"- {_plain(claim['text'], LEAD_TEXT_CHARS)} ({claim['id']})",
              f"  - On the page: \"{quote}\" ({_link(claim['source_url'])}{where})"]
     before = _tokens(claim.get("context_before", ""))[-3:]
     if any(word in NEGATIONS for word in before):
@@ -937,15 +941,17 @@ def render_lead(checked: dict[str, Any], headline: str = "") -> str:
         backing = ("backed by quotes of its own, below" if skeptic["supported"] else
                    "the skeptic's opinion only: none of its own quotes was found on its page")
         out += [f"**Skeptic: `{skeptic['verdict']}`** ({backing}).", "",
-                "The skeptic's objection, in its own words: " + _plain(skeptic["objection"], 1200),
+                "The skeptic's objection, in its own words: "
+                + _plain(skeptic["objection"], 3 * LEAD_TEXT_CHARS),
                 ""]
         if skeptic.get("disputes"):
             out += ["It disputes these first-pass claims: "
                     + _plain(", ".join(skeptic["disputes"]), 300) + ".", ""]
-        for claim in skeptic["claims"][:4]:
+        for claim in skeptic["claims"][:LEAD_SKEPTIC_CLAIMS]:
             out += _claim_lines(claim)
-        if len(skeptic["claims"]) > 4:
-            out += [f"- and {len(skeptic['claims']) - 4} more kept claims in the checked file."]
+        if len(skeptic["claims"]) > LEAD_SKEPTIC_CLAIMS:
+            out += [f"- and {len(skeptic['claims']) - LEAD_SKEPTIC_CLAIMS} more kept claims in "
+                    "the checked file."]
         out += [""]
     unknown = [n for n in SECTIONS if n not in sections or sections[n]["verdict"] == UNKNOWN]
     out += ["## What the check proves", "",
@@ -957,10 +963,14 @@ def render_lead(checked: dict[str, Any], headline: str = "") -> str:
             "## Questions for a person (the agents' own, not checked)", ""]
     bodies = list(sections.items()) + ([(SKEPTIC, skeptic)] if skeptic else [])
     items = [(name, item) for name, body in bodies for item in body.get("open_items") or []]
-    for name, item in items[:14]:
-        out += [f"- ({name}) {_plain(item, 400)}"]
-    if len(items) > 14:
-        out += [f"- and {len(items) - 14} more in the checked file."]
+    # The skeptic's questions first, then one from each section in turn.
+    per = [[(n, i) for n, i in items if n == name] for name in (SKEPTIC, *SECTIONS)]
+    turns = [pair for rank in range(max((len(p) for p in per), default=0))
+             for p in per if rank < len(p) for pair in [p[rank]]]
+    for name, item in turns[:LEAD_OPEN_ITEMS]:
+        out += [f"- ({name}) {_plain(item, LEAD_TEXT_CHARS)}"]
+    if len(turns) > LEAD_OPEN_ITEMS:
+        out += [f"- and {len(turns) - LEAD_OPEN_ITEMS} more in the checked file."]
     if not items:
         out += ["None written down."]
     return "\n".join(out) + "\n"
