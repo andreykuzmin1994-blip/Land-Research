@@ -1,0 +1,57 @@
+{
+ "schema": 1,
+ "parcel_id": "09F070100320322",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The brief's 'likely' entitlement path rests on a future land use label (Office/Industrial) from the 2021 plan, which the plan adopted in October 2025 replaced. On the 2025 plan's Future Development Map this parcel reads, by eye, as Highway Mixed-Use, not Light Industrial or Industrial (my own reading of a map image set against the county parcel map; it is not a quoted finding and a person must confirm it). The plan's Highway Mixed-Use category lists retail, office, multifamily and hospitality and no warehousing, lists C-2 but neither M-1 nor M-2 as its zoning districts, and is the SR 74/Senoia Road corridor where the plan says to limit additional development until a specific plan exists. So unless the unread C-2 text allows a warehouse by right, the use would need a rezoning or permit that the adopted plan points against. A smaller doubt: the address 601 Senoia Rd is shared with a separate 2.5-acre improved parcel (39 living units on the county record) that lies between this land and Senoia Road on the county parcel map, so this parcel is rear land reached by the local road the screener measured, not from Senoia Road itself.",
+  "disputes": ["market-3"],
+  "claims": [
+   {
+    "text": "The 2025 comprehensive plan (PDF page 147, printed page 145) names the SR 74/Senoia Road corridor as its Highway Mixed-Use future development areas and says the corridor needs a redesign and a placemaking plan. So the strategy the first pass quoted (plans-5: limit additional development in the SR 74/Senoia Road corridor until a specific plan is established) is aimed at Highway Mixed-Use land.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-11",
+    "quote": "The SR 74/Senoia Road corridor (Highway Mixed-Use future development areas) is in need of a redesign. A placemaking plan will create a vision for the area that promotes walkability and good urban design principles"
+   },
+   {
+    "text": "The 2025 plan's Highway Mixed-Use page (PDF page 140, printed page 138) lists the zoning districts that fit the category. C-2 is among them; M-1 and M-2, the industrial districts, are not. A rezoning of Highway Mixed-Use land to M-1 for a warehouse would not match the adopted plan.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-11",
+    "quote": "Appropriate Zoning District(s) RM-12, RM-36, O&I, C-1, C-2, P&O"
+   },
+   {
+    "text": "The same page (PDF page 140) lists the development types the plan calls appropriate in Highway Mixed-Use. Warehousing, distribution and industrial uses are not in the list.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-11",
+    "quote": "multifamily; vertical and horizontal mixed-use up to four stories, small to medium retail; large retail centers with grocery anchor; large office; hospitality."
+   },
+   {
+    "text": "By contrast the 2025 plan names warehousing as an appropriate development type in its Light Industrial category (PDF page 142, printed page 140). The plan puts warehousing in its Light Industrial and Industrial categories, not in Highway Mixed-Use.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-11",
+    "quote": "flex space; commercial storage; warehousing, utilities."
+   },
+   {
+    "text": "Asked for every parcel whose site address begins '601 SENOIA', Fulton County's parcel layer returns two parcels with the same address: this lead (09F070100320322) and a second parcel, 09F070100320314. The street address is therefore not unique to this land.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%20LIKE%20%27601%20SENOIA%25%27&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-11",
+    "quote": "\"ParcelID\":\"09F070100320314\",\"TaxYear\":2027,\"Address\":\"601 SENOIA RD\",\"AddrNumber\":\"601\""
+   },
+   {
+    "text": "In the same answer, the record of that second parcel (09F070100320314) shows it is improved: about $1.4 million of improvements, 39 living units, 2.5 acres. Web search results for the address point to a motel (search results only, not verified). What the web shows under this address is likely about that parcel, not the vacant 13.5 acres.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%20LIKE%20%27601%20SENOIA%25%27&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-11",
+    "quote": "\"ImprAppr\":1404800,\"LUCode\":\"255\",\"ClassCode\":\"C4\",\"ExCode\":null,\"LivUnits\":39,\"LandAcres\":2.5"
+   }
+  ],
+  "open_items": [
+   "Seen, not verifiable: on the Future Development Map (PDF page 125) and the Highway Mixed-Use map (PDF page 141) of https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan this parcel appears inside the red Highway Mixed-Use area north-west of the I-85 / Senoia Road interchange. I matched the map's parcel lines by eye against the county parcel map (the fan of narrow lots on Fairburn Industrial Blvd lies just north of it). The maps are images, so no quote can carry this. Ask Fairburn Planning & Zoning which 2025 future development category covers parcel 09F070100320322.",
+   "Seen, not verifiable: on the same map the adjoining same-owner parcel to the west and south-west (09F070100320066, which the screener set aside for protected land) is drawn as Greenspace, and Light Industrial begins only west of that. An assemblage toward the west would cross Greenspace.",
+   "Does the C-2 text (zoning ordinance Sec. 80-84) allow a warehouse or distribution building at all, by right or by use permit? Still unread (Municode). If it does not, the path is a rezoning to M-1 on land the 2025 plan appears to map as Highway Mixed-Use: ask the city whether staff would support that.",
+   "Has the city acted on the plan's strategy to limit additional development in the SR 74/Senoia Road corridor until a specific plan exists (a moratorium, a placemaking or corridor plan under way, a zoning rewrite)? Not found, but council and planning commission agendas could not be read: the city's Agenda Center and Agendas & Minutes pages show no documents to a plain fetch, and the City Administrator reports on the site stop at late 2024.",
+   "Is the parcel inside the GA Highway 74 Overlay, and what uses does the overlay prohibit? Not read (Municode; the overlay boundary is only on map images).",
+   "Access: on the county parcel map the motel parcel and other small lots lie between this land and Senoia Road, and a narrow strip runs from its south-east corner to Senoia Road. Which road is the 381 ft of frontage the screener measured, is it a public street a truck can use, and where would a truck entrance go? The I-85 / SR 74 interchange is being rebuilt by GDOT: ask whether the project changes access on Senoia Road north of I-85 or took right-of-way here. Not read: GDOT's robots.txt disallows Anthropic's agents, so its project pages were not fetched.",
+   "Unverified, from a web search result only (the page was not read: cbre.com answers robots.txt with HTTP 403): a broker page lists C-2 land on Senoia Rd near I-85 exit 61, 12.18 acres, under properties for lease. The acreage does not match this parcel. A person should open it in a browser and check whether it is this land or the same owner's neighbouring land, and whether it is offered for sale or for ground lease only.",
+   "market-3 (first pass): its quote shows the parcel id, tax year and address, not the owner, and comes from an f=html query page that shows the request back. The same owner on the tax roll would not show an option or a contract in any case."
+  ]
+ }
+}

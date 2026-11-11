@@ -1,0 +1,85 @@
+{
+ "schema": 1,
+ "parcel_id": "09F070000320927",
+ "skeptic": {
+  "verdict": "killed",
+  "objection": "This parcel is not open land: it is part of the land of a named developer's three-building project. The developer applied for the rezoning, sued the city when it was denied, won the M-1 zoning on a court-ordered revote in March 2026, and in April 2026 told the county development authority that the zoning is in hand and the biggest tenant is secured, with a bond inducement of up to $220 million covering all three buildings on the whole assemblage. An outside buyer has no visible way in unless that deal has lapsed. What is not shown is a completed sale: no final bond resolution appears on the authority's agendas through 27 October 2026 and the county parcel record still names the 2012 owner, so a person should check the deed records before dropping the lead for good.",
+  "disputes": [
+   "market-4",
+   "utilities-4",
+   "plans-6"
+  ],
+  "claims": [
+   {
+    "text": "The county development authority's minutes of 28 April 2026 record the developer telling the board that the zoning is in hand and the biggest tenant has been secured. This is the developer's own statement to the board, about the project at Old Senoia Road and Spence Road that the rezoning ordinance ties to this parcel.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_406_998520003.pdf",
+    "retrieved": "2026-11-11",
+    "quote": "Mr. Boler confirmed that zoning is in hand and the biggest tenant has been secured, and the developer is seeing strong interest from other potential tenants."
+   },
+   {
+    "text": "The same minutes say the developer plans to build in phases and to combine the parcels into three, one for each of the three buildings, and that the bond amount covers all three. So no part of the assemblage is described as left over for another buyer.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_406_998520003.pdf",
+    "retrieved": "2026-11-11",
+    "quote": "Mr. Boler further confirmed the plan for a phased approach, with priority on the first building, and the expectation to combine parcels in the future so that the project will have three parcels, one for each phase. The $220 million bond amount includes all three buildings."
+   },
+   {
+    "text": "The authority's fact sheet for the 28 April 2026 inducement names the developer, not the tax-roll owner, as the project owner. The 'estimated closing date' on it is a field of the bond inducement fact sheet: it is the authority's bond transaction, and the page does not say it is the date of a land purchase.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_397_3860749721.pdf",
+    "retrieved": "2026-11-11",
+    "quote": "Project Owner: KMT Partners, LLC Location /Taxing Jurisdictions: Fulton County/ Fulton Schools/ City of South Fulton Investment: $220,000,000 Estimated Closing Date: 3rd Quarter 2026"
+   },
+   {
+    "text": "The fact sheet puts the project on about 188 acres in three buildings, which is the whole assemblage of the rezoning (this parcel included), not part of it.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_397_3860749721.pdf",
+    "retrieved": "2026-11-11",
+    "quote": "The Project would be developed across approximately 188 acres and consist of three state-of-the-art logistics buildings."
+   },
+   {
+    "text": "A local news report (Capital B Atlanta, 7 April 2026) says the M-1 zoning came from a revote ordered by the Superior Court after the developer sued the city over the council's denial in October 2025. This is a news report of court records, not the court order itself.",
+    "source_url": "https://atlanta.capitalbnews.org/south-fulton-warehouse-lawsuit-resident-pushback/",
+    "retrieved": "2026-11-11",
+    "quote": "Court records show that after the lawsuit was filed, the city and the developer agreed to take the zoning request back up for a revote, and Fulton County Superior Court Judge Melynee Leftridge signed off on a court order to hold a revote by March 24, 2026."
+   },
+   {
+    "text": "The same report says neighbours said in April 2026 that they planned legal action against the city over the approval. I found no report that such a case was filed.",
+    "source_url": "https://atlanta.capitalbnews.org/south-fulton-warehouse-lawsuit-resident-pushback/",
+    "retrieved": "2026-11-11",
+    "quote": "Opponents of the project haven’t given up yet, as residents say they also plan to take legal action against the city."
+   },
+   {
+    "text": "The same report describes the tax-roll owner as an operating company that holds the land while a separate developer runs the project. It says 'reportedly'; it is not a Secretary of State record.",
+    "source_url": "https://atlanta.capitalbnews.org/south-fulton-warehouse-lawsuit-resident-pushback/",
+    "retrieved": "2026-11-11",
+    "quote": "While KMT Partners is the developer of the project, MAPCO Farms, a convenience store retailer, reportedly owns the land."
+   },
+   {
+    "text": "Against a finished deal: I read the development authority's preliminary agendas for 19 May, 17 June, 23 June, 28 July, 25 August, 29 September and 27 October 2026, and none lists a final bond resolution for this project (searched each for the developer's name, the project name, Senoia and Spence). The quote is one of the two bond resolutions that are on the 27 October agenda, for another company. The 17 November agenda was not posted when I looked.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_41_963367144.pdf",
+    "retrieved": "2026-11-11",
+    "quote": "Bond Resolution for First Industrial, L.P. (Induced as Post Consumer Brands, LLC)"
+   },
+   {
+    "text": "Against a finished deal: the county tax parcel layer, asked on 2026-11-11 for the seven parcel ids of the ordinance (by parcel id only), returns tax year 2027 records in which this parcel and five others still carry the owner name given in the brief and none carries the developer's name. The tax roll lags deeds, so this does not show that no deed was recorded.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID+IN+(%2709F070000320927%27,%2709F100200471269%27,%2709F070000320661%27,%2709F100100460651%27,%2709F100100460610%27,%2709F100100460636%27,%2709F110300450881%27)&outFields=ParcelID,Owner,Address,LandAcres,TaxYear,LUCode,ClassCode&returnGeometry=false&orderByFields=ParcelID&f=json",
+    "retrieved": "2026-11-11",
+    "quote": "\"ParcelID\":\"09F070000320927\",\"Owner\":\"MAPCO FARMS LLC \",\"Address\":\"0 IRWIN RD\",\"LandAcres\":47.52,\"TaxYear\":2027"
+   },
+   {
+    "text": "A lesser point on access: the legal description in the posted ordinance runs the first tract (72.35 acres) along Irwin Road and Old Senoia Road, the roads this parcel fronts, and gives Old Senoia Road a right-of-way of only 30 feet there.",
+    "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806",
+    "retrieved": "2026-11-11",
+    "quote": "AT THE INTERSECTION OF THE NORTHERLY RIGHT-OF-WAY LINE OF IRWIN ROAD (VARIABLE R/W, 60’ R/W AT THIS POINT) AND THE EASTERLY RIGHT-OF-WAY LINE OF OLD SENOIA ROAD (30' R/W)"
+   }
+  ],
+  "open_items": [
+   "First question: has anything been recorded against this parcel or its six neighbours since April 2026 (a deed, a memorandum of contract or option, a lease to the development authority)? Check the Fulton County Clerk of Superior Court deed records by hand. If nothing has, ask whether the developer's contract is still live: the authority's estimate of a third-quarter 2026 closing has passed with no final bond resolution on its agendas through 27 October 2026 (its next meetings are listed for 17 November and 1 December 2026).",
+   "Dispute of market-4: the 'estimated closing date' in the development authority's release is, on the authority's own fact sheet, a field of the bond inducement. No page read by either pass shows a land purchase contract or its closing date. The quotes show a developer pursuing the land with the owner's land in the project's name, not a contract; the practical result for an outside buyer is the same.",
+   "Dispute of utilities-4: the checklist makes the utilities verdict the weaker of water and sewer. Sewer is shown nearby and water is not shown, so the section's verdict should read not_shown, not nearby. Also ask whether the Morning Creek sewer lines found within 1,500 ft can serve a site that the staff report says drains to a tributary of Whitewater Creek, or whether a pump station or an extension is needed.",
+   "Dispute of plans-6: the kept quote gives a resolution number and a date and does not say what the moratorium covers. That it concerns data centres and not warehouses rests on the first agent's reading of the rest of the page.",
+   "What is the state of the developer's lawsuit against the city (a news report listed it as open on 7 April 2026), and has anyone filed a challenge to ORD2026-010? A rezoning that came from a court-ordered revote is worth a look at the Fulton County Superior Court docket before relying on it.",
+   "Seen, not verifiable: https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806 pages 7 and 8 are images with no text layer. Page 7 (GRTA Attachment A) asks for Old Senoia Road to be paved as a two-lane road between SR 74 and the site's first driveway and through the rest of the site, with a sidewalk, and for turn lanes on SR 74 and SR 92/Spence Road, all subject to GDOT approval. Page 8 is the zoning site plan, titled with the developer's name and the project name. A buyer of this parcel alone would want to know which of these road works fall on it.",
+   "My own arithmetic, not checked by anyone: the Irwin Road courses of the first tract in the legal description add up to about 2,650 ft, close to the brief's 2,525 ft of frontage on one local road, which fits this parcel lying inside the 72.35-acre tract. Condition 1 of the posted ordinance calls the site plan 'conceptual only', so the conditions do not appear to tie the zoning to the three-building layout; that point is in the lead's favour if the land ever comes free.",
+   "Not found after searching: any report of a land closing, a land disturbance permit, a groundbreaking or a named tenant for this site after April 2026; any warehouse moratorium or M-1 text amendment by the city since March 2026; any lawsuit filed by residents. Not looked at: deed records, court dockets, the city's permit records, the Secretary of State record, listing sites (never used; a person may look at them by hand)."
+  ]
+ }
+}
