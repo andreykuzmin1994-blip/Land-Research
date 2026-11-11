@@ -22,10 +22,10 @@ session" at the end. It writes nothing of its own into the findings.
    afresh on every run, and drops any claim whose quote is not on the
    page. Do not argue with a drop: find the right page or leave the
    section `unknown`. What it will not accept as "on the page":
-   - words that are also in the URL: 25 characters in a row, three words
-     in a row, or one long word (a search or query page that shows your
-     own request back to you proves nothing). If the best sentence
-     repeats the document's file name, quote another sentence;
+   - words that are also in the URL: 25 characters in a row anywhere in
+     it, or three words in a row or one long word from the part after
+     the "?" (a search or query page that shows your own request back to
+     you proves nothing);
    - a quote that starts or ends inside a word or a number;
    - text in a form field, a drop-down list, the page title, a script;
    - in a PDF, a quote that runs from one page onto the next. A quote
@@ -238,7 +238,7 @@ its own was found on its page, not that the objection follows from it.
    ```
 
    This run refuses if a `skeptic.json` is there. Note the
-   `findings.json sha256` it prints.
+   `findings.json sha256` it prints, and use no other hash in step 2.
 2. Hand the skeptic the brief and a copy of `findings.checked.json`, in a
    fresh context. When it has written `skeptic.json`, run
 
@@ -252,10 +252,10 @@ its own was found on its page, not that the objection follows from it.
    and writes one `findings.checked.json` and `lead.md`. This second run
    is the one that counts: a first-pass claim it drops (the page changed
    or stopped answering) is dropped, and `lead.md` says how many.
-3. Optionally write `headline.txt` in the folder before the last run: one
-   plain line, the single finding a person should act on first. It is
-   printed at the top of `lead.md`, labelled as your reading, with any
-   quotation marks and web addresses taken out.
+3. Optionally pass `--headline "one plain line"` to the last run: the
+   single finding a person should act on first. It is printed at the top
+   of `lead.md`, labelled as your reading, as plain words. (It is an
+   argument, not a file, so no agent can leave one.)
 4. Read the dropped list `quotecheck` prints. Copy `findings.json`,
    `skeptic.json`, `findings.checked.json` and `lead.md` to
    `leads/<parcel>/` on the data branch. The fetched pages are not kept.
@@ -264,17 +264,20 @@ its own was found on its page, not that the objection follows from it.
 
 `quotecheck` writes it from `findings.checked.json`; nobody edits it. In
 it, words in double quotation marks are a kept quote and a link is a kept
-claim's address, because only the code puts them there. Everything an
-agent wrote (claim text, objection, open items, the headline) is labelled
-as the agent's own and has its quotation marks, markup and web addresses
-removed. It gives:
+claim's address, because only the code puts them there. A quote is shown
+as a code span, so markup or an address inside the page's own words is
+displayed, not followed. Everything an agent wrote (claim text, objection,
+open items, the headline) is labelled as the agent's own and reduced to
+letters, digits and plain punctuation, with web addresses removed. It
+gives:
 
 - per section, the checked verdict and the section's first kept claim
   with its quote and link (a section with none reads `unknown`, and says
   so when the investigator had written something else);
-- a note when the page's words just before a quote include "not" or the
-  like, when a PDF quote was found only across columns, and when a quote
-  shares words with the query part of its address;
+- for each quote shown, the page's words just before and after it (a
+  "not" in front of a quote shows there), and a note when a PDF quote was
+  found only across columns or when a quote shares words with the query
+  part of its address;
 - the skeptic's verdict, whether quotes of its own back it, its objection
   and the claims it disputes;
 - how many claims were kept and dropped, what is still `unknown`, and the
