@@ -71,7 +71,7 @@ class ScoreTests(unittest.TestCase):
         # One site, positive in both years, ranked first in each: one site of credit.
         weights = {"2015-099": 0.5, "2016-099": 0.5}
         res = ev.evaluate(records, weights, "dev", scorer=lambda f: {"score": f["signal"]},
-                          settings=SETTINGS)
+                          settings=SETTINGS, fields=("signal",))
         self.assertEqual((res["positives"], res["sites"]), (2, 1.0))
         self.assertAlmostEqual(res["hits"], 1.0)
         self.assertAlmostEqual(res["graded"], 1.0)
@@ -102,12 +102,17 @@ class ScoreTests(unittest.TestCase):
         ev.evaluate(records, set(), "dev", scorer=spy, settings=SETTINGS,
                     fields=("signal", "flood_pct", "not_in_record"))
         self.assertEqual(set(seen), {("flood_pct", "not_in_record", "signal")})
+        with self.assertRaises(TypeError):          # no default: the old deny-list is gone
+            ev.evaluate(records, set(), "dev", scorer=spy, settings=SETTINGS)
+        with self.assertRaises(TypeError):
+            ev.ranking(records, "dev", spy, SETTINGS)
 
     def test_screened_out_positive_earns_nothing(self):
         records = pool()
         next(r for r in records if r["key"] == "2015-099")["flood_pct"] = 90.0
         res = ev.evaluate(records, {"2015-099": 1.0}, "dev",
-                          scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS)
+                          scorer=lambda f: {"score": f["signal"]}, settings=SETTINGS,
+                          fields=("signal",))
         self.assertEqual((res["hits"], res["graded"], res["positives_screened_out"]), (0, 0, 1))
 
     def test_bootstrap_copies(self):
@@ -182,7 +187,8 @@ class KeepRuleTests(unittest.TestCase):
     def test_thresholds_are_the_reviewed_ones(self):
         # Changing these needs the null test re-run and recorded (reviews/36).
         self.assertEqual((ev.MIN_GAIN, ev.WIN_SHARE_TO_KEEP, ev.CREDIT_SPAN, ev.K_SHARE,
-                          ev.BOOTSTRAP), (2.0, 0.95, 10.0, 0.02, 500))
+                          ev.BOOTSTRAP), (2.0, 0.99, 10.0, 0.02, 500))
+        self.assertGreaterEqual(ev.NULL_TRIALS, 1000)
 
     def test_null_test_is_deterministic_and_counts_false_keeps(self):
         base = {r["key"]: r["signal"] / 2.0 for r in self.records}
@@ -190,8 +196,47 @@ class KeepRuleTests(unittest.TestCase):
             a = ev.null_test(self.records, self.pos, base, 6, 4.0)
             b = ev.null_test(self.records, self.pos, base, 6, 4.0)
         self.assertEqual(a, b)
-        self.assertEqual((a["trials"], a["noise"]), (6, 4.0))
+        self.assertEqual((a["trials"], a["noise"], a["mode"]), (6, 4.0, "independent"))
         self.assertTrue(0 <= a["false_keeps"] <= 6)
+
+    def test_null_test_compares_two_different_rankings_and_ties_are_not_wins(self):
+        base = {r["key"]: r["signal"] / 2.0 for r in self.records}
+        seen = []
+        real = ev.keep_verdict
+
+        def spy(records, positives, new, best, split="dev"):
+            seen.append(new != best)
+            return real(records, positives, new, best, split)
+
+        with mock.patch.object(ev, "BOOTSTRAP", 5), mock.patch.object(ev, "keep_verdict", spy):
+            for mode in ev.NULL_MODES:
+                ev.null_test(self.records, self.pos, base, 3, 8.0, mode=mode)
+        self.assertEqual(seen, [True] * 6)
+        with self.assertRaises(ValueError):
+            ev.null_test(self.records, self.pos, base, 3, 8.0, mode="other")
+        # A ranking never beats itself: a tie is not a win.
+        self.assertEqual(ev.paired_win_share(self.records, self.pos, self.perfect, self.perfect), 0.0)
+
+    def test_cell_shared_noise_moves_a_cell_together_in_every_year(self):
+        base = {r["key"]: 50.0 for r in self.records}
+        orders = []
+        with mock.patch.object(ev, "keep_verdict",
+                               side_effect=lambda rec, pos, new, best, split="dev": (
+                                   orders.extend([new, best]) or {"keep": False, "gain": 0.0})):
+            ev.null_test(self.records, self.pos, base, 1, 1000.0, mode="cell-shared")
+        block = {r["key"]: r["block"] for r in self.records}
+
+        def best_cell(order):
+            places: dict[str, list[int]] = {}
+            for place, key in enumerate(order):
+                places.setdefault(block[key], []).append(place)
+            return min(places, key=lambda b: sum(places[b]))
+
+        # Half the noise is one draw per cell, the same in every year, so the
+        # cell that comes out on top is the same cell in both years.
+        self.assertEqual(best_cell(orders[0][2015]), best_cell(orders[0][2016]))
+        self.assertEqual(best_cell(orders[1][2015]), best_cell(orders[1][2016]))
+        self.assertNotEqual(orders[0][2015], orders[1][2015])
 
 
 class DecideMechanicsTests(unittest.TestCase):
@@ -235,7 +280,8 @@ class DecideMechanicsTests(unittest.TestCase):
                 "score_range": [0.0, 90.0], "order": orders, "nonfinite_scores": 0}
 
     def test_baseline_keep_and_discard_with_rounded_log(self):
-        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), False), 0)
+        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), False), 3)
+        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), True), 0)
         self.commits.append("bbb")
         self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: -r["signal"]), False), 0)
         self.commits.append("ccc")
@@ -251,7 +297,8 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual((saved["commit"], sorted(saved["order"])), ("bbb", ["2015", "2016"]))
         text = self.out.getvalue()
         self.assertIn("DECISION: KEEP", text)
-        self.assertIn("needs +2 graded, hits not lower, and 95%", text)
+        self.assertIn("needs +2 graded, hits not lower, and a win in 99% of resamples", text)
+        self.assertNotIn("wins", text)
 
     def test_a_log_from_the_old_evaluator_is_refused(self):
         self.log.write_text("time\tcommit\tparent\tfingerprint\thits\tpositives\tk\trecall\t"
@@ -265,7 +312,7 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), True), 3)
 
     def test_a_changed_key_needs_a_human_baseline(self):
-        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), False), 0)
+        self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: r["signal"]), True), 0)
         self.commits.append("bbb")
         with mock.patch.object(ev, "fingerprint", return_value="fp2"):
             self.assertEqual(ev.decide(self.records, self.pos, self.dev(lambda r: -r["signal"]),
@@ -323,9 +370,61 @@ class BuildRuleTests(unittest.TestCase):
                              "positive", year)
         for year in (2018, 2019):                # the developer owns it and later sells the building
             self.assertEqual(be.classify(shares, self.chain(), self.DEV, date(year, 1, 1)),
-                             "left out: sold after the building", year)
+                             "left out: bought at a real price since 2015", year)
         self.assertEqual(be.classify(shares, self.chain(), self.REIT, date(2021, 1, 1)),
-                         "left out: built but not sold by the as-of owner")
+                         "left out: bought at a real price since 2015")
+        # A developer who bought before the window, built, and sold the building.
+        early = [deed("2013-06-01", 900000, self.A), deed("2020-09-01", 30000000, self.DEV)]
+        self.assertEqual(be.classify(shares, early, self.DEV, date(2019, 1, 1)),
+                         "left out: sold after the building")
+        self.assertEqual(be.classify(shares, early, self.REIT, date(2021, 1, 1)),
+                         "left out: bought at a real price since 2015")
+
+    def test_a_buyer_inside_the_window_is_never_the_seller(self):
+        """reviews/36, 05, finding 4: the landowner sells in June 2016; the
+        developer builds in 2018 and sells the finished building in November
+        2018; the 2019 digest is the first to show the building. The digests
+        alone put the developer's sale "before the building"."""
+        shares = {y: (1.0 if y >= 2019 else 0.0) for y in be.BUILT_YEARS}
+        sales = [deed("2001-05-01", 90000, "OLD FARM OWNER"), deed("2016-06-15", 900000, self.A),
+                 deed("2018-11-20", 30000000, self.DEV)]
+        for year in (2015, 2016):
+            self.assertEqual(be.classify(shares, sales, self.A, date(year, 1, 1)), "positive", year)
+        for year in (2017, 2018):
+            self.assertEqual(be.classify(shares, sales, self.DEV, date(year, 1, 1)),
+                             "left out: bought at a real price since 2015", year)
+        self.assertTrue(be.sale_before(sales, self.DEV, date(2017, 1, 1), date(2019, 1, 1), 50000))
+        # A middleman's land flip is left out the same way (operator decision, 2026-11-11).
+        flip = [deed("2015-03-01", 400000, self.A), deed("2016-08-01", 900000, "FLIPPER LLC")]
+        self.assertEqual(be.classify(shares, flip, "FLIPPER LLC", date(2016, 1, 1)),
+                         "left out: bought at a real price since 2015")
+        # What does not make a buyer: a deed before the window, a token price,
+        # a right-of-way deed, the owner's own deed, a deed on or after the as-of date.
+        for other in ([deed("2014-12-31", 900000, "X")], [deed("2015-06-01", 49999, "X")],
+                      [deed("2015-06-01", 900000, "X", "Right of Way/Dept of Trans")],
+                      [deed("2015-06-01", 900000, self.A)], [deed("2016-06-01", 900000, "X")]):
+            self.assertFalse(be.bought_in_window(other, self.A, date(2016, 1, 1)), other)
+        self.assertTrue(be.bought_in_window([deed("2015-01-01", 50000, "X")], self.A,
+                                            date(2016, 1, 1)))
+        # A parcel that was never built on stays a negative whoever bought it.
+        none = {y: 0.0 for y in be.BUILT_YEARS}
+        self.assertEqual(be.classify(none, sales, self.DEV, date(2018, 1, 1)), "negative")
+
+    def test_a_first_quarter_buyer_shown_by_the_digest_is_left_out_built_or_not(self):
+        why = "left out: the digest shows the buyer of a first-quarter sale"
+        built = {y: (1.0 if y >= 2019 else 0.0) for y in be.BUILT_YEARS}
+        none = {y: 0.0 for y in be.BUILT_YEARS}
+        feb = [deed("2017-02-10", 900000, self.A)]
+        for shares in (built, none):
+            self.assertEqual(be.classify(shares, feb, "BUYER LLC", date(2017, 1, 1)), why)
+        # The January owner is the seller of that deed: the record is sound.
+        self.assertEqual(be.classify(built, feb, self.A, date(2017, 1, 1)), "positive")
+        self.assertEqual(be.classify(none, feb, self.A, date(2017, 1, 1)), "negative")
+        # Outside the quarter, unpriced, or a right-of-way deed: not a sign of a late digest.
+        for sales in ([deed("2017-04-03", 900000, self.A)], [deed("2016-12-31", 40000, self.A)],
+                      [deed("2017-02-10", 0, self.A)],
+                      [deed("2017-02-10", 900000, self.A, "Right of Way/Dept of Trans")]):
+            self.assertEqual(be.classify(none, sales, "BUYER LLC", date(2017, 1, 1)), "negative")
 
     def test_never_built_is_a_negative_and_owner_user_is_left_out(self):
         none = {y: 0.0 for y in be.BUILT_YEARS}
@@ -367,6 +466,42 @@ class BuildRuleTests(unittest.TestCase):
                  "p4": [deed("2016-12-01", 5, "A"), deed("2017-01-05", 5, "B")]}
         self.assertEqual(be.snapshot_date_check(parcels, sales, as_of),
                          {"quarter_before": [0, 1], "quarter_after": [1, 1]})
+
+    def test_one_cell_per_site_from_its_first_year(self):
+        cohorts = {2016: [{"parcel_id": "p1", "lon": -84.52, "lat": 33.61},
+                          {"parcel_id": "p2", "lon": -84.52, "lat": 33.61}],
+                   2015: [{"parcel_id": "p1", "lon": -84.48, "lat": 33.61}],
+                   2017: [{"parcel_id": "p1", "lon": -84.61, "lat": 33.70}]}
+        cells = be.site_cells(cohorts)
+        self.assertEqual(cells["p1"], be.cell_for(-84.48, 33.61))      # 2015, not a later centroid
+        self.assertEqual(cells["p2"], be.cell_for(-84.52, 33.61))
+        self.assertNotEqual(cells["p1"], cells["p2"])
+
+    def test_a_dev_parcel_on_test_ground_is_dropped(self):
+        from shapely.geometry import box
+        kept = [{"parcel_id": "t1", "geometry": box(0, 0, 10, 10)},
+                {"parcel_id": "d1", "geometry": box(5, 5, 12, 12)},     # the same ground, a new id
+                {"parcel_id": "d2", "geometry": box(10, 0, 20, 10)},    # only shares an edge
+                {"parcel_id": "d3", "geometry": box(40, 40, 50, 50)}]
+        is_test = {"t1": True, "d1": False, "d2": False, "d3": False}
+        self.assertEqual(be.dev_on_test_ground(kept, is_test), {"d1"})
+        self.assertEqual(be.dev_on_test_ground(kept[1:], is_test), set())
+
+    def test_a_sites_weights_sum_to_one(self):
+        kept = [{"parcel_id": "p1", "label": "positive"}, {"parcel_id": "p1", "label": "positive"},
+                {"parcel_id": "p1", "label": "negative"}, {"parcel_id": "p2", "label": "positive"},
+                {"parcel_id": "p3", "label": "positive"}, {"parcel_id": "p4", "label": "negative"}]
+        self.assertEqual(be.positive_years(kept, {"p3"}), {"p1": 2, "p2": 1})
+
+    def test_the_features_file_has_the_same_bytes_every_time(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            a, b = Path(tmp, "a.gz"), Path(tmp, "b.gz")
+            be.write_gz(a, {"records": [1, 2]})
+            with mock.patch("time.time", return_value=2_000_000_000.0):
+                be.write_gz(b, {"records": [1, 2]})
+            self.assertEqual(a.read_bytes(), b.read_bytes())
+            with gzip.open(a, "rt") as fh:
+                self.assertEqual(json.load(fh), {"records": [1, 2]})
 
     def test_keys_and_urls(self):
         self.assertEqual(be.key_for("14F0001 0001"), be.key_for("14F0001 0001", 2016))

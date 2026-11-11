@@ -13,6 +13,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import date
@@ -305,19 +306,42 @@ class NonFiniteScoreTests(unittest.TestCase):
         def scorer(f):
             return {"score": float("nan") if f["signal"] == 101 else float(f["signal"])}
 
-        res = ev.evaluate(records, positives, "dev", scorer=scorer, settings=SETTINGS)
+        res = ev.evaluate(records, positives, "dev", scorer=scorer, settings=SETTINGS,
+                          fields=("signal",))
         self.assertEqual(res["nonfinite_scores"], 1)
         self.assertTrue(all(math.isfinite(x) for x in res["score_range"]))
         for bad in (float("inf"), float("-inf")):
             res = ev.evaluate(records, positives, "dev", scorer=lambda f, b=bad: {"score": b},
-                              settings=SETTINGS)
+                              settings=SETTINGS, fields=("signal",))
             self.assertEqual(res["nonfinite_scores"], 150)
 
     def test_finite_scores_report_zero(self):
         records, positives = _pool()
         res = ev.evaluate(records, positives, "dev", scorer=lambda f: {"score": f["signal"]},
-                          settings=SETTINGS)
+                          settings=SETTINGS, fields=("signal",))
         self.assertEqual(res["nonfinite_scores"], 0)
+        self.assertEqual(res["unstable_scores"], 0)
+
+    def test_a_score_that_depends_on_the_call_is_counted(self):
+        records, positives = _pool()
+        calls = []
+
+        def counter(f):
+            calls.append(1)
+            return {"score": float(len(calls) % 90)}
+
+        res = ev.evaluate(records, positives, "dev", scorer=counter, settings=SETTINGS,
+                          fields=("signal",))
+        self.assertGreater(res["unstable_scores"], 100)
+        self.assertEqual(len(calls), 300)              # 150 dev records, each asked twice
+        seen = {}
+
+        def remembers(f):
+            return {"score": float(seen.setdefault(f["signal"], len(seen)) % 90)}
+
+        again = ev.evaluate(records, positives, "dev", scorer=remembers, settings=SETTINGS,
+                            fields=("signal",))
+        self.assertEqual(again["unstable_scores"], 0)  # stable within a run: the guard is not a sandbox
 
 
 CURRENT_RANK = ev.RANK_FILE.read_text() if hasattr(ev, "RANK_FILE") else ""
@@ -484,7 +508,7 @@ class DecideTests(unittest.TestCase):
 
     def baseline_then_experiment(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.repo.commit("bbb")
 
     def test_first_run_records_baseline_then_keeps(self):
@@ -501,7 +525,7 @@ class DecideTests(unittest.TestCase):
             with self.subTest(old_hits=old_hits):
                 self.fresh()
                 self.repo.commit("aaa")
-                self.assertEqual(self.run_decide(old_hits), 0)
+                self.assertEqual(self.run_decide(old_hits, new_baseline=True), 0)
                 self.repo.commit("bbb", "screener/autoresearch/evaluate.py", "screener/screens.py")
                 self.assert_refused_without_writes()
                 self.assertEqual(self.run_decide(new_hits, new_baseline=True), 0)
@@ -531,7 +555,7 @@ class DecideTests(unittest.TestCase):
 
     def test_rows_outside_history_are_refused(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.repo.history = [("xxx", ["screener/rank.py"])]          # branch from before aaa
         self.repo.commit("yyy")
         self.assert_refused_without_writes()
@@ -543,7 +567,7 @@ class DecideTests(unittest.TestCase):
 
     def test_new_baseline_allowed_on_a_scored_commit(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.assertEqual(self.run_decide(2), 3)
         self.assertEqual(self.run_decide(2, new_baseline=True), 0)
 
@@ -560,9 +584,70 @@ class DecideTests(unittest.TestCase):
 
     def test_commit_must_touch_only_rank(self):
         self.repo.commit("aaa")
-        self.assertEqual(self.run_decide(2), 0)
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
         self.repo.commit("bbb", "helper.py", "screener/rank.py")
         self.assert_refused_without_writes()
+
+    def test_only_a_human_records_a_baseline_the_first_one_included(self):
+        self.repo.commit("aaa")
+        self.assert_refused_without_writes()                     # no log at all
+        self.assertIn("no baseline for this evaluation set", sys.stdout.getvalue())
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
+        self.repo.commit("bbb")
+        self.log.unlink()
+        self.best.unlink()                                       # a new container, or rm
+        self.assert_refused_without_writes()
+        self.log.write_text("")                                  # a zero-byte log
+        self.assert_refused_without_writes()
+        self.assertEqual(self.run_decide(2, new_baseline=True), 0)
+        self.assertEqual(self.statuses(), ["baseline"])          # header written to the empty file
+
+    def test_no_other_file_under_screener_may_change_since_the_best_run(self):
+        for other in ("screener/autoresearch/__init__.py", "screener/__init__.py",
+                      "screener/scoring.py", "screener/autoresearch/data/fulton_2015_labels.json"):
+            with self.subTest(other):
+                self.fresh()
+                self.baseline_then_experiment()
+                self.repo.history[-1] = ("bbb", [other])         # an earlier commit slipped it in
+                self.repo.commit("ccc")                          # HEAD itself touches only rank.py
+                self.assert_refused_without_writes()
+                self.assertIn("files other than screener/rank.py changed", sys.stdout.getvalue())
+        self.fresh()
+        self.baseline_then_experiment()
+        self.repo.history[-1] = ("bbb", ["README.md"])           # outside screener/: not its business
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+
+    def test_a_decision_shows_rounded_scores_and_no_win_share(self):
+        self.baseline_then_experiment()
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+        self.repo.commit("ddd")                                  # left in place, then another
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertEqual(self.statuses(), ["baseline", "keep", "discard", "discard"])
+        self.assertNotIn("wins", text)
+        self.assertNotRegex(text, r"\d%\s+of resamples\)?;")
+        decisions = [ln for ln in text.splitlines() if ln.startswith(("DECISION: KEEP",
+                                                                      "DECISION: DISCARD"))]
+        self.assertEqual(len(decisions), 3)
+        for line in decisions:
+            self.assertRegex(line, r"graded \d+\.\d vs best kept \d+\.\d \([+-]\d+\.\d\); "
+                                   r"hits \d+\.\d vs \d+\.\d( \(needs .*\))?$")
+        # The log, which the loop does not open, keeps the exact share.
+        self.assertRegex(ev._rows()[-1]["win_share"], r"^\d\.\d{3}$")
+        # The reset goes to the best kept commit, not to the commit before HEAD.
+        self.assertTrue(text.rstrip().endswith("git reset --hard bbb"))
+
+    def test_unstable_scores_are_refused(self):
+        self.repo.commit("aaa")
+        self.assert_refused_without_writes(new_baseline=True, unstable_scores=2)
+
+    def test_scores_just_outside_0_100_are_refused_on_exact_values(self):
+        self.repo.commit("aaa")
+        self.assert_refused_without_writes(new_baseline=True, score_span=[0.0, 100.04])
+        self.assert_refused_without_writes(new_baseline=True, score_span=[-0.04, 90.0])
 
     def test_nonfinite_scores_are_refused(self):
         self.repo.commit("aaa")
