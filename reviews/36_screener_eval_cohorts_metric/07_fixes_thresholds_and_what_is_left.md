@@ -22,8 +22,20 @@ the checklist. Counts by year and split only.
    these fixes": three new must-fixes (N1 a refused `--decide` printed
    the score, N2 the import cache could score an older `rank.py`, N3
    `--null-test` was an unlogged scoring) and seven smaller ones.
-5. Second round of fixes. Its independent check is `08`, if that file is
-   here; if it is not, the second round has not been checked.
+5. Second round of fixes.
+6. `08`: independent check of the second round, with one baseline and two
+   no-op experiments run end to end through real git in a scratch clone
+   (old key). Verdict "clear after these fixes": nothing found that lets
+   a loop keeping to `PROGRAM.md`'s letter raise the score without
+   ranking better; one must-fix (F1, the reset hint could delete a
+   human's commit) and three should-fixes (F2 a fixed shuffle seed, F3
+   same-day deeds in the builder, F4 a root-level file that hides
+   itself).
+7. Third round: F1 to F6 of `08` and its document corrections. **This
+   round has not had an independent check.** It is small: the reset hint,
+   a shuffle nobody can predict, same-day deeds, root-level names that
+   shadow standard modules, a separate message when the second process
+   cannot run, the test split held to the stability check.
 
 ## What the code does now that it did not at merge
 
@@ -31,16 +43,16 @@ the checklist. Counts by year and split only.
 |---|---|
 | `05` 1, thresholds | `WIN_SHARE_TO_KEEP` 0.95 → 0.99; `MIN_GAIN` stays 2.0. `--null-test` runs 1,000 trials per setting by default, in two modes (noise per record; half the noise shared by a map cell in every year). |
 | `05` 2, oracle | A decision prints the two rounded scores and their difference: no win share, no exact gain, no `recall`. A refused `--decide` prints no score. Every other scoring appends a `look`, `test` or `null` row with a hash of `rank.py`. |
-| `05` 3, baseline | Only `--new-baseline` records a baseline, the first included. Any file under `screener/` changed since the best kept run refuses, documents and `tests/` aside. A new baseline prints the run it replaces and whether `rank.py` differs. |
+| `05` 3, baseline | Only `--new-baseline` records a baseline, the first included. Any file under `screener/` changed since the best kept run refuses, documents and `tests/` aside. A new baseline prints the run it replaces and whether `rank.py` differs. After a DISCARD the printed reset takes back the experiment only (`08` F1). |
 | `05` 4, developers as sellers | Builder: a built parcel bought at a real price since 1 January 2015 is left out of that year. **Not in the data yet.** |
-| `05` 5 / `06` N6, state and salts | Every record is scored again, in another order, by a fresh copy of `rank.py` in a new process under another hash seed. `hash` and `id` are refused. |
+| `05` 5 / `06` N6 / `08` F2, state and salts | Every record is scored again, in an order drawn fresh each run, by a fresh copy of `rank.py` in a new process under another hash seed. `hash` and `id` are refused. The refusal does not say how many records disagreed. |
 | `05` 6, tests | `fields` is mandatory; `main()` is tested with a spy; the builder's cell, overlap and weight steps are functions with tests; the labels file carries a site hash per positive, and three data tests use it (they skip until the key is rebuilt). |
 | `05` 7, empty log | The header is written when the log is missing or empty. |
-| `05` 8, snapshot date | Builder: a parcel is left out of year Y when the first priced deed of the first quarter has a seller other than the digest's owner. **Not in the data yet.** |
+| `05` 8, snapshot date | Builder: a parcel is left out of year Y when no priced deed of the first quarter's first sale day has the digest's owner as its seller. **Not in the data yet.** |
 | `05` 10, reproducibility | The gzip files carry no timestamp; the deed file's SHA-256 goes into the meta. `meta.built` (the date) still changes the fingerprint from day to day. |
 | `06` N2, stale bytecode | The bytes that are checked are compiled and run by the evaluator; `rank.py` is never loaded through the import cache. A linked `rank.py` is refused. |
 | `06` N4, working directory | Git is asked in the repository root. |
-| `06` N5, code outside `screener/` | A module loaded from inside the repository but outside `screener/` refuses every mode. |
+| `06` N5 / `08` F4, code outside `screener/` | A root-level file or folder named like a standard module, or a module loaded from inside the repository but outside `screener/`, refuses every mode. |
 | `06` N10 | `--decide` refuses a key without the new builder's meta; a `best_ranking.json` that does not give its logged score is refused. |
 
 Not changed: `05` 9's numbers in the documents (they describe the old key
@@ -76,9 +88,10 @@ records, so they must be measured again on it before the stop is lifted.
 (`rnhp.dot.ga.gov/hosting/rest/services/FCRS`). On 2026-11-11 from 13:51
 to at least 15:05 that server answered "Token Required" for a public
 layer, and its folder listings reported that its own portal component
-was not running. The build stops there (after the digests and the deed
-file, which were fetched). Nothing was worked around: the old key is
-still in `data/`, unchanged since merge.
+was not running. It was still answering that at 19:19 UTC. The build
+stops there (after the digests and the deed file, which were fetched).
+Nothing was worked around: the old key is still in `data/`, unchanged
+since merge.
 
 The same layer feeds `exit_miles` in the live run, so an on-demand run
 would fail in the same place while the outage lasts.
@@ -107,7 +120,8 @@ In one reviewed change:
    `MIN_GAIN` to 2.5 and run it again. Record the table here.
 3. Refresh the numbers in `PROGRAM.md` and `README.md` (pools, sites,
    cells with positives, baseline, random).
-4. If `08` is missing, or lists must-fixes, deal with that first.
+4. Have the third round (item 7 above) read by someone who did not
+   write it. `08`'s notes F7 to F9 are known and left as they are.
 5. Set `REVIEW_PENDING = ""` and remove the notice at the top of
    `PROGRAM.md`.
 

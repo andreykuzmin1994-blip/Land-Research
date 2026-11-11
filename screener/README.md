@@ -644,53 +644,66 @@ span sessions.
 To run the loop, open a fresh Claude Code session and say: "Read
 screener/autoresearch/PROGRAM.md and run 15 experiments."
 
-The evaluator refuses (prints `REFUSED: ...`, exits 3, logs nothing) when:
+The evaluator refuses (prints `REFUSED: ...`, exits 3, shows no score,
+logs nothing) when:
 
-- `rank.py` breaks the purity rules (below). It is checked before it is
-  imported, in every mode but `--control`, so a refused file never runs
-  and nothing is scored.
+- `rank.py` breaks the purity rules (below). Its source is checked before
+  it is run, in every mode but `--control` (which does not run it), so a
+  refused file never runs and nothing is scored.
+- a file or folder at the repository root is named like a standard module
+  (`random.py`, `csv.py`), or a module was loaded from inside the
+  repository but outside `screener/`: it would run inside the evaluator
+  unseen by the git checks.
 - `rank.learned_score` gives a record a different score the second time
-  it is asked. Every record is scored twice, in two orders, in every
-  mode: a score may depend only on the record.
-- (`--decide`) there are uncommitted changes or untracked files under
-  `screener/` (ignored files such as `cache/` don't count), the experiment
-  commit touches any file besides `screener/rank.py`, or git can't be read.
-- (`--decide`) any score is NaN or infinite, or outside 0–100.
+  it is asked. Every record of every split that is scored is asked again,
+  in an order drawn fresh each run, by a fresh copy of `rank.py` in a new
+  Python process: a score may depend only on the record. (If that second
+  process cannot start, nothing is scored and the message says so.)
 - `experiments.tsv` was written by an earlier version of the evaluator
   (other columns): a human moves the old file aside. A look is refused
   too, because it could not be logged.
+- (`--decide`) there are uncommitted changes or untracked files under
+  `screener/` (ignored files such as `cache/` don't count), the experiment
+  commit touches any file besides `screener/rank.py`, git can't be read,
+  or this commit was already scored. Fix the commit and run it again.
+- (`--decide`) any score is NaN or infinite, or outside 0–100. Fix
+  `rank.py`.
+
+and, where a human then records a baseline with `--decide --new-baseline`
+(at the best kept commit when only its record was lost):
+
 - (`--decide`) there is no baseline for this key in `experiments.tsv`
   (a first run, a new container, a deleted log, a rebuilt key). Only
   `--new-baseline` records one; the loop never runs it.
 - (`--decide`) any file under `screener/` other than `rank.py` changed
   since the best kept run (the evaluator, `screens.py`, `data/`, a
-  package `__init__.py`, anything), or the best kept run's record is
-  broken: `best_ranking.json` is missing, unreadable or from another run,
-  or `experiments.tsv` has kept runs, none of which is in this branch's
+  package `__init__.py`; documents and `screener/tests/` aside), or the
+  best kept run's record is broken: `best_ranking.json` is missing,
+  unreadable, from another run or does not give its logged score, or
+  `experiments.tsv` has kept runs, none of which is in this branch's
   history. Deleting one of those files can't reset the bar.
+- (`--decide`) the key in `data/` was built before the 2026-11-11 builder
+  rules: a human rebuilds it first.
 
-- (`--decide`) this commit was already scored; the key in `data/` was
-  built before the 2026-11-11 builder rules; or `--test` is given with it.
-- a module was loaded from inside the repository but outside `screener/`
-  (a root-level `random.py` would run inside the evaluator unseen).
+A new baseline starts a new chain: later experiments are compared with
+it, not with older runs. It prints the best kept run it replaces and
+whether `rank.py` differs from it. (`--decide --test` and
+`--new-baseline` without `--decide` are usage errors: exit 2.)
 
 A decision prints the two scores to one decimal and their difference,
 never the bootstrap win share (that goes to the log only): finer numbers
 would let one experiment ask whether a band of parcels holds a known site.
-A refused `--decide` prints no score. Every other scoring is logged as a
-`look`, `test` or `null` row with a hash of `rank.py`.
+Every scoring that runs `rank.py` and shows a number is logged as a
+`look`, `test` or `null` row with a hash of `rank.py`. After a DISCARD
+the evaluator prints the `git reset --hard` that takes back the
+experiment and nothing else.
 
 The `rank.py` that is checked is the one that runs: its bytes are compiled
 by the evaluator, not loaded through Python's import cache (which once
 scored an older `rank.py` of the same size, edited within the same
-second). Git is asked about the repository the evaluator is in, whatever
-the working directory. Documents and `screener/tests/` may change between
-experiments; any other file under `screener/` needs a new baseline.
-
-In each of the last cases a human re-records the baseline with
-`--decide --new-baseline` (at the best kept commit when only its record
-was lost). A new baseline starts a new chain: later experiments are
-compared with it, not with older runs.
+second; the live `python -m screener.run` still imports it the ordinary
+way). Git is asked about the repository the evaluator is in, whatever the
+working directory.
 
 ### The purity check
 

@@ -442,11 +442,15 @@ class FakeRepo:
             if args[2] == "HEAD~1":
                 files = self.history[-1][1]
             else:
-                after = self.history[names.index(args[2]) + 1:] if args[2] in names else []
+                end = names.index(args[3]) + 1 if len(args) > 3 and args[3] in names else len(names)
+                after = self.history[names.index(args[2]) + 1:end] if args[2] in names else []
                 files = sorted({f for _, fs in after for f in fs})
             if only and not under:                       # a single file asked about
                 return "\n".join(f for f in files if f in only)
             return "\n".join(f for f in files if not under or f.startswith("screener/"))
+        if args[0] == "log" and "--oneline" in args:
+            first, last = args[-1].split("..")
+            return "\n".join(f"{c} exp" for c in names[names.index(first) + 1:names.index(last) + 1])
         if args[0] == "log":
             return "exp: test"
         return ""
@@ -645,8 +649,21 @@ class DecideTests(unittest.TestCase):
                                    r"hits \d+\.\d vs \d+\.\d( \(needs .*\))?$")
         # The log, which the loop does not open, keeps the exact share.
         self.assertRegex(ev._rows()[-1]["win_share"], r"^\d\.\d{3}$")
-        # The reset goes to the best kept commit, not to the commit before HEAD.
-        self.assertTrue(text.rstrip().endswith("git reset --hard bbb"))
+        # The reset takes back the experiment and nothing else.
+        hints = [ln for ln in text.splitlines() if ln.startswith("Revert the experiment")]
+        self.assertEqual(hints, ["Revert the experiment: git reset --hard bbb"] * 2)
+        # ccc was a discard left in place, so undoing ddd means going back past it.
+        self.assertIn("this also removes 1 commit(s) made since the best kept run", text)
+
+    def test_the_reset_hint_keeps_a_humans_commit_made_since_the_best_run(self):
+        self.baseline_then_experiment()
+        self.repo.history[-1] = ("bbb", ["screener/README.md", "screener/tests/test_rules.py"])
+        self.repo.commit("ccc")                                  # the experiment
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertIn("DECISION: DISCARD", text)
+        self.assertTrue(text.rstrip().endswith("Revert the experiment: git reset --hard bbb"))
+        self.assertNotIn("also removes", text)
 
     def test_documents_and_tests_may_change_since_the_best_run(self):
         self.baseline_then_experiment()

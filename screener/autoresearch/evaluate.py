@@ -65,7 +65,8 @@ about the repository this file is in, whatever the working directory.
 or untracked files under screener/, a commit that touches anything but
 screener/rank.py, any other file under screener/ changed since the best
 kept run, a score that isn't a finite number in 0-100, a log written for
-another version of this evaluator, no baseline for this key, a key built
+another version of this evaluator, a commit that was already scored, no
+baseline for this key, a key built
 before the 2026-11-11 builder rules, or a best kept run whose
 experiments.tsv row or best_ranking.json is missing, doesn't match or
 doesn't reproduce its logged score. Only a human records a baseline (--new-baseline), the
@@ -160,7 +161,10 @@ NULL_NOISE = (4.0, 8.0, 16.0)                # --null-test: score-point noise le
 # every year (a real edit moves a site's years and its neighbours together).
 NULL_MODES = ("independent", "cell-shared")
 NULL_TRIALS = 1000                           # fewer cannot resolve a 2% target
-ORDER_SEED = 11                              # the second scoring pass's order
+# Said without the count: how many records disagreed is not the loop's to know.
+UNSTABLE = ("rank.learned_score gave some records a different score the second time it was "
+            "asked (by a fresh copy, in another order); a score may depend only on the record "
+            "it is given.")
 # Why --decide refuses for now ("" = it does not). Set while a change to this
 # evaluation awaits its review; a human clears it in the change that records
 # the review's outcome. Scoring without --decide still works.
@@ -203,6 +207,10 @@ RANK_BANNED_STRINGS = ("autoresearch/data", "fulton_20", "test_blocks", "experim
 # What to use instead, in refusal messages.
 RANK_HINTS = {"type": " (use isinstance)", "format": " (use an f-string)",
               "format_map": " (use an f-string)", "print": " (put reasons in why_site / why_seller)"}
+
+
+class SecondPassFailed(Exception):
+    """The second scoring pass could not run at all (not: it disagreed)."""
 
 
 class EvalSetError(Exception):
@@ -285,12 +293,14 @@ def ranking(records: list[dict], split: str, scorer, settings: dict,
 
     first = [float(scorer(features_of(r))["score"]) for r in ranked]
     again = list(range(len(ranked)))
-    random.Random(ORDER_SEED).shuffle(again)
+    # An order nobody can work out beforehand: with a fixed seed, a rank.py
+    # could rebuild the shuffle and still know each record's place in the file.
+    random.SystemRandom().shuffle(again)
     rows = [features_of(ranked[i]) for i in again]
     seconds = (recheck(rows) if recheck is not None
                else [float(scorer(row)["score"]) for row in rows])
-    if len(seconds) != len(again):
-        raise ValueError("the second scoring pass did not return one score per record")
+    if seconds is None or len(seconds) != len(again):
+        raise SecondPassFailed("the second scoring pass did not return one score per record")
     unstable = 0
     for i, second in zip(again, seconds):
         if second != first[i] and not (math.isnan(second) and math.isnan(first[i])):
@@ -498,8 +508,8 @@ def null_test(records: list[dict], positives, base: dict[str, float], trials: in
 def rank_problems(source: str | bytes) -> list[str]:
     """Why rank.py's source breaks PROGRAM.md rules 1-3, if it does.
 
-    It reads the source before rank.py is imported (bytes are parsed the way
-    the importer compiles them). It refuses:
+    It reads the source before rank.py is run (bytes are parsed the way
+    Python compiles them). It refuses:
     - imports other than __future__, math and typing; typing names outside
       RANK_TYPING_NAMES; module objects or private names through them;
     - the names in RANK_BANNED_NAMES (open, eval, exec, compile, getattr,
@@ -679,22 +689,25 @@ def second_pass(source: bytes):
     rank.py bytes in a new Python process under another hash seed. A score
     that leans on what an earlier call saw, on the order of calls, or on
     anything that differs between processes (set order, an address in a
-    repr) comes back different. A row that raises there, or a pass that
-    cannot run, counts as different."""
+    repr) comes back different. A row that raises there counts as
+    different. A pass that cannot run returns None, and nothing is scored:
+    that is a broken setup, not an unstable rank.py. The new process gets
+    no PYTHONPATH, so nothing beside the standard library is on its path."""
     text = source.decode("utf-8-sig")
 
-    def recheck(rows: list[dict]) -> list[float]:
-        seed = "1" if os.environ.get("PYTHONHASHSEED") != "1" else "2"
+    def recheck(rows: list[dict]) -> list[float] | None:
+        env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONSTARTUP")}
+        env["PYTHONHASHSEED"] = "1" if os.environ.get("PYTHONHASHSEED") != "1" else "2"
         try:
             done = subprocess.run([sys.executable, "-P", "-c", _SECOND_PASS],
                                   input=json.dumps({"source": text, "rows": rows}),
                                   capture_output=True, text=True, timeout=600, cwd=str(HERE),
-                                  env=dict(os.environ, PYTHONHASHSEED=seed))
+                                  env=env)
             scores = json.loads(done.stdout) if done.returncode == 0 else None
         except (OSError, subprocess.SubprocessError, ValueError):
             scores = None
         if not isinstance(scores, list) or len(scores) != len(rows):
-            return [math.inf] * len(rows) if rows else []       # never equal to a real pass
+            return None
         out = []
         for value in scores:
             try:
@@ -707,13 +720,19 @@ def second_pass(source: bytes):
 
 
 def foreign_modules() -> list[str]:
-    """Loaded modules whose file is inside this repository but outside
-    screener/ (and not an installed package): a root-level random.py or
-    csv.py would run inside the evaluator, and the git checks only look
-    under screener/."""
+    """What could run inside the evaluator from the repository but outside
+    screener/, where the git checks do not look: a file or folder at the
+    repository root named like a standard-library module (random.py,
+    csv.py: it would be imported in its place, whatever it then says about
+    itself), and any loaded module whose file is inside the repository but
+    outside screener/ and is not an installed package."""
     inside = ROOT / "screener"
     installed = {Path(p).resolve() for p in (sys.prefix, sys.base_prefix, sys.exec_prefix)}
-    out = []
+    try:
+        out = [f"{entry.name} (shadows a standard module)" for entry in ROOT.iterdir()
+               if entry.name.removesuffix(".py") in sys.stdlib_module_names]
+    except OSError:
+        out = []
     for name, module in list(sys.modules.items()):
         file = getattr(module, "__file__", None)
         if not isinstance(file, str):
@@ -870,9 +889,7 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
         return _refuse(f"rank.learned_score returned {dev['nonfinite_scores']} scores that are NaN "
                        "or infinite; every score must be a finite number.")
     if dev.get("unstable_scores"):
-        return _refuse(f"rank.learned_score gave {dev['unstable_scores']} records a different "
-                       "score the second time it was asked; a score may depend only on the "
-                       "record it is given.")
+        return _refuse(UNSTABLE)
     lo, hi = dev.get("score_span") or dev["score_range"]
     if lo < 0 or hi > 100:
         return _refuse(f"rank.learned_score ranges {lo:.1f}..{hi:.1f}; it must stay within 0-100 "
@@ -970,7 +987,17 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
         BEST_FILE.write_text(json.dumps({"commit": head, "fingerprint": fp, "order": dev["order"]}))
     print(f"DECISION: {status.upper()} — {why}")
     if status == "discard":
-        print(f"Revert the experiment: git reset --hard {best['commit']}")
+        # Take back the experiment and nothing else. HEAD~1 holds the best
+        # kept rank.py unless an earlier discard was left in place; a human's
+        # commit to a document or a test may sit between the two.
+        if not _git("diff", "--name-only", best["commit"], parent, "--", EXPERIMENT_FILE):
+            print(f"Revert the experiment: git reset --hard {parent}")
+        else:
+            between = _git("log", "--oneline", f"{best['commit']}..{parent}").splitlines()
+            print(f"Revert the experiment: git reset --hard {best['commit']}")
+            print(f"(an earlier discarded experiment was left in place; this also removes "
+                  f"{len(between)} commit(s) made since the best kept run. If any is not an "
+                  "experiment, stop and ask a human.)")
     return 0
 
 
@@ -1051,12 +1078,17 @@ def main(argv: list[str] | None = None) -> int:
                        "has no " + " / ".join(BUILDER_META) + "). A human must rebuild it "
                        "(python -m screener.autoresearch.build_eval) and record a new baseline.")
     scorer, recheck = load_scorer(source), second_pass(source)
-    dev = evaluate(records, positives, "dev", scorer=scorer, settings=settings, fields=fields,
-                   recheck=recheck)
-    if dev["unstable_scores"]:
-        return _refuse(f"rank.learned_score gave {dev['unstable_scores']} records a different "
-                       "score the second time it was asked (by a fresh copy, in another "
-                       "order); a score may depend only on the record it is given.")
+    try:
+        dev = evaluate(records, positives, "dev", scorer=scorer, settings=settings,
+                       fields=fields, recheck=recheck)
+        test = (evaluate(records, positives, "test", scorer=scorer, settings=settings,
+                         fields=fields, recheck=recheck) if args.test else None)
+    except SecondPassFailed:
+        return _refuse("the second scoring pass (a fresh rank.py in a new Python process) could "
+                       "not run, so nothing was scored. This is the setup, not rank.py: check "
+                       "that this Python can start itself.")
+    if dev["unstable_scores"] or (test and test["unstable_scores"]):
+        return _refuse(UNSTABLE)
     if args.decide:
         # Nothing is shown before decide()'s guards pass: a refused run is not a look.
         return decide(records, positives, dev, args.new_baseline)
@@ -1080,8 +1112,6 @@ def main(argv: list[str] | None = None) -> int:
                                         "hits_may_not_fall": True},
                           "fingerprint": fingerprint(), "null_test": results}))
         return 0
-    test = (evaluate(records, positives, "test", scorer=scorer, settings=settings, fields=fields,
-                     recheck=recheck) if args.test else None)
     # Every scoring leaves a row: looks are otherwise free, unlimited questions.
     problem = _note_look("look", dev) or (test and _note_look("test", test)) or None
     if problem:

@@ -433,6 +433,18 @@ class MainTests(unittest.TestCase):
                 self.assertIn("a different score the second time", text)
                 self.assertNotIn("graded", text)
         self.assertFalse(self.log.exists())
+        # The sealed split is held to it too.
+        real = ev.evaluate
+
+        def only_test_unstable(*a, **kw):
+            out = real(*a, **kw)
+            out["unstable_scores"] = 3 if a[2] == "test" else 0
+            return out
+        self.spy = lambda f: {"score": 50.0}
+        with mock.patch.object(ev, "evaluate", only_test_unstable):
+            code, text = self.run_main("--test")
+        self.assertEqual(code, 3)
+        self.assertNotIn("graded", text)
 
     def test_a_refused_decide_shows_no_score_and_test_does_not_go_with_it(self):
         with mock.patch.object(ev, "REVIEW_PENDING", ""), \
@@ -471,6 +483,28 @@ class MainTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.run_main("--null-test", "20")
         self.assertEqual([r["status"] for r in self.rows()], ["null"])
+
+    def test_main_uses_the_fresh_process_pass_and_says_when_it_cannot_run(self):
+        asked = []
+        with mock.patch.object(ev, "second_pass",
+                               return_value=lambda rows: asked.append(len(rows)) or
+                               [float(self.spy(row)["score"]) for row in rows]):
+            self.assertEqual(self.run_main()[0], 0)
+        self.assertEqual(len(asked), 1)
+        self.assertGreater(asked[0], 5000)
+        with mock.patch.object(ev, "second_pass", return_value=lambda rows: None):
+            code, text = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn("could not run, so nothing was scored", text)
+        self.assertNotIn("different score", text)
+        self.assertEqual(len(self.rows()), 1)
+
+    def test_the_unstable_refusal_gives_no_count(self):
+        self.spy = lambda f, box=[]: box.append(1) or {"score": float(len(box) % 97)}
+        code, text = self.run_main()
+        self.assertEqual(code, 3)
+        self.assertIn("gave some records a different score", text)
+        self.assertNotRegex(text, r"\d")
 
     def test_a_module_from_the_repository_outside_screener_refuses_every_mode(self):
         with mock.patch.object(ev, "foreign_modules", return_value=["random", "csv"]):
@@ -588,13 +622,46 @@ class CheckedBytesTests(unittest.TestCase):
     def test_a_second_pass_that_cannot_run_counts_every_record(self):
         records = pool(years=(2015,), per_year=40)
         recheck = ev.second_pass(self.SOURCE)
-        with mock.patch.object(ev.subprocess, "run", side_effect=OSError("no python")):
-            unstable = ev.ranking(records, "dev", ev.load_scorer(self.SOURCE), SETTINGS,
-                                  ("acres",), recheck)[3]
-        self.assertEqual(unstable, 40)
-        with self.assertRaises(ValueError):
-            ev.ranking(records, "dev", ev.load_scorer(self.SOURCE), SETTINGS, ("acres",),
-                       lambda rows: [1.0])
+        scorer = ev.load_scorer(self.SOURCE)
+
+        class Done:
+            def __init__(self, code, out):
+                self.returncode, self.stdout = code, out
+
+        good = json.dumps([float(31).hex()] * 40)
+        for outcome in (OSError("no python"), Done(1, good), Done(0, "not json"),
+                        Done(0, json.dumps([float(31).hex()] * 39))):
+            with self.subTest(str(outcome)[:30]), mock.patch.object(
+                    ev.subprocess, "run", side_effect=[outcome]
+                    if isinstance(outcome, Exception) else None,
+                    return_value=None if isinstance(outcome, Exception) else outcome):
+                with self.assertRaises(ev.SecondPassFailed):
+                    ev.ranking(records, "dev", scorer, SETTINGS, ("acres",), recheck)
+        with self.assertRaises(ev.SecondPassFailed):
+            ev.ranking(records, "dev", scorer, SETTINGS, ("acres",), lambda rows: [1.0])
+
+    def test_a_row_that_raises_in_the_fresh_process_counts_as_different(self):
+        source = b"def learned_score(p):\n    return {'score': 10.0 / (p['acres'] - 7.0)}\n"
+        scores = ev.second_pass(source)([{"acres": 1.0}, {"acres": 7.0}, {"acres": 9.0}])
+        self.assertEqual(scores, [10.0 / -6.0, math.inf, 5.0])
+
+    def test_nan_twice_is_not_a_difference(self):
+        records = pool(years=(2015,), per_year=40)
+        result = ev.ranking(records, "dev", lambda f: {"score": float("nan")}, SETTINGS,
+                            ("signal",))
+        self.assertEqual((result[2], result[3]), (40, 0))
+
+    def test_the_fresh_process_gets_no_pythonpath(self):
+        captured = {}
+
+        def run(cmd, **kw):
+            captured.update(kw["env"])
+            raise OSError
+        with mock.patch.dict("os.environ", {"PYTHONPATH": ".", "PYTHONSTARTUP": "x.py"}), \
+                mock.patch.object(ev.subprocess, "run", run):
+            self.assertIsNone(ev.second_pass(self.SOURCE)([{"acres": 1.0}]))
+        self.assertNotIn("PYTHONPATH", captured)
+        self.assertNotIn("PYTHONSTARTUP", captured)
 
     def test_the_second_pass_uses_another_order_and_another_hash_seed(self):
         records = pool(years=(2015,), per_year=40)
@@ -618,6 +685,7 @@ class CheckedBytesTests(unittest.TestCase):
         import sys
         import types
         self.assertEqual(ev.foreign_modules(), [])
+        before = ev.foreign_modules()
         stray = types.ModuleType("stray_csv")
         stray.__file__ = str(ev.ROOT / "csv.py")
         fine = types.ModuleType("fine_mod")
@@ -625,7 +693,18 @@ class CheckedBytesTests(unittest.TestCase):
         venv = types.ModuleType("venv_mod")
         venv.__file__ = str(ev.ROOT / ".venv" / "lib" / "site-packages" / "y.py")
         with mock.patch.dict(sys.modules, {"stray_csv": stray, "fine_mod": fine, "venv_mod": venv}):
-            self.assertEqual(ev.foreign_modules(), ["stray_csv"])
+            self.assertEqual(sorted(set(ev.foreign_modules()) - set(before)), ["stray_csv"])
+        # A root-level file named like a standard module is seen whatever it
+        # says about itself once loaded.
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "csv.py").write_text("")
+            Path(tmp, "random").mkdir()
+            Path(tmp, "prepare.py").write_text("")
+            Path(tmp, "screener").mkdir()
+            with mock.patch.object(ev, "ROOT", Path(tmp)):
+                self.assertEqual(sorted(n for n in ev.foreign_modules() if "shadows" in n),
+                                 ["csv.py (shadows a standard module)",
+                                  "random (shadows a standard module)"])
 
     def test_git_runs_in_the_repository_root(self):
         seen = []
@@ -732,6 +811,12 @@ class BuildRuleTests(unittest.TestCase):
         resold = [deed("2017-02-10", 900000, self.A), deed("2017-03-15", 950000, "BUYER LLC")]
         self.assertEqual(be.classify(built, resold, self.A, date(2017, 1, 1)), "positive")
         self.assertEqual(be.classify(built, resold, "BUYER LLC", date(2017, 1, 1)), why)
+        # Two deeds on one day have no order in the file: either way round,
+        # the January owner is the seller of one of them.
+        same_day = [deed("2017-02-10", 950000, "BUYER LLC"), deed("2017-02-10", 900000, self.A)]
+        for sales in (same_day, same_day[::-1]):
+            self.assertEqual(be.classify(built, sales, self.A, date(2017, 1, 1)), "positive")
+            self.assertEqual(be.classify(built, sales, "THIRD PARTY LLC", date(2017, 1, 1)), why)
         # A deed dated 1 January itself counts, and the price need not reach MIN_PRICE.
         self.assertEqual(be.classify(none, [deed("2017-01-01", 900000, self.A)], "BUYER LLC",
                                      date(2017, 1, 1)), why)

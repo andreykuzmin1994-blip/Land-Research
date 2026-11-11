@@ -104,9 +104,9 @@ readable.
    Score an idea once, with `--decide`, after committing it. The loop
    runs `--decide` and nothing else: never a plain look, `--test`,
    `--control` or `--null-test`. Do not score variations to find out
-   which parcels are the answers: every scoring that shows a number is
-   logged with a hash of `rank.py`, a refused `--decide` shows none, and
-   a human reads the log.
+   which parcels are the answers: every scoring of `rank.py` that shows
+   a number is logged with a hash of the file, a refused `--decide`
+   shows none, and a human reads the log.
 3. Keep `learned_score` pure and general. No lookups of specific values
    that single out a handful of parcels (exact acreages, land values or
    codes chosen to hit known answers). Prefer smooth curves and
@@ -125,8 +125,8 @@ readable.
 
 ### What `rank.py` may not use
 
-The evaluator reads `rank.py`'s source and refuses it, before importing
-it and in every mode, if it uses any of:
+The evaluator reads `rank.py`'s source and refuses it, before running it,
+if it uses any of:
 
 - imports other than `__future__`, `math` and `typing` (and from `typing`
   only `Any`, `Optional`, `Union`, `Mapping`, `Sequence`, `Iterable`,
@@ -158,7 +158,9 @@ starts from); the loop never does.
 #   edit screener/rank.py (one idea)
 git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
-#   DISCARD -> run the exact `git reset --hard <commit>` it prints
+#   DISCARD -> run the exact `git reset --hard <commit>` it prints (it
+#              takes back your experiment only; if it warns that it
+#              removes other commits, stop and ask a human)
 #   KEEP    -> carry on from here
 #   REFUSED -> see below
 ```
@@ -185,8 +187,9 @@ run, `hits` is not lower, **and** it beats the best kept run in at least
 99% of clustered bootstrap resamples (whole map cells are resampled, every
 year of a cell together, because sites cluster and repeat across years).
 You are shown the two scores rounded to one decimal and their difference,
-nothing finer; the comparison uses exact values. Every run is appended to
-`screener/autoresearch/experiments.tsv` (untracked, append-only).
+nothing finer; the comparison uses exact values. Every decision (keep or
+discard) is appended to `screener/autoresearch/experiments.tsv`
+(untracked, append-only); a refused run is not.
 
 If a human changes anything under `screener/` other than `rank.py`
 (`evaluate.py`, `screens.py`, `data/`, any other code or data file;

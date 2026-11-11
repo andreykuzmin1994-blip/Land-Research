@@ -219,17 +219,21 @@ def _real_transfer(deed: dict[str, Any], owner: str | None, min_price: float) ->
 
 
 def digest_shows_buyer(sales: list[dict[str, Any]], owner: str | None, as_of: date) -> bool:
-    """Is the digest's owner the buyer of a first-quarter sale? True when the
-    first priced deed dated in the SNAPSHOT_SLACK after the as-of date has a
-    seller other than the digest's owner (a January owner would be the
-    seller of that deed)."""
+    """Is the digest's owner the buyer of a first-quarter sale? True when no
+    priced deed of the first day with one, in the SNAPSHOT_SLACK after the
+    as-of date, has the digest's owner as its seller (a January owner would
+    be the seller of the quarter's first sale)."""
     quarter = sorted((s for s in sales if as_of <= s["date"] < as_of + SNAPSHOT_SLACK
                       and s["price"] > 0 and s["instrument"] not in fulton.NON_TRANSFER_DEEDS),
                      key=lambda s: s["date"])
     # Only the quarter's first priced deed says who owned the land in
     # January: when the January owner sells and the buyer resells within the
     # quarter, the second deed's seller is not the digest's owner either.
-    return bool(quarter) and not fulton.same_owner(quarter[0]["old_owner"], owner)
+    # Deeds of the same day have no order in the file, so any of that day's
+    # sellers may be the January owner.
+    first_day = [s for s in quarter if s["date"] == quarter[0]["date"]] if quarter else []
+    return bool(first_day) and not any(fulton.same_owner(s["old_owner"], owner)
+                                       for s in first_day)
 
 
 def bought_in_window(sales: list[dict[str, Any]], owner: str | None, as_of: date) -> bool:
