@@ -6,12 +6,13 @@ code and checks what maps can show. This step reads what only documents
 show: the zoning text, the plans, the owner's record.
 
 The product is `screener/leads/<parcel>/findings.checked.json` and a short
-`lead.md`. It is a reading aid for a person. It decides nothing.
+`lead.md`, both written by `python -m screener.quotecheck`, never by hand.
+It is a reading aid for a person. It decides nothing.
 
 There are three roles. The **investigator** and the **skeptic** are
 agents and follow the rules below. The **launching session** (the one the
-operator asked) starts them, runs the final `quotecheck`, and writes
-nothing of its own into the findings.
+operator asked) starts them and runs `quotecheck`; see "The launching
+session" at the end. It writes nothing of its own into the findings.
 
 ## Rules
 
@@ -21,11 +22,14 @@ nothing of its own into the findings.
    afresh on every run, and drops any claim whose quote is not on the
    page. Do not argue with a drop: find the right page or leave the
    section `unknown`. What it will not accept as "on the page":
-   - words that are also in the URL (a search or query page that shows
-     your own request back to you proves nothing);
-   - a quote that starts or ends inside a word;
+   - words that are also in the URL: 25 characters in a row, three words
+     in a row, or one long word (a search or query page that shows your
+     own request back to you proves nothing). If the best sentence
+     repeats the document's file name, quote another sentence;
+   - a quote that starts or ends inside a word or a number;
    - text in a form field, a drop-down list, the page title, a script;
-   - in a PDF, a quote that runs from one page onto the next.
+   - in a PDF, a quote that runs from one page onto the next. A quote
+     that only reads across two columns is kept but flagged.
 2. **`unknown` is a good answer.** A section with no surviving claim is
    `unknown`. Never fill a gap from memory, from a search snippet or from
    what is usual elsewhere.
@@ -140,7 +144,8 @@ useful thing an investigation can find.
 
 `screener/leads/<parcel>/findings.json`, with exactly these fields (a
 file with any other field, section or verdict is refused whole; a claim
-with any other field is dropped):
+with any other field is dropped). Put each section's strongest claim
+first: `lead.md` shows the first kept claim of each section.
 
 ```json
 {
@@ -162,13 +167,15 @@ with any other field is dropped):
 }
 ```
 
-You may run `python -m screener.quotecheck screener/leads/<parcel>/findings.json`
-yourself to see what is dropped, and correct `findings.json`. The check
-that counts is the one the launching session runs after you finish: it
-fetches everything again. `findings.checked.json` gives each claim an id
-(`zoning-1` is the first zoning claim as written), the text on each side
-of the quote, and, under `pages`, when each page was fetched, its final
-address and its SHA-256.
+The investigator may run `python -m screener.quotecheck
+screener/leads/<parcel>/findings.json` to see what is dropped, and correct
+`findings.json`. The check that counts is the one the launching session
+runs after the investigator finishes: it fetches everything again.
+`findings.checked.json` gives each claim an id (`zoning-1` is the first
+zoning claim as written), the text on each side of the quote, the words
+the quote shares with its address, and, under `pages`, when each page was
+fetched, its final address and its SHA-256. PDFs need the `pdftotext`
+command (poppler-utils); without it a PDF claim is dropped and says so.
 
 ## The skeptic
 
@@ -181,9 +188,14 @@ Its job is to find the strongest reason this lead fails: a condition the
 first agent missed, a newer ordinance, a plan that points the other way,
 a sign the owner will not sell, a kept quote that does not say what its
 claim says (the text on each side of the quote is in the checked file).
+For each first-pass claim it leans on or doubts, it compares the quote
+with the claim's address: `quotecheck` cannot fully tell a county record
+from a query page showing the request's own words back
+(`words_shared_with_url` lists the overlap it saw).
 
 It writes one file, `screener/leads/<parcel>/skeptic.json`, and changes
-no other:
+no other. It does not run `quotecheck` (that rewrites the checked file
+and `pages/`) and does not touch `findings.json`:
 
 ```json
 {
@@ -209,36 +221,64 @@ no other:
   support their section's verdict. Optional.
 - `claims`: its own quoted evidence, checked like any other.
 
-The launching session then runs `quotecheck` on `findings.json` again. It
-picks up `skeptic.json` from the same folder, fetches every page of both
-files afresh and writes one `findings.checked.json` with a `skeptic`
-object. If none of the skeptic's own claims is kept, the object says
-`"supported": false`: the objection is then the skeptic's opinion, not a
-finding, and `lead.md` must say so in those words. A skeptic verdict
-changes no grade, digest or decision. It informs the person.
+A skeptic verdict changes no grade, digest or decision. It informs the
+person. If none of the skeptic's own claims is kept, the checked file
+says `"supported": false` and `lead.md` says the objection is the
+skeptic's opinion only. `"supported": true` means only that some quote of
+its own was found on its page, not that the objection follows from it.
+
+## The launching session
+
+1. Make sure the lead folder holds no `skeptic.json` (delete a stale
+   one), start the investigator, and when it has finished run
+
+   ```bash
+   python -m screener.quotecheck screener/leads/<parcel>/findings.json
+   ```
+
+   This run refuses if a `skeptic.json` is there. Note the
+   `findings.json sha256` it prints.
+2. Hand the skeptic the brief and a copy of `findings.checked.json`, in a
+   fresh context. When it has written `skeptic.json`, run
+
+   ```bash
+   python -m screener.quotecheck screener/leads/<parcel>/findings.json \
+       --with-skeptic --findings-sha256 <the hash from step 1>
+   ```
+
+   It refuses if `findings.json` changed since step 1 (the skeptic names
+   claims by their position). It fetches every page of both files again
+   and writes one `findings.checked.json` and `lead.md`. This second run
+   is the one that counts: a first-pass claim it drops (the page changed
+   or stopped answering) is dropped, and `lead.md` says how many.
+3. Optionally write `headline.txt` in the folder before the last run: one
+   plain line, the single finding a person should act on first. It is
+   printed at the top of `lead.md`, labelled as your reading, with any
+   quotation marks and web addresses taken out.
+4. Read the dropped list `quotecheck` prints. Copy `findings.json`,
+   `skeptic.json`, `findings.checked.json` and `lead.md` to
+   `leads/<parcel>/` on the data branch. The fetched pages are not kept.
 
 ## lead.md
 
-Written by the launching session from `findings.checked.json` only, after
-the skeptic. At most about 500 words, plain words. Lead with one line: the
-single finding a person should act on first.
+`quotecheck` writes it from `findings.checked.json`; nobody edits it. In
+it, words in double quotation marks are a kept quote and a link is a kept
+claim's address, because only the code puts them there. Everything an
+agent wrote (claim text, objection, open items, the headline) is labelled
+as the agent's own and has its quotation marks, markup and web addresses
+removed. It gives:
 
-- the lead's grade line from the brief;
-- per section: the verdict, written as the section name and the verdict
-  in backticks (``Zoning: `conditional` ``), and the one claim that best
-  supports it, with its link;
-- the skeptic's verdict the same way (``Skeptic: `weakened` ``), its
-  objection, and whether it is supported by a kept quote or is opinion;
-- what was dropped by `quotecheck` (counts only: do not repeat a dropped
-  claim) and what is still `unknown`;
-- the open items, as questions for a person to ask, most important first.
+- per section, the checked verdict and the section's first kept claim
+  with its quote and link (a section with none reads `unknown`, and says
+  so when the investigator had written something else);
+- a note when the page's words just before a quote include "not" or the
+  like, when a PDF quote was found only across columns, and when a quote
+  shares words with its address;
+- the skeptic's verdict, whether quotes of its own back it, its objection
+  and the claims it disputes;
+- how many claims were kept and dropped, what is still `unknown`, and the
+  agents' open questions.
 
-Anything in quotation marks must be copied from a kept quote, and every
-web link must be a kept claim's address. `python -m screener.quotecheck
-<findings.json> --lead <lead.md>` checks those two things and the
-verdicts, and exits 1 if one fails. Put your own words outside quotation
-marks.
-
-State what the check proves: each quote was on its page when `quotecheck`
-fetched it (the checked file has the time). It does not prove the page is
+What the check proves: each quote was on its page when `quotecheck`
+fetched it (the file gives the time). It does not prove the page is
 current or that the reading of it is right.
