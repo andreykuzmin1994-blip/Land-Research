@@ -85,6 +85,7 @@ import csv
 import gzip
 import hashlib
 import importlib
+import importlib.machinery
 import importlib.util
 import inspect
 import io
@@ -728,11 +729,23 @@ def foreign_modules() -> list[str]:
     outside screener/ and is not an installed package."""
     inside = ROOT / "screener"
     installed = {Path(p).resolve() for p in (sys.prefix, sys.base_prefix, sys.exec_prefix)}
+    out = []
     try:
-        out = [f"{entry.name} (shadows a standard module)" for entry in ROOT.iterdir()
-               if entry.name.removesuffix(".py") in sys.stdlib_module_names]
+        for entry in ROOT.iterdir():
+            if entry.is_dir():
+                # A folder is importable in a standard module's place only as
+                # a package (venv/ or site/ without an __init__ is not).
+                shadows = (entry.name in sys.stdlib_module_names
+                           and any(entry.glob("__init__.*")))
+            else:
+                # csv.py, csv.pyc, csv.cpython-313-x86_64-linux-gnu.so, ...
+                shadows = any(entry.name.endswith(suffix)
+                              and entry.name[:-len(suffix)] in sys.stdlib_module_names
+                              for suffix in importlib.machinery.all_suffixes())
+            if shadows:
+                out.append(f"{entry.name} (shadows a standard module)")
     except OSError:
-        out = []
+        pass
     for name, module in list(sys.modules.items()):
         file = getattr(module, "__file__", None)
         if not isinstance(file, str):
@@ -993,11 +1006,22 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
         if not _git("diff", "--name-only", best["commit"], parent, "--", EXPERIMENT_FILE):
             print(f"Revert the experiment: git reset --hard {parent}")
         else:
-            between = _git("log", "--oneline", f"{best['commit']}..{parent}").splitlines()
-            print(f"Revert the experiment: git reset --hard {best['commit']}")
-            print(f"(an earlier discarded experiment was left in place; this also removes "
-                  f"{len(between)} commit(s) made since the best kept run. If any is not an "
-                  "experiment, stop and ask a human.)")
+            # An earlier discard was left in place. Going back to the best
+            # kept run removes every commit since: say so only when each one
+            # is a discard this log recorded. Otherwise a human sorts it out.
+            between = [line.split()[0] for line in
+                       _git("log", "--format=%h", f"{best['commit']}..{parent}").splitlines()
+                       if line.strip()]
+            discards = {r["commit"] for r in _decisions()
+                        if r["status"] == "discard" and r["fingerprint"] == fp}
+            if between and all(c in discards for c in between):
+                print(f"Revert the experiment: git reset --hard {best['commit']}")
+                print(f"(this also takes back {len(between)} earlier discarded experiment(s) "
+                      "that were left in place)")
+            else:
+                print("Do not reset. Stop and ask a human: commits that are not discarded "
+                      f"experiments lie between the best kept run ({best['commit']}) and this "
+                      "one, and undoing this experiment by a reset would remove them.")
     return 0
 
 
@@ -1082,11 +1106,12 @@ def main(argv: list[str] | None = None) -> int:
         dev = evaluate(records, positives, "dev", scorer=scorer, settings=settings,
                        fields=fields, recheck=recheck)
         test = (evaluate(records, positives, "test", scorer=scorer, settings=settings,
-                         fields=fields, recheck=recheck) if args.test else None)
+                         fields=fields, recheck=recheck)
+                if args.test and not args.null_test else None)
     except SecondPassFailed:
         return _refuse("the second scoring pass (a fresh rank.py in a new Python process) could "
-                       "not run, so nothing was scored. This is the setup, not rank.py: check "
-                       "that this Python can start itself.")
+                       "not run, so nothing was scored. Either this Python cannot start itself, "
+                       "or rank.py fails or hangs when it is loaded on its own.")
     if dev["unstable_scores"] or (test and test["unstable_scores"]):
         return _refuse(UNSTABLE)
     if args.decide:

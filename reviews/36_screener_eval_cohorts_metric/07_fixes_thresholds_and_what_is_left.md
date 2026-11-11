@@ -31,11 +31,19 @@ the checklist. Counts by year and split only.
    human's commit) and three should-fixes (F2 a fixed shuffle seed, F3
    same-day deeds in the builder, F4 a root-level file that hides
    itself).
-7. Third round: F1 to F6 of `08` and its document corrections. **This
-   round has not had an independent check.** It is small: the reset hint,
-   a shuffle nobody can predict, same-day deeds, root-level names that
-   shadow standard modules, a separate message when the second process
-   cannot run, the test split held to the stability check.
+7. Third round: F1 to F6 of `08` and its document corrections (the reset
+   hint, a shuffle nobody can predict, same-day deeds, root-level names
+   that shadow standard modules, a separate message when the second
+   process cannot run, the test split held to the stability check).
+8. `09`: independent check of the third round, again through real git in
+   a scratch clone. Verdict "the third round is sound": no blocker or
+   must-fix; three should-fixes (N1 a root `venv/` folder refused every
+   run, N2 one branch of the reset hint could still remove a human's
+   commit, N3 a root `csv.pyc` was not seen).
+9. Fourth round: N1, N2, N3 and N6 of `09`. A few lines each, with tests;
+   **not independently checked.** When a reset would remove a commit
+   that is not a logged discard, the evaluator now prints "Do not reset"
+   and no command.
 
 ## What the code does now that it did not at merge
 
@@ -120,8 +128,9 @@ In one reviewed change:
    `MIN_GAIN` to 2.5 and run it again. Record the table here.
 3. Refresh the numbers in `PROGRAM.md` and `README.md` (pools, sites,
    cells with positives, baseline, random).
-4. Have the third round (item 7 above) read by someone who did not
-   write it. `08`'s notes F7 to F9 are known and left as they are.
+4. Have the fourth round (item 9 above: `foreign_modules` and the reset
+   hint in `evaluate.py`) read by someone who did not write it. The
+   notes left as they are: `08` F7 to F9, `09` N4, N5 and N7.
 5. Set `REVIEW_PENDING = ""` and remove the notice at the top of
    `PROGRAM.md`.
 

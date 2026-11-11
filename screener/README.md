@@ -650,8 +650,9 @@ logs nothing) when:
 - `rank.py` breaks the purity rules (below). Its source is checked before
   it is run, in every mode but `--control` (which does not run it), so a
   refused file never runs and nothing is scored.
-- a file or folder at the repository root is named like a standard module
-  (`random.py`, `csv.py`), or a module was loaded from inside the
+- a file at the repository root, or a package folder there, is named
+  like a standard module (`random.py`, `csv.pyc`; a `venv/` folder is
+  fine), or a module was loaded from inside the
   repository but outside `screener/`: it would run inside the evaluator
   unseen by the git checks.
 - `rank.learned_score` gives a record a different score the second time
@@ -695,8 +696,9 @@ never the bootstrap win share (that goes to the log only): finer numbers
 would let one experiment ask whether a band of parcels holds a known site.
 Every scoring that runs `rank.py` and shows a number is logged as a
 `look`, `test` or `null` row with a hash of `rank.py`. After a DISCARD
-the evaluator prints the `git reset --hard` that takes back the
-experiment and nothing else.
+the evaluator prints the `git reset --hard` that takes back discarded
+experiments and nothing else; when a reset would remove any other commit
+it prints "Do not reset" and no command.
 
 The `rank.py` that is checked is the one that runs: its bytes are compiled
 by the evaluator, not loaded through Python's import cache (which once

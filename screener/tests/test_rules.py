@@ -448,9 +448,9 @@ class FakeRepo:
             if only and not under:                       # a single file asked about
                 return "\n".join(f for f in files if f in only)
             return "\n".join(f for f in files if not under or f.startswith("screener/"))
-        if args[0] == "log" and "--oneline" in args:
+        if args[0] == "log" and "--format=%h" in args:
             first, last = args[-1].split("..")
-            return "\n".join(f"{c} exp" for c in names[names.index(first) + 1:names.index(last) + 1])
+            return "\n".join(names[names.index(first) + 1:names.index(last) + 1])
         if args[0] == "log":
             return "exp: test"
         return ""
@@ -653,7 +653,26 @@ class DecideTests(unittest.TestCase):
         hints = [ln for ln in text.splitlines() if ln.startswith("Revert the experiment")]
         self.assertEqual(hints, ["Revert the experiment: git reset --hard bbb"] * 2)
         # ccc was a discard left in place, so undoing ddd means going back past it.
-        self.assertIn("this also removes 1 commit(s) made since the best kept run", text)
+        self.assertIn("this also takes back 1 earlier discarded experiment(s)", text)
+        self.assertNotIn("Do not reset", text)
+
+    def test_no_reset_is_printed_when_it_would_remove_a_commit_that_is_not_a_discard(self):
+        for human_first in (True, False):
+            with self.subTest(human_first=human_first):
+                self.fresh()
+                self.baseline_then_experiment()                   # aaa baseline, bbb
+                human = ("hhh", ["screener/README.md"])
+                if human_first:
+                    self.repo.history[-1] = human
+                    self.repo.commit("bbb")
+                self.assertEqual(self.run_decide(3, order=self.bad), 0)       # bbb: discard, left
+                if not human_first:
+                    self.repo.history.append(human)
+                self.repo.commit("ccc")
+                self.assertEqual(self.run_decide(3, order=self.bad), 0)
+                last = sys.stdout.getvalue().rstrip().splitlines()[-1]
+                self.assertTrue(last.startswith("Do not reset. Stop and ask a human"), last)
+                self.assertNotIn("git reset --hard", last)
 
     def test_the_reset_hint_keeps_a_humans_commit_made_since_the_best_run(self):
         self.baseline_then_experiment()

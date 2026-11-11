@@ -670,6 +670,10 @@ class CheckedBytesTests(unittest.TestCase):
                    lambda rows: seen.extend(r["signal"] for r in rows) or [1.0] * len(rows))
         self.assertEqual(sorted(seen), [float(i) for i in range(40)])
         self.assertNotEqual(seen, [float(i) for i in range(40)])
+        again = []
+        ev.ranking(records, "dev", lambda f: {"score": 1.0}, SETTINGS, ("signal",),
+                   lambda rows: again.extend(r["signal"] for r in rows) or [1.0] * len(rows))
+        self.assertNotEqual(seen, again)                       # drawn fresh each run
         captured = {}
 
         def run(cmd, **kw):
@@ -697,14 +701,17 @@ class CheckedBytesTests(unittest.TestCase):
         # A root-level file named like a standard module is seen whatever it
         # says about itself once loaded.
         with tempfile.TemporaryDirectory() as tmp:
-            Path(tmp, "csv.py").write_text("")
-            Path(tmp, "random").mkdir()
-            Path(tmp, "prepare.py").write_text("")
-            Path(tmp, "screener").mkdir()
+            for name in ("csv.py", "json.pyc", "prepare.py", ".gitignore", "CSV.txt",
+                         "math" + __import__("importlib.machinery").machinery.EXTENSION_SUFFIXES[0]):
+                Path(tmp, name).write_text("")
+            for folder in ("random", "venv", "site", "types", "screener", "tests"):
+                Path(tmp, folder).mkdir()
+            Path(tmp, "random", "__init__.py").write_text("")
             with mock.patch.object(ev, "ROOT", Path(tmp)):
-                self.assertEqual(sorted(n for n in ev.foreign_modules() if "shadows" in n),
-                                 ["csv.py (shadows a standard module)",
-                                  "random (shadows a standard module)"])
+                found = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
+            self.assertEqual(len(found), 4)
+            self.assertEqual([n for n in found if not n.startswith("math")],
+                             ["csv.py", "json.pyc", "random"])
 
     def test_git_runs_in_the_repository_root(self):
         seen = []

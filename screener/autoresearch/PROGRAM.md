@@ -159,8 +159,8 @@ starts from); the loop never does.
 git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
 #   DISCARD -> run the exact `git reset --hard <commit>` it prints (it
-#              takes back your experiment only; if it warns that it
-#              removes other commits, stop and ask a human)
+#              takes back discarded experiments and nothing else). If it
+#              prints "Do not reset" instead, stop and ask a human.
 #   KEEP    -> carry on from here
 #   REFUSED -> see below
 ```
