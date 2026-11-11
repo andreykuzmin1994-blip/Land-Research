@@ -766,7 +766,9 @@ class LeadFileTests(Base):
                                       quote='"warehouse":"1 building on the parcel"')))
         self.assertEqual(r.checked["sections"]["zoning"]["claims"][0]["words_shared_with_url"],
                          ["warehouse"])
-        self.assertIn("also in the address (warehouse)", qc.render_lead(r.checked))
+        self.assertIn("also in the request (warehouse)", qc.render_lead(r.checked))
+        # A word of the host or the path alone is not flagged.
+        self.assertEqual(qc.words_shared_with_url("the city code article says", URL), [])
 
 
 class CliTests(Base):

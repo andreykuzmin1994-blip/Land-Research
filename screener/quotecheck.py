@@ -50,7 +50,7 @@ What a kept quote must pass (reviews/35 .../06 and 07):
   in a row, three words in a row, or one long word shared with the address
   drops the claim. This cannot be made airtight (a query can name an
   output field in two short words), so each kept claim lists the words it
-  shares with its address for the skeptic to weigh;
+  shares with the query part of its address for the skeptic to weigh;
 - it sits on the page between word boundaries ("allowed" is not found in
   "disallowed", nor "5 feet" in "21.5 feet"), and the 80 characters on
   each side are saved with the claim, so a cut "not" shows;
@@ -322,12 +322,17 @@ def _tokens(text: str) -> list[str]:
 
 
 def words_shared_with_url(quote: str, url: str) -> list[str]:
-    """The quote's words of four or more letters that are also in its
-    address, in the quote's order. Saved with a kept claim for the skeptic."""
-    in_url = set(_tokens(_decoded(url)))
+    """The quote's words of four or more letters that are also in the query
+    part of its address (after the "?"), in the quote's order: the part a
+    query page is most likely to show back. Saved with a kept claim for the
+    skeptic. (The drop rules of quote_is_from_url look at the whole address.)"""
+    try:
+        in_query = set(_tokens(_decoded(urllib.parse.urlsplit(url).query)))
+    except ValueError:
+        return []
     seen: list[str] = []
     for word in _tokens(normalise(quote)):
-        if sum(ch.isalpha() for ch in word) >= 4 and word in in_url and word not in seen:
+        if sum(ch.isalpha() for ch in word) >= 4 and word in in_query and word not in seen:
             seen.append(word)
     return seen
 
@@ -899,7 +904,7 @@ def _claim_lines(claim: dict[str, Any]) -> list[str]:
         lines.append("  - Found only in the PDF's layout order, which can read across "
                      "columns: open the page.")
     if claim.get("words_shared_with_url"):
-        lines.append("  - Some of these words are also in the address ("
+        lines.append("  - Some of these words are also in the request ("
                      + _plain(", ".join(claim["words_shared_with_url"][:6]), 80)
                      + "): check the page did not just show the request back.")
     return lines

@@ -173,7 +173,8 @@ screener/leads/<parcel>/findings.json` to see what is dropped, and correct
 runs after the investigator finishes: it fetches everything again.
 `findings.checked.json` gives each claim an id (`zoning-1` is the first
 zoning claim as written), the text on each side of the quote, the words
-the quote shares with its address, and, under `pages`, when each page was
+the quote shares with the query part of its address, and, under `pages`,
+when each page was
 fetched, its final address and its SHA-256. PDFs need the `pdftotext`
 command (poppler-utils); without it a PDF claim is dropped and says so.
 
@@ -273,7 +274,7 @@ removed. It gives:
   so when the investigator had written something else);
 - a note when the page's words just before a quote include "not" or the
   like, when a PDF quote was found only across columns, and when a quote
-  shares words with its address;
+  shares words with the query part of its address;
 - the skeptic's verdict, whether quotes of its own back it, its objection
   and the claims it disputes;
 - how many claims were kept and dropped, what is still `unknown`, and the
