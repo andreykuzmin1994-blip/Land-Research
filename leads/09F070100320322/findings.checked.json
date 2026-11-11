@@ -14,10 +14,7 @@
      "quote": "Click Here to access the zoning ordinance for the City of Fairburn.",
      "context_before": "ordinances click here to access the codified ordinance of the city of fairburn. ",
      "context_after": " click here to access the common ordinances and procedures for the city of fairb",
-     "words_shared_with_url": [
-      "city",
-      "fairburn"
-     ],
+     "words_shared_with_url": [],
      "page_file": "pages/1888c0c2bcfbba99d6829690.html"
     }
    ],
@@ -39,9 +36,7 @@
      "quote": "Plan Update 2021 (PDF, 10.88 MB) Plan Update 2025 (PDF, 151.26 MB)",
      "context_before": "006 (pdf, 163.9 kb) stwp 2011 (pdf, 796.29 kb) plan update 2015 (pdf, 16.85 mb) ",
      "context_after": " region: county: city: georgia department of community affairs facebook page for",
-     "words_shared_with_url": [
-      "plan"
-     ],
+     "words_shared_with_url": [],
      "page_file": "pages/86a892126ee809d2f855f0cd.html"
     },
     {
@@ -93,10 +88,7 @@
      "context_after": " this plan should consider infrastructure needed to accommodate recent growth, b",
      "pdf_page": 123,
      "pdf_order": "reading",
-     "words_shared_with_url": [
-      "approved",
-      "plan"
-     ],
+     "words_shared_with_url": [],
      "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
     },
     {
@@ -133,10 +125,7 @@
      "quote": "Durham Lakes (Gas Station) Gas Station Concept Plan 101 Durham Lake Pkwy On Hold, Under Review Rivertown (Gas Station) Gas Station Rezoning and Variance 6900 Rivertown Rd On Hold, Under Review DRB Campbell Commons Single Family Detached Rezoning R-3 to R-CT Campbellton Fairburn Road, Fairburn GA 30213 (parcel#09F180200131441) Mayor and City Council 10/26/2026 NexMetro Acquisitions, LLC (c/o Steven L. Jones, McKagen Jones) Multi Family Residential, Conservation, and Institutional Rezoning OI and AG to PD -Planned Development and Variance 0 Milam Road, Fairburn, GA, Parcels: 09F020400070093 & 09F020400070143 Mayor and City Council 11/09/2026",
      "context_before": "[email protected]. project name proposed use type of request location next step ",
      "context_after": " make a payment report an issue fairburn today public comments agenda & minutes ",
-     "words_shared_with_url": [
-      "fairburn",
-      "development"
-     ],
+     "words_shared_with_url": [],
      "page_file": "pages/63c2340b4ce15a08451d89f9.html"
     },
     {
@@ -204,10 +193,7 @@
      "quote": "Durham Lakes (Gas Station) Gas Station Concept Plan 101 Durham Lake Pkwy On Hold, Under Review Rivertown (Gas Station) Gas Station Rezoning and Variance 6900 Rivertown Rd On Hold, Under Review DRB Campbell Commons Single Family Detached Rezoning R-3 to R-CT Campbellton Fairburn Road, Fairburn GA 30213 (parcel#09F180200131441) Mayor and City Council 10/26/2026 NexMetro Acquisitions, LLC (c/o Steven L. Jones, McKagen Jones) Multi Family Residential, Conservation, and Institutional Rezoning OI and AG to PD -Planned Development and Variance 0 Milam Road, Fairburn, GA, Parcels: 09F020400070093 & 09F020400070143 Mayor and City Council 11/09/2026",
      "context_before": "[email protected]. project name proposed use type of request location next step ",
      "context_after": " make a payment report an issue fairburn today public comments agenda & minutes ",
-     "words_shared_with_url": [
-      "fairburn",
-      "development"
-     ],
+     "words_shared_with_url": [],
      "page_file": "pages/63c2340b4ce15a08451d89f9.html"
     },
     {
@@ -280,9 +266,7 @@
     "context_after": " that would transform the corridor into a place where there is a \"there\" to visi",
     "pdf_page": 147,
     "pdf_order": "reading",
-    "words_shared_with_url": [
-     "plan"
-    ],
+    "words_shared_with_url": [],
     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
    },
    {
@@ -365,15 +349,15 @@
  "pages": {
   "https://www.fairburn.com/411/City-Ordinances": {
    "file": "pages/1888c0c2bcfbba99d6829690.html",
-   "fetched_at": "2026-11-11T14:32:25Z",
+   "fetched_at": "2026-11-11T15:01:30Z",
    "final_url": "https://www.fairburn.com/411/City-Ordinances",
    "status": 200,
    "bytes": 101864,
-   "sha256": "a7e864c5f7412710e22160dad6bfa0f48ee898867df7bdb76484f306e5c8e24e"
+   "sha256": "4cd940817cab9aac057e58377d0c2b4484c14b3abee865991e3297811e2358a1"
   },
   "https://dca.georgia.gov/fairburn-city-comprehensive-plan": {
    "file": "pages/86a892126ee809d2f855f0cd.html",
-   "fetched_at": "2026-11-11T14:32:27Z",
+   "fetched_at": "2026-11-11T15:01:31Z",
    "final_url": "https://dca.georgia.gov/fairburn-city-comprehensive-plan",
    "status": 200,
    "bytes": 98332,
@@ -381,7 +365,7 @@
   },
   "https://dca.georgia.gov/document/plans/plan-update-2021-28/download": {
    "file": "pages/38867038d87aba041861e0fc.pdf",
-   "fetched_at": "2026-11-11T14:32:28Z",
+   "fetched_at": "2026-11-11T15:01:32Z",
    "final_url": "https://dca.georgia.gov/document/plans/plan-update-2021-28/download",
    "status": 200,
    "bytes": 11409979,
@@ -389,7 +373,7 @@
   },
   "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan": {
    "file": "pages/0d2514dcf7b12fbafbbf3624.pdf",
-   "fetched_at": "2026-11-11T14:32:40Z",
+   "fetched_at": "2026-11-11T15:02:51Z",
    "final_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
    "status": 200,
    "bytes": 158602610,
@@ -397,31 +381,31 @@
   },
   "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases": {
    "file": "pages/63c2340b4ce15a08451d89f9.html",
-   "fetched_at": "2026-11-11T14:32:45Z",
+   "fetched_at": "2026-11-11T15:03:00Z",
    "final_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
    "status": 200,
    "bytes": 105559,
-   "sha256": "c71989ff135683aba0f9c3bbd33817182d9781b67c278b03c6b5eb233a18518b"
+   "sha256": "2d5d5cfc598562cfcf5f464f7df5d35e4966af1f4961a5250b7f1654daf03b61"
   },
   "https://www.fairburn.com/257/Pending-Zoning-Development-Cases": {
    "file": "pages/07157d4229d0e9e15fd26812.html",
-   "fetched_at": "2026-11-11T14:32:55Z",
+   "fetched_at": "2026-11-11T15:03:12Z",
    "final_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
    "status": 200,
    "bytes": 96407,
-   "sha256": "f8add23e0bdf1561c534c30cc4cc2ec934e2c1abfb77db922dfdd5a3524fdf2d"
+   "sha256": "16a811d18af1aaf6cae345cb674eab1ca205564911100b12936997a1c5b3be90"
   },
   "https://www.fairburn.com/185/Utilities-Department": {
    "file": "pages/6063be1f065b0a203c86ba57.html",
-   "fetched_at": "2026-11-11T14:33:05Z",
+   "fetched_at": "2026-11-11T15:03:18Z",
    "final_url": "https://www.fairburn.com/185/Utilities-Department",
    "status": 200,
-   "bytes": 108022,
-   "sha256": "40c0c95d384613c14ef2a7dc1cf7b870a01b9e55e4cdb89969bee0a579b0926e"
+   "bytes": 108020,
+   "sha256": "c20c2db4580c9b407507a26654ddc8750d183ca6a2027ba344e652d2eb7e5a1e"
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070100320322%27&outFields=*&returnGeometry=false&f=html": {
    "file": "pages/ffe9adbd7bed71ce71470289.html",
-   "fetched_at": "2026-11-11T14:33:07Z",
+   "fetched_at": "2026-11-11T15:03:20Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070100320322%27&outFields=*&returnGeometry=false&f=html",
    "status": 200,
    "bytes": 12367,
@@ -429,7 +413,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%20LIKE%20%27601%20SENOIA%25%27&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/20fe1c2092b5ca7cab7e78af.html",
-   "fetched_at": "2026-11-11T14:33:07Z",
+   "fetched_at": "2026-11-11T15:03:20Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%20LIKE%20%27601%20SENOIA%25%27&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 5053,
@@ -440,7 +424,7 @@
   "kept": 22,
   "dropped": 1,
   "downgraded": [],
-  "checked_at": "2026-11-11T14:33:07Z",
+  "checked_at": "2026-11-11T15:03:20Z",
   "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
   "inputs": {
    "findings.json": "ba9005dfd329d9c80e684cbdccda1d36ae249aa8a71dfdf74bd61f5c5dfd474b",

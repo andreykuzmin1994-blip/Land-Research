@@ -447,10 +447,7 @@
     "quote": "Court records show that after the lawsuit was filed, the city and the developer agreed to take the zoning request back up for a revote, and Fulton County Superior Court Judge Melynee Leftridge signed off on a court order to hold a revote by March 24, 2026.",
     "context_before": "rational basis\" and alleged that the city violated state and local zoning laws. ",
     "context_after": " on that day, the city council unanimously voted in favor of the development. \"e",
-    "words_shared_with_url": [
-     "lawsuit",
-     "fulton"
-    ],
+    "words_shared_with_url": [],
     "page_file": "pages/c5bdc88fd53cba9ba8342341.html"
    },
    {
@@ -534,7 +531,7 @@
  "pages": {
   "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/ArchivedAgenda/_03242026-796": {
    "file": "pages/7d526780fe6296dca5ce0f20.pdf",
-   "fetched_at": "2026-11-11T14:31:36Z",
+   "fetched_at": "2026-11-11T15:00:26Z",
    "final_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/ArchivedAgenda/_03242026-796",
    "status": 200,
    "bytes": 650658,
@@ -542,7 +539,7 @@
   },
   "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806": {
    "file": "pages/8a9f37020ab69dcbc511fb20.pdf",
-   "fetched_at": "2026-11-11T14:31:46Z",
+   "fetched_at": "2026-11-11T15:00:36Z",
    "final_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_03242026-1806",
    "status": 200,
    "bytes": 1297363,
@@ -550,7 +547,7 @@
   },
   "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm": {
    "file": "pages/393b92198f2491fed3f30d11.pdf",
-   "fetched_at": "2026-11-11T14:31:56Z",
+   "fetched_at": "2026-11-11T15:00:46Z",
    "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13326/Z24-026-CV24-010-MAPCO-rm",
    "status": 200,
    "bytes": 2127457,
@@ -558,7 +555,7 @@
   },
   "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_05122026-1832": {
    "file": "pages/238ff6cc4c601af0eae200fc.pdf",
-   "fetched_at": "2026-11-11T14:32:06Z",
+   "fetched_at": "2026-11-11T15:00:56Z",
    "final_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_05122026-1832",
    "status": 200,
    "bytes": 189481,
@@ -566,7 +563,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/4/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json": {
    "file": "pages/1cc57b51463e3965c364a844.html",
-   "fetched_at": "2026-11-11T14:32:07Z",
+   "fetched_at": "2026-11-11T15:00:58Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/4/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json",
    "status": 200,
    "bytes": 35687,
@@ -574,7 +571,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/18/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json": {
    "file": "pages/fd1d78cc081f48e593c76006.html",
-   "fetched_at": "2026-11-11T14:32:08Z",
+   "fetched_at": "2026-11-11T15:00:58Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/18/query?where=1%3D1&geometry=-84.572769%2C33.550782&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&orderByFields=OBJECTID&f=json",
    "status": 200,
    "bytes": 3941,
@@ -582,7 +579,7 @@
   },
   "https://www.developfultoncounty.com/uploads/about-us-news_47_1005894727.pdf": {
    "file": "pages/f59495d5f13b19282cacdc4a.pdf",
-   "fetched_at": "2026-11-11T14:32:10Z",
+   "fetched_at": "2026-11-11T15:01:00Z",
    "final_url": "https://www.developfultoncounty.com/uploads/about-us-news_47_1005894727.pdf",
    "status": 200,
    "bytes": 343968,
@@ -590,7 +587,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070000320927%27&outFields=ParcelID,Owner,OwnerAddr1,OwnerAddr2,Address,LandAcres,LUCode,ClassCode,TaxDist&returnGeometry=false&f=json": {
    "file": "pages/77846b673f7a0fddbc8e1748.html",
-   "fetched_at": "2026-11-11T14:32:10Z",
+   "fetched_at": "2026-11-11T15:01:00Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F070000320927%27&outFields=ParcelID,Owner,OwnerAddr1,OwnerAddr2,Address,LandAcres,LUCode,ClassCode,TaxDist&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 1202,
@@ -598,7 +595,7 @@
   },
   "https://www.developfultoncounty.com/uploads/meetings-and-minutes_406_998520003.pdf": {
    "file": "pages/1ed826c5b3620c0438ec3228.pdf",
-   "fetched_at": "2026-11-11T14:32:11Z",
+   "fetched_at": "2026-11-11T15:01:01Z",
    "final_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_406_998520003.pdf",
    "status": 200,
    "bytes": 201870,
@@ -606,7 +603,7 @@
   },
   "https://www.developfultoncounty.com/uploads/meetings-and-minutes_397_3860749721.pdf": {
    "file": "pages/8f3bfb6baf599a55bedf3891.pdf",
-   "fetched_at": "2026-11-11T14:32:12Z",
+   "fetched_at": "2026-11-11T15:01:02Z",
    "final_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_397_3860749721.pdf",
    "status": 200,
    "bytes": 138067,
@@ -614,7 +611,7 @@
   },
   "https://atlanta.capitalbnews.org/south-fulton-warehouse-lawsuit-resident-pushback/": {
    "file": "pages/c5bdc88fd53cba9ba8342341.html",
-   "fetched_at": "2026-11-11T14:32:13Z",
+   "fetched_at": "2026-11-11T15:01:03Z",
    "final_url": "https://atlanta.capitalbnews.org/south-fulton-warehouse-lawsuit-resident-pushback/",
    "status": 200,
    "bytes": 253208,
@@ -622,7 +619,7 @@
   },
   "https://www.developfultoncounty.com/uploads/meetings-and-minutes_41_963367144.pdf": {
    "file": "pages/e9b1a7a007adde6989ff1846.pdf",
-   "fetched_at": "2026-11-11T14:32:14Z",
+   "fetched_at": "2026-11-11T15:01:04Z",
    "final_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_41_963367144.pdf",
    "status": 200,
    "bytes": 132602,
@@ -630,7 +627,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID+IN+(%2709F070000320927%27,%2709F100200471269%27,%2709F070000320661%27,%2709F100100460651%27,%2709F100100460610%27,%2709F100100460636%27,%2709F110300450881%27)&outFields=ParcelID,Owner,Address,LandAcres,TaxYear,LUCode,ClassCode&returnGeometry=false&orderByFields=ParcelID&f=json": {
    "file": "pages/d7a5e460a58510248c8627f2.html",
-   "fetched_at": "2026-11-11T14:32:14Z",
+   "fetched_at": "2026-11-11T15:01:04Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID+IN+(%2709F070000320927%27,%2709F100200471269%27,%2709F070000320661%27,%2709F100100460651%27,%2709F100100460610%27,%2709F100100460636%27,%2709F110300450881%27)&outFields=ParcelID,Owner,Address,LandAcres,TaxYear,LUCode,ClassCode&returnGeometry=false&orderByFields=ParcelID&f=json",
    "status": 200,
    "bytes": 1894,
@@ -641,7 +638,7 @@
   "kept": 35,
   "dropped": 0,
   "downgraded": [],
-  "checked_at": "2026-11-11T14:32:14Z",
+  "checked_at": "2026-11-11T15:01:04Z",
   "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
   "inputs": {
    "findings.json": "5172d4759a15817715029f109d384ef5823904cc99cb679d9540fd432ce0e05a",
