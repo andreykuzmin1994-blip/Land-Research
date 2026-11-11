@@ -577,6 +577,40 @@ a `--limit` trial. Limits:
   a FEATURES entry, and rebuild with `--new-baseline`. Do not read the
   flag text from `rank.py`.
 
+## Checking a lead against documents
+
+After a run, two agents can look into one graded lead: an investigator
+reads the public documents (ordinances, staff reports, plans, county GIS),
+then a skeptic looks for the strongest reason the lead fails. Their rules
+are in `INVESTIGATE.md`. Every claim they make rests on an exact quote and
+its address, and `quotecheck.py` fetches each address itself and keeps a
+claim only if the quote is on the page:
+
+```bash
+python -m screener.quotecheck screener/leads/<parcel>/findings.json
+python -m screener.quotecheck screener/leads/<parcel>/findings.json --with-skeptic --findings-sha256 <hash the first run printed>
+```
+
+It writes `findings.checked.json` and `lead.md` in the lead's folder
+(`screener/leads/` is kept out of git; the data branch keeps the results).
+`lead.md` is written by the code: words in double quotation marks are a
+kept quote and a link is a kept claim's address. PDFs need the `pdftotext`
+command (poppler-utils).
+
+- **What a kept claim proves:** the quoted words were on that page when
+  the tool fetched it. Not that the page is current, nor that the claim
+  follows from the quote. A skeptic verdict changes no grade or rank.
+- **What it will not fetch:** anything but public http(s) pages by GET;
+  an address that names CoStar, LoopNet or Crexi anywhere; a page its
+  host's robots.txt disallows, or whose robots.txt can't be read; a
+  redirect to another host.
+- **Known limits** (`reviews/35_screener_lead_layer`, 06 to 08): a query
+  page can show a request's own words back, and the guard against that is
+  not airtight (the skeptic compares each quote with its address); text
+  hidden by a style sheet and invisible PDF text count as page text; the
+  zoning code (Municode) and the Secretary of State cannot be read by a
+  polite fetch, so those two stay a person's job.
+
 ## AutoResearch
 
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
@@ -595,11 +629,17 @@ not comparable.
 
 ```bash
 python -m screener.autoresearch.build_eval          # rebuild the frozen key (humans only, ~5 min; needs data/test_blocks.json)
-python -m screener.autoresearch.evaluate --decide   # baseline, then once per experiment
-python -m screener.autoresearch.evaluate --test     # sealed test split (humans only)
-python -m screener.autoresearch.evaluate --decide --new-baseline   # humans, after changing the key or screens
-python -m screener.autoresearch.evaluate --null-test               # humans: how often the keep rule keeps noise (minutes)
+python -m screener.autoresearch.evaluate --decide --new-baseline   # humans: the first baseline, and after any change under screener/ but rank.py
+python -m screener.autoresearch.evaluate --decide   # the loop: once per experiment
+python -m screener.autoresearch.evaluate            # a look at the dev score (logged)
+python -m screener.autoresearch.evaluate --test     # sealed test split (humans only; logged)
+python -m screener.autoresearch.evaluate --null-test               # humans: how often the keep rule keeps noise (about 20 minutes on 4 cores)
 ```
+
+`experiments.tsv` and `best_ranking.json` are not in git, so a new cloud
+session has neither: the loop then stops ("no baseline") until a human
+records one. Keep them with the branch the loop runs on if a batch must
+span sessions.
 
 To run the loop, open a fresh Claude Code session and say: "Read
 screener/autoresearch/PROGRAM.md and run 15 experiments."
@@ -609,18 +649,31 @@ The evaluator refuses (prints `REFUSED: ...`, exits 3, logs nothing) when:
 - `rank.py` breaks the purity rules (below). It is checked before it is
   imported, in every mode but `--control`, so a refused file never runs
   and nothing is scored.
+- `rank.learned_score` gives a record a different score the second time
+  it is asked. Every record is scored twice, in two orders, in every
+  mode: a score may depend only on the record.
 - (`--decide`) there are uncommitted changes or untracked files under
   `screener/` (ignored files such as `cache/` don't count), the experiment
   commit touches any file besides `screener/rank.py`, or git can't be read.
 - (`--decide`) any score is NaN or infinite, or outside 0–100.
-- (`--decide`) `experiments.tsv` was written by an earlier version of the
-  evaluator (other columns), or holds runs of another key and none of
-  this one: a human moves the old file aside or records a new baseline.
-- (`--decide`) the evaluation changed since the best kept run (`evaluate.py`,
-  `screens.py`, `data/`), or the best kept run's record is broken:
-  `best_ranking.json` is missing, unreadable or from another run, or
-  `experiments.tsv` has kept runs, none of which is in this branch's
+- `experiments.tsv` was written by an earlier version of the evaluator
+  (other columns): a human moves the old file aside. A look is refused
+  too, because it could not be logged.
+- (`--decide`) there is no baseline for this key in `experiments.tsv`
+  (a first run, a new container, a deleted log, a rebuilt key). Only
+  `--new-baseline` records one; the loop never runs it.
+- (`--decide`) any file under `screener/` other than `rank.py` changed
+  since the best kept run (the evaluator, `screens.py`, `data/`, a
+  package `__init__.py`, anything), or the best kept run's record is
+  broken: `best_ranking.json` is missing, unreadable or from another run,
+  or `experiments.tsv` has kept runs, none of which is in this branch's
   history. Deleting one of those files can't reset the bar.
+
+A decision prints the two scores to one decimal and their difference,
+never the bootstrap win share (that goes to the log only): finer numbers
+would let one experiment ask whether a band of parcels holds a known site.
+Every scoring without `--decide` is logged as a `look` (or `test`) row
+with a hash of `rank.py`.
 
 In each of the last cases a human re-records the baseline with
 `--decide --new-baseline` (at the best kept commit when only its record
@@ -642,8 +695,8 @@ must be UTF-8: any other `# coding:` line is refused, because under
 - the names `open`, `eval`, `exec`, `compile`, `getattr`, `setattr`,
   `delattr`, `globals`, `locals`, `vars`, `breakpoint`, `input`, `print`,
   `help`, `exit`, `quit`, `type`, `format` (and `str.format`),
-  `get_type_hints` and `ForwardRef`; dunder names (`__x__`); private (`_x`)
-  attributes;
+  `get_type_hints`, `ForwardRef`, `hash` and `id` (those two differ from
+  run to run); dunder names (`__x__`); private (`_x`) attributes;
 - attributes of frames, generators, coroutines, tracebacks and code
   objects (any attribute starting with `f_`, `gi_`, `cr_`, `ag_`, `tb_` or
   `co_`), and keyword arguments named `co_...` or `__x__`;
@@ -655,7 +708,9 @@ must be UTF-8: any other `# coding:` line is refused, because under
   up bare names such as `sys` in `typing`'s namespace);
 - assigning to or deleting an attribute of an imported module or name
   (`math.isfinite = ...`), and using a module as a value (`m = math`);
-- `global` and `nonlocal`;
+- `global` and `nonlocal`. (Other state kept between calls, such as a
+  mutable default or a module-level list, is not seen by this check; the
+  two-pass scoring catches it when it changes a score.)
 - strings (docstrings aside) that name the evaluation files, or that are
   exactly a dunder (`"__globals__"`), a frame or code attribute (`"f_back"`)
   or one of the refused builtins (`"open"`).
