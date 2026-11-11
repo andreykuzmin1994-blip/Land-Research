@@ -164,10 +164,11 @@ ORDER_SEED = 11                              # the second scoring pass's order
 # Why --decide refuses for now ("" = it does not). Set while a change to this
 # evaluation awaits its review; a human clears it in the change that records
 # the review's outcome. Scoring without --decide still works.
-REVIEW_PENDING = ("the 2026-11-10 rebuild of this evaluation (five as-of years, graded score) "
-                  "was merged before its adversarial review and its keep-threshold check were "
-                  "finished. No experiment may be kept or discarded against it yet. Stop and "
-                  "tell a human (screener/AGENTS_DESIGN.md, \"Next session\")")
+REVIEW_PENDING = ("the evaluation's review findings are fixed in code (reviews/36, 05 to 07), "
+                  "but the answer key in data/ has not been rebuilt under the new builder "
+                  "rules, and the keep thresholds have not been checked on the rebuilt key. No "
+                  "experiment may be kept or discarded yet. Stop and tell a human "
+                  "(screener/AGENTS_DESIGN.md, \"Next session\")")
 # Record fields the ranking never sees. The ranking is handed an allow-list
 # (the key's meta "features" and "banned"), so a new record field is hidden
 # unless it is added there; this tuple only documents the known ones.

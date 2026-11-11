@@ -669,11 +669,23 @@ The evaluator refuses (prints `REFUSED: ...`, exits 3, logs nothing) when:
   or `experiments.tsv` has kept runs, none of which is in this branch's
   history. Deleting one of those files can't reset the bar.
 
+- (`--decide`) this commit was already scored; the key in `data/` was
+  built before the 2026-11-11 builder rules; or `--test` is given with it.
+- a module was loaded from inside the repository but outside `screener/`
+  (a root-level `random.py` would run inside the evaluator unseen).
+
 A decision prints the two scores to one decimal and their difference,
 never the bootstrap win share (that goes to the log only): finer numbers
 would let one experiment ask whether a band of parcels holds a known site.
-Every scoring without `--decide` is logged as a `look` (or `test`) row
-with a hash of `rank.py`.
+A refused `--decide` prints no score. Every other scoring is logged as a
+`look`, `test` or `null` row with a hash of `rank.py`.
+
+The `rank.py` that is checked is the one that runs: its bytes are compiled
+by the evaluator, not loaded through Python's import cache (which once
+scored an older `rank.py` of the same size, edited within the same
+second). Git is asked about the repository the evaluator is in, whatever
+the working directory. Documents and `screener/tests/` may change between
+experiments; any other file under `screener/` needs a new baseline.
 
 In each of the last cases a human re-records the baseline with
 `--decide --new-baseline` (at the best kept commit when only its record
@@ -732,10 +744,12 @@ Known gaps:
 - A dunder or frame attribute name can still be computed as a string
   (`"_" * 2 + ...`). The rules refuse the known ways to use such a string
   (getattr, `match`, `type()`, class hooks, code objects), not the string.
-- A planted `screener/__pycache__/rank.*.pyc` whose recorded timestamp and
-  size match `rank.py` would run instead of the checked source. git ignores
-  it, so `--decide` doesn't see it.
-- The file could change between the check and the import.
+- A planted `.pyc` for another module the evaluator imports (not
+  `rank.py`, whose checked bytes are compiled directly) would still run;
+  git ignores `__pycache__`, so `--decide` doesn't see it.
+- State that gives the same score in every process (a table keyed by a
+  record's own values) is not state the second pass can see; rule 3 and
+  the human read of each kept diff stand against lookups.
 - Changing shared objects through their methods (such as registering a
   class with an ABC) isn't detected.
 - The live `python -m screener.run` doesn't run the check.
