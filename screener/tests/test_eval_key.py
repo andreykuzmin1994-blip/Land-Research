@@ -267,7 +267,7 @@ class DecideMechanicsTests(unittest.TestCase):
         if args[0] == "status":
             return "## main"
         if args[0] == "diff":
-            return "screener/rank.py" if args[2] == "HEAD~1" else ""
+            return "screener/rank.py" if "HEAD~1" in args else ""
         return "exp: test"
 
     def dev(self, sort_key):
@@ -354,9 +354,12 @@ class MainTests(unittest.TestCase):
             self.seen.add(tuple(sorted(features)))
             return {"score": 50.0 + (features.get("acres") or 0.0) / 7.0}
 
+        self.spy = spy
         for p in (mock.patch.object(ev, "LOG_FILE", self.log),
                   mock.patch.object(ev, "BEST_FILE", Path(self.tmp.name, "best_ranking.json")),
-                  mock.patch("screener.rank.learned_score", spy)):
+                  mock.patch.object(ev, "foreign_modules", return_value=[]),
+                  mock.patch.object(ev, "load_scorer", side_effect=lambda source: self.spy),
+                  mock.patch.object(ev, "second_pass", return_value=None)):
             p.start()
             self.addCleanup(p.stop)
 
@@ -398,6 +401,17 @@ class MainTests(unittest.TestCase):
         self.assertIn("REFUSED", text)
         self.assertNotIn("graded", text)
 
+    def test_a_look_at_an_uncommitted_rank_py_says_so(self):
+        real = ev._git
+        with mock.patch.object(ev, "_git", side_effect=lambda *a: (
+                " M screener/rank.py" if a[0] == "status" else real(*a))):
+            self.run_main()
+        self.assertTrue(self.rows()[-1]["description"].endswith(" (uncommitted)"))
+        with mock.patch.object(ev, "_git", side_effect=lambda *a: (
+                "" if a[0] == "status" else real(*a))):
+            self.run_main()
+        self.assertNotIn("uncommitted", self.rows()[-1]["description"])
+
     def test_looks_are_not_decisions(self):
         self.run_main()
         self.assertEqual(ev._decisions(), [])
@@ -410,7 +424,9 @@ class MainTests(unittest.TestCase):
             calls.append(1)
             return {"score": float(len(calls) % 97)}
 
-        with mock.patch("screener.rank.learned_score", counter):
+        self.spy = counter
+        with mock.patch.object(ev, "REVIEW_PENDING", ""), \
+                mock.patch.object(ev, "BUILDER_META", ()):
             for argv in ((), ("--test",), ("--decide",), ("--null-test", "20")):
                 code, text = self.run_main(*argv)
                 self.assertEqual(code, 3, argv)
@@ -418,10 +434,217 @@ class MainTests(unittest.TestCase):
                 self.assertNotIn("graded", text)
         self.assertFalse(self.log.exists())
 
+    def test_a_refused_decide_shows_no_score_and_test_does_not_go_with_it(self):
+        with mock.patch.object(ev, "REVIEW_PENDING", ""), \
+                mock.patch.object(ev, "BUILDER_META", ()), \
+                mock.patch.object(ev, "_git", return_value=""):       # git gives nothing: refused
+            code, text = self.run_main("--decide")
+        self.assertEqual(code, 3)
+        self.assertTrue(text.startswith("REFUSED"))
+        self.assertNotIn("graded", text)
+        self.assertNotIn("hits", text)
+        self.assertFalse(self.log.exists())
+        code, text = self.run_main("--decide", "--test")
+        self.assertEqual(code, 2)
+        self.assertNotIn("graded", text)
+        with mock.patch.object(ev, "REVIEW_PENDING", "pending"):
+            code, text = self.run_main("--decide")
+        self.assertEqual((code, text), (3, "REFUSED: pending.\n"))
+
+    def test_a_key_from_before_the_builder_rules_decides_nothing(self):
+        real = ev.load
+
+        def old_key():
+            records, positives, meta = real()
+            return records, positives, {k: v for k, v in meta.items() if k not in ev.BUILDER_META}
+
+        with mock.patch.object(ev, "REVIEW_PENDING", ""), mock.patch.object(ev, "load", old_key):
+            code, text = self.run_main("--decide", "--new-baseline")
+            self.assertEqual(code, 3)
+            self.assertIn("built before the 2026-11-11 builder rules", text)
+            self.assertEqual(self.run_main()[0], 0)                    # a look still works
+        self.assertEqual([r["status"] for r in self.rows()], ["look"])
+
+    def test_a_null_test_leaves_a_row_before_it_runs(self):
+        with mock.patch.object(ev.concurrent.futures, "ProcessPoolExecutor",
+                               side_effect=RuntimeError("stopped here")):
+            with self.assertRaises(RuntimeError):
+                self.run_main("--null-test", "20")
+        self.assertEqual([r["status"] for r in self.rows()], ["null"])
+
+    def test_a_module_from_the_repository_outside_screener_refuses_every_mode(self):
+        with mock.patch.object(ev, "foreign_modules", return_value=["random", "csv"]):
+            for argv in ((), ("--control",), ("--decide",), ("--null-test", "20")):
+                code, text = self.run_main(*argv)
+                self.assertEqual(code, 3, argv)
+                self.assertIn("outside screener/ (random, csv)", text)
+        self.assertFalse(self.log.exists())
+
     def test_new_baseline_needs_decide(self):
         code, text = self.run_main("--new-baseline")
         self.assertEqual(code, 2)
         self.assertFalse(self.log.exists())
+
+
+class BuiltKeyTests(unittest.TestCase):
+    """The committed key, as the 2026-11-11 builder writes it. Reads keys,
+    cells, splits, weights and site hashes: no feature of any record."""
+
+    def setUp(self):
+        self.meta = ev.load_meta()
+        if not all(self.meta.get(k) for k in ev.BUILDER_META):
+            self.skipTest("the key in data/ has not been rebuilt with the 2026-11-11 builder "
+                          "rules yet (evaluate --decide refuses it)")
+        self.records, self.weights, _ = ev.load()
+        self.sites = {}
+        for year in ev.COHORTS:
+            self.sites.update(json.loads(ev.labels_file(year).read_text())["sites"])
+
+    def test_meta_names_the_window_and_the_deed_file(self):
+        self.assertEqual(self.meta["window_start"], be.WINDOW_START.isoformat())
+        self.assertRegex(self.meta["deed_file_sha256"], r"^[0-9a-f]{64}$")
+        for year in ev.COHORTS:
+            with gzip.open(ev.features_file(year), "rb") as fh:
+                self.assertEqual(fh.read(0), b"")
+            self.assertEqual(ev.features_file(year).read_bytes()[4:8], b"\0\0\0\0")   # no gzip time
+
+    def test_every_positive_has_a_site_and_a_sites_weights_sum_to_one(self):
+        self.assertEqual(set(self.sites), set(self.weights))
+        totals: dict[str, float] = {}
+        for key, site in self.sites.items():
+            totals[site] = totals.get(site, 0.0) + self.weights[key]
+        for site, total in totals.items():
+            self.assertAlmostEqual(total, 1.0, places=4, msg=site)
+
+    def test_a_site_sits_in_one_cell_and_one_split(self):
+        where = {r["key"]: (r["block"], r["split"]) for r in self.records}
+        places: dict[str, set] = {}
+        for key, site in self.sites.items():
+            places.setdefault(site, set()).add(where[key])
+        self.assertTrue(all(len(p) == 1 for p in places.values()))
+        test_blocks = set(json.loads(ev.TEST_BLOCKS_FILE.read_text())["test_blocks"])
+        for block, split in where.values():
+            self.assertEqual(split == "test", block in test_blocks)
+
+
+class CheckedBytesTests(unittest.TestCase):
+    """The rank.py that is checked is the rank.py that runs, and a fresh
+    copy of it scores every record the same."""
+
+    SOURCE = (b"def learned_score(p):\n"
+              b"    return {'score': 30.0 + (p.get('acres') or 0.0)}\n")
+
+    def test_the_scorer_is_made_from_the_bytes_not_from_the_import_cache(self):
+        import importlib
+        import os
+        import screener.rank as live
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp, "rank.py")
+            for weight in (30, 90):                           # same size, same second
+                fake.write_bytes(self.SOURCE.replace(b"30.0", b"%d.0" % weight))
+                os.utime(fake, (1_700_000_000, 1_700_000_000))
+                with mock.patch.object(ev, "RANK_FILE", fake):
+                    scorer = ev.load_scorer(fake.read_bytes())
+                self.assertEqual(scorer({"acres": 1.0})["score"], weight + 1.0)
+        self.assertIs(importlib.import_module("screener.rank"), live)   # the import is untouched
+        self.assertNotIn("p.get('acres')", Path(live.__file__).read_text())
+
+    def test_rank_source_gives_the_checked_bytes_and_refuses_a_link(self):
+        problems, source = ev.rank_source()
+        self.assertEqual((problems, source), ([], ev.RANK_FILE.read_bytes()))
+        self.assertEqual(ev.rank_import_problems(), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            target, link = Path(tmp, "elsewhere.py"), Path(tmp, "rank.py")
+            target.write_bytes(self.SOURCE)
+            link.symlink_to(target)
+            with mock.patch.object(ev, "RANK_FILE", link), \
+                    mock.patch.object(ev, "_rank_origin", return_value=str(link)):
+                problems, source = ev.rank_source()
+        self.assertEqual((source, len(problems)), (b"", 1))
+        self.assertIn("link", problems[0])
+
+    def second_pass_unstable(self, body: bytes) -> int:
+        source = b"SEEN = {}\nBOX = []\n\ndef learned_score(p):\n" + body
+        records = pool(years=(2015,), per_year=40)
+        for i, r in enumerate(records):
+            r["acres"] = float(i)
+        scorer = ev.load_scorer(source)
+        return ev.ranking(records, "dev", scorer, SETTINGS, ("acres",),
+                          ev.second_pass(source))[3]
+
+    def test_a_fresh_process_catches_what_a_second_call_cannot(self):
+        honest = b"    return {'score': 10.0 + p['acres'] / 3.0}\n"
+        memo = b"    return {'score': float(SEEN.setdefault(p['acres'], len(SEEN)))}\n"
+        counter = b"    BOX.append(1)\n    return {'score': float(len(BOX))}\n"
+        salted = b"    return {'score': float(sorted({'a', 'b', 'c', 'd', 'e', 'f', 'g'}, key=repr)[0] != list({'a', 'b', 'c', 'd', 'e', 'f', 'g'})[0]) + float(len(repr(BOX)) + len(repr(p.get)) % 7)}\n"
+        raises = b"    return {'score': 1.0 / (len(SEEN) - len(SEEN))}\n"
+        self.assertEqual(self.second_pass_unstable(honest), 0)
+        self.assertGreater(self.second_pass_unstable(memo), 30)      # index of first sight
+        self.assertGreater(self.second_pass_unstable(counter), 30)
+        del salted
+        with self.assertRaises(ZeroDivisionError):
+            self.second_pass_unstable(raises)
+
+    def test_a_second_pass_that_cannot_run_counts_every_record(self):
+        records = pool(years=(2015,), per_year=40)
+        recheck = ev.second_pass(self.SOURCE)
+        with mock.patch.object(ev.subprocess, "run", side_effect=OSError("no python")):
+            unstable = ev.ranking(records, "dev", ev.load_scorer(self.SOURCE), SETTINGS,
+                                  ("acres",), recheck)[3]
+        self.assertEqual(unstable, 40)
+        with self.assertRaises(ValueError):
+            ev.ranking(records, "dev", ev.load_scorer(self.SOURCE), SETTINGS, ("acres",),
+                       lambda rows: [1.0])
+
+    def test_the_second_pass_uses_another_order_and_another_hash_seed(self):
+        records = pool(years=(2015,), per_year=40)
+        seen = []
+        ev.ranking(records, "dev", lambda f: {"score": 1.0}, SETTINGS, ("signal",),
+                   lambda rows: seen.extend(r["signal"] for r in rows) or [1.0] * len(rows))
+        self.assertEqual(sorted(seen), [float(i) for i in range(40)])
+        self.assertNotEqual(seen, [float(i) for i in range(40)])
+        captured = {}
+
+        def run(cmd, **kw):
+            captured.update(kw["env"], cmd=cmd, cwd=kw["cwd"])
+            raise OSError
+        with mock.patch.object(ev.subprocess, "run", run):
+            ev.second_pass(self.SOURCE)([{"acres": 1.0}])
+        self.assertIn(captured["PYTHONHASHSEED"], ("1", "2"))
+        self.assertNotEqual(captured["PYTHONHASHSEED"], __import__("os").environ.get("PYTHONHASHSEED"))
+        self.assertIn("-P", captured["cmd"])
+
+    def test_foreign_modules_sees_a_repository_file_outside_screener(self):
+        import sys
+        import types
+        self.assertEqual(ev.foreign_modules(), [])
+        stray = types.ModuleType("stray_csv")
+        stray.__file__ = str(ev.ROOT / "csv.py")
+        fine = types.ModuleType("fine_mod")
+        fine.__file__ = str(ev.ROOT / "screener" / "x.py")
+        venv = types.ModuleType("venv_mod")
+        venv.__file__ = str(ev.ROOT / ".venv" / "lib" / "site-packages" / "y.py")
+        with mock.patch.dict(sys.modules, {"stray_csv": stray, "fine_mod": fine, "venv_mod": venv}):
+            self.assertEqual(ev.foreign_modules(), ["stray_csv"])
+
+    def test_git_runs_in_the_repository_root(self):
+        seen = []
+
+        class Done:
+            stdout, returncode = "ok\n", 0
+
+        def run(cmd, **kw):
+            seen.append(kw.get("cwd"))
+            return Done()
+        with mock.patch.object(ev.subprocess, "run", run):
+            self.assertEqual(ev._git("status"), "ok")
+            self.assertTrue(ev._is_ancestor("abc"))
+        self.assertEqual(seen, [str(ev.ROOT), str(ev.ROOT)])
+        self.assertTrue((ev.ROOT / "screener" / "rank.py").is_file())
+
+    def test_hash_and_id_are_refused(self):
+        for src in ("x = hash('a')\n", "y = id(object())\n"):
+            self.assertTrue(ev.rank_problems(src), src)
 
 
 class BuildRuleTests(unittest.TestCase):
@@ -504,8 +727,18 @@ class BuildRuleTests(unittest.TestCase):
         # The January owner is the seller of that deed: the record is sound.
         self.assertEqual(be.classify(built, feb, self.A, date(2017, 1, 1)), "positive")
         self.assertEqual(be.classify(none, feb, self.A, date(2017, 1, 1)), "negative")
+        # The January owner sells and the buyer resells within the quarter:
+        # only the first deed says who owned it in January.
+        resold = [deed("2017-02-10", 900000, self.A), deed("2017-03-15", 950000, "BUYER LLC")]
+        self.assertEqual(be.classify(built, resold, self.A, date(2017, 1, 1)), "positive")
+        self.assertEqual(be.classify(built, resold, "BUYER LLC", date(2017, 1, 1)), why)
+        # A deed dated 1 January itself counts, and the price need not reach MIN_PRICE.
+        self.assertEqual(be.classify(none, [deed("2017-01-01", 900000, self.A)], "BUYER LLC",
+                                     date(2017, 1, 1)), why)
+        self.assertEqual(be.classify(none, [deed("2017-02-10", 40000, self.A)], "BUYER LLC",
+                                     date(2017, 1, 1)), why)
         # Outside the quarter, unpriced, or a right-of-way deed: not a sign of a late digest.
-        for sales in ([deed("2017-04-03", 900000, self.A)], [deed("2016-12-31", 40000, self.A)],
+        for sales in ([deed("2017-04-03", 900000, self.A)], [deed("2016-12-31", 900000, self.A)],
                       [deed("2017-02-10", 0, self.A)],
                       [deed("2017-02-10", 900000, self.A, "Right of Way/Dept of Trans")]):
             self.assertEqual(be.classify(none, sales, "BUYER LLC", date(2017, 1, 1)), "negative")

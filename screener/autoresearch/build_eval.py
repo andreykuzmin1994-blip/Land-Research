@@ -59,9 +59,9 @@ Split:     ~5 km grid cells. The cells sealed for the test set are frozen
 
 Writes screener/autoresearch/data/fulton_<year>_features.json.gz and
 fulton_<year>_labels.json for each year. The labels file also gives each
-positive record a site hash ("sites"), so a test can check that a site's
-weights sum to 1 and that it sits in one cell; the ranking never sees the
-labels file. Records carry no owner names,
+positive record a site hash ("sites"); tests/test_eval_key.py checks on the
+built files that a site's weights sum to 1 and that it sits in one cell and
+one split. The ranking never sees the labels file. Records carry no owner names,
 parcel ids or coordinates (the keys and block ids are short hashes: they
 keep casual eyes off the answers, they are not a secret, since the county
 file is public).
@@ -219,12 +219,17 @@ def _real_transfer(deed: dict[str, Any], owner: str | None, min_price: float) ->
 
 
 def digest_shows_buyer(sales: list[dict[str, Any]], owner: str | None, as_of: date) -> bool:
-    """Is the digest's owner the buyer of a first-quarter sale? True when a
-    priced deed dated in the SNAPSHOT_SLACK after the as-of date has a
+    """Is the digest's owner the buyer of a first-quarter sale? True when the
+    first priced deed dated in the SNAPSHOT_SLACK after the as-of date has a
     seller other than the digest's owner (a January owner would be the
-    seller of any such deed)."""
-    return any(as_of <= s["date"] < as_of + SNAPSHOT_SLACK and _real_transfer(s, owner, 0)
-               for s in sales)
+    seller of that deed)."""
+    quarter = sorted((s for s in sales if as_of <= s["date"] < as_of + SNAPSHOT_SLACK
+                      and s["price"] > 0 and s["instrument"] not in fulton.NON_TRANSFER_DEEDS),
+                     key=lambda s: s["date"])
+    # Only the quarter's first priced deed says who owned the land in
+    # January: when the January owner sells and the buyer resells within the
+    # quarter, the second deed's seller is not the digest's owner either.
+    return bool(quarter) and not fulton.same_owner(quarter[0]["old_owner"], owner)
 
 
 def bought_in_window(sales: list[dict[str, Any]], owner: str | None, as_of: date) -> bool:

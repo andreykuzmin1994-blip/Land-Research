@@ -8,7 +8,7 @@ the files in data/. Usage:
     python -m screener.autoresearch.evaluate --decide --new-baseline   # humans: record a baseline
     python -m screener.autoresearch.evaluate --test      # sealed test split (humans only; logged)
     python -m screener.autoresearch.evaluate --control   # what random ranking scores
-    python -m screener.autoresearch.evaluate --null-test # how often the keep rule keeps noise (humans)
+    python -m screener.autoresearch.evaluate --null-test # how often the keep rule keeps noise (humans; logged)
 
 The key (build_eval.py): for each as-of year in COHORTS, the parcels that
 year's owner (an owner from before the key's window, not a buyer inside
@@ -35,10 +35,10 @@ run, hits must not be lower, AND the new ranking's graded must beat the
 best kept run's in at least WIN_SHARE_TO_KEEP of clustered bootstrap
 resamples. Each resample draws whole ~5 km map cells, every year of a cell
 together, because positives come in clusters and a site repeats across
-years; both rankings are scored on the same draw. The thresholds were
-checked with --null-test on the key as built, so that a change that is
-not an improvement is kept about 2% of the time or less; the measured
-rates are in reviews/36_screener_eval_cohorts_metric (06).
+years; both rankings are scored on the same draw. The thresholds are
+checked with --null-test, so that a change that is not an improvement is
+kept about 2% of the time or less; the measured rates, and the key they
+were measured on, are in reviews/36_screener_eval_cohorts_metric (07).
 
 What the loop is shown. Scores are printed and logged to one decimal, and
 a decision prints the rounded scores only: no win share, and the gain as
@@ -46,21 +46,29 @@ the difference of the rounded scores. A finer number would answer "is
 there a known site in this band of parcels" one experiment at a time.
 Comparisons use the exact values, recomputed from the best kept run's
 saved ranking; the exact win share goes to the log, which the loop does
-not open. Every scoring without --decide is logged too (status "look",
-or "test"), with a hash of rank.py, so looks leave a trace.
+not open. --decide shows nothing until its guards have passed, so a
+refused run is not a look. Every other scoring is logged (status "look",
+"test" or "null"), with a hash of rank.py, so looks leave a trace.
 
-Guards. Before rank.py is imported, a static check (rank_problems) must
-pass, or nothing is scored. The ranking is handed only the feature fields
-named in the key's meta, never a key, year, cell or weight, and every
-record is scored twice in two different orders: a score that differs
-between the passes (state kept between calls, a salted hash) refuses the
-run. --decide also refuses (exit 3, logs nothing) on uncommitted changes
+Guards. Before rank.py runs, a static check (rank_problems) must pass, or
+nothing is scored. The bytes that were checked are the bytes that run:
+they are compiled here, never loaded through the import system, whose
+bytecode cache can hold an older rank.py of the same size and second. The
+ranking is handed only the feature fields named in the key's meta, never
+a key, year, cell or weight. Every record is scored a second time, in
+another order, by a fresh copy of rank.py in a new Python process with
+another hash seed: a score that differs (state kept between calls, a
+per-process salt) refuses the run. A module loaded from inside the
+repository but outside screener/ refuses it too. Git is always asked
+about the repository this file is in, whatever the working directory.
+--decide also refuses (exit 3, logs nothing) on uncommitted changes
 or untracked files under screener/, a commit that touches anything but
 screener/rank.py, any other file under screener/ changed since the best
 kept run, a score that isn't a finite number in 0-100, a log written for
-another version of this evaluator, no baseline for this key, or a best
-kept run whose experiments.tsv row or best_ranking.json is missing or
-doesn't match. Only a human records a baseline (--new-baseline), the
+another version of this evaluator, no baseline for this key, a key built
+before the 2026-11-11 builder rules, or a best kept run whose
+experiments.tsv row or best_ranking.json is missing, doesn't match or
+doesn't reproduce its logged score. Only a human records a baseline (--new-baseline), the
 first one included; it starts a new chain: later experiments are compared
 with it, not with older runs.
 """
@@ -81,18 +89,21 @@ import inspect
 import io
 import json
 import math
+import os
 import random
 import re
 import subprocess
 import sys
 import time
 import tokenize
+import types
 import typing
 from pathlib import Path
 
 from .. import screens
 
 HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent.parent                    # the repository: git is always asked here
 DATA = HERE / "data"
 # The as-of years of the key, named here (not found by a glob): a missing
 # file is an error, never a smaller key.
@@ -125,17 +136,22 @@ LOG_COLUMNS = ["time", "commit", "parent", "fingerprint", "graded", "hits", "sit
 # The one file an experiment may change. Any other file under screener/
 # changed since the best kept run (the evaluator, the key, the screens, a
 # package __init__ that runs inside the evaluator) needs a human-recorded
-# new baseline (--new-baseline).
+# new baseline (--new-baseline). Documents and tests are not run by the
+# evaluator, so they are let through (INERT).
 EXPERIMENT_FILE = "screener/rank.py"
-# Log rows that decide something; "look" and "test" rows only leave a trace.
+INERT_SUFFIX, INERT_FOLDER = ".md", "screener/tests/"
+# Log rows that decide something; "look", "test" and "null" rows only leave a trace.
 DECISIONS = ("baseline", "keep", "discard")
+# What a key built by the current builder carries in its meta (reviews/36, 05
+# finding 4): a key without them predates the rule and decides nothing.
+BUILDER_META = ("window_start", "deed_file_sha256")
 K_SHARE = 0.02
 # Credit falls to 0 at CREDIT_SPAN x K: nothing ranked below about the top
 # 20% is paid for, so lifting sites through the unread middle earns nothing.
 CREDIT_SPAN = 10.0
 BOOTSTRAP = 500
-# Checked with --null-test on the key as built (reviews/36, 05 and 06): see
-# there before changing, and re-run --null-test after any change.
+# Checked with --null-test (reviews/36, 05 to 07): see there before
+# changing, and re-run --null-test after any change to these or to the key.
 MIN_GAIN = 2.0
 WIN_SHARE_TO_KEEP = 0.99
 SHOWN_DECIMALS = 1                           # what the loop is shown; comparisons are exact
@@ -247,7 +263,7 @@ def _tiebreak(key: str) -> str:
 
 
 def ranking(records: list[dict], split: str, scorer, settings: dict,
-            fields: tuple[str, ...] | list[str]
+            fields: tuple[str, ...] | list[str], recheck=None
             ) -> tuple[dict[int, list[str]], tuple, int, int]:
     """Per as-of year, the keys of the split's parcels that pass the screens,
     best first; the (min, max) finite score seen; how many scores were NaN
@@ -257,18 +273,25 @@ def ranking(records: list[dict], split: str, scorer, settings: dict,
     scrambles the sort, so those rank last and --decide refuses the run.
     The second pass scores the same records in another order: a scorer
     that counts its calls, remembers what it saw or salts its answer gives
-    itself away there, and the run is refused."""
+    itself away there, and the run is refused. `recheck` does that pass
+    (it is handed the feature rows in the new order and returns their
+    scores; main() gives one that asks a fresh rank.py in a new process).
+    Without it the same scorer is asked again here."""
     ranked = [r for r in records if r["split"] == split and not screens.site_rejects(r, settings)]
 
-    def score_of(r: dict) -> float:
-        return float(scorer({k: r.get(k) for k in fields})["score"])
+    def features_of(r: dict) -> dict:
+        return {k: r.get(k) for k in fields}
 
-    first = [score_of(r) for r in ranked]
+    first = [float(scorer(features_of(r))["score"]) for r in ranked]
     again = list(range(len(ranked)))
     random.Random(ORDER_SEED).shuffle(again)
+    rows = [features_of(ranked[i]) for i in again]
+    seconds = (recheck(rows) if recheck is not None
+               else [float(scorer(row)["score"]) for row in rows])
+    if len(seconds) != len(again):
+        raise ValueError("the second scoring pass did not return one score per record")
     unstable = 0
-    for i in again:
-        second = score_of(ranked[i])
+    for i, second in zip(again, seconds):
         if second != first[i] and not (math.isnan(second) and math.isnan(first[i])):
             unstable += 1
     scored: dict[int, list[tuple]] = {}
@@ -344,19 +367,23 @@ def split_pools(records: list[dict], split: str) -> dict[int, dict[str, int]]:
 
 
 def evaluate(records: list[dict], positives, split: str, *, fields: tuple[str, ...] | list[str],
-             scorer=None, settings: dict | None = None) -> dict:
+             scorer=None, settings: dict | None = None, recheck=None) -> dict:
     """Score one split. "hits", "graded" and "score_span" are exact (decide
     uses them); main() rounds what it prints. `fields` is what the scorer
-    may see of a record, and must be given."""
+    may see of a record, and must be given. With no scorer, the checked
+    rank.py is used (and refused, with ValueError, if it breaks the rules)."""
     if scorer is None:
-        scorer = importlib.import_module("screener.rank").learned_score
+        problems, source = rank_source()
+        if problems:
+            raise ValueError("screener/rank.py breaks the rules: " + "; ".join(problems[:3]))
+        scorer = load_scorer(source)
     if settings is None:
         settings = load_meta_screens()
     weights = _weights(positives)
     pools = split_pools(records, split)
     in_split = {key for pool in pools.values() for key in pool}
     pos = {k for k in in_split if weights.get(k)}
-    orders, span, nonfinite, unstable = ranking(records, split, scorer, settings, fields)
+    orders, span, nonfinite, unstable = ranking(records, split, scorer, settings, fields, recheck)
     hits, graded, k = score_orders(orders, pools, weights)
     ranked = {key for order in orders.values() for key in order}
     sites = sum(weights[k] for k in pos)
@@ -592,35 +619,126 @@ def _rank_origin() -> str | None:
     return spec.origin if spec else None
 
 
-def rank_import_problems() -> list[str]:
-    """rank_problems for the rank.py that would be imported, read the way the
-    importer reads it: the file's bytes, decoded by their own coding
-    declaration, which must be UTF-8. (Under '# coding: utf-7', text that
-    reads as a comment can decode to a line of code.)"""
+def rank_source() -> tuple[list[str], bytes]:
+    """(rank_problems for screener/rank.py, the bytes they were found in).
+    The file is read once, the way the importer reads it: its bytes, decoded
+    by their own coding declaration, which must be UTF-8. (Under
+    '# coding: utf-7', text that reads as a comment can decode to a line of
+    code.) Those bytes are what load_scorer runs."""
     origin = _rank_origin()
     if not origin or Path(origin).resolve() != RANK_FILE.resolve():
-        return [f"screener.rank would load from {origin}, not screener/rank.py"]
+        return [f"screener.rank would load from {origin}, not screener/rank.py"], b""
+    if RANK_FILE.is_symlink():
+        return ["is a link to another file; rank.py must be the file itself"], b""
     data = RANK_FILE.read_bytes()
     try:
         encoding, _ = tokenize.detect_encoding(io.BytesIO(data).readline)
     except SyntaxError as e:
-        return [f"has an unreadable coding declaration ({e})"]
+        return [f"has an unreadable coding declaration ({e})"], b""
     if codecs.lookup(encoding).name not in ("utf-8", "utf-8-sig"):
-        return [f"declares the {encoding} encoding; rank.py must be UTF-8"]
-    return rank_problems(data)
+        return [f"declares the {encoding} encoding; rank.py must be UTF-8"], b""
+    return rank_problems(data), data
+
+
+def rank_import_problems() -> list[str]:
+    """Why the rank.py on disk may not be run (rank_source without the bytes)."""
+    return rank_source()[0]
+
+
+def load_scorer(source: bytes):
+    """rank.learned_score made from exactly these bytes. They are compiled
+    and run here, never loaded through the import system: its bytecode cache
+    is keyed by the file's size and whole-second time, so a rank.py edited
+    within a second of the last run, to the same length, would otherwise
+    score as the old one (reviews/36, 06, N2). A planted .pyc and a file
+    changed between the check and the import are closed the same way."""
+    module = types.ModuleType("screener.rank")
+    module.__file__ = str(RANK_FILE)
+    exec(compile(source, str(RANK_FILE), "exec", dont_inherit=True), module.__dict__)  # noqa: S102
+    return module.learned_score
+
+
+_SECOND_PASS = r"""
+import json, sys, types
+job = json.load(sys.stdin)
+module = types.ModuleType("screener.rank")
+exec(compile(job["source"], "rank.py", "exec", dont_inherit=True), module.__dict__)
+out = []
+for features in job["rows"]:
+    try:
+        out.append(float(module.learned_score(features)["score"]).hex())
+    except Exception as exc:
+        out.append("error " + type(exc).__name__)
+json.dump(out, sys.stdout)
+"""
+
+
+def second_pass(source: bytes):
+    """A recheck for ranking(): scores rows with a fresh copy of these
+    rank.py bytes in a new Python process under another hash seed. A score
+    that leans on what an earlier call saw, on the order of calls, or on
+    anything that differs between processes (set order, an address in a
+    repr) comes back different. A row that raises there, or a pass that
+    cannot run, counts as different."""
+    text = source.decode("utf-8-sig")
+
+    def recheck(rows: list[dict]) -> list[float]:
+        seed = "1" if os.environ.get("PYTHONHASHSEED") != "1" else "2"
+        try:
+            done = subprocess.run([sys.executable, "-P", "-c", _SECOND_PASS],
+                                  input=json.dumps({"source": text, "rows": rows}),
+                                  capture_output=True, text=True, timeout=600, cwd=str(HERE),
+                                  env=dict(os.environ, PYTHONHASHSEED=seed))
+            scores = json.loads(done.stdout) if done.returncode == 0 else None
+        except (OSError, subprocess.SubprocessError, ValueError):
+            scores = None
+        if not isinstance(scores, list) or len(scores) != len(rows):
+            return [math.inf] * len(rows) if rows else []       # never equal to a real pass
+        out = []
+        for value in scores:
+            try:
+                out.append(float.fromhex(value))
+            except (TypeError, ValueError):
+                out.append(math.inf)
+        return out
+
+    return recheck
+
+
+def foreign_modules() -> list[str]:
+    """Loaded modules whose file is inside this repository but outside
+    screener/ (and not an installed package): a root-level random.py or
+    csv.py would run inside the evaluator, and the git checks only look
+    under screener/."""
+    inside = ROOT / "screener"
+    installed = {Path(p).resolve() for p in (sys.prefix, sys.base_prefix, sys.exec_prefix)}
+    out = []
+    for name, module in list(sys.modules.items()):
+        file = getattr(module, "__file__", None)
+        if not isinstance(file, str):
+            continue
+        try:
+            path = Path(file).resolve()
+        except OSError:
+            continue
+        parents = set(path.parents)
+        if (ROOT in parents and inside not in parents and "site-packages" not in path.parts
+                and not parents & installed):
+            out.append(name)
+    return sorted(out)
 
 
 def _git(*args: str) -> str:
     try:
         return subprocess.run(["git", *args], capture_output=True, text=True,
-                              check=True).stdout.strip()
+                              check=True, cwd=str(ROOT)).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return ""
 
 
 def _is_ancestor(commit: str) -> bool:
     return subprocess.run(["git", "merge-base", "--is-ancestor", commit, "HEAD"],
-                          capture_output=True).returncode == 0
+                          capture_output=True, cwd=str(ROOT)).returncode == 0
 
 
 def _rows() -> list[dict]:
@@ -704,7 +822,8 @@ def _shown(x: float) -> float:
 
 def _note_look(status: str, res: dict) -> str | None:
     """Log a scoring that decided nothing ("look": dev without --decide;
-    "test": the sealed split), with a hash of the rank.py that was scored.
+    "test": the sealed split; "null": a --null-test, logged before it
+    runs), with a hash of the rank.py that was scored.
     Returns why it could not be logged (then nothing is shown), or None."""
     problem = _log_header_problem()
     if problem:
@@ -785,8 +904,10 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
         if touched != [EXPERIMENT_FILE]:
             return _refuse("an experiment is one commit that edits only screener/rank.py; "
                            f"HEAD touches: {', '.join(touched) or 'nothing'}.")
-        since = [f for f in _git("diff", "--name-only", best["commit"], "HEAD", "--",
-                                 "screener").splitlines() if f and f != EXPERIMENT_FILE]
+        since = [f for f in _git("diff", "--name-only", "--no-renames", best["commit"], "HEAD",
+                                 "--", "screener").splitlines()
+                 if f and f != EXPERIMENT_FILE
+                 and not f.endswith(INERT_SUFFIX) and not f.startswith(INERT_FOLDER)]
         if since:
             return _refuse(f"files other than screener/rank.py changed since the best kept run "
                            f"({', '.join(since[:5])}). A human must record a new baseline: "
@@ -798,11 +919,31 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
                            f"must check out {best['commit']} and record it again: {NEW_BASELINE}")
 
     if best is None:
-        status, why, share = "baseline", "recorded as the baseline for this evaluation set", ""
+        status, share = "baseline", ""
+        why = (f"recorded as the baseline for this evaluation set: graded "
+               f"{_shown(dev['graded'])}, hits {_shown(dev['hits'])}")
+        # A human runs this; say what it replaces, so a baseline is never a
+        # silent way to bless whatever rank.py is at HEAD.
+        before = _best_kept(_kept_rows(fp))
+        if before is not None and before["commit"] != head:
+            changed = bool(_git("diff", "--name-only", before["commit"], "HEAD", "--",
+                                EXPERIMENT_FILE))
+            print(f"NOTE: the best kept run before this was {before['commit']} (graded "
+                  f"{before['graded']}, hits {before['hits']}). rank.py "
+                  + ("DIFFERS from it: this baseline also accepts that change, unjudged."
+                     if changed else "is the same as there."))
     else:
         # Both rankings are scored here, on exact values; the log's rounded
         # numbers are never compared.
         v = keep_verdict(records, positives, dev["order"], saved["order"])
+        try:
+            logged = (float(best["graded"]), float(best["hits"]))
+        except (KeyError, TypeError, ValueError):
+            logged = None
+        if logged != (_shown(v["best_graded"]), _shown(v["best_hits"])):
+            return _refuse(f"best_ranking.json does not give the score logged for the best kept "
+                           f"run ({best['commit']}), so it is not that run's ranking. A human "
+                           f"must check out {best['commit']} and record it again: {NEW_BASELINE}")
         # Shown: rounded scores and their difference, nothing finer (the
         # exact gain's sign and the win share would tell one experiment
         # whether a band of parcels holds a known site). The log has the share.
@@ -850,12 +991,18 @@ def main(argv: list[str] | None = None) -> int:
         print("No complete evaluation set: run `python -m screener.autoresearch.build_eval` "
               "first (it needs data/test_blocks.json from git).")
         return 2
+    source = b""
     if not args.control:
-        # Before anything imports rank.py: a refused file never runs.
-        problems = rank_import_problems()
+        # Before rank.py runs: a refused file never does.
+        problems, source = rank_source()
         if problems:
             return _refuse("screener/rank.py breaks PROGRAM.md rules 1-3, so it was not run: "
                            + "; ".join(problems[:5]))
+    strays = foreign_modules()
+    if strays:
+        return _refuse("modules were loaded from inside the repository but outside screener/ ("
+                       + ", ".join(strays[:5]) + "): run from a clean checkout; a file there "
+                       "that shadows a standard module would run inside the evaluator.")
     try:
         records, positives, meta = load()
     except EvalSetError as exc:
@@ -893,16 +1040,32 @@ def main(argv: list[str] | None = None) -> int:
     if args.new_baseline and not args.decide:
         print("--new-baseline only applies with --decide")
         return 2
-    dev = evaluate(records, positives, "dev", settings=settings, fields=fields)
+    if args.decide and args.test:
+        print("--test does not go with --decide: a decision shows only the dev scores")
+        return 2
+    if args.decide and REVIEW_PENDING:
+        return _refuse(REVIEW_PENDING + ".")
+    if args.decide and not all(meta.get(k) for k in BUILDER_META):
+        return _refuse("the key in data/ was built before the 2026-11-11 builder rules (its meta "
+                       "has no " + " / ".join(BUILDER_META) + "). A human must rebuild it "
+                       "(python -m screener.autoresearch.build_eval) and record a new baseline.")
+    scorer, recheck = load_scorer(source), second_pass(source)
+    dev = evaluate(records, positives, "dev", scorer=scorer, settings=settings, fields=fields,
+                   recheck=recheck)
     if dev["unstable_scores"]:
         return _refuse(f"rank.learned_score gave {dev['unstable_scores']} records a different "
-                       "score the second time it was asked; a score may depend only on the "
-                       "record it is given.")
+                       "score the second time it was asked (by a fresh copy, in another "
+                       "order); a score may depend only on the record it is given.")
+    if args.decide:
+        # Nothing is shown before decide()'s guards pass: a refused run is not a look.
+        return decide(records, positives, dev, args.new_baseline)
     if args.null_test:
         if args.null_test < 20:
             print("--null-test needs at least 20 trials")
             return 2
-        scorer = importlib.import_module("screener.rank").learned_score
+        problem = _note_look("null", dev)      # its output depends on the labels: leave a row
+        if problem:
+            return _refuse(problem)
         base = {}
         for r in records:
             if r["split"] == "dev" and not screens.site_rejects(r, settings):
@@ -916,18 +1079,17 @@ def main(argv: list[str] | None = None) -> int:
                                         "hits_may_not_fall": True},
                           "fingerprint": fingerprint(), "null_test": results}))
         return 0
-    test = (evaluate(records, positives, "test", settings=settings, fields=fields)
-            if args.test else None)
-    if not args.decide:
-        # Every scoring leaves a row: plain looks are otherwise free, unlimited questions.
-        problem = _note_look("look", dev) or (test and _note_look("test", test)) or None
-        if problem:
-            return _refuse(problem)
+    test = (evaluate(records, positives, "test", scorer=scorer, settings=settings, fields=fields,
+                     recheck=recheck) if args.test else None)
+    # Every scoring leaves a row: looks are otherwise free, unlimited questions.
+    problem = _note_look("look", dev) or (test and _note_look("test", test)) or None
+    if problem:
+        return _refuse(problem)
     out = {"dev": public(dev)}
     if test:
         out["test"] = public(test)
     print(json.dumps(out))
-    return decide(records, positives, dev, args.new_baseline) if args.decide else 0
+    return 0
 
 
 def _null_job(job: tuple) -> dict:

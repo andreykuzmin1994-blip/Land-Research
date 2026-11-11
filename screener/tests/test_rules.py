@@ -427,8 +427,10 @@ class FakeRepo:
     def git(self, *args):
         if self.broken:
             return ""
+        args = tuple(a for a in args if a == "--" or not a.startswith("--no-"))
         names = [c for c, _ in self.history]
         under = "--" in args and args[args.index("--") + 1:] == ("screener",)
+        only = args[args.index("--") + 1:] if "--" in args else ()
         if args[:2] == ("rev-parse", "--short"):
             back = 1 if args[2] == "HEAD~1" else 0
             return names[-1 - back] if len(names) > back else ""
@@ -442,6 +444,8 @@ class FakeRepo:
             else:
                 after = self.history[names.index(args[2]) + 1:] if args[2] in names else []
                 files = sorted({f for _, fs in after for f in fs})
+            if only and not under:                       # a single file asked about
+                return "\n".join(f for f in files if f in only)
             return "\n".join(f for f in files if not under or f.startswith("screener/"))
         if args[0] == "log":
             return "exp: test"
@@ -489,9 +493,13 @@ class DecideTests(unittest.TestCase):
 
     def run_decide(self, hits, order=None, new_baseline=False, **extra):
         # The keep decision is made from the rankings themselves (rescored in
-        # decide); "hits" and "graded" here are only what gets logged.
-        dev = {"hits": float(hits), "graded": float(hits), "sites": 10.0, "positives": 10,
-               "k": 3, "score_range": [0.0, 90.0], "order": {0: order or self.bad},
+        # decide), and the logged score must be the ranking's own: `hits` only
+        # names the case.
+        orders = {0: order or self.bad}
+        real_hits, graded, _ = ev.score_orders(orders, ev.split_pools(self.records, "dev"),
+                                               ev._weights(self.positives))
+        dev = {"hits": real_hits, "graded": graded, "sites": 10.0, "positives": 10,
+               "k": 3, "score_range": [0.0, 90.0], "order": orders,
                "nonfinite_scores": 0}
         dev.update(extra)
         return ev.decide(self.records, self.positives, dev, new_baseline)
@@ -639,6 +647,51 @@ class DecideTests(unittest.TestCase):
         self.assertRegex(ev._rows()[-1]["win_share"], r"^\d\.\d{3}$")
         # The reset goes to the best kept commit, not to the commit before HEAD.
         self.assertTrue(text.rstrip().endswith("git reset --hard bbb"))
+
+    def test_documents_and_tests_may_change_since_the_best_run(self):
+        self.baseline_then_experiment()
+        self.repo.history[-1] = ("bbb", ["screener/README.md", "screener/autoresearch/PROGRAM.md",
+                                         "screener/tests/test_rules.py"])
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.good), 0)
+        self.assertEqual(self.statuses(), ["baseline", "keep"])
+
+    def test_a_best_ranking_that_does_not_give_its_logged_score_is_refused(self):
+        self.repo.commit("aaa")
+        self.assertEqual(self.run_decide(3, order=self.good, new_baseline=True), 0)
+        self.repo.commit("bbb")
+        saved = json.loads(self.best.read_text())
+        for order in ({}, {"0": self.bad}, {"0": self.good[:5]}):
+            with self.subTest(str(order)[:20]):
+                self.best.write_text(json.dumps(dict(saved, order=order)))
+                self.assert_refused_without_writes()
+                self.assertIn("does not give the score logged", sys.stdout.getvalue())
+
+    def test_a_new_baseline_says_what_it_replaces(self):
+        self.baseline_then_experiment()
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)          # a discard, left in place
+        self.assertEqual(self.run_decide(3, order=self.bad, new_baseline=True), 0)
+        text = sys.stdout.getvalue()
+        self.assertIn("NOTE: the best kept run before this was aaa", text)
+        self.assertIn("rank.py DIFFERS from it", text)
+        self.repo.commit("ccc", "screener/README.md")
+        self.assertEqual(self.run_decide(3, order=self.bad, new_baseline=True), 0)
+        self.assertIn("rank.py is the same as there.", sys.stdout.getvalue())
+        self.assertIn("DECISION: BASELINE — recorded as the baseline for this evaluation set: "
+                      "graded ", sys.stdout.getvalue())
+
+    def test_the_gain_shown_is_the_difference_of_the_rounded_scores(self):
+        self.baseline_then_experiment()
+        verdict = {"keep": False, "gain": 0.14, "hits_change": 0.0, "win_share": 0.65,
+                   "best_graded": 0.0, "best_hits": 0.0}
+        with mock.patch.object(ev, "keep_verdict", return_value=verdict):
+            dev = {"hits": 0.04, "graded": 0.04, "sites": 10.0, "positives": 10, "k": 3,
+                   "score_range": [0.0, 90.0], "order": {0: self.good}, "nonfinite_scores": 0}
+            self.assertEqual(ev.decide(self.records, self.positives, dev, False), 0)
+        line = [ln for ln in sys.stdout.getvalue().splitlines() if "DISCARD" in ln][-1]
+        self.assertIn("graded 0.0 vs best kept 0.0 (+0.0); hits 0.0 vs 0.0 (needs", line)
+        self.assertNotIn("0.1", line)
+        self.assertNotIn("65", line)
 
     def test_unstable_scores_are_refused(self):
         self.repo.commit("aaa")
