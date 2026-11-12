@@ -616,16 +616,17 @@ command (poppler-utils).
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
 against an answer key it can't game: Fulton land that its owner sold,
 before any building, to someone who had a $1M+ industrial building on it
-by 2025, asked from each January of 2015 to 2019. That's 49 distinct
-sites (164 site-years), spatially split 38 dev / 11 test. See
+by 2025, asked from each January of 2015 to 2019. That's 45 distinct
+sites (147 site-years), spatially split 35 dev / 10 test. See
 `screener/autoresearch/PROGRAM.md`.
 
-Key rebuilt 2026-11-10 (`reviews/36_screener_eval_cohorts_metric`): five
-as-of years instead of 2016 alone, a sale must precede the building, and
-a change is judged on a graded score (where each site ranks) instead of
-whole top-2% hits. The hand-built ranking scores graded 12.2 of 38 dev
-sites (1.9 in the top 2%); random ranking averages 3.4. Earlier scores are
-not comparable.
+Key rebuilt 2026-11-12 (`reviews/36_screener_eval_cohorts_metric`, 05 to
+13): five as-of years instead of 2016 alone, a sale must precede the
+building, a parcel bought at a real price since 2015 counts only under
+the owner before, and a change is judged on a graded score (where each
+site ranks) instead of whole top-2% hits. The hand-built ranking scores
+graded 11.8 of 35 dev sites (2.4 in the top 2%); random ranking averages
+3.1. Earlier scores are not comparable.
 
 ```bash
 python -m screener.autoresearch.build_eval          # rebuild the frozen key (humans only, ~5 min; needs data/test_blocks.json)
