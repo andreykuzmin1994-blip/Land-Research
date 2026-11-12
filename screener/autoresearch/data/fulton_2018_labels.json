@@ -22,7 +22,7 @@
    2025
   ],
   "built": "2026-11-12",
-  "pool": 3041,
+  "pool": 3042,
   "min_price": 50000,
   "window_start": "2015-01-01",
   "deed_file_sha256": "afc09daf0a0dc88eaae4633e2a094cc880f81dbe8a67a581cd4918f0f32b41e2",
@@ -106,7 +106,8 @@
   "b76ae136d6ae35bd": 0.2,
   "ca39daaaa77962b7": 0.25,
   "ca5efd0e3858c971": 0.2,
-  "e881bf778bb6956d": 0.2
+  "e881bf778bb6956d": 0.2,
+  "f03b66df00433c0e": 0.25
  },
  "sites": {
   "0582539c01817da5": "9c2e3b974241aa30",
@@ -127,6 +128,7 @@
   "b76ae136d6ae35bd": "79cdb2831eb4b15d",
   "ca39daaaa77962b7": "26564b2b25112dbd",
   "ca5efd0e3858c971": "e2a506d52d7f45ce",
-  "e881bf778bb6956d": "2f1636caea99b0cc"
+  "e881bf778bb6956d": "2f1636caea99b0cc",
+  "f03b66df00433c0e": "8a90a23e48fcd6fa"
  }
 }

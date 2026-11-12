@@ -258,7 +258,22 @@ def same_owner(a: str | None, b: str | None) -> bool:
     So companies that only share words are different owners ("SOUTH FULTON
     LAND PARTNERS LLC" / "SOUTH FULTON LAND CO", "OAK RIDGE LLC" / "OAK
     RIDGE HOMEOWNERS ASSOCIATION INC"). "X LLC & Y LLC" matches X or Y.
+
+    A name at the deed file's limit is also tried without its last word,
+    which the cut may have left as a stray letter or a half tail ("... CO
+    INC" cut to "... COMPANY I"; "..., LLC A DELAWARE" cut from "..., LLC A
+    DELAWARE LIMITED LIABILITY COMPANY": reviews/36 11).
     """
+    if _same_owner(a, b):
+        return True
+    for x, y in ((a, b), (b, a)):
+        x = (x or "").strip()
+        if len(x) >= DEED_NAME_CAP and " " in x and _same_owner(x.rsplit(" ", 1)[0], y):
+            return True
+    return False
+
+
+def _same_owner(a: str | None, b: str | None) -> bool:
     for x, y in ((a, b), (b, a)):
         if len((x or "").strip()) >= DEED_NAME_CAP and _letters(y).startswith(_letters(x)):
             return True
