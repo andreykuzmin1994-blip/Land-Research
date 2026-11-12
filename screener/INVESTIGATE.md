@@ -26,11 +26,14 @@ session" at the end. It writes nothing of its own into the findings.
      it, or 40 characters of the quote's words whatever separates them in
      the URL (`_`, `-`, `+`, `.`), or three words in a row or one long
      word from the part after the "?" or the "#" (a search or query page
-     that shows your own request back to you proves nothing). A path
-     that looks typed (a `+` or `%20` in it, or a `search`, `query`,
-     `find`, `results` or `lookup` segment) is held to the three-words
-     rule too; any other path that shares three words in a row with the
-     quote is flagged in `lead.md`, not dropped. Every address a redirect
+     that shows your own request back to you proves nothing). The parts
+     of a path that look typed are held to the three-words rule too:
+     what follows a whole `search`, `query`, `find`, `results` or
+     `lookup` segment (`/search/<words>`), and a segment with a `+` or
+     `%20` in it unless it is a document's file name
+     (`Article%2012%20Light%20Industrial.pdf`). Any other path that
+     shares three words in a row with the quote is flagged in `lead.md`,
+     not dropped. Every address a redirect
      passes through, the last included, is held to the same rules;
    - so a map query by the owner's name proves nothing about the owner
      (the answer shows the name you sent): query by parcel id, as rule 7

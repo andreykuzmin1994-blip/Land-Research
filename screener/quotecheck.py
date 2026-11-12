@@ -358,17 +358,33 @@ def _query_words(url: str) -> tuple[list[str], list[str]]:
     return _tokens(_decoded(parts.query + " " + parts.fragment)), _tokens(_decoded(values))
 
 
-def _path_words(url: str) -> tuple[list[str], bool]:
-    """The words of the address's path, and whether the path looks like it
-    carries typed words: an encoded space ("+" or %20) or a search-like
-    segment (REQUEST_PATH_WORDS)."""
+DOCUMENT_SUFFIXES = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".rtf", ".odt")
+
+
+def _path_words(url: str) -> tuple[list[str], list[str]]:
+    """The words of the address's path; and the words in it that look typed.
+    Typed: the segments after a whole segment that names a request
+    ("/search/<words>", "/results/<words>"), and a segment with an encoded
+    space ("+" or %20) unless it is the file name of a document
+    ("Article%2012%20Light%20Industrial.pdf"). A request word inside a
+    slug ("hearing-results") or as the last segment (ArcGIS ".../query")
+    types nothing."""
     try:
         path = urllib.parse.urlsplit(url).path
     except ValueError:
-        return [], True
-    words = _tokens(_decoded(path))
-    typed = "+" in path or "%20" in path.lower() or bool(REQUEST_PATH_WORDS & set(words))
-    return words, typed
+        return [], []
+    segments = [seg for seg in path.split("/") if seg]
+    typed: list[str] = []
+    after_request = False
+    for n, seg in enumerate(segments):
+        words = _tokens(_decoded(seg))
+        spaced = "+" in seg or "%20" in seg.lower()
+        document = n == len(segments) - 1 and _decoded(seg).endswith(DOCUMENT_SUFFIXES)
+        if after_request or (spaced and not document):
+            typed += words
+        if _decoded(seg).strip() in REQUEST_PATH_WORDS:
+            after_request = True
+    return _tokens(_decoded(path)), typed
 
 
 def _shared_runs(words: list[str], seq: list[str]) -> list[int]:
@@ -404,8 +420,9 @@ def quote_is_from_url(quote: str, url: str) -> bool:
     its query part holds ECHO_WORDS of the quote's words in a row (two of
     them of four letters or more) or one of its words of ECHO_TOKEN_CHARS or
     more with eight letters or more. A page that shows its request back
-    would show them. The path is held to the same run of words only when it
-    looks typed (an encoded space, or a "search" or "results" segment): a
+    would show them. The path is held to the same run of words only where it
+    looks typed (_path_words: an encoded space, or what follows a "search"
+    or "results" segment): a
     document's file name often shares words with the document
     ("2045-Comprehensive-Plan-Update.pdf"), so there a shared run is flagged,
     not dropped (words_shared_with_url)."""
@@ -426,8 +443,7 @@ def quote_is_from_url(quote: str, url: str) -> bool:
         return True
     if _shared_runs(words, in_query) or _shared_runs(words, values):
         return True
-    path, typed = _path_words(url)
-    return typed and bool(_shared_runs(words, path))
+    return bool(_shared_runs(words, _path_words(url)[1]))
 
 
 class Robots:
@@ -764,8 +780,10 @@ def find_quote(quote: str, page: Page) -> dict[str, Any] | None:
                     # The end of the PDF page before: a "not" there still shows.
                     tail = texts[(number - 1, order)][-(CONTEXT_CHARS - len(before)):]
                     before = f"{tail} (page break) {before}"
-                found: dict[str, Any] = {"context_before": before,
-                                         "context_after": text[end:end + CONTEXT_CHARS]}
+                after = text[end:end + CONTEXT_CHARS]
+                if number and len(after) < CONTEXT_CHARS and (number + 1, order) in texts:
+                    after = f"{after} (page break) {texts[(number + 1, order)][:CONTEXT_CHARS - len(after)]}"
+                found: dict[str, Any] = {"context_before": before, "context_after": after}
                 if number:
                     found["pdf_page"], found["pdf_order"] = number, order
                 return found
@@ -961,21 +979,27 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
     '"`\u00ab\u00bb\u02ba\u02dd\u02ee\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u2032\u2033'
     '\u2034\u2035\u2036\u2037\u2039\u203a\u275b\u275c\u275d\u275e\u276e\u276f\u2e42\u301d\u301e'
     '\u301f\uff02\uff07')}
-_PLAIN_KEPT = " .,;:!?()'-/%$+="
+_PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
+_TLDS = ("com", "org", "net", "gov", "edu", "mil", "int", "info", "biz", "io", "app", "dev",
+         "site", "online", "xyz", "top", "link", "page", "example")
 _ADDRESS = re.compile(
-    r"(?i)\S*\s*:\s*/\s*/\s*\S*"                    # any scheme, whatever stands before it
+    r"(?i)\S*[a-z0-9]:/\s*/\S*"                       # any scheme, whatever stands before it
     r"|\S*www\s*\.\s*\S+"
-    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/\S*"          # a numeric host with a path
-    r"|(?:[^\W_](?:[^\W_]|-)*\.)+[^\W\d_]{2,}\b(?:/\S*)?")  # and bare host names, any script
+    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/\S*[a-z]\S*"   # a numeric host with a path
+    # and bare host names, any script, ending in a two-letter or common top-level name
+    r"|(?:[^\W_](?:[^\W_]|-)*\.)+(?:[a-z]{2}|" + "|".join(_TLDS) + r")\b(?:/\S*)?")
 
 
 def _kept_char(ch: str) -> bool:
     """ASCII letters and digits, Latin letters with marks, plain punctuation.
     Other scripts go: their letters include look-alike quotation marks
     (U+02BB, U+1425, U+05F2) and right-to-left text."""
-    if ch.isascii():
+    if ch.isascii() or ch in _PLAIN_KEPT:
         return ch.isalnum() or ch in _PLAIN_KEPT
-    return ch.isalpha() and unicodedata.name(ch, "").startswith("LATIN ")
+    # A Latin letter that is an ASCII letter plus marks ("e" + accent). The
+    # Saltillo and click letters are Latin too, and look like quotation marks.
+    base = unicodedata.normalize("NFKD", ch)[0]
+    return ch.isalpha() and base.isascii() and base.isalpha()
 
 
 def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
@@ -990,6 +1014,7 @@ def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
         raw = raw[-limit * 4:]
     t = html.unescape(html.unescape(clean(raw, limit * 4)))       # &quot; and &amp;quot;
     t = unicodedata.normalize("NFKC", clean(t, limit * 4)).translate(_QUOTE_MARKS)
+    t = t.replace("\u2044", "/")                  # 1\u00bd reads 1 1/2, not 11 2
     t = t.replace("@", " at ").replace("&", " and ")
     t = "".join(ch if _kept_char(ch) else " " for ch in t)
     for _ in range(5):
@@ -1174,15 +1199,15 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     folder = path.parent
     out, lead = folder / CHECKED_NAME, folder / LEAD_NAME
     try:
-        if path.name != FINDINGS_NAME:
+        if path.name != FINDINGS_NAME:     # another file: this folder's results are not its
             raise Invalid(f"the file to check is named {FINDINGS_NAME}")
         failed = _remove_results(folder)   # a failed run must not leave an old result
         if failed:
             raise Invalid(f"the old {failed} could not be removed")
         findings, findings_hash = _read_json(path)
         if (isinstance(findings, dict) and isinstance(findings.get("parcel_id"), str)
-                and folder.name != findings["parcel_id"].replace(" ", "_")):
-            raise Invalid(f"parcel_id does not match the folder name {clean(folder.name, 60)!r} "
+                and folder.resolve().name != findings["parcel_id"].replace(" ", "_")):
+            raise Invalid(f"parcel_id does not match the folder name {clean(folder.resolve().name, 60)!r} "
                           "(the folder is the parcel id with each space written as _)")
         skeptic_path = folder / SKEPTIC_NAME
         skeptic_doc, skeptic_hash = None, ""
