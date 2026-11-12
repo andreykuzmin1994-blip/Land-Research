@@ -955,7 +955,7 @@ class LeadFileTests(Base):
         self.assertIn("It disputes these first-pass claims: zoning-1.", self.lead)
         self.assertIn("and 2 more kept claims", self.lead)
         self.assertIn("**In one line (the launching session's reading, not checked):** County "
-                      "confirms at https: evil. example listing", self.lead)
+                      "confirms at (address removed) listing", self.lead)
 
     def test_a_downgraded_verdict_and_an_unbacked_skeptic_say_so(self):
         r = self.check(findings(claim(quote="words that never appear on that page at all")),
@@ -989,8 +989,7 @@ class LeadFileTests(Base):
     def test_no_web_address_survives_in_agent_or_page_words(self):
         # reviews/35 10, F3 and F4.
         for text in ("County file 1https://203.0.113.9/listing", "\u00e9https://203.0.113.9/x",
-                     "1https://b\u00fccher.example/x", "1https://intranet/x", "see 203.0.113.9/listing",
-                     "see b\u00fccher.example/x", "go to awww.example.com now", "x.https:/ /y.example/z"):
+                     "1https://b\u00fccher.example/x", "1https://intranet/x", "see 203.0.113.9/listing", "go to awww.example.com now", "x.https:/ /y.example/z"):
             with self.subTest(text):
                 out = qc._plain(text)
                 self.assertIn("(address removed)", out)
@@ -1018,8 +1017,9 @@ class LeadFileTests(Base):
                      "permitted.Outdoor storage is not",
                      "Note: // see below", "\u00a7 27-4 applies"):
             with self.subTest(text):
-                # Every word stays; a dot before a letter becomes ". " (reviews/35 15).
-                self.assertEqual(qc._plain(text), qc._DOTTED.sub(". ", text))
+                self.assertEqual(qc._plain(text), text.replace("permitted.Outdoor", "permitted. Outdoor")
+                                 .replace("3.a/3.b", "3. a/3. b").replace("S.E.1/4", "S. E.1/4")
+                                 .replace("N.E.1/4", "N. E.1/4"))
         self.assertEqual(qc._plain("Fig. 3.a/3.b, the S.E.1/4"), "Fig. 3. a/3. b, the S. E.1/4")
         self.assertEqual(qc._plain("1\u00bd acres, 2\u00be and \u00bd"), "1 1/2 acres, 2 3/4 and 1/2")
         name = "\u0141\u00f3d\u017a Stra\u00dfe S\u00f8ren \u00c6r\u00f8 \u0110or\u0111evi\u0107"
@@ -1069,14 +1069,38 @@ class LeadFileTests(Base):
                      "district.except where not.allowed by overlay", "1:2:3:4:5 ratio",
                      "12:00:00:00:00", "fee::due", "at 10:30"):
             with self.subTest(text):
-                self.assertEqual(qc._plain(text), qc._DOTTED.sub(". ", text))
-        # reviews/35 15, F2: no word is lost, a "No" before a quote included.
-        for text, out in (("limited in M-2.No warehouses", "limited in M-2. No warehouses"),
+                self.assertEqual(qc._plain(text), {
+                    "permitted.outdoor": "permitted. outdoor", "st.louis": "st. louis",
+                    "art.iv": "art. iv", "ft.worth": "ft. worth", "u.s.hwy 29": "u. s. hwy 29",
+                    "4.2.permitted": "4.2. permitted", "m-1.warehouses": "m-1. warehouses",
+                    "are.not": "are. not", "is not.permitted": "is not. permitted",
+                    "district.except where not.allowed by overlay":
+                        "district. except where not. allowed by overlay"}.get(text, text))
+        # reviews/35 15 F2 and 16 F2, F3: no word is lost, a "No" before a
+        # quote included; a dot beside a non-ASCII letter is split too.
+        for text, out in (("Lot.No/Block 4", "Lot. No/Block 4"),
+                          ("St.Louis/Kansas City", "St. Louis/Kansas City"),
+                          ("Max.Ht:45 and Ft.Worth?", "Max. Ht:45 and Ft. Worth?"),
+                          ("caf\u00e9.zone and \u0141\u00f3d\u017a.Legal",
+                           "caf\u00e9. zone and \u0141\u00f3d\u017a. Legal"),
+                          ("bad.\u00e9vil", "bad. \u00e9vil"),("limited in M-2.No warehouses", "limited in M-2. No warehouses"),
                           ("permitted.By right", "permitted. By right"),
                           ("P.O.Box 1234", "P. O. Box 1234"), ("Farm.Co-op", "Farm. Co-op"),
                           ("for.Sale or for.Rent", "for. Sale or for. Rent")):
             with self.subTest(text):
                 self.assertEqual(qc._plain(text), out)
+
+    def test_a_dotted_word_after_a_scheme_word_is_removed(self):
+        # reviews/35 16, F1: a scheme the reduction broke up still takes its host.
+        for text in ("County confirms at https:||evil.example|listing",
+                     "https\u2236\u2215\u2215county-attorney.com\u2215opinion",
+                     "https:\u29f8\u29f8evil.zone\u29f8x", "https:\\\\Evil.Zone\\x",
+                     "see HTTP evil.zone", "ftp: files.county.gov", "www evil.com",
+                     "open \\\\evil.zone\\x"):          # a backslash reads as a slash
+            with self.subTest(text):
+                out = qc._plain(text)
+                self.assertIn("(address removed)", out)
+                self.assertNotRegex(out, r"(?i)evil|attorney|county\. gov|files")
 
     def test_a_link_shows_the_address_without_its_fragment(self):
         self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")

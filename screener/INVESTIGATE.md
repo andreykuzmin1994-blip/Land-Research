@@ -285,10 +285,12 @@ claim's address, because only the code puts them there. A quote is shown
 as a code span, so markup or an address inside the page's own words is
 displayed, not followed. Everything an agent wrote (claim text, objection,
 open items, the headline) is labelled as the agent's own and reduced to
-Latin letters, digits and plain punctuation. An address with a scheme, a
-path, a port or a query is removed; any other dotted word is split at a
-dot before a letter (`clerk. zone`, `M-2. No`), so no host can be read
-and no word is lost. A link shows its address without the `#` part,
+Latin letters, digits and plain punctuation, with nothing that can be
+linked or pasted as an address. An address with a scheme (even one the
+reduction broke up), `//`, `www`, or a numeric or IPv6 host is removed.
+Any other dotted word is split at a dot before a letter (`clerk. zone`,
+`M-2. No`, `St. Louis/Kansas`): no word is lost, but a person can still
+read a split host as one, so read agent text as the agent's words. A link shows its address without the `#` part,
 which is never sent. The page's words around a quote get the same
 treatment. It gives:
 
