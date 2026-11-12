@@ -1091,16 +1091,41 @@ class LeadFileTests(Base):
                 self.assertEqual(qc._plain(text), out)
 
     def test_a_dotted_word_after_a_scheme_word_is_removed(self):
-        # reviews/35 16, F1: a scheme the reduction broke up still takes its host.
+        # reviews/35 16 F1 and 17 F1: a scheme with a colon or slash takes its
+        # host, and so does a scheme with a colon and no space, whatever host.
         for text in ("County confirms at https:||evil.example|listing",
-                     "https\u2236\u2215\u2215county-attorney.com\u2215opinion",
                      "https:\u29f8\u29f8evil.zone\u29f8x", "https:\\\\Evil.Zone\\x",
-                     "see HTTP evil.zone", "ftp: files.county.gov", "www evil.com",
-                     "open \\\\evil.zone\\x"):          # a backslash reads as a slash
+                     "ftp: files.county.gov", "open \\\\evil.zone\\x",
+                     "at https:3405803785/opinion", "data:text/html;base64,PHNjcmlwdD5h==",
+                     "See https:intranet/x", "http:localhost:8080/admin", "https:0xcb007109/x",
+                     "https:2130706433", "ftp:3405803785/x", "file:/etc/passwd",
+                     "javascript:alert(1)", "localhost:8080/x", "3405803785/x", "mailto:clerk.zone"):
             with self.subTest(text):
                 out = qc._plain(text)
                 self.assertIn("(address removed)", out)
-                self.assertNotRegex(out, r"(?i)evil|attorney|county\. gov|files")
+                self.assertNotRegex(out, r"(?i)evil|attorney|county\. gov|files|3405|intranet|"
+                                         r"localhost|0xcb|2130|passwd|alert|base64|clerk")
+        # A scheme word with only spaces before a host: split, not pasteable.
+        for text, out in (("https\u2236\u2215\u2215county-attorney.com\u2215opinion",
+                           "https county-attorney. com opinion"),
+                          ("see HTTP evil.zone", "see HTTP evil. zone"),
+                          ("www evil.com", "www evil. com")):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), out)
+
+    def test_prose_that_names_a_scheme_keeps_every_word(self):
+        # reviews/35 17, F2.
+        for text, out in (("The portal uses HTTP 1.1 only", "The portal uses HTTP 1.1 only"),
+                          ("served over HTTP/1.1", "served over HTTP/1.1"),
+                          ("HTTP 404.Not found", "HTTP 404. Not found"),
+                          ("Upload plans by FTP: Sec.4.2 applies", "Upload plans by FTP: Sec.4.2 applies"),
+                          ("county ftp site.Parcels are listed", "county ftp site. Parcels are listed"),
+                          ("the www St.Louis office", "the www St. Louis office"),
+                          ("tel: 404 555 0100", "tel: 404 555 0100"),
+                          ("data: the county", "data: the county"),
+                          ("http and https", "http and https")):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), out)
 
     def test_a_link_shows_the_address_without_its_fragment(self):
         self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")

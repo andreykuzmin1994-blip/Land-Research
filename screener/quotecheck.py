@@ -999,6 +999,9 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
 _PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
 _LABEL = r"[^\W_](?:[^\W_]|-)*"
 _HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any script
+# A host name ends in a label of letters (or punycode): "4.2.1.3", "1.1" and
+# "S.E.1" are numbers, not hosts.
+_NAMED_HOST = r"(?:" + _LABEL + r"\.)+(?:[^\W\d_]{2,}|xn--[a-z0-9-]+)"
 _ADDRESS = re.compile(
     r"(?i)\S*:/\s*/\S*"                                  # any scheme, whatever stands before it
     r"|\S*[/\\]\s*[/\\]\s*" + _HOST + r"\S*"            # //host or \\host, spaced schemes too
@@ -1010,9 +1013,15 @@ _ADDRESS = re.compile(
     # IPv6: a "::" form standing alone, or all eight groups
     r"|(?<![\w:])(?=[0-9a-f:]*::)[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])"
     r"|\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b"
-    # a dotted word right after a scheme word, whatever the reduction left
-    # between them ("https: evil.example", "https county-attorney.com")
-    r"|\b(?:https?|ftps?|www)\b[\s:/]*" + _HOST + r"\S*")
+    # a scheme word with a colon and anything but a space straight after it
+    # ("https:3405803785/x", "data:text/html,...", "javascript:...")
+    r"|\b(?:https?|ftps?|sftp|file|data|javascript|vbscript|mailto|tel|wss?|blob|about)\b:\S+"
+    # a named host after a scheme word and a colon or slash, with spaces the
+    # reduction left ("https: evil.example"); not "HTTP 1.1", "FTP: Sec.4.2",
+    # "the www St.Louis office" (reviews/35 17)
+    r"|\b(?:https?|ftps?|www)\b\s*[:/][\s:/]*" + _NAMED_HOST + r"\S*"
+    # localhost, and a long number or hex number used as a host
+    r"|\blocalhost\b[:/]\S*|\b(?:\d{8,}|0x[0-9a-f]{6,})[/:]\S*")
 # Any other dotted word ("clerk.zone", "M-2.No", "St.Louis/Kansas") is split
 # at a dot before a letter instead of removed: every word stays, and nothing
 # can be linked or pasted as an address, though "clerk. zone" can still be
@@ -1043,9 +1052,12 @@ def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
     """An agent's (or a page's) words made safe to sit in lead.md: one line
     of letters, digits and plain punctuation. No quotation marks but the
     apostrophe, no markup, no entities, and nothing that can be linked or
-    pasted as an address: an address with a scheme, //, www, or a numeric
-    or IPv6 host is removed, and any other dotted word is split at a dot
-    before a letter ("clerk. zone"), which a person can still read. Characters are reduced first and
+    pasted as an address: an address with a scheme, //, www., localhost,
+    or a numeric, long-integer, hex or IPv6 host is removed; a named host
+    after a scheme word and a colon or slash is removed; any other dotted
+    word is split at a dot before a letter ("clerk. zone"), which a person
+    can still read. A dotted number ("203.0.113.9", "4.2.1.3") stays: it
+    cannot be told from a section number. Characters are reduced first and
     addresses removed after, so nothing removed can leave an address behind. In lead.md only this code writes quotation
     marks and links."""
     raw = str(text)
