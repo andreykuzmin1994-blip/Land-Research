@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "parcel_id": "14 0064  LL0047",
+  "run": "fulton-2026-11-12",
+  "sections": {
+    "zoning": {
+      "verdict": "by_right",
+      "claims": [
+        {
+          "text": "City of Atlanta zoning layer (LotsWithZoning), queried at the parcel's map point (33.650297, -84.385996): one lot of 19.96 GIS acres zoned I-1. The PIN field is cut to '14 0064  LL004' (20-character field); the acreage matches the 20.0-acre parcel.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"PIN\":\"14 0064  LL004\",\"GIS_ACRES\":19.96226963,\"ZONING_CLASSIFICATION\":\"I-1\""
+        },
+        {
+          "text": "Atlanta ordinance 23-O-1058 (2023) restates I-1 Sec. 16-16.003(20): warehousing, self-storage facilities and distribution centers are a permitted principal use in I-1, except where any part of the property is within 500 ft of the BeltLine corridor (Sec. 16-36.007).",
+          "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/10376/1221734/pdf",
+          "retrieved": "2026-11-12",
+          "quote": "Warehousing, self-storage facilities, distribution centers. facilities except when any part of the property is within 500 feet of the beltline corridor as defined in City Code Section 16-36.007"
+        },
+        {
+          "text": "The same zoning record shows no SPI, subarea, TSA or rezoning case (CASEIN/CASEOUT blank) on this lot, and status Current: no conditional (-C) case is recorded against it.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"SPI\":\" \",\"SUBAREA\":\" \",\"TSA\":\" \",\"STATUS_1\":\"Current\",\"CASEIN\":\" \",\"CASEOUT\":\" \""
+        },
+        {
+          "text": "Atlanta GIS BeltLine Corridor layer (BeltlineLayers layer 0), queried for any corridor feature within 1,000 ft of the parcel's map point: the answer has no features, so the 500 ft BeltLine exclusion in Sec. 16-16.003(20) does not appear to apply. (Distance is from the map point, not the parcel edge.)",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/BeltlineLayers/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+        },
+        {
+          "text": "Atlanta GIS Zoning Overlay layer (LandUsePlanning layer 1), queried at the parcel's map point: no overlay feature returned.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+        }
+      ],
+      "open_items": [
+        "The zoning queries hit one map point inside the parcel, not the whole outline: confirm with Atlanta Office of Zoning and Development that the full parcel is I-1 with no conditions, overlay or pending text amendment (Atlanta is rewriting its zoning ordinance).",
+        "Municode (the current text of Chapter 16, I-1) was not read (known wall). Check the I-1 transitional yard / height-plane rules next to residential districts: the brief's surroundings and the abandoned 1958 street sewers (see utilities) suggest residential land nearby.",
+        "Ordinance 23-O-1058 is the Municode-hosted copy marked 'Last Updated: 06/14/23'; confirm it was adopted as printed."
+      ]
+    },
+    "plans": {
+      "verdict": "supports",
+      "claims": [
+        {
+          "text": "Atlanta GIS 'Development Patterns - Future Land Use' layer (layer 8), queried at the parcel's map point: future land use Industrial.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"NDP\":\"I\",\"FID_L8LAND\":2267,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\""
+        },
+        {
+          "text": "Atlanta GIS Rezoning Cases layer (layer 10), queried at the parcel's map point: no rezoning case covers the point.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"ADDL_LEGIS\",\"type\":\"esriFieldTypeString\",\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]}"
+        },
+        {
+          "text": "Within 1,500 ft of the parcel's map point the Rezoning Cases layer has two small R-4 to I-1 cases from 2019 (Z-19-087 and Z-19-088, last update February 2020, more than five years ago) ...",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"I-1\",\"DOCKET_NO\":\"Z-19-087\",\"STATUS\":\"FILED\",\"FINAL_UPDA\":1582848000000"
+        },
+        {
+          "text": "... and Z-06-111 (ordinance 06-O-2263), a 19.6-acre I-1/R-4 to I-1 case from 2006 on a neighbouring tract. No case within 1,500 ft is from the last five years.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"FROM_ZONE\":\"I1, R4\",\"TO_ZONE\":\"I-1\",\"DOCKET_NO\":\"Z-06-111\",\"STATUS\":\"COMPLETE\""
+        },
+        {
+          "text": "Atlanta GIS Building Moratorium layer (layer 5), queried at the parcel's map point: no moratorium feature returned.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+        }
+      ],
+      "open_items": [
+        "Seen, not verifiable: https://aimewebapp.blob.core.windows.net/finalactions/06o2263.pdf (scanned; the host answers robots.txt with 400, so quotecheck will not fetch it). Ordinance 06-O-2263 (Z-06-111), adopted 2007-02-05, rezoned 84, 88, 96, 98, 100, 120 and 130 Poole Creek Road and 3715 and 3711 Wilson Drive from I-1 and R-4 to I-1-C, with conditions on truck route signs (I-75/Central Ave/Crown Rd or I-85/Jonesboro Rd to Southside Industrial Park Drive), coordination with the Atlanta Police Department on driveways near the Atlanta Police Academy, and Wilson Road right-of-way and widening. The GIS layer lists the result as I-1, not I-1-C. This is the neighbouring tract, not 81 Poole Creek Rd: ask whether similar truck-route expectations would be put on this parcel.",
+        "Check the City's adopted Comprehensive Development Plan text and the NPU Z neighbourhood plans for this area; only the GIS future-land-use layer was read."
+      ]
+    },
+    "utilities": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "Sewer: the City of Atlanta Sewer Pipe layer (MapEGIS/manholes layer 1), asked for pipes within 1,200 ft of the parcel's map point that are not marked abandoned, returns 8-inch Active Public lines on Poole Creek Rd (the parcel's frontage road), upstream street numbers 44 to 183, installed 1956.",
+          "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?where=SERVSTAT%3C%3E%27ABAN%27&geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1200&units=esriSRUnit_Foot&outFields=NAME,SERVSTAT,PIPEDIAM,UNITTYPE,INSTALL_DATE,UPS_STNO,UPS_STNAME,UPS_SUFFIX&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"NAME\":\"POOLE CREEK RD\",\"SERVSTAT\":\"APUB\",\"PIPEDIAM\":8"
+        },
+        {
+          "text": "The layer's own code list: SERVSTAT APUB means Active Public and ABAN means Abandoned.",
+          "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1?f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"Abandoned\",\"code\":\"ABAN\"},{\"name\":\"Private\",\"code\":\"PRIV\"},{\"name\":\"Active Public\",\"code\":\"APUB\"}"
+        },
+        {
+          "text": "Within 600 ft of the parcel's map point the same layer shows only abandoned 8-inch 1958 lines under Gilbert Wy, Archcrest Dr and Celeste Dr SE: streets of a former residential layout, on or right beside the parcel.",
+          "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"NAME\":\"GILBERT WY\",\"UPS_STNO\":\"139\",\"UPS_PREDIR\":\" \",\"UPS_STNAME\":\"GILBERT\",\"UPS_SUFFIX\":\"WY\",\"UPS_POSTDIR\":\"SE\",\"ZIP\":\"30354\",\"SEWERSHED\":\"SR11YC\",\"BASIN\":\"BSOC\",\"SEWERGROUP\":3,\"UNITTYPE\":\"LAT\",\"SM_SUBTYPE\":4,\"SURF\":null,\"SERVSTAT\":\"ABAN\""
+        }
+      ],
+      "open_items": [
+        "Water: no public City of Atlanta water-main layer was found (the watershed GIS folders answered empty and the capital-projects service was not started), so water is unknown and the verdict is unknown though sewer is shown nearby. Ask Atlanta Department of Watershed Management for the nearest water main and its size.",
+        "Sewer capacity: the active lines found are 8-inch, 1950s, in the Poole Creek Rd frontage; only the utility can say whether they can take an industrial building's flow.",
+        "The abandoned 1958 street sewers (Gilbert Wy, Archcrest Dr, Celeste Dr) suggest the parcel was once a platted residential subdivision. Ask the title examiner whether those streets were formally closed and the old lots combined, and look on site for old foundations or fill."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {
+          "text": "Atlanta GIS Rezoning Cases layer, queried at the parcel's map point: no rezoning case (by the owner or anyone else) covers the parcel.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"ADDL_LEGIS\",\"type\":\"esriFieldTypeString\",\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]}"
+        },
+        {
+          "text": "Atlanta GIS Special Use Permits layer (layer 11), queried for any permit within 1,500 ft of the parcel's map point: no features returned.",
+          "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+        }
+      ],
+      "open_items": [
+        "A web search for the site address found no sale notice, public notice or development-authority release; listing sites were not checked (CoStar, LoopNet and Crexi are excluded by rule). Ask a broker or the owner whether the land is offered or committed.",
+        "Same owner for 19 years (sale 2007-11-15), months after the neighbouring tract was rezoned I-1-C for a developer (06-O-2263, February 2007): ask whether this parcel was bought as part of that project and whether a site plan or option exists."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "The owner on the assessor roll is an entity with 'ET AL' (more than one owner on title). The Georgia Secretary of State search is a known wall (403); a person should look up the entity's status, formation date, principal office and registered agent by hand.",
+        "Ask whether the owner is affiliated with the railroad whose line runs 419 ft from the parcel (the brief); a railroad-related holder may sell only with rail-use terms or not at all. Not checked: no search by owner name was made, by rule.",
+        "Pull recent deeds: the brief's last sale is 2007-11-15 for $4,718,631."
+      ]
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+ "schema": 1,
+ "parcel_id": "13 0096  LL0306",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Union City's own text could not be read: www.unioncityga.gov answered 403 (Access Denied) to a plain request for robots.txt and for the zoning ordinance PDF, and the city's zoning layer is on ArcGIS Online (a known wall). The M-1 district, its use table and any conditions on this parcel are unverified. Ask Union City Community Development for the current M-1 use table (warehouse / distribution) and any conditions of zoning on 13 0096 LL0306 and LL0322.",
+    "Search snippet only, not read or verified: search results named Union City zoning ordinance revisions dated Aug 2023, Aug 2024 and Feb 2025 (Rev. II) on the city's site, and a July 2023 Planning and Zoning Commission text amendment allowing data centers in M-1 and M-2. Confirm which revision is in force.",
+    "Search snippet only, not read or verified: a Union City notice said Council adopted a 180-day moratorium in March 2026 on rezonings, text amendments and conditional use applications while the zoning ordinance is rewritten, then extended it 90 days to expire December 31, 2026. If true, the M-1 text may change soon and no rezoning or conditional use could be filed before 2027. Confirm with the city.",
+    "The county tax record for this parcel (Fulton parcel layer, tax year 2027) shows ClassCode R5 and LUCode 100, which look like a residential vacant-land tax class, not an industrial one. That is a tax class, not zoning, but ask the city to confirm the zoning map shows M-1 here."
+   ]
+  },
+  "plans": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "text": "A 2018 GDOT handout on widening Buffington Road says the development north of Rock Quarry Road is commercial and industrial, including a quarry, and the development south of it is and is expected to remain low-density residential. From the county parcel and GDOT road layers, the investigator reads this parcel as sitting just north of a road at about latitude 33.604 that looks like Rock Quarry Road, with the Sable Glen residential subdivision to the south; that placement is the investigator's reading of map coordinates, not stated in the handout.",
+     "source_url": "https://mydocs.dot.ga.gov/PublicOutreachTemp/0013948/PDF/0013948_0013949_WelcomeLtr_2018.01.19.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Rock Quarry Road was selected as the dividing point between two GDOT widening projects (0013948 and 0013949). The development north of Rock Quarry Road is commercial and industrial, including several major business headquarters as well as a quarry, and the development south of Rock Quarry Road is, and is expected to remain, low-density residential."
+    },
+    {
+     "text": "The same GDOT handout proposes widening Buffington Road north of Rock Quarry Road to four lanes with a 20-foot raised median, needing right of way or easements from about 22 parcels. A raised median would limit left-turn access to any frontage; the project's current status and whether this parcel's frontage is within it are not known.",
+     "source_url": "https://mydocs.dot.ga.gov/PublicOutreachTemp/0013948/PDF/0013948_0013949_WelcomeLtr_2018.01.19.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Project 0013948 would widen Buffington Road to four lanes from Rock Quarry Road to US 29/SR 14/ Roosevelt Highway, a distance of 0.934 miles. Within the limits of this project, Buffington Road is primarily bounded by industrial and commercial parcels and is proposed to be a 4-lane section with a 20-foot raised median."
+    },
+    {
+     "text": "Union City's 2020 comprehensive plan update (as submitted for ARC review, January 2021) has a District-Industrial character area meant for large-scale distribution and industrial uses near I-85. Whether this parcel is mapped District-Industrial, District-Quarry or something else could not be read: the Future Development Map is an image without parcel-level text.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Building development should be variable within D-I to promote the specific needs of industrial activities or businesses and accommodate large-scale distribution facilities, industrial activities, or office park developments."
+    },
+    {
+     "text": "A 2018 City of South Fulton staff report records a South Fulton truck ordinance that classifies Buffington Rd as a restricted route closed to most truck traffic. It was written about a site at Flat Shoals Rd and Buffington Rd about 1.7 miles south; whether the ordinance still stands and whether it covers the stretch of Buffington Rd at this parcel (the parcel is in Union City; parcels across the road are in South Fulton) is not known.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/680/Z18-002-Staff-Report-for-MC-MAY-WEBSITE",
+     "retrieved": "2026-11-12",
+     "quote": "On February 13, 2018, the Mayor and Council of the City of South Fulton adopted a Truck Ordinance which criminalizes all truck traffic along both Flat Shoals Rd and Buffington Rd"
+    }
+   ],
+   "open_items": [
+    "Locate this parcel on Union City's adopted Future Development Map (2020 update, or the 2025 update if adopted). The 2020 map shows a District-Quarry area and District-Industrial areas in the northeast of the city near I-85; the investigator could not place the parcel on the image. The plan's consistency table appears to pair District-Quarry with M-2 only and District-Industrial with M-1 and M-2 (table read from layout, not quotable).",
+    "No rezoning case on or beside this parcel was found, but Union City agendas and minutes could not be read (city site answers 403). Ask the city for any rezoning, variance or conditional use on 13 0096 LL0306, LL0322, LL0330 and LL0360 (all Buffington Rd, same owner per the county parcel layer) in the last five years.",
+    "Nearby but not beside: an ARC DRI (#4315, Nov 2024) describes a proposed 1,000,000 SF data center on about 67.8 acres east of Buffington Rd and north of Jonesboro Rd (SR 138), with a rezoning to O-I; its parcels sit about 3 miles south of this lead by the county parcel map. Search snippets (not verified) report resident opposition.",
+    "Ask Union City or South Fulton whether the 2018 South Fulton truck ordinance (Buffington Rd as a restricted route) is in force and which jurisdiction controls truck routing on Buffington Rd at this parcel. Industrial neighbours to the north on Buffington Rd (county parcel layer: PPF Industrial and Chick-fil-A parcels, class I5) suggest trucks use parts of the road, but that is not confirmed.",
+    "Ask GDOT / Fulton County about the status of Buffington Road widening project 0013948 (and 0013949) and whether right of way is needed from this parcel. A March 2024 EPD stream buffer variance (BV-060-23-30) to Union City Public Services covers 'Buffington Road Improvements'; its location was not stated in the letter."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "text": "Sewer: Fulton County's public water-resources map, asked for gravity sewer pipes (layer 4, Waste Water Pipe) in an envelope from -84.5025,33.6037 to -84.4940,33.6117 around the parcel, returns an active 8-inch PVC Fulton County gravity main (Morning Creek basin) whose nearest end lies about 295 ft west-southwest of the parcel line, across Buffington Rd (distance computed by the investigator from the returned geometry). Its upstream invert is about 957 ft; whether the site can drain to it by gravity is not known.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=-84.5025,33.6037,-84.4940,33.6117&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FacilityID\":\"SPSMMC5120730\",\"UpID\":\"SMMC5120730\",\"DownID\":\"SMMC5120720\",\"DiElevation\":-999.99,\"DiDepth\":-999.99,\"DiAngle\":999.99,\"UpSInvert\":957.468,\"DnSInvert\":955.42,\"Location\":null,\"WarrantyDate\":null,\"LegacyID\":null,\"Condition\":\"GOOD\",\"ConditionDate\":null,\"InstallDate\":null,\"Crossing\":\"NONE\",\"Basin\":\"MORNING CREEK\",\"SubBasin\":\"MC51\",\"UpSize\":\"8\",\"UpMaterial\":\"PVC\",\"UpCircle\":\"Y\",\"UpHeight\":\"0\",\"UpWidth\":\"0\",\"UpComment\":\"NONE\",\"UpSurveyDate\":1165536000000,\"UpSurveyBy\":\"CDM\",\"UpRodDepth\":10.7,\"UpRodAngle\":999.99,\"UpLining\":\"0\",\"DnSize\":\"8\",\"DnMaterial\":\"PVC\",\"DnCircle\":\"Y\",\"DnHeight\":\"0\",\"DnWidth\":\"0\",\"DnComment\":\"NONE\",\"DnSurvevDate\":1165536000000,\"DnSurveyBy\":\"CDM\",\"DnRodDepth\":8.6,\"DnRodAngle\":999.99,\"DnLining\":\"0\",\"Active\":\"1\",\"ForceMain\":\"0\",\"OldMaterial\":\"NA\",\"OldSize\":\"NA\",\"Subdivision\":\" \",\"StrPreDirection\":\" \",\"StrNumber\":\" \",\"StrName\":\" \",\"StrType\":\" \",\"StrSuffix\":\" \",\"SrcTheme\":null,\"Data_Src\":\"SV\",\"GISStatus\":\"C\",\"Editor\":\"PWGIS\",\"LastEdit\":1723276643000,\"Comments\":null,\"Maintenance\":\"UNK\",\"CreatedBy\":null,\"CreateDate\":null,\"FlowMeter\":\"MC51\",\"Enabled\":1,\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FULTON COUNTY\""
+    },
+    {
+     "text": "Sewer: Fulton County's 'Fulton County Water Sewer Service Area' layer (layer 16), asked at the parcel's centre point (-84.4982, 33.6077), answers Fulton County, sewer, service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?geometry=-84.4982,33.6077&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""
+    },
+    {
+     "text": "Water: no published water main map for this parcel was found. The Development Authority of Fulton County lists Union City among the cities that run their own water service, so Union City (not Fulton County) is the likely water provider; this is a county-wide statement, not a map of this parcel.",
+     "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+     "retrieved": "2026-11-12",
+     "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park, Palmetto, Roswell and Union City."
+    },
+    {
+     "text": "Water and sewer along the corridor: a 2018 South Fulton staff report on sites at 6255 Buffington Rd / 3725 Flat Shoals Rd (about 1.7 miles south, in South Fulton) says water came from the City of Atlanta and sewer from Fulton County. Not about this parcel.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/680/Z18-002-Staff-Report-for-MC-MAY-WEBSITE",
+     "retrieved": "2026-11-12",
+     "quote": "Water service is provided to these sites by City of Atlanta. Sewer service is available to the site by Fulton County. Any extension of sewer service is the responsibility of the developer."
+    }
+   ],
+   "open_items": [
+    "Water is not shown on any map the investigator could read: Union City's GIS is on ArcGIS Online and its website answered 403. Ask Union City's Utility Division for the nearest water main on Buffington Rd at this parcel, its size and fire-flow. The brief's 'Public water' comes from the assessor's record, not a utility map.",
+    "Sewer capacity and gravity access: only Fulton County Public Works can say whether the Morning Creek basin line (8-inch) can take an industrial connection and whether the parcel (about 72 ft of relief per the brief) can reach it by gravity or needs a pump station.",
+    "Fulton County's Utilities GIS folder on the same server asks for a sign-in token; it was not used.",
+    "Not fetched: a consultant's site carries drawings titled 'Union City Division III Water Mains' (Jan 2025) per a search result; a city capital project might show mains on Buffington Rd. Ask the city rather than relying on a third-party host."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "text": "The Fulton County parcel layer, asked for this parcel by parcel id, still lists the same owner for tax year 2027 (the brief gives the last recorded sale as 2014). No transfer to a developer shows on the county roll. This is the only market source the investigator could read; Union City agendas and public notices could not be checked.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0306%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"TaxYear\":2027,\"Address\":\"0 BUFFINGTON RD\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"BUFFINGTON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"MARTIN MARIETTA MATERIALS REAL ESTATE INVESTMENTS INC\""
+    }
+   ],
+   "open_items": [
+    "The owner name and a 2018 GDOT handout that places a quarry on the industrial stretch of Buffington Rd north of Rock Quarry Road suggest these parcels may be buffer or reserve land for a quarry. If so, the owner may not sell, or may sell only with restrictions (blasting setbacks, no-residential covenants). A person should check title and recorded covenants before any approach.",
+    "The same owner holds at least four touching or near-touching parcels on the east side of Buffington Rd in the county parcel layer: 13 0096 LL0306 (12.0 ac), LL0322 (7.6 ac), LL0330 (5.3 ac) and 13 0065 LL0360 (4.6 ac, class I4), plus 13 0095 LL0125 (21.1 ac, class I5) to the southeast. The brief counts only parcels of 5 to 50 ac. Any sale or plan may cover the whole group.",
+    "Two parcels across Buffington Rd (5415 Buffington Rd, 12.5 ac, and 13 0065 LL0626, 5.9 ac) are held by the Development Authority of Fulton County, which usually means an incentivised (bond-lease) project. Not this parcel, but a person may ask the authority what project they serve.",
+    "Union City public notices, agendas and minutes could not be read (403). Check them for any case naming these parcels."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "The Secretary of State record was not consulted (known wall: 403 and a search form; the owner's name may not be put into an outside service). Status, formation date, principal office and registered agent are unknown.",
+    "The tax-roll name ends 'MATERIALS REAL ESTATE INVESTMENTS INC' and mails from an out-of-state P.O. box; it reads like a land-holding entity, but that is a reading of the name only, not a record. A person should pull the SoS record by hand, and the 2014 Limited Warranty Deed (the brief gives the same $2,236,074 for this parcel and LL0322, which suggests one deed for several parcels) for any use restrictions."
+   ]
+  }
+ }
+}

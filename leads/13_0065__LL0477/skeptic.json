@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0065  LL0477",
+  "run": "fulton-2026-11-12",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "This is not raw land. It is an operating Enterprise Holdings rental-car fleet facility. Fulton County Pretreatment Services shows an existing commercial waste discharge permit for Enterprise Holdings at 3600 Naturally Fresh Blvd, renewed on 7 Jan 2025. The county's tax year 2027 parcel record still carries improvements and a different owner, an out-of-state LLC, so the operator is almost certainly a tenant. Together with the 2005 purchase at $14.4M (from the brief; about four times today's appraised total), this reads as a leased investment property. It would be bought at income value, and it cannot be built on until the lease ends. The first pass flagged the site as occupied, but only from a 2003-2013 state contract sheet. This 2025 county record makes current operating use the main question. Zoning (M-1, South Fulton) and the Industrial plan designation hold up; the lead turns on the lease term and the owner's intentions, which only a person can find out.",
+    "disputes": [],
+    "claims": [
+      {
+        "text": "Fulton County Pretreatment Services received a renewal of a Commercial Waste Discharge Permit for this facility on 7 Jan 2025 (an existing permit, not a new one): the site was in operating use in 2025.",
+        "source_url": "https://go.citygrows.com/initiated_flows/256334/summary",
+        "retrieved": "2026-11-12",
+        "quote": "Commercial Waste Discharge Permit Application (New or Renewal) Jan 07, 2025"
+      },
+      {
+        "text": "The same 2025 permit record gives the facility address as this parcel's site address.",
+        "source_url": "https://go.citygrows.com/initiated_flows/256334/summary",
+        "retrieved": "2026-11-12",
+        "quote": "Facility Address 3600 NATURALLY FRESH BLVD. COLLEGE PARK GA 30349"
+      },
+      {
+        "text": "The same record names the facility, and the permit holder (owner/corporation), as Enterprise Holdings, a party other than the LLC that owns the parcel on the county roll. So the operator is a tenant or occupant, not the landowner.",
+        "source_url": "https://go.citygrows.com/initiated_flows/256334/summary",
+        "retrieved": "2026-11-12",
+        "quote": "Owner / Corporation Name Enterprise Holdings"
+      },
+      {
+        "text": "The same record calls the facility an Enterprise Holdings site.",
+        "source_url": "https://go.citygrows.com/initiated_flows/256334/summary",
+        "retrieved": "2026-11-12",
+        "quote": "Facility Name (Area B) ENTERPRISE HOLDINGS"
+      },
+      {
+        "text": "The county parcel layer, queried by parcel id, is already on tax year 2027 for this site address. It still lists the out-of-state LLC as owner, so the owner has not changed and is not the operator named on the 2025 permit.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713+0065++LL0477%27&outFields=%2A&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"TaxYear\":2027,\"Address\":\"3600 NATURALLY FRESH BLVD\""
+      },
+      {
+        "text": "Owner field of the same tax year 2027 county record (not Enterprise Holdings).",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713+0065++LL0477%27&outFields=%2A&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"Owner\":\"COLE VG ATLANTA GA LLC"
+      },
+      {
+        "text": "Despite the 'College Park' mailing address on the permit, the county's city-limits layer (Tax/Tyler_Cities), queried at the parcel's point (33.610533, -84.505301), puts the site in the City of South Fulton (tax code 55, consistent with the parcel's TaxDist 55H). The South Fulton zoning sources the first pass used are the right jurisdiction.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Tax/Tyler_Cities/MapServer/0/query?geometry=-84.505301%2C33.610533&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"Name\":\"South Fulton\",\"TaxCode\":55"
+      },
+      {
+        "text": "This tests zoning-4, which rested on a 2020 draft. An adopted-era staff report (Z26-001/CDP26-003, council meeting 11 Aug 2026) quotes the same M-1 intent, including warehousing and distributing, as the text of the South Fulton Zoning Code. This supports the first pass on intent; it is still not the adopted use table.",
+        "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+        "retrieved": "2026-11-12",
+        "quote": "M-1 Light Industrial District is described in the South Fulton Zoning Code as follows: M-1 Light Industrial District. The M-1 District is intended to provide locations for light industrial uses and industrial parks which meet the needs for processing, manufacturing, fabricating, warehousing, distributing"
+      },
+      {
+        "text": "This tests plans-1, which rested on a 2022 report. The same 2026 staff report, written under the 2026 Comprehensive Plan, describes the Industrial land use category as dedicated to warehousing and distribution. The newer plan does not point the other way on the category itself. Whether this parcel keeps that designation on the 2026 map was not checked.",
+        "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+        "retrieved": "2026-11-12",
+        "quote": "In the City of South Fulton, the Industrial land use category is dedicated to manufacturing, warehousing, distribution, freight logistics, and other industrial operations."
+      }
+    ],
+    "open_items": [
+      "Lease: the parcel appears to be leased to Enterprise Holdings (operator on a 2025 county permit; owner is a separate out-of-state LLC; 2005 purchase at $14,375,000 per the brief, versus a 2027 appraised total of $3,447,300). A person should pull the recorded deed and any memorandum of lease from the Fulton County deed records to learn the lease term, renewal options and any tenant purchase option or right of first refusal, before treating this as a land lead.",
+      "If the lease runs for years, the lead is a future redevelopment play, not a land acquisition: the buyer would pay income value for a leased asset and inherit the tenant. The screener's land-value and seller-motivation scoring does not model this.",
+      "The 2025 permit concerns exterior subsurface tanks (fee tier 1-5) at a fleet facility. A Phase I environmental assessment should check for fuel storage tanks, vehicle wash and maintenance, and oil/water separators before any redevelopment.",
+      "The permit is from Fulton County Pretreatment Services, which suggests the site discharges to Fulton County sanitary sewer. Utilities stay unknown until the provider confirms; nothing quoted here says 'sewer'.",
+      "I checked the first pass's zoning-1 column alignment in the 2020 draft (page 39, layout text): the 'A' marks for Distribution Center and General Warehousing sit exactly under the M-1 and M-2 headers. The quote reads as claimed. It is still a draft; the adopted Appendix C Table 2-4 (Municode) was not read.",
+      "Overlay districts and any conditions from a past Fulton County rezoning of this parcel were not checked (the city zoning map is on ArcGIS Online, which cannot be fetched here). Note that the Z26-001 site sits in the Sandtown Overlay; ask planning whether any overlay covers Naturally Fresh Blvd.",
+      "Not fetched: enterprisemobility.com answered robots.txt with 403, so a job posting that search results tied to this site was not opened. efts.sec.gov (SEC full-text search) answered robots.txt with 403 and was not used. An EPA FRS query for ZIP 30349 (data.epa.gov) showed no facility at 3600 Naturally Fresh Blvd.",
+      "Search results only (not opened, not evidence): directory listings tie this address to Enterprise remarketing and truck-sales operations, and an NLRB case page (nlrb.gov, case 10-RD-001476) to the earlier operator, Vanguard Alamo/National Car Rental."
+    ]
+  }
+}

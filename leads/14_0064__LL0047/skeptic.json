@@ -1,0 +1,69 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0064  LL0047",
+ "run": "fulton-2026-11-12",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The seller is the open question, and the first pass never tested it. The county roll sends the owner's tax bills to 650 West Peachtree St NW, which Norfolk Southern's own site gives as its Real Estate Department. The parcel adjoins a 25.5-acre tract owned by Central of Georgia Railroad Co, about 400 ft from the NS line, so this looks like railroad land next to railroad land, held since 2007. NS names two real-estate channels: sales to non-shipping customers, and strategic sales for its core business and freight customers. Its site does not say which channel this tract belongs to, whether it is held for rail-served or operating use, or whether the 'ET AL' co-owners would sell to a non-rail warehouse buyer. The market verdict no_sign_found rests only on empty rezoning and special-use queries, which say nothing about the owner's intent. Second doubt: the by_right zoning verdict rests on the 1982 ordinance, while ATL Zoning 2.0 brings a new official zoning map that renames every district. Its adoption and the new name for this I-1 lot were not confirmed. Nothing found kills the lead. Zoning and location checks hold up: the map point is in this parcel, and every lot within 60 ft of its outline is I-1 or I-1-C, with no residential lot.",
+  "disputes": [],
+  "claims": [
+   {
+    "text": "Fulton County tax parcel layer, queried at the same map point the first pass used: it returns parcel 14 0064  LL0047 at 81 Poole Creek Rd SE. So the Atlanta zoning lot with the truncated PIN '14 0064  LL004' (zoning-1) is this parcel.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"14 0064  LL0047\",\"TaxYear\":2027,\"Address\":\"81 POOLE CREEK RD SE\""
+   },
+   {
+    "text": "The same Fulton record sends the owner's bills to 650 West Peachtree St NW, Atlanta 30308.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Owner\":\"SOUTHERN REGION INDUSTRIAL REALTY INC  ET AL\",\"OwnerAddr1\":\"650 WEST PEACHTREE ST NW\",\"OwnerAddr2\":\"ATLANTA GA 30308\""
+   },
+   {
+    "text": "Norfolk Southern's real-estate contacts page gives the same address, 650 West Peachtree Street NW, Atlanta GA 30308, for the Norfolk Southern Real Estate Department. The owner's mailing address is the railroad's real-estate office.",
+    "source_url": "https://www.norfolksouthern.com/en/rail-development-property/ns-property/contact-ns-real-estate",
+    "retrieved": "2026-11-12",
+    "quote": "Norfolk Southern Real Estate Department 650 West Peachtree Street NW Atlanta, GA 30308"
+   },
+   {
+    "text": "On the same page NS keeps a separate channel for land that supports its core business and freight customers (strategic sales and acquisitions) and another for non-shipping customers. Which channel this tract falls under is not public.",
+    "source_url": "https://www.norfolksouthern.com/en/rail-development-property/ns-property/contact-ns-real-estate",
+    "retrieved": "2026-11-12",
+    "quote": "Sales and leases to support NS’s core businesses and freight customers Strategic Sales & Acquisitions"
+   },
+   {
+    "text": "Fulton parcel layer, asked for parcels within 60 ft of this parcel's outline (outline taken from the same layer): the answer includes 25 Poole Creek Rd SE, owned by Central of Georgia Railroad Co. The subject parcel adjoins railroad-owned land.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Address\":\"25 POOLE CREEK RD SE\",\"AddrNumber\":\"25\",\"AddrPreDir\":null,\"AddrStreet\":\"POOLE CREEK\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SE\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CENTRAL OF GA RAILROAD CO \""
+   },
+   {
+    "text": "That adjoining railroad tract is 25.49 acres in property class U5 (a utility class, not an ordinary industrial lot).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"LUCode\":\"799\",\"ClassCode\":\"U5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":25.49"
+   },
+   {
+    "text": "Atlanta zoning lots within 60 ft of the parcel's outline: the answer lists seven lots, all I-1 or I-1-C and none residential. One is the adjoining 20.19-acre I-1-C lot, the conditional tract from Z-06-111 (plans-4). Residential transitional-yard rules therefore look unlikely to bite, but the neighbour carries rezoning conditions.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"PIN\":\"14 00640001031\",\"GIS_ACRES\":20.19350001,\"ZONING_CLASSIFICATION\":\"I-1-C\""
+   },
+   {
+    "text": "Atlanta's zoning rewrite (ATL Zoning 2.0) comes with a new official zoning map that renames every existing district. The I-1 by-right reading of Sec. 16-16.003 (zoning-2) is the 1982 code, and it may not carry over unchanged.",
+    "source_url": "https://atlzoning.com/wp-content/uploads/2025/12/ATL-Zoning-December-2025-Update.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Draft V2 will also include a new Official Zoning Map. This map updates the names of all existing zoning districts to match the new ATL Zoning 2.0 system."
+   }
+  ],
+  "open_items": [
+   "Ask the owner (through a person, not this agent) whether the tract is held for rail-served or strategic use, is leased or used with the adjoining Central of Georgia Railroad tract at 25 Poole Creek Rd SE, who the 'ET AL' co-owners are, and whether a sale to a non-rail warehouse user is possible at all.",
+   "Status of ATL Zoning 2.0: web search results (snippets only, not verified) said the adopting ordinance (26-O-1508) was held in the Council Zoning Committee in autumn 2026. Check the Council file and the Draft V2 zoning map for this lot's proposed district, and whether warehousing and distribution stay permitted by right in it.",
+   "I checked whether the parcel belongs to NS's Atlanta finished-vehicle facility. NS lists that facility at 33 Southwoods Parkway, Hapeville (43 acres), and the Fulton parcel layer has no Southwoods address, so it looks to be elsewhere (probably Clayton County). Not confirmed: drive the site and see what is on it now (vehicle, trailer or equipment storage, rail-related use).",
+   "Assessor land-use code 339, class I5, land value $271,020 per acre: ask the assessor what code 339 means and whether paving or other improvements are recorded, since that value is high for vacant land here.",
+   "utilities-1: the context after its quote shows the matched Poole Creek Rd record has UNITTYPE 'LAT'. Confirm with Watershed Management whether that is a street collector sewer able to serve an industrial building or only a lateral connection. The water question stays open, as the first pass said.",
+   "Neighbouring tract Z-06-111 (06-O-2263) carries truck-route and driveway conditions. This parcel is already I-1 and needs no rezoning, but ask the city whether a truck route via Southside Industrial Pkwy would be expected for its driveway too.",
+   "The SEC host answered robots.txt with 403, so the railroad's subsidiary list in its annual report was not read. Whether the owner entity is a Norfolk Southern subsidiary rests here only on the shared mailing address and the adjoining railroad tract."
+  ]
+ }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0096  LL0306",
+  "run": "fulton-2026-11-12",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "This parcel is very likely part of the land around Martin Marietta's active Red Oak granite quarry, not a free-standing vacant lot. The tax-roll owner carries the quarry operator's name. The parcel shares its east line with the parcel addressed 5414 Buffington Rd Rear, and 5414 Buffington Road is the quarry's facility address in an EPD notice. The quarry's 288-acre state mining permit is plotted about 0.45 mi east-southeast. In 2020 the quarry applied to relocate and replace its plant equipment. Land a quarry operator holds next to its pit is often kept as a blasting or visual buffer, or as reserve for moving the pit or the plant. That is my reading, not a document: the owner may not sell at all, or only with use restrictions, and the parcel may lie inside the mining permit boundary or the city's District-Quarry character area. Lesser points: homes and a church face the parcel across Buffington Rd. The GDOT widening plans a raised median on this stretch. The brief already shows about 72 ft of relief.",
+    "disputes": ["market-1"],
+    "claims": [
+      {
+        "text": "Georgia EPD's list of permitted surface mines (dated 28 Aug 2024) shows Martin Marietta Materials' Red Oak Quarry, a granite quarry with 288 permitted acres, off Buffington Road, plotted at 33.6053, -84.4894. By the county parcel outline that point is about 720 m (0.45 mi) east-southeast of this parcel's nearest corner (distance computed by the skeptic). The permit boundary itself is not given, so how close the permitted area comes to the parcel is not known.",
+        "source_url": "https://epd.georgia.gov/document/document/surface-mining-permitted-facilities-08282024/download",
+        "retrieved": "2026-11-12",
+        "quote": "Fulton,085-16,\"MARTIN MARIETTA MATERIALS, INC. - RED OAK QUARRY\",Quarry,Granite,288,\"Off Buffington Road, south of Exit 1 (spur 14)\",Red Oak,33.6053,-84.4894"
+      },
+      {
+        "text": "Asked for every parcel that intersects this parcel's own outline (the outline as returned by the same layer), the Fulton County parcel layer returns 13 0066 LL0138, addressed 5414 Buffington Rd Rear. That is the quarry's facility address in the EPD air notice (next claim). So this parcel shares a boundary with land carrying the quarry's address. The same answer also returns 13 0095 LL1347 (0 Rock Quarry Rd) and the same owner's LL0322 and LL0360.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.497019%2C33.606711%5D%2C%5B-84.499372%2C33.606678%5D%2C%5B-84.499353%2C33.606933%5D%2C%5B-84.499342%2C33.60719%5D%2C%5B-84.49935%2C33.607191%5D%2C%5B-84.499349%2C33.607552%5D%2C%5B-84.499296%2C33.607552%5D%2C%5B-84.499298%2C33.607608%5D%2C%5B-84.49935%2C33.607607%5D%2C%5B-84.49936%2C33.607857%5D%2C%5B-84.499378%2C33.608106%5D%2C%5B-84.499403%2C33.608355%5D%2C%5B-84.499436%2C33.608603%5D%2C%5B-84.49939%2C33.608608%5D%2C%5B-84.499396%2C33.608647%5D%2C%5B-84.499441%2C33.608642%5D%2C%5B-84.499441%2C33.608678%5D%2C%5B-84.496963%2C33.608691%5D%2C%5B-84.497019%2C33.606711%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"ParcelID\":\"13 0066  LL0138\",\"TaxYear\":2027,\"Address\":\"5414 BUFFINGTON RD REAR\""
+      },
+      {
+        "text": "An EPD Air Protection Branch public advisory (comment deadline 18 Dec 2020) lists a permit application from Martin Marietta Materials' Red Oak Quarry at 5414 Buffington Road for the relocation and replacement of its plant equipment. Where the new plant sits, and whether it uses this parcel or the same owner's neighbouring parcels, is not stated.",
+        "source_url": "https://epd.georgia.gov/document/document/pa1120-3/download",
+        "retrieved": "2026-11-12",
+        "quote": "Facility Name: Martin Marietta Materials, Inc. - Red Oak Quarry Application No: 27756 Facility Address: 5414 Buffington Road., Red Oak, 30272 EPD Notice Type: Permit Application Description of Operation: Aggregate Quarry Reason for Application: Relocation and replacement of the plant equipment."
+      },
+      {
+        "text": "The county parcel layer, asked at the quarry's EPD permit point (-84.4894, 33.6053), returns parcel 13 0095 LL0109, 5414 Rock Quarry Rd. That parcel belongs to the group of industrial-class parcels east of this one, which lie between it and the permit point.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.4894,33.6053&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"ParcelID\":\"13 0095  LL0109\",\"TaxYear\":2027,\"Address\":\"5414 ROCK QUARRY RD\""
+      },
+      {
+        "text": "Asked for parcels in an envelope from -84.5009,33.6062 to -84.4996,33.6088, a strip just west of this parcel across Buffington Rd, the county parcel layer returns single-family lots, each with one living unit and residential class R3. One of them is 13 0096 LL4563 (200 Hightide Cir), about 150 m from the parcel's west line. The strip also holds the Pleasant Hills South Missionary Baptist church parcels at 5425 and 5445 Buffington Rd, which face the frontage. The site-fit check in the brief models no residential buffer.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5009,33.6062,-84.4996,33.6088&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":\"HF01S7\",\"LivUnits\":1,\"LandAcres\":0.1629,\"NbrHood\":\"1388\",\"Subdiv\":null,\"SubdivNum\":\"23841\",\"SubdivLot\":\"7\",\"SubdivBlck\":null,\"FeatureID\":\"13 0096  LL4563\""
+      }
+    ],
+    "open_items": [
+      "Why market-1 is disputed: its quote is accurate, but the same county record shows the owner carries the name of the operator of the adjoining quarry. That is a sign the land is held for the quarry, not a neutral 'no sign found'. Market should be read as 'owner likely not a seller' until a person learns otherwise.",
+      "Search snippet only, not read or verified: a SaportaReport news article (a secondary source, not fetched) reported Red Oak Quarry filings with the US Army Corps of Engineers, Savannah District. Per the snippet, the quarry would move its plant and processing facilities to another site on its property as part of a pit expansion adding about 50 years to the mine's life, with 55.6 acres involved, and the Sable Chase neighbourhood lies west of the quarry. A person should find the Corps public notice and its site map. Check whether the new plant site, the pit expansion or their buffers use this parcel or the same owner's LL0322, LL0330 and LL0360 (with this parcel, about 29.5 acres along Buffington Rd).",
+      "Ask Georgia EPD's Surface Mining Unit for the boundary and mining land use plan map of permit 085-16 (288 acres). If this parcel is inside the permitted area or a required buffer, the lead is not available for industrial development.",
+      "Pull the 2014 Limited Warranty Deed and any recorded covenants (blasting easements, no-build or buffer covenants, rights of first refusal) before any approach.",
+      "Blasting at an active granite quarry about 0.45 mi away (closer if the pit or plant moves west) may matter to a warehouse's slab, racking and tenants. Ask for the quarry's blast-monitoring and setback terms.",
+      "On the 2020 Union City Future Development Map (ARC review copy, PDF page 78), the District-Quarry area is a dark block on the city's east edge by I-85. The skeptic could not place this parcel on the image. If the parcel is District-Quarry, the investigator's reading that the plan pairs District-Quarry with M-2 only would weigh against M-1 warehouse use. The plan's general District text also expects high-impact districts to be 'defined by large buffers'.",
+      "utilities-2 shows only that the parcel lies inside Fulton County's sewer service area. Its context shows a polygon of about 10.17 billion sq ft (about 365 sq mi), so it says nothing about a line at the site.",
+      "Search snippet only, not read or verified: a council member's September 2025 town-hall flyer lists Buffington Rd from Rock Quarry Rd to SR 14/US 29 (GDOT 0013948) as under construction, with completion in Fall 2026. If built as the 2018 handout describes (raised median), ask GDOT or the city whether a median opening is planned at this frontage for left-turning trucks.",
+      "The EPD mine list is dated 28 Aug 2024 and the air advisory 2020: the quarry's current permit status and plant location should be confirmed.",
+      "No page read addressed instructions to an automated reader."
+    ]
+  }
+}

@@ -1,0 +1,482 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0064  LL0047",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "by_right",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "City of Atlanta zoning layer (LotsWithZoning), queried at the parcel's map point (33.650297, -84.385996): one lot of 19.96 GIS acres zoned I-1. The PIN field is cut to '14 0064  LL004' (20-character field); the acreage matches the 20.0-acre parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"PIN\":\"14 0064  LL004\",\"GIS_ACRES\":19.96226963,\"ZONING_CLASSIFICATION\":\"I-1\"",
+     "context_before": ":\"last_edited_date\",\"length\":8}],\"features\":[{\"attributes\":{\"objectid_12\":24344,",
+     "context_after": ",\"muni_link\":\"\\u003ca href=\\\"https://library.municode.com/ga/atlanta/codes/code_",
+     "words_shared_with_url": [],
+     "page_file": "pages/53b3f1e0d3b0bc6482d0f6c8.html"
+    },
+    {
+     "id": "zoning-2",
+     "text": "Atlanta ordinance 23-O-1058 (2023) restates I-1 Sec. 16-16.003(20): warehousing, self-storage facilities and distribution centers are a permitted principal use in I-1, except where any part of the property is within 500 ft of the BeltLine corridor (Sec. 16-36.007).",
+     "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/10376/1221734/pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Warehousing, self-storage facilities, distribution centers. facilities except when any part of the property is within 500 feet of the beltline corridor as defined in City Code Section 16-36.007",
+     "context_before": " uses and structures. 2023-18(23-o-1058) last updated: 06/14/23 page 1 of 2 (page break) (20) ",
+     "context_after": ". an existing self-storage facility within 500 feet of the beltline corridor may",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/b66791fb030063500f1b2ef6.pdf"
+    },
+    {
+     "id": "zoning-3",
+     "text": "The same zoning record shows no SPI, subarea, TSA or rezoning case (CASEIN/CASEOUT blank) on this lot, and status Current: no conditional (-C) case is recorded against it.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"SPI\":\" \",\"SUBAREA\":\" \",\"TSA\":\" \",\"STATUS_1\":\"Current\",\"CASEIN\":\" \",\"CASEOUT\":\" \"",
+     "context_before": "ga/atlanta/codes/code_of_ordinances?nodeid=ptiiicoorandeco_pt16zo_ch16liindire\",",
+     "context_after": ",\"sunrise\":-2208970800000,\"sunset\":32503611600000,\"reference\":\"r954\",\"shape.area",
+     "words_shared_with_url": [],
+     "page_file": "pages/53b3f1e0d3b0bc6482d0f6c8.html"
+    },
+    {
+     "id": "zoning-4",
+     "text": "Atlanta GIS BeltLine Corridor layer (BeltlineLayers layer 0), queried for any corridor feature within 1,000 ft of the parcel's map point: the answer has no features, so the 500 ft BeltLine exclusion in Sec. 16-16.003(20) does not appear to apply. (Distance is from the map point, not the parcel edge.)",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/BeltlineLayers/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/d15ec2f91027853d8030e14f.html"
+    },
+    {
+     "id": "zoning-5",
+     "text": "Atlanta GIS Zoning Overlay layer (LandUsePlanning layer 1), queried at the parcel's map point: no overlay feature returned.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/0cf8f5f616222f72d0b09234.html"
+    }
+   ],
+   "open_items": [
+    "The zoning queries hit one map point inside the parcel, not the whole outline: confirm with Atlanta Office of Zoning and Development that the full parcel is I-1 with no conditions, overlay or pending text amendment (Atlanta is rewriting its zoning ordinance).",
+    "Municode (the current text of Chapter 16, I-1) was not read (known wall). Check the I-1 transitional yard / height-plane rules next to residential districts: the brief's surroundings and the abandoned 1958 street sewers (see utilities) suggest residential land nearby.",
+    "Ordinance 23-O-1058 is the Municode-hosted copy marked 'Last Updated: 06/14/23'; confirm it was adopted as printed."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "Atlanta GIS 'Development Patterns - Future Land Use' layer (layer 8), queried at the parcel's map point: future land use Industrial.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NDP\":\"I\",\"FID_L8LAND\":2267,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\"",
+     "context_before": "\":16862,\"fid_l4ndp_\":684,\"fid_1\":0.0,\"pin\":\"industrial\",\"conversion\":\"flu only\",",
+     "context_after": ",\"lastupdate\":null,\"lasteditor\":\" \",\"density\":\" \",\"far\":\" \",\"history\":\"industria",
+     "words_shared_with_url": [],
+     "page_file": "pages/8d5dce29c1de9b21275227c0.html"
+    },
+    {
+     "id": "plans-2",
+     "text": "Atlanta GIS Rezoning Cases layer (layer 10), queried at the parcel's map point: no rezoning case covers the point.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"ADDL_LEGIS\",\"type\":\"esriFieldTypeString\",\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]}",
+     "context_before": "pe.area\"},{\"name\":\"shape.len\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.len\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/f05c77bdfc181baac6b58886.html"
+    },
+    {
+     "id": "plans-3",
+     "text": "Within 1,500 ft of the parcel's map point the Rezoning Cases layer has two small R-4 to I-1 cases from 2019 (Z-19-087 and Z-19-088, last update February 2020, more than five years ago) ...",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"I-1\",\"DOCKET_NO\":\"Z-19-087\",\"STATUS\":\"FILED\",\"FINAL_UPDA\":1582848000000",
+     "context_before": "ape.len\":4185.8259101297799,\"addl_legis\":null}},{\"attributes\":{\"objectid\":25921,",
+     "context_after": ",\"status_subtype\":4,\"ordinance\":\"19-o-1586\",\"ordhyperlink\":\"https://aimewebapp.b",
+     "words_shared_with_url": [],
+     "page_file": "pages/037a594becb807e7117fd10f.html"
+    },
+    {
+     "id": "plans-4",
+     "text": "... and Z-06-111 (ordinance 06-O-2263), a 19.6-acre I-1/R-4 to I-1 case from 2006 on a neighbouring tract. No case within 1,500 ft is from the last five years.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FROM_ZONE\":\"I1, R4\",\"TO_ZONE\":\"I-1\",\"DOCKET_NO\":\"Z-06-111\",\"STATUS\":\"COMPLETE\"",
+     "context_before": ":\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":2685,",
+     "context_after": ",\"final_upda\":null,\"status_subtype\":2,\"ordinance\":\"06-o-2263\",\"ordhyperlink\":\"ht",
+     "words_shared_with_url": [],
+     "page_file": "pages/037a594becb807e7117fd10f.html"
+    },
+    {
+     "id": "plans-5",
+     "text": "Atlanta GIS Building Moratorium layer (layer 5), queried at the parcel's map point: no moratorium feature returned.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "gth\":8},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/a5e98c23e769079729640634.html"
+    }
+   ],
+   "open_items": [
+    "Seen, not verifiable: https://aimewebapp.blob.core.windows.net/finalactions/06o2263.pdf (scanned; the host answers robots.txt with 400, so quotecheck will not fetch it). Ordinance 06-O-2263 (Z-06-111), adopted 2007-02-05, rezoned 84, 88, 96, 98, 100, 120 and 130 Poole Creek Road and 3715 and 3711 Wilson Drive from I-1 and R-4 to I-1-C, with conditions on truck route signs (I-75/Central Ave/Crown Rd or I-85/Jonesboro Rd to Southside Industrial Park Drive), coordination with the Atlanta Police Department on driveways near the Atlanta Police Academy, and Wilson Road right-of-way and widening. The GIS layer lists the result as I-1, not I-1-C. This is the neighbouring tract, not 81 Poole Creek Rd: ask whether similar truck-route expectations would be put on this parcel.",
+    "Check the City's adopted Comprehensive Development Plan text and the NPU Z neighbourhood plans for this area; only the GIS future-land-use layer was read."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer: the City of Atlanta Sewer Pipe layer (MapEGIS/manholes layer 1), asked for pipes within 1,200 ft of the parcel's map point that are not marked abandoned, returns 8-inch Active Public lines on Poole Creek Rd (the parcel's frontage road), upstream street numbers 44 to 183, installed 1956.",
+     "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?where=SERVSTAT%3C%3E%27ABAN%27&geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1200&units=esriSRUnit_Foot&outFields=NAME,SERVSTAT,PIPEDIAM,UNITTYPE,INSTALL_DATE,UPS_STNO,UPS_STNAME,UPS_SUFFIX&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NAME\":\"POOLE CREEK RD\",\"SERVSTAT\":\"APUB\",\"PIPEDIAM\":8",
+     "context_before": "date\":1987,\"ups_stno\":null,\"ups_stname\":null,\"ups_suffix\":null}},{\"attributes\":{",
+     "context_after": ",\"unittype\":\"lat\",\"install_date\":1956,\"ups_stno\":\"120\",\"ups_stname\":\"poole creek",
+     "words_shared_with_url": [
+      "name",
+      "servstat",
+      "pipediam"
+     ],
+     "page_file": "pages/a1179422bb1a7d4fea34d9d6.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "The layer's own code list: SERVSTAT APUB means Active Public and ABAN means Abandoned.",
+     "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1?f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"Abandoned\",\"code\":\"ABAN\"},{\"name\":\"Private\",\"code\":\"PRIV\"},{\"name\":\"Active Public\",\"code\":\"APUB\"}",
+     "context_before": "\"length\":4,\"domain\":{\"type\":\"codedvalue\",\"name\":\"domainservstat\",\"codedvalues\":[",
+     "context_after": ",{\"name\":\"converted to storm\",\"code\":\"cts\"},{\"name\":\"not surveyed\",\"code\":\"ns\"},",
+     "words_shared_with_url": [],
+     "page_file": "pages/acf6f729354a55de2d02bd63.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Within 600 ft of the parcel's map point the same layer shows only abandoned 8-inch 1958 lines under Gilbert Wy, Archcrest Dr and Celeste Dr SE: streets of a former residential layout, on or right beside the parcel.",
+     "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NAME\":\"GILBERT WY\",\"UPS_STNO\":\"139\",\"UPS_PREDIR\":\" \",\"UPS_STNAME\":\"GILBERT\",\"UPS_SUFFIX\":\"WY\",\"UPS_POSTDIR\":\"SE\",\"ZIP\":\"30354\",\"SEWERSHED\":\"SR11YC\",\"BASIN\":\"BSOC\",\"SEWERGROUP\":3,\"UNITTYPE\":\"LAT\",\"SM_SUBTYPE\":4,\"SURF\":null,\"SERVSTAT\":\"ABAN\"",
+     "context_before": "3320105701\",\"install_date\":1958,\"mapno\":\"233201\",\"source\":null,\"invmethod\":null,",
+     "context_after": ",\"pipetype\":null,\"pipeshp\":null,\"pipediam\":8,\"pipeht\":0,\"pipelen\":250.1156479999",
+     "words_shared_with_url": [],
+     "page_file": "pages/3e11f98079640e74e39e41d9.html"
+    }
+   ],
+   "open_items": [
+    "Water: no public City of Atlanta water-main layer was found (the watershed GIS folders answered empty and the capital-projects service was not started), so water is unknown and the verdict is unknown though sewer is shown nearby. Ask Atlanta Department of Watershed Management for the nearest water main and its size.",
+    "Sewer capacity: the active lines found are 8-inch, 1950s, in the Poole Creek Rd frontage; only the utility can say whether they can take an industrial building's flow.",
+    "The abandoned 1958 street sewers (Gilbert Wy, Archcrest Dr, Celeste Dr) suggest the parcel was once a platted residential subdivision. Ask the title examiner whether those streets were formally closed and the old lots combined, and look on site for old foundations or fill."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "Atlanta GIS Rezoning Cases layer, queried at the parcel's map point: no rezoning case (by the owner or anyone else) covers the parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"ADDL_LEGIS\",\"type\":\"esriFieldTypeString\",\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]}",
+     "context_before": "pe.area\"},{\"name\":\"shape.len\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.len\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/f05c77bdfc181baac6b58886.html"
+    },
+    {
+     "id": "market-2",
+     "text": "Atlanta GIS Special Use Permits layer (layer 11), queried for any permit within 1,500 ft of the parcel's map point: no features returned.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/856058a497c0ba0d4125062c.html"
+    }
+   ],
+   "open_items": [
+    "A web search for the site address found no sale notice, public notice or development-authority release; listing sites were not checked (CoStar, LoopNet and Crexi are excluded by rule). Ask a broker or the owner whether the land is offered or committed.",
+    "Same owner for 19 years (sale 2007-11-15), months after the neighbouring tract was rezoned I-1-C for a developer (06-O-2263, February 2007): ask whether this parcel was bought as part of that project and whether a site plan or option exists."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "The owner on the assessor roll is an entity with 'ET AL' (more than one owner on title). The Georgia Secretary of State search is a known wall (403); a person should look up the entity's status, formation date, principal office and registered agent by hand.",
+    "Ask whether the owner is affiliated with the railroad whose line runs 419 ft from the parcel (the brief); a railroad-related holder may sell only with rail-use terms or not at all. Not checked: no search by owner name was made, by rule.",
+    "Pull recent deeds: the brief's last sale is 2007-11-15 for $4,718,631."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The seller is the open question, and the first pass never tested it. The county roll sends the owner's tax bills to 650 West Peachtree St NW, which Norfolk Southern's own site gives as its Real Estate Department. The parcel adjoins a 25.5-acre tract owned by Central of Georgia Railroad Co, about 400 ft from the NS line, so this looks like railroad land next to railroad land, held since 2007. NS names two real-estate channels: sales to non-shipping customers, and strategic sales for its core business and freight customers. Its site does not say which channel this tract belongs to, whether it is held for rail-served or operating use, or whether the 'ET AL' co-owners would sell to a non-rail warehouse buyer. The market verdict no_sign_found rests only on empty rezoning and special-use queries, which say nothing about the owner's intent. Second doubt: the by_right zoning verdict rests on the 1982 ordinance, while ATL Zoning 2.0 brings a new official zoning map that renames every district. Its adoption and the new name for this I-1 lot were not confirmed. Nothing found kills the lead. Zoning and location checks hold up: the map point is in this parcel, and every lot within 60 ft of its outline is I-1 or I-1-C, with no residential lot.",
+  "disputes": [],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "Fulton County tax parcel layer, queried at the same map point the first pass used: it returns parcel 14 0064  LL0047 at 81 Poole Creek Rd SE. So the Atlanta zoning lot with the truncated PIN '14 0064  LL004' (zoning-1) is this parcel.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"14 0064  LL0047\",\"TaxYear\":2027,\"Address\":\"81 POOLE CREEK RD SE\"",
+    "context_before": "ouble\",\"alias\":\"shape.stlength()\"}],\"features\":[{\"attributes\":{\"objectid\":80587,",
+    "context_after": ",\"addrnumber\":\"81\",\"addrpredir\":null,\"addrstreet\":\"poole creek\",\"addrsuffix\":\"rd",
+    "words_shared_with_url": [],
+    "page_file": "pages/b817a6be34dfa74d28c179b5.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The same Fulton record sends the owner's bills to 650 West Peachtree St NW, Atlanta 30308.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Owner\":\"SOUTHERN REGION INDUSTRIAL REALTY INC  ET AL\",\"OwnerAddr1\":\"650 WEST PEACHTREE ST NW\",\"OwnerAddr2\":\"ATLANTA GA 30308\"",
+    "context_before": "le creek\",\"addrsuffix\":\"rd\",\"addrposdir\":\"se\",\"addrunttyp\":null,\"addrunit\":null,",
+    "context_after": ",\"taxdist\":\"05\",\"lucode\":\"339\",\"classcode\":\"i5\",\"excode\":null,\"livunits\":0,\"land",
+    "words_shared_with_url": [],
+    "page_file": "pages/b817a6be34dfa74d28c179b5.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "Norfolk Southern's real-estate contacts page gives the same address, 650 West Peachtree Street NW, Atlanta GA 30308, for the Norfolk Southern Real Estate Department. The owner's mailing address is the railroad's real-estate office.",
+    "source_url": "https://www.norfolksouthern.com/en/rail-development-property/ns-property/contact-ns-real-estate",
+    "retrieved": "2026-11-12",
+    "quote": "Norfolk Southern Real Estate Department 650 West Peachtree Street NW Atlanta, GA 30308",
+    "context_before": "tion maps valmaprequest@nscorp.com other inquiries realestateinquiry@nscorp.com ",
+    "context_after": " new to norfolk southern how does rail shipping work? get started with intermoda",
+    "words_shared_with_url": [],
+    "page_file": "pages/8e67c2854cc5f38f30a84333.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "On the same page NS keeps a separate channel for land that supports its core business and freight customers (strategic sales and acquisitions) and another for non-shipping customers. Which channel this tract falls under is not public.",
+    "source_url": "https://www.norfolksouthern.com/en/rail-development-property/ns-property/contact-ns-real-estate",
+    "retrieved": "2026-11-12",
+    "quote": "Sales and leases to support NS\u2019s core businesses and freight customers Strategic Sales & Acquisitions",
+    "context_before": "communities sales realestatesales@nscorp.com leases realestateleases@nscorp.com ",
+    "context_after": " realestatestrategicsales@nscorp.com strategic land development leases realestat",
+    "words_shared_with_url": [],
+    "page_file": "pages/8e67c2854cc5f38f30a84333.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "Fulton parcel layer, asked for parcels within 60 ft of this parcel's outline (outline taken from the same layer): the answer includes 25 Poole Creek Rd SE, owned by Central of Georgia Railroad Co. The subject parcel adjoins railroad-owned land.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Address\":\"25 POOLE CREEK RD SE\",\"AddrNumber\":\"25\",\"AddrPreDir\":null,\"AddrStreet\":\"POOLE CREEK\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SE\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CENTRAL OF GA RAILROAD CO \"",
+    "context_before": "88}},{\"attributes\":{\"objectid\":80706,\"parcelid\":\"14 0064 ll0039\",\"taxyear\":2027,",
+    "context_after": ",\"owneraddr1\":\"1200 peachtree st box 7-142\",\"owneraddr2\":\"atlanta ga 30309-3579\"",
+    "words_shared_with_url": [],
+    "page_file": "pages/6db49af59db5cbaacf44a056.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "That adjoining railroad tract is 25.49 acres in property class U5 (a utility class, not an ordinary industrial lot).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"LUCode\":\"799\",\"ClassCode\":\"U5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":25.49",
+    "context_before": "200 peachtree st box 7-142\",\"owneraddr2\":\"atlanta ga 30309-3579\",\"taxdist\":\"05\",",
+    "context_after": ",\"nbrhood\":\"c907\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":n",
+    "words_shared_with_url": [],
+    "page_file": "pages/6db49af59db5cbaacf44a056.html"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "Atlanta zoning lots within 60 ft of the parcel's outline: the answer lists seven lots, all I-1 or I-1-C and none residential. One is the adjoining 20.19-acre I-1-C lot, the conditional tract from Z-06-111 (plans-4). Residential transitional-yard rules therefore look unlikely to bite, but the neighbour carries rezoning conditions.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"PIN\":\"14 00640001031\",\"GIS_ACRES\":20.19350001,\"ZONING_CLASSIFICATION\":\"I-1-C\"",
+    "context_before": "_edited_user\":null,\"last_edited_date\":null}},{\"attributes\":{\"objectid_12\":23058,",
+    "context_after": ",\"muni_link\":\"\\u003ca href=\\\"https://library.municode.com/ga/atlanta/codes/code_",
+    "words_shared_with_url": [],
+    "page_file": "pages/eaacf6ad74d1e7ebbd6a24b6.html"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "Atlanta's zoning rewrite (ATL Zoning 2.0) comes with a new official zoning map that renames every existing district. The I-1 by-right reading of Sec. 16-16.003 (zoning-2) is the 1982 code, and it may not carry over unchanged.",
+    "source_url": "https://atlzoning.com/wp-content/uploads/2025/12/ATL-Zoning-December-2025-Update.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Draft V2 will also include a new Official Zoning Map. This map updates the names of all existing zoning districts to match the new ATL Zoning 2.0 system.",
+    "context_before": "be reflected in draft v2, which will be the version shared for formal adoption. ",
+    "context_after": " the map will also keep in place any zoning conditions associated with rezonings",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/8a09bc2de8a4feae91d15828.pdf"
+   }
+  ],
+  "open_items": [
+   "Ask the owner (through a person, not this agent) whether the tract is held for rail-served or strategic use, is leased or used with the adjoining Central of Georgia Railroad tract at 25 Poole Creek Rd SE, who the 'ET AL' co-owners are, and whether a sale to a non-rail warehouse user is possible at all.",
+   "Status of ATL Zoning 2.0: web search results (snippets only, not verified) said the adopting ordinance (26-O-1508) was held in the Council Zoning Committee in autumn 2026. Check the Council file and the Draft V2 zoning map for this lot's proposed district, and whether warehousing and distribution stay permitted by right in it.",
+   "I checked whether the parcel belongs to NS's Atlanta finished-vehicle facility. NS lists that facility at 33 Southwoods Parkway, Hapeville (43 acres), and the Fulton parcel layer has no Southwoods address, so it looks to be elsewhere (probably Clayton County). Not confirmed: drive the site and see what is on it now (vehicle, trailer or equipment storage, rail-related use).",
+   "Assessor land-use code 339, class I5, land value $271,020 per acre: ask the assessor what code 339 means and whether paving or other improvements are recorded, since that value is high for vacant land here.",
+   "utilities-1: the context after its quote shows the matched Poole Creek Rd record has UNITTYPE 'LAT'. Confirm with Watershed Management whether that is a street collector sewer able to serve an industrial building or only a lateral connection. The water question stays open, as the first pass said.",
+   "Neighbouring tract Z-06-111 (06-O-2263) carries truck-route and driveway conditions. This parcel is already I-1 and needs no rezoning, but ask the city whether a truck route via Southside Industrial Pkwy would be expected for its driveway too.",
+   "The SEC host answered robots.txt with 403, so the railroad's subsidiary list in its annual report was not read. Whether the owner entity is a Norfolk Southern subsidiary rests here only on the shared mailing address and the adjoining railroad tract."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/53b3f1e0d3b0bc6482d0f6c8.html",
+   "fetched_at": "2026-11-12T19:32:24Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3580,
+   "sha256": "5e9c827b0015e2dd4b3afbf2180a56448f94a67f6cf2fedc9904d4cbac60c33b"
+  },
+  "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/10376/1221734/pdf": {
+   "file": "pages/b66791fb030063500f1b2ef6.pdf",
+   "fetched_at": "2026-11-12T19:32:26Z",
+   "final_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/10376/1221734/pdf",
+   "status": 200,
+   "bytes": 221411,
+   "sha256": "7a1aa1adf675684bec072f9f3ddb311969502763bc2c3ea7752f36d90f872abe"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/BeltlineLayers/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/d15ec2f91027853d8030e14f.html",
+   "fetched_at": "2026-11-12T19:32:26Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/BeltlineLayers/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1027,
+   "sha256": "b5a15ccb9547588b0cea252e18ee709297cdcef53df4eb4b150dbd4d8199c69c"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/0cf8f5f616222f72d0b09234.html",
+   "fetched_at": "2026-11-12T19:32:27Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1337,
+   "sha256": "16e717ddaa52870a0b50866d722028848735e785b3e7ef1f0667d9e8408c0409"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/8d5dce29c1de9b21275227c0.html",
+   "fetched_at": "2026-11-12T19:32:28Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3833,
+   "sha256": "490e986fb57707c90a2aabb5450c84df9420bd7a225e592cd9892a347bd2bb8d"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/f05c77bdfc181baac6b58886.html",
+   "fetched_at": "2026-11-12T19:32:29Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 2126,
+   "sha256": "1ec314cea5160f6f38fd0aadfa436df171e9cc5894d06e7f052f83d0a7575e73"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/037a594becb807e7117fd10f.html",
+   "fetched_at": "2026-11-12T19:32:30Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4290,
+   "sha256": "02a02f5154173f86bee317a71822157ade0c3a7a4246acdba7d670e78482f9ed"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/a5e98c23e769079729640634.html",
+   "fetched_at": "2026-11-12T19:32:31Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1579,
+   "sha256": "4ed791fe9d9f56ee37efa14190bb7f307a0e4b131ed8158411cd8bb29d9e6ba6"
+  },
+  "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?where=SERVSTAT%3C%3E%27ABAN%27&geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1200&units=esriSRUnit_Foot&outFields=NAME,SERVSTAT,PIPEDIAM,UNITTYPE,INSTALL_DATE,UPS_STNO,UPS_STNAME,UPS_SUFFIX&returnGeometry=false&f=json": {
+   "file": "pages/a1179422bb1a7d4fea34d9d6.html",
+   "fetched_at": "2026-11-12T19:32:33Z",
+   "final_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?where=SERVSTAT%3C%3E%27ABAN%27&geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1200&units=esriSRUnit_Foot&outFields=NAME,SERVSTAT,PIPEDIAM,UNITTYPE,INSTALL_DATE,UPS_STNO,UPS_STNAME,UPS_SUFFIX&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 2588,
+   "sha256": "6275cd6be799ea3366849b4e06734bfb5558f751b4a7c3714a772e17e754325d"
+  },
+  "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1?f=json": {
+   "file": "pages/acf6f729354a55de2d02bd63.html",
+   "fetched_at": "2026-11-12T19:32:34Z",
+   "final_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1?f=json",
+   "status": 200,
+   "bytes": 29674,
+   "sha256": "022c417699fc2b326cfa306a1c2498f191ac2fc819eacb7660507e59a2d0a24d"
+  },
+  "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/3e11f98079640e74e39e41d9.html",
+   "fetched_at": "2026-11-12T19:32:35Z",
+   "final_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 14305,
+   "sha256": "cd49898d3b86128d69e659bf6495f738334db9d5e31dfd665d539b5915f94f2a"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/856058a497c0ba0d4125062c.html",
+   "fetched_at": "2026-11-12T19:32:35Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1812,
+   "sha256": "181ed0ad18b7d634f32b01b95a543571d1afba2d671d90c8154a38315efad8d1"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b817a6be34dfa74d28c179b5.html",
+   "fetched_at": "2026-11-12T19:32:36Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=-84.385996%2C33.650297&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3672,
+   "sha256": "72425ddda65a23bd8777b1c8af76a7ec570ec78db7df4ea61cb199d76140945b"
+  },
+  "https://www.norfolksouthern.com/en/rail-development-property/ns-property/contact-ns-real-estate": {
+   "file": "pages/8e67c2854cc5f38f30a84333.html",
+   "fetched_at": "2026-11-12T19:32:38Z",
+   "final_url": "https://www.norfolksouthern.com/en/rail-development-property/ns-property/contact-ns-real-estate",
+   "status": 200,
+   "bytes": 855812,
+   "sha256": "017e354475bbf74206bf2618223b93a09565681290a49477c2b2503445d27082"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6db49af59db5cbaacf44a056.html",
+   "fetched_at": "2026-11-12T19:32:38Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 8106,
+   "sha256": "f63da8a904b5e2920266d36befb08a50b54300024e361014decd3aa8f33ba70b"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/eaacf6ad74d1e7ebbd6a24b6.html",
+   "fetched_at": "2026-11-12T19:32:39Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LotsWithZoning/MapServer/0/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.3866%2C33.652234%5D%2C%5B-84.384927%2C33.652216%5D%2C%5B-84.384958%2C33.651171%5D%2C%5B-84.385004%2C33.649592%5D%2C%5B-84.385041%2C33.648346%5D%2C%5B-84.38547%2C33.648348%5D%2C%5B-84.387032%2C33.648341%5D%2C%5B-84.386981%2C33.652248%5D%2C%5B-84.3866%2C33.652234%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 8634,
+   "sha256": "0d6ff8942e032d38c7db8e84cfee6b6ed1e948e53e8a3f8d73d72ff556569139"
+  },
+  "https://atlzoning.com/wp-content/uploads/2025/12/ATL-Zoning-December-2025-Update.pdf": {
+   "file": "pages/8a09bc2de8a4feae91d15828.pdf",
+   "fetched_at": "2026-11-12T19:32:40Z",
+   "final_url": "https://atlzoning.com/wp-content/uploads/2025/12/ATL-Zoning-December-2025-Update.pdf",
+   "status": 200,
+   "bytes": 1221328,
+   "sha256": "dbf7c55eeecdfd570845389638ada66707b8f38ce6dfda430a469d113d730fa9"
+  }
+ },
+ "quotecheck": {
+  "kept": 23,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:32:40Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "1f6a017f5c6829676e21d8ed2407522e2c86dcc67e6fba9efb583290fcfd8ed0",
+   "skeptic.json": "1f0dfa77e72af89670ce587ffdc09c6242419634f8764dd300c679262021f9b9"
+  }
+ },
+ "dropped_claims": []
+}

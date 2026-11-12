@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0065  LL0477",
+  "run": "fulton-2026-11-12",
+  "sections": {
+    "zoning": {
+      "verdict": "by_right",
+      "claims": [
+        {
+          "text": "In the City of South Fulton's draft Article 2 Principal Use Table: Non-Residential Districts (May 21, 2020 memo), Distribution Center (NAICS 493) and General Warehousing and Indoor Storage (49311) carry an 'A' in the last two columns, M-1 and M-2. This is the DRAFT that preceded the ordinance adopted on 8 Dec 2020, not the codified text; the parcel's M-1 zoning itself comes from the screener's zoning layer.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/3297/COSF-Zoning-Revision-Draft-Article-2",
+          "retrieved": "2026-11-12",
+          "quote": "493      Distribution Center                                                                                A     A\n\n49311    General Warehousing and Indoor Storage                                                             A     A"
+        },
+        {
+          "text": "The same draft's cover memo says the principal use tables show whether a use is allowed by right, by special use approval, or prohibited.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/3297/COSF-Zoning-Revision-Draft-Article-2",
+          "retrieved": "2026-11-12",
+          "quote": "The Principal Use Tables identify whether a use is allowed by-right, upon approval by City\n          Council as a special use, or if the use is prohibited."
+        },
+        {
+          "text": "The legend of Table 2-4 (Sec. 207.06), as reproduced in the city's draft text amendment TA24-002 (an unsigned ORD2024 draft on commercial truck parking), reads A = Allowed, S = special use, blank = prohibited. The same draft would allow a commercial truck parking lot in M-1 and M-2 subject to Sec. 302.48; whether it was adopted was not checked.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11180/TA24-002-Commercial-Truck-Parking-Ordinance",
+          "retrieved": "2026-11-12",
+          "quote": "A = Allowed        S = Allowed if Approved as a Special Use         Blank = Prohibited"
+        },
+        {
+          "text": "The same draft states the M-1 district's intent: light industrial uses and industrial parks, including warehousing, distributing and flex office-warehouse uses.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/3297/COSF-Zoning-Revision-Draft-Article-2",
+          "retrieved": "2026-11-12",
+          "quote": "The M-1 District is intended to provide locations for light industrial uses and industrial\n    parks which meet the needs of for processing, manufacturing, fabricating, and\n    warehousing, distributing, research, and flex office-warehouse uses"
+        },
+        {
+          "text": "The city's Zoning Ordinance page says the ordinance was approved on 8 Dec 2020 and that the current text is Appendix C of the Code of Ordinances (hosted on Municode, which cannot be quoted here). So the adopted use table was not read directly.",
+          "source_url": "https://www.cityofsouthfultonga.gov/2434/Zoning-Ordinance",
+          "retrieved": "2026-11-12",
+          "quote": "On December 8, 2020 the City of South Fulton's Mayor and Council approved the Zoning Ordinance previously referred to as the Zoning Resolution."
+        }
+      ],
+      "open_items": [
+        "Confirm in the adopted Appendix C, Sec. 207.06 (Table 2-4), as amended since 2020, that warehousing and distribution are still 'A' (allowed) in M-1; Municode could not be read here.",
+        "Confirm whether this parcel's M-1 carries conditions from a past Fulton County rezoning (conditional zoning) and whether it lies in any overlay district (the city has several, e.g. South Fulton Parkway and Old National overlays); neither was checked.",
+        "The current use appears to be a vehicle rental / fleet operation (see market). Ask planning whether that use is a legal conforming use and what a redevelopment would trigger."
+      ]
+    },
+    "plans": {
+      "verdict": "supports",
+      "claims": [
+        {
+          "text": "City of South Fulton staff (Z22-013 report, 2022) treat the 'Industrial Zone' future land use designation as the one that accommodates a warehouse and the M-1 district. The screener's future land use layer gives this parcel 'Industrial Zone'; that layer (ArcGIS Online) could not be quoted, and the city adopted a newer 2026 comprehensive plan whose categories may differ.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/6839/Z22-013-CV22-005-0-FIB_PC-08_28_22",
+          "retrieved": "2026-11-12",
+          "quote": "If approved, the rezoning request would\n  require a Future Land Use change to Industrial Zone to accommodate the warehouse and the\n  M-1 zoning district."
+        },
+        {
+          "text": "The city's Zoning Cases page (rezonings, special use permits, modifications and variances, 2017 to the Z26-025 case heard 9/29/2026) lists no case at 3600 Naturally Fresh Blvd: the page text contains neither 'Naturally' nor 'Fresh'. The page lists cases by address, not by parcel id, so a case filed under another address for this parcel would be missed.",
+          "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+          "retrieved": "2026-11-12",
+          "quote": "Rezonings Case # Location Staff Report CZIM Planning Commission Mayor and Council Z26-024/CDP26-008 4380 Old Fairburn Road"
+        }
+      ],
+      "open_items": [
+        "Confirm the parcel's designation on the future land use map of the adopted 2026 South Fulton Comprehensive Plan (staff reports in 2026 cite both a 2021 and a 2026 plan).",
+        "Ask planning whether any moratorium (e.g. on truck parking, data centers or industrial uses) or new overlay affects this area; none was searched for specifically."
+      ]
+    },
+    "utilities": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "No published water or sewer map was found that could be read: the Fulton County GIS 'Utilities' and 'CountyServices' folders require a token, and the City of Atlanta GIS server has no water/sewer service in its public folders.",
+        "Ask which utility serves 3600 Naturally Fresh Blvd for water and for sewer (City of Atlanta Watershed Management or Fulton County Public Works), where the nearest mains are, and their capacity. The site is already built on and occupied, so it presumably has service, but that is not confirmed."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {
+          "text": "No public sign of a sale or developer interest: the city's Zoning Cases page lists no rezoning, special use, modification or variance case at 3600 Naturally Fresh Blvd (the page text contains neither 'Naturally' nor 'Fresh'). The list is by address, not parcel id.",
+          "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+          "retrieved": "2026-11-12",
+          "quote": "Rezonings Case # Location Staff Report CZIM Planning Commission Mayor and Council Z26-024/CDP26-008 4380 Old Fairburn Road"
+        },
+        {
+          "text": "The Planning Commission agenda for 18 Nov 2026 (old and new business, seven cases) has no case at 3600 Naturally Fresh Blvd or on Naturally Fresh Blvd.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/16470/PC-Agenda-11_18_26-2rm",
+          "retrieved": "2026-11-12",
+          "quote": "Ten minutes are reserved for those speaking in favor of each case, and another ten"
+        },
+        {
+          "text": "Important context: this is not vacant land. The county's own parcel layer, queried by parcel id, carries an improvement appraisal of $678,800 beside a land appraisal of $2,768,500 (class code C5, land use code 332).",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713+0065++LL0477%27&outFields=%2A&returnGeometry=false&f=json",
+          "retrieved": "2026-11-12",
+          "quote": "\"LandAppr\":2768500,\"ImprAppr\":678800,\"LUCode\":\"332\",\"ClassCode\":\"C5\""
+        },
+        {
+          "text": "A Georgia DOAS statewide contract sheet (contract effective Dec 2003, expiring June 2013) gives National Car Rental's vendor address as 3600 Naturally Fresh Blvd: the site has been a car-rental company facility. Old document; current occupant not confirmed from a primary source.",
+          "source_url": "https://pur.doas.ga.gov/tgm/swc_contracts/swc30293_1_information_sheet.pdf",
+          "retrieved": "2026-11-12",
+          "quote": "National Car Rental\n3600 Naturally Fresh Blvd.\nAtlanta, GA 30349"
+        }
+      ],
+      "open_items": [
+        "The site appears to be an operating vehicle-rental / fleet facility owned by an out-of-state LLC; it may be under a long-term lease to the occupant. Confirm the building, the current occupant and any lease term (title search, assessor record) before treating it as a land lead.",
+        "Search results (not opened, not used as evidence) pointed to directory listings of rental-car and vehicle remarketing businesses at this address and to a property report suggesting a building of roughly 18,600 SF built about 2002; confirm with the county assessor (qPublic, manual lookup).",
+        "A property listing on a ZoomProspector page for Fulton County turned up in search; it was not opened because such listing feeds can come from LoopNet/CoStar. A person may check whether the site is actively marketed through non-CoStar channels."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "The Georgia Secretary of State business search could not be used (403 to automated requests, and it is a form). A person should look up the owning LLC's record there: status, formation date, principal office, registered agent.",
+        "The owner's name and an out-of-state mailing address (from the county record) suggest an investment or net-lease holding vehicle rather than an operator, but no primary source was read to confirm this."
+      ]
+    }
+  }
+}
