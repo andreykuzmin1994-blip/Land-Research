@@ -416,12 +416,14 @@ class FakeRepo:
         self.history: list[tuple[str, list[str]]] = []
         self.dirty: list[str] = []
         self.broken = False
+        self.gone: set[str] = set()          # commits reset away, still known to git
 
     def commit(self, name, *files):
         self.history.append((name, list(files) or ["screener/rank.py"]))
 
     def reset(self, name):
         names = [c for c, _ in self.history]
+        self.gone.update(names[names.index(name) + 1:])
         self.history = self.history[:names.index(name) + 1]
 
     def git(self, *args):
@@ -448,6 +450,9 @@ class FakeRepo:
             if only and not under:                       # a single file asked about
                 return "\n".join(f for f in files if f in only)
             return "\n".join(f for f in files if not under or f.startswith("screener/"))
+        if args[:3] == ("rev-parse", "--verify", "--quiet"):    # a logged short hash, made full
+            short = args[3].removesuffix("^{commit}")
+            return short.ljust(40, "0") if short in names or short in self.gone else ""
         if args[0] == "log" and "--format=%H" in args:           # full hashes
             first, last = args[-1].split("..")
             return "\n".join(n.ljust(40, "0") for n in names[names.index(first) + 1:names.index(last) + 1])
@@ -687,6 +692,18 @@ class DecideTests(unittest.TestCase):
         text = sys.stdout.getvalue()
         self.assertIn("Revert the experiment: git reset --keep aaa", text)
         self.assertNotIn("--hard", text)
+
+    def test_a_logged_hash_git_cannot_make_full_stands_for_nothing(self):
+        # reviews/36 12, finding 1: an ambiguous or hand-cut row must not
+        # cover a human's commit that happens to share its first letters.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        self.repo.history.append(("bbbe", ["screener/README.md"]))  # a human's, same first letters
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertTrue(text.rstrip().splitlines()[-1].startswith("Do not reset"))
+        self.assertNotIn("git reset", text[text.rindex("DECISION:"):])
 
     def test_the_reset_hint_keeps_a_humans_commit_made_since_the_best_run(self):
         self.baseline_then_experiment()

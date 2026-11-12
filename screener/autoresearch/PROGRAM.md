@@ -160,7 +160,8 @@ git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
 #   DISCARD -> run the exact `git reset --keep <commit>` it prints (it
 #              takes back discarded experiments and nothing else). If it
-#              prints "Do not reset" instead, stop and ask a human.
+#              prints "Do not reset" instead, stop and ask a human. If git
+#              refuses the reset, stop and ask a human: never use --hard.
 #   KEEP    -> carry on from here
 #   REFUSED -> see below
 ```

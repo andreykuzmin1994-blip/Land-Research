@@ -724,17 +724,30 @@ class CheckedBytesTests(unittest.TestCase):
             # A folder without an __init__ is a namespace package: it loses to
             # a module this Python has (venv/), and wins where there is none
             # (msvcrt/ or _winapi/ on Linux: reviews/36 10, finding 1).
-            missing = [n for n in ("msvcrt", "_winapi") if not ev._stdlib_has(n)]
+            missing = ["msvcrt", "_winapi"] if sys.platform != "win32" else []
             for folder in ("random", "venv", "site", "types", "screener", "tests", *missing):
                 Path(tmp, folder).mkdir()
             Path(tmp, "random", "__init__.py").write_text("")
             Path(tmp, "types", "__init__.pyi").write_text("")     # not importable: no shadow
             Path(tmp, "site", "__init__.txt").write_text("")
-            with mock.patch.object(ev, "ROOT", Path(tmp)):
+            Path(tmp, "venv", "__init__.py").mkdir()                # a folder of that name: no package
+            # With the root on sys.path too (PYTHONPATH=.), its own folders do
+            # not count as the standard module (reviews/36 12, finding 3).
+            with mock.patch.object(ev, "ROOT", Path(tmp)), \
+                    mock.patch.object(sys, "path", [tmp, "", *sys.path]):
                 found = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
             self.assertEqual(len(found), 4 + len(missing))
             self.assertEqual([n for n in found if not n.startswith("math")],
                              sorted(["csv.py", "json.pyc", "random", *missing]))
+            # An empty folder of the same name elsewhere on sys.path is no
+            # standard module either (reviews/36 12, finding 2).
+            with tempfile.TemporaryDirectory() as other:
+                for name in missing:
+                    Path(other, name).mkdir()
+                with mock.patch.object(ev, "ROOT", Path(tmp)), \
+                        mock.patch.object(sys, "path", [other, *sys.path]):
+                    again = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
+                self.assertEqual(again, found)
 
     def test_git_runs_in_the_repository_root(self):
         seen = []

@@ -722,13 +722,16 @@ def second_pass(source: bytes):
 
 def _stdlib_has(name: str) -> bool:
     """Is there a module of this name on this Python outside the repository?"""
-    if name in sys.builtin_module_names:
+    if name in sys.builtin_module_names or importlib.machinery.FrozenImporter.find_spec(name):
         return True
     elsewhere = [p for p in sys.path if p and _outside_repo(p)]
     try:
-        return importlib.machinery.PathFinder.find_spec(name, elsewhere) is not None
+        spec = importlib.machinery.PathFinder.find_spec(name, elsewhere)
     except (ImportError, ValueError):
         return False
+    # A namespace folder elsewhere (no loader) is no module of its own:
+    # the repository's folder would still be merged in (reviews/36 12, 2).
+    return spec is not None and spec.loader is not None
 
 
 def _outside_repo(path: str) -> bool:
@@ -757,7 +760,7 @@ def foreign_modules() -> list[str]:
                 # without an __init__ does only when this Python has no such
                 # module of its own (msvcrt/ or _winapi/ on Linux): an
                 # existing module wins over a namespace folder (venv/, site/).
-                package = any((entry / f"__init__{suffix}").exists() for suffix in suffixes)
+                package = any((entry / f"__init__{suffix}").is_file() for suffix in suffixes)
                 shadows = entry.name in sys.stdlib_module_names and (
                     package or not _stdlib_has(entry.name))
             else:
@@ -1037,9 +1040,14 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
             between = [line.split()[0] for line in
                        _git("log", "--format=%H", f"{best['commit']}..{parent}").splitlines()
                        if line.strip()]
-            discards = {r["commit"] for r in _decisions()
-                        if r["status"] == "discard" and r["fingerprint"] == fp and r["commit"]}
-            if between and all(any(c.startswith(d) for d in discards) for c in between):
+            logged = {r["commit"] for r in _decisions()
+                      if r["status"] == "discard" and r["fingerprint"] == fp and r["commit"]}
+            # Each logged short hash made full by git: an ambiguous or unknown
+            # one gives nothing, so it cannot stand for a human's commit
+            # (reviews/36 12, finding 1).
+            discards = {_git("rev-parse", "--verify", "--quiet", f"{c}^{{commit}}") for c in logged}
+            discards.discard("")
+            if between and all(c in discards for c in between):
                 print(f"Revert the experiment: git reset --keep {best['commit']}")
                 print(f"(this also takes back {len(between)} earlier discarded experiment(s) "
                       "that were left in place)")
