@@ -58,7 +58,7 @@ someone who built an industrial building on it by 2025?
 - **Fixed size:** K is fixed at 2% of the pool, so inflating scores can't
   help. Only ranking real sites higher does. The hard screens are frozen
   into the evaluation set.
-- **Baseline (key rebuilt 2026-11-12):** graded 11.8 of 35 dev sites, 2.4
+- **Baseline (key rebuilt 2026-11-12):** graded 11.7 of 35 dev sites, 2.4
   hits. Random ranking averages graded 3.1 (5th–95th percentile 1.7–4.6)
   and 0.8 hits. Scores from earlier keys (the 2026-11-10 key, a single
   2016 year, whole hits) are not comparable.

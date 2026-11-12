@@ -625,7 +625,7 @@ Key rebuilt 2026-11-12 (`reviews/36_screener_eval_cohorts_metric`, 05 to
 building, a parcel bought at a real price since 2015 counts only under
 the owner before, and a change is judged on a graded score (where each
 site ranks) instead of whole top-2% hits. The hand-built ranking scores
-graded 11.8 of 35 dev sites (2.4 in the top 2%); random ranking averages
+graded 11.7 of 35 dev sites (2.4 in the top 2%); random ranking averages
 3.1. Earlier scores are not comparable.
 
 ```bash
