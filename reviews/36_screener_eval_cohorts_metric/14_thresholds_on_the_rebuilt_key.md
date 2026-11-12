@@ -64,8 +64,9 @@ At 2.5 the worst case is 2.4% (about 1.5% to 3.6%). That is the old key's
 2.3%, which `05` judged acceptable. The cost is that a real gain of
 between 2.0 and 2.5 graded points is now discarded.
 
-Earlier runs on the intermediate keys of the same day, at 2.0: 0.6 / 1.0
-/ 2.4% and 1.1 / 1.6 / 1.5% (fingerprint `d2a7c5649330`).
+On the day's first rebuild (fingerprint `d2a7c5649330`, before the name
+fix), at 2.0: per record 0.6 / 1.0 / 2.4%, half shared by the cell
+1.1 / 1.6 / 1.5% (noise 4 / 8 / 16).
 
 ## Reviews of the code since `07`
 
