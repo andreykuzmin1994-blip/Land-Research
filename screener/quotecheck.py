@@ -361,7 +361,7 @@ def _query_words(url: str) -> tuple[list[str], list[str]]:
 DOCUMENT_SUFFIXES = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".rtf", ".odt")
 
 
-def _path_words(url: str) -> tuple[list[str], list[str]]:
+def _path_words(url: str, document_names: bool = True) -> tuple[list[str], list[str]]:
     """The words of the address's path; and the words in it that look typed.
     Typed: the segments after a whole segment that names a request
     ("/search/<words>", "/results/<words>"), and a segment with an encoded
@@ -379,10 +379,11 @@ def _path_words(url: str) -> tuple[list[str], list[str]]:
     for n, seg in enumerate(segments):
         words = _tokens(_decoded(seg))
         spaced = "+" in seg or "%20" in seg.lower()
-        document = n == len(segments) - 1 and _decoded(seg).endswith(DOCUMENT_SUFFIXES)
+        document = (document_names and n == len(segments) - 1
+                    and _decoded(seg).endswith(DOCUMENT_SUFFIXES))
         if after_request or (spaced and not document):
             typed += words
-        if _decoded(seg).strip() in REQUEST_PATH_WORDS:
+        if words and words[0] in REQUEST_PATH_WORDS:     # search, search.php, search-results
             after_request = True
     return _tokens(_decoded(path)), typed
 
@@ -413,7 +414,7 @@ def words_shared_with_url(quote: str, url: str) -> list[str]:
     return seen
 
 
-def quote_is_from_url(quote: str, url: str) -> bool:
+def quote_is_from_url(quote: str, url: str, document_names: bool = True) -> bool:
     """Is the quote made of its own address? True when the address holds
     MIN_QUOTE_CHARS in a row of the quote anywhere, or ECHO_SLUG_CHARS of
     the quote's words whatever separates them ("_", "-", "+", "."); or when
@@ -443,7 +444,7 @@ def quote_is_from_url(quote: str, url: str) -> bool:
         return True
     if _shared_runs(words, in_query) or _shared_runs(words, values):
         return True
-    return bool(_shared_runs(words, _path_words(url)[1]))
+    return bool(_shared_runs(words, _path_words(url, document_names)[1]))
 
 
 class Robots:
@@ -939,6 +940,12 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
                         why = f"page {page.problem}"
                     elif any(quote_is_from_url(claim["quote"], hop) for hop in _addresses(page)):
                         why = "the quote repeats words from an address the request was redirected to"
+                    elif not page.record.get("file", "").endswith(".pdf") and any(
+                            quote_is_from_url(claim["quote"], a, document_names=False)
+                            for a in [claim["source_url"], *_addresses(page)]):
+                        # A ".pdf" name that did not answer with a PDF is no
+                        # document's file name (reviews/35 12, F2).
+                        why = "the quote repeats words from its own source_url"
                     else:
                         found = find_quote(claim["quote"], page)
                         if found is None:
@@ -980,14 +987,26 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
     '\u2034\u2035\u2036\u2037\u2039\u203a\u275b\u275c\u275d\u275e\u276e\u276f\u2e42\u301d\u301e'
     '\u301f\uff02\uff07')}
 _PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
+# Top-level names a renderer may link with no "www." or path (markdown-it's
+# linkify list among them); with a "/" after it, any top-level name counts.
 _TLDS = ("com", "org", "net", "gov", "edu", "mil", "int", "info", "biz", "io", "app", "dev",
-         "site", "online", "xyz", "top", "link", "page", "example")
+         "site", "online", "xyz", "top", "link", "page", "example", "city", "shop", "pro",
+         "land", "museum", "name", "aero", "asia", "cat", "coop", "jobs", "mobi", "tel",
+         "travel", "store", "tech", "club", "law", "realty", "properties")
+_HOST = r"[^\W_](?:[^\W_]|-)*(?:\.[^\W_](?:[^\W_]|-)*)+"    # dotted, any script
 _ADDRESS = re.compile(
-    r"(?i)\S*[a-z0-9]:/\s*/\S*"                       # any scheme, whatever stands before it
+    r"(?i)\S*:/\s*/\S*"                                  # any scheme, whatever stands before it
+    r"|\S*:\s*/\s*/\s*" + _HOST + r"\S*"                 # ... spaced out, before a dotted host
+    r"|\S*/\s*/\s*" + _HOST + r"\S*"                     # //host, whatever stands before it
     r"|\S*www\s*\.\s*\S+"
-    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?/\S*[a-z]\S*"   # a numeric host with a path
-    # and bare host names, any script, ending in a two-letter or common top-level name
-    r"|(?:[^\W_](?:[^\W_]|-)*\.)+(?:[a-z]{2}|" + "|".join(_TLDS) + r")\b(?:/\S*)?")
+    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+|/)\S*"            # a numeric host with a port or path
+    r"|" + _HOST + r"/\S*"                                # a dotted host with a path
+    r"|(?:[^\W_](?:[^\W_]|-)*\.)+(?:[a-z]{2}|" + "|".join(_TLDS) + r")\b")
+# Latin letters that are no ASCII letter plus marks, and look like no
+# quotation mark: kept, so names and streets read right.
+_LATIN_KEPT = frozenset("\u0141\u0142\u00df\u1e9e\u00d8\u00f8\u00c6\u00e6\u0110\u0111\u00d0\u00f0"
+                        "\u00de\u00fe\u0152\u0153\u0126\u0127\u0131\u014a\u014b")
+_FRACTIONS = re.compile("(?<=\\d)(?=[\u00bc-\u00be\u2150-\u215f\u2189])")
 
 
 def _kept_char(ch: str) -> bool:
@@ -996,6 +1015,8 @@ def _kept_char(ch: str) -> bool:
     (U+02BB, U+1425, U+05F2) and right-to-left text."""
     if ch.isascii() or ch in _PLAIN_KEPT:
         return ch.isalnum() or ch in _PLAIN_KEPT
+    if ch in _LATIN_KEPT:
+        return True
     # A Latin letter that is an ASCII letter plus marks ("e" + accent). The
     # Saltillo and click letters are Latin too, and look like quotation marks.
     base = unicodedata.normalize("NFKD", ch)[0]
@@ -1013,8 +1034,9 @@ def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
     if keep_end:
         raw = raw[-limit * 4:]
     t = html.unescape(html.unescape(clean(raw, limit * 4)))       # &quot; and &amp;quot;
+    t = _FRACTIONS.sub(" ", t)                    # 1\u00bd reads 1 1/2, not 11/2
     t = unicodedata.normalize("NFKC", clean(t, limit * 4)).translate(_QUOTE_MARKS)
-    t = t.replace("\u2044", "/")                  # 1\u00bd reads 1 1/2, not 11 2
+    t = t.replace("\u2044", "/")
     t = t.replace("@", " at ").replace("&", " and ")
     t = "".join(ch if _kept_char(ch) else " " for ch in t)
     for _ in range(5):

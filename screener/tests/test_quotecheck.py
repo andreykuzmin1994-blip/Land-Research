@@ -343,13 +343,26 @@ class MatchTests(Base):
                 self.assertTrue(qc.quote_is_from_url("here: m-1 warehouses allowed",
                                                      f"{HOST}/{word}/m-1-warehouses-allowed"))
         for typed in ("/tags/m-1+warehouses+allowed", "/tags/m-1%20warehouses%20allowed",
-                      "/tags/m-1%20warehouses%20allowed.aspx"):
+                      "/tags/m-1%20warehouses%20allowed.aspx", "/s/m-1+warehouses+allowed.pdf/x",
+                      "/Search/m-1-warehouses-allowed", "/city/search/m-1-warehouses-allowed",
+                      "/search.php/m-1-warehouses-allowed", "/search-results/m-1-warehouses-allowed",
+                      "/search;jsessionid=1/m-1-warehouses-allowed",
+                      "/search%2F/m-1-warehouses-allowed"):
             with self.subTest(typed):
                 self.assertTrue(qc.quote_is_from_url("here: m-1 warehouses allowed", HOST + typed))
         # The 40-character rule is tried at every offset of the quote.
         self.assertTrue(qc.quote_is_from_url(
             "Notice. Warehouses are permitted by right in the M-1 district",
             HOST + "/news/warehouses-are-permitted-by-right-in-the-m-1-district"))
+
+    def test_a_document_name_counts_only_when_the_reply_is_a_pdf(self):
+        # reviews/35 12, F2: "warehouses+allowed+here.pdf" served as a web page.
+        url = HOST + "/s/warehouses+allowed+here.pdf"
+        quote = "No hits: warehouses allowed here"
+        self.assertEqual(qc.claim_problem(claim(source_url=url, quote=quote)), "")
+        self.fetcher.pages[url] = b"<p>No hits: warehouses allowed here</p>"
+        self.assertEqual(self.reason(findings(claim(source_url=url, quote=quote))),
+                         "the quote repeats words from its own source_url")
 
     def test_every_address_of_a_redirect_is_held_to_the_echo_rules(self):
         # reviews/35 10, F1: a short link that lands on a query page.
@@ -970,11 +983,27 @@ class LeadFileTests(Base):
             with self.subTest(text):
                 self.assertTrue(all(ch.isascii() for ch in qc._plain(text)))
         self.assertEqual(qc._plain("a {b} ^c"), "a b c")
-        for text in ("Sec. 4.2.1.3/4.2.1.4 of the code", "permitted.Outdoor storage is not",
+        for text in ("Sec. 4.2.1.3 and 4.2.1.4 of the code", "permitted.Outdoor storage is not",
                      "Note: // see below", "\u00a7 27-4 applies"):
             with self.subTest(text):
                 self.assertEqual(qc._plain(text), text)
-        self.assertEqual(qc._plain("1\u00bd acres"), "11/2 acres")
+        self.assertEqual(qc._plain("1\u00bd acres, 2\u00be and \u00bd"), "1 1/2 acres, 2 3/4 and 1/2")
+        name = "\u0141\u00f3d\u017a Stra\u00dfe S\u00f8ren \u00c6r\u00f8 \u0110or\u0111evi\u0107"
+        self.assertEqual(qc._plain(name), name)
+
+    def test_addresses_with_spaces_any_top_level_name_or_a_port_are_removed(self):
+        # reviews/35 12, F1, and the mutation survivors it lists.
+        for text in ("HTTPS : / / x.city/p", "https ://evil.city/x", "https: //evil.city/x",
+                     "http\u015b://evil.city/x", "\u00e9://evil.city/x", "see //evil.city/x",
+                     "//203.0.113.9/1", "evil.city/x", "evil.shop/x", "evil.pro/x", "evil.zzz/x",
+                     "evil.land/parcel", "evil.museum", "evil.com", "evil.ly", "203.0.113.9/123",
+                     "203.0.113.9:8080/1", "https\u2236//evil.city/x", "https\u00b7//evil.city/x",
+                     "https\u02d0//evil.city/x", "_://evil.city/x", "\u2044\u2044evil.city",
+                     "x2://y.example", "verify.shop/ok"):
+            with self.subTest(text):
+                out = qc._plain("see " + text + " now")
+                self.assertIn("(address removed)", out)
+                self.assertNotRegex(out, r"(?i)evil|203\.0|x\.city|y\.example|//|shop")
 
     def test_a_link_shows_the_address_without_its_fragment(self):
         self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")
@@ -988,12 +1017,17 @@ class LeadFileTests(Base):
         # Only the same text order, only the end of the page before, only
         # when the page itself has too little in front of the quote.
         long = "x" * 200 + " not"
+        nxt = "except on lots under five acres. " + "z" * 200
         page = qc.Page(units=[(1, "layout", "the layout text ends in not"), (1, "reading", long),
                               (2, "reading", "permitted in the m-1 district by right."),
-                              (3, "reading", "except on lots under five acres.")])
+                              (3, "layout", "layout text of the next page"), (3, "reading", nxt)])
         found = qc.find_quote("permitted in the M-1 district by right", page)
         self.assertEqual(found["context_before"], long[-qc.CONTEXT_CHARS:] + " (page break) ")
-        self.assertEqual(found["context_after"], ". (page break) except on lots under five acres.")
+        self.assertEqual(found["context_after"], ". (page break) " + nxt[:qc.CONTEXT_CHARS - 1])
+        page = qc.Page(units=[(1, "reading", "permitted in the m-1 district by right. " + "w" * 100),
+                              (2, "reading", "the next page")])
+        found = qc.find_quote("permitted in the M-1 district by right", page)
+        self.assertNotIn("page break", found["context_after"])
         page = qc.Page(units=[(1, "reading", "the page before"),
                               (2, "reading", "y" * 100 + " permitted in the m-1 district by right.")])
         found = qc.find_quote("permitted in the M-1 district by right", page)
