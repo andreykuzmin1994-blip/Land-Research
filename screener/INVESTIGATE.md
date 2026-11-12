@@ -23,9 +23,19 @@ session" at the end. It writes nothing of its own into the findings.
    page. Do not argue with a drop: find the right page or leave the
    section `unknown`. What it will not accept as "on the page":
    - words that are also in the URL: 25 characters in a row anywhere in
-     it, or three words in a row or one long word from the part after
-     the "?" (a search or query page that shows your own request back to
-     you proves nothing);
+     it, or 40 characters of the quote's words whatever separates them in
+     the URL (`_`, `-`, `+`, `.`), or three words in a row or one long
+     word from the part after the "?" or the "#" (a search or query page
+     that shows your own request back to you proves nothing). A path
+     that looks typed (a `+` or `%20` in it, or a `search`, `query`,
+     `find`, `results` or `lookup` segment) is held to the three-words
+     rule too; any other path that shares three words in a row with the
+     quote is flagged in `lead.md`, not dropped. Every address a redirect
+     passes through, the last included, is held to the same rules;
+   - so a map query by the owner's name proves nothing about the owner
+     (the answer shows the name you sent): query by parcel id, as rule 7
+     asks. A `#:~:text=` link that carries the quote is dropped: cite the
+     page without it;
    - a quote that starts or ends inside a word or a number;
    - text in a form field, a drop-down list, the page title, a script;
    - in a PDF, a quote that runs from one page onto the next. A quote
@@ -59,7 +69,8 @@ session" at the end. It writes nothing of its own into the findings.
    an owner, broker, city or utility. Write the question down as an open
    item for the person.
 6. **Write only inside `screener/leads/<parcel>/`** (gitignored; the
-   folder is the parcel id with each space written as `_`). Never write
+   folder is the parcel id with each space written as `_`, and
+   `quotecheck` refuses a file whose `parcel_id` does not match it). Never write
    in its `pages/` folder: that is `quotecheck`'s record of what it
    fetched. Never edit code, settings, `inputs/decisions.csv` or anything
    under `autoresearch/`.
@@ -268,14 +279,16 @@ claim's address, because only the code puts them there. A quote is shown
 as a code span, so markup or an address inside the page's own words is
 displayed, not followed. Everything an agent wrote (claim text, objection,
 open items, the headline) is labelled as the agent's own and reduced to
-letters, digits and plain punctuation, with web addresses removed. It
+Latin letters, digits and plain punctuation, with web addresses removed
+(a link shows its address without the `#` part, which is never sent). It
 gives:
 
 - per section, the checked verdict and the section's first kept claim
   with its quote and link (a section with none reads `unknown`, and says
   so when the investigator had written something else);
 - for each quote shown, the page's words just before and after it (a
-  "not" in front of a quote shows there), and a note when a PDF quote was
+  "not" in front of a quote shows there; for a quote at the top of a PDF
+  page, the end of the page before), and a note when a PDF quote was
   found only across columns or when a quote shares words with the query
   part of its address;
 - the skeptic's verdict, whether quotes of its own back it, its objection
