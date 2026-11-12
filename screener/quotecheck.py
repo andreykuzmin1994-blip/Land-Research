@@ -997,6 +997,12 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
     '\u2034\u2035\u2036\u2037\u2039\u203a\u275b\u275c\u275d\u275e\u276e\u276f\u2e42\u301d\u301e'
     '\u301f\uff02\uff07')}
 _PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
+# Schemes removed with whatever follows their colon. Not tel:, about:, blob:
+# or ws:, which read as prose ("Tel:404-555-0100", "WS:12 mph"); a blob:
+# address carries an https: one, which goes (reviews/35 18).
+SCHEMES = ("https", "http", "ftps", "ftp", "sftp", "javascript", "vbscript", "mailto", "sms",
+           "smb", "webcal", "view-source", "magnet", "search-ms", "ssh", "telnet", "ldap",
+           "gopher", "nntp", "intent", "itms-services")
 _LABEL = r"[^\W_](?:[^\W_]|-)*"
 _HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any script
 # A host name ends in a label of letters (or punycode): "4.2.1.3", "1.1" and
@@ -1005,23 +1011,26 @@ _NAMED_HOST = r"(?:" + _LABEL + r"\.)+(?:[^\W\d_]{2,}|xn--[a-z0-9-]+)"
 _ADDRESS = re.compile(
     r"(?i)\S*:/\s*/\S*"                                  # any scheme, whatever stands before it
     r"|\S*[/\\]\s*[/\\]\s*" + _HOST + r"\S*"            # //host or \\host, spaced schemes too
+    r"|(?<![^\s(])//(?=[^\W_])\S*"                          # //intranet/x, //3405803785?x
     r"|\S*www\s*\.\s*\S+"
     # a numeric host with a port, query or fragment, or a path that is no
     # second dotted number; the hex form
     r"|\b\d{1,3}(?:\.\d{1,3}){3}(?:[:?#]|/(?!\d+(?:\.\d+)+\b))\S*"
-    r"|\b0x[0-9a-f]+(?:\.0x[0-9a-f]+){1,3}\S*"
+    # a dotted host with a hex part: 0xcb.0.113.9/x, 0xcb.29961/x
+    r"|\b(?=[0-9a-fx.]*0x)(?:0x[0-9a-f]+|\d+)(?:\.(?:0x[0-9a-f]+|\d+)){1,3}\S*"
     # IPv6: a "::" form standing alone, or all eight groups
     r"|(?<![\w:])(?=[0-9a-f:]*::)[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])"
     r"|\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b"
-    # a scheme word with a colon and anything but a space straight after it
-    # ("https:3405803785/x", "data:text/html,...", "javascript:...")
-    r"|\b(?:https?|ftps?|sftp|file|data|javascript|vbscript|mailto|tel|wss?|blob|about)\b:\S+"
-    # a named host after a scheme word and a colon or slash, with spaces the
-    # reduction left ("https: evil.example"); not "HTTP 1.1", "FTP: Sec.4.2",
-    # "the www St.Louis office" (reviews/35 17)
-    r"|\b(?:https?|ftps?|www)\b\s*[:/][\s:/]*" + _NAMED_HOST + r"\S*"
-    # localhost, and a long number or hex number used as a host
-    r"|\blocalhost\b[:/]\S*|\b(?:\d{8,}|0x[0-9a-f]{6,})[/:]\S*")
+    # a scheme a browser or the system opens, with anything but a space
+    # straight after its colon (SCHEMES; "https:3405803785/x", "smb:host/x");
+    # file: only with a slash, data: only with a media type, so "Case
+    # file:A-12" and "Source data:2026" stay (reviews/35 17, 18)
+    r"|\b(?:" + "|".join(SCHEMES) + r"):\S+|\bms-[a-z-]+:\S+|\bfile:/\S*"
+    r"|\bdata:(?:[a-z]+/[a-z0-9.+-]+[;,]|,)\S*"
+    # a named host after http, https or ftp and a colon or slash, with spaces
+    # the reduction left ("https: evil.example"); not "HTTP 1.1", "FTP:
+    # Sec.4.2" or "the www St.Louis office"
+    r"|\b(?:https?|ftps?)\b\s*[:/][\s:/]*" + _NAMED_HOST + r"\S*")
 # Any other dotted word ("clerk.zone", "M-2.No", "St.Louis/Kansas") is split
 # at a dot before a letter instead of removed: every word stays, and nothing
 # can be linked or pasted as an address, though "clerk. zone" can still be
@@ -1052,12 +1061,13 @@ def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
     """An agent's (or a page's) words made safe to sit in lead.md: one line
     of letters, digits and plain punctuation. No quotation marks but the
     apostrophe, no markup, no entities, and nothing that can be linked or
-    pasted as an address: an address with a scheme, //, www., localhost,
-    or a numeric, long-integer, hex or IPv6 host is removed; a named host
-    after a scheme word and a colon or slash is removed; any other dotted
-    word is split at a dot before a letter ("clerk. zone"), which a person
-    can still read. A dotted number ("203.0.113.9", "4.2.1.3") stays: it
-    cannot be told from a section number. Characters are reduced first and
+    pasted as an address: an address under one of SCHEMES (or ms-*, file:/,
+    data:<type>), //host, www., a numeric host with a port or path, a hex
+    or IPv6 host is removed; a named host after http, https or ftp and a
+    colon or slash is removed; any other dotted word is split at a dot
+    before a letter ("clerk. zone"), which a person can still read. A dotted
+    number ("203.0.113.9", "4.2.1.3") stays: it cannot be told from a
+    section number. Characters are reduced first and
     addresses removed after, so nothing removed can leave an address behind. In lead.md only this code writes quotation
     marks and links."""
     raw = str(text)

@@ -1099,12 +1099,19 @@ class LeadFileTests(Base):
                      "at https:3405803785/opinion", "data:text/html;base64,PHNjcmlwdD5h==",
                      "See https:intranet/x", "http:localhost:8080/admin", "https:0xcb007109/x",
                      "https:2130706433", "ftp:3405803785/x", "file:/etc/passwd",
-                     "javascript:alert(1)", "localhost:8080/x", "3405803785/x", "mailto:clerk.zone"):
+                     "javascript:alert(1)", "mailto:clerk.zone",
+                     # reviews/35 18, F1 and F3
+                     "see \\\\intranet\\opinion", "or //3405803785?x", "//localhost/x",
+                     "sms:+14045551234", "ms-msdt:/id", "search-ms:query=x", "smb:intranet/share",
+                     "webcal:intranet/cal", "view-source:intranet", "magnet:?xt=urn:x",
+                     "0xcb.0.113.9/x", "0xcb.29961/x", "vbscript:x", "sftp:x/y", "ftps:x/y",
+                     "http:x/y", "ftp:x/y", "ssh:host", "telnet:host", "ldap:host", "data:,x"):
             with self.subTest(text):
                 out = qc._plain(text)
                 self.assertIn("(address removed)", out)
                 self.assertNotRegex(out, r"(?i)evil|attorney|county\. gov|files|3405|intranet|"
-                                         r"localhost|0xcb|2130|passwd|alert|base64|clerk")
+                                         r"localhost|0xcb|2130|passwd|alert|base64|clerk|"
+                                         r"\+1404|msdt|query|share|cal\b|urn|x/y|host")
         # A scheme word with only spaces before a host: split, not pasteable.
         for text, out in (("https\u2236\u2215\u2215county-attorney.com\u2215opinion",
                            "https county-attorney. com opinion"),
@@ -1123,7 +1130,19 @@ class LeadFileTests(Base):
                           ("the www St.Louis office", "the www St. Louis office"),
                           ("tel: 404 555 0100", "tel: 404 555 0100"),
                           ("data: the county", "data: the county"),
-                          ("http and https", "http and https")):
+                          ("http and https", "http and https"),
+                          # reviews/35 18, F2
+                          ("Tel:404-555-0100 for the clerk", "Tel:404-555-0100 for the clerk"),
+                          ("Source data:2026 assessor roll", "Source data:2026 assessor roll"),
+                          ("Zoning data:M-1 and M-2", "Zoning data:M-1 and M-2"),
+                          ("Case file:A-12 is closed", "Case file:A-12 is closed"),
+                          ("Questions about:the zoning", "Questions about:the zoning"),
+                          ("WS:12 mph", "WS:12 mph"), ("Note: // see below", "Note: // see below"),
+                          ("see the WWW: Ord.No. 26-04 page", "see the WWW: Ord. No. 26-04 page"),
+                          ("Permit 20260412/3 was issued", "Permit 20260412/3 was issued"),
+                          ("Book 20261234/Page 5", "Book 20261234/Page 5"),
+                          ("Recorded 20261112:14:05", "Recorded 20261112:14:05"),
+                          ("localhost:8080/x and 3405803785/x", "localhost:8080/x and 3405803785/x")):
             with self.subTest(text):
                 self.assertEqual(qc._plain(text), out)
 

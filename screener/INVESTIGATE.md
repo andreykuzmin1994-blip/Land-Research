@@ -286,11 +286,16 @@ as a code span, so markup or an address inside the page's own words is
 displayed, not followed. Everything an agent wrote (claim text, objection,
 open items, the headline) is labelled as the agent's own and reduced to
 Latin letters, digits and plain punctuation, with nothing that can be
-linked or pasted as an address. An address with a scheme, `//`, `www.`,
-`localhost`, or a numeric, hex or IPv6 host is removed, and so is a host
-after a scheme word and a colon or slash the reduction left (`https:
-evil.example`). A dotted number (`203.0.113.9`, `4.2.1.3`) stays: it
-cannot be told from a section number.
+linked or pasted as an address. Removed: an address under a scheme a
+browser or the system opens (`https`, `http`, `ftp`, `mailto`, `smb`,
+`ms-*` and the others in `quotecheck.SCHEMES`; `file:/`; `data:` with a
+media type), `//host`, `www.`, a numeric host with a port or path, and
+hex and IPv6 hosts; and a host after `http`, `https` or `ftp` and a colon
+or slash that the reduction left (`https: evil.example`). Kept, as prose:
+`Tel:404-555-0100`, `data:2026`, `file:A-12`, `about:`, `WS:12`, and long
+numbers such as `20260412/3`, none of which opens as an address. Lost on
+purpose: `HTTP:404` (it opens as one). A dotted number (`203.0.113.9`,
+`4.2.1.3`) stays: it cannot be told from a section number.
 Any other dotted word is split at a dot before a letter (`clerk. zone`,
 `M-2. No`, `St. Louis/Kansas`): no word is lost, but a person can still
 read a split host as one, so read agent text as the agent's words. A link shows its address without the `#` part,
