@@ -693,6 +693,18 @@ class DecideTests(unittest.TestCase):
         self.assertIn("Revert the experiment: git reset --keep aaa", text)
         self.assertNotIn("--hard", text)
 
+    def test_a_hex_ref_name_in_the_log_stands_for_nothing(self):
+        # reviews/36 15, note 4: a branch named "2026" resolves to a human's commit.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        self.log.write_text(self.log.read_text().replace("\tbbb\t", "\t2026\t"))
+        real = self.repo.git
+        self.repo.git = lambda *a: ("bbb".ljust(40, "0") if a[:3] == ("rev-parse", "--verify", "--quiet")
+                                    and a[3].startswith("2026") else real(*a))
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        self.assertTrue(sys.stdout.getvalue().rstrip().splitlines()[-1].startswith("Do not reset"))
+
     def test_a_logged_hash_git_cannot_make_full_stands_for_nothing(self):
         # reviews/36 12, finding 1: an ambiguous or hand-cut row must not
         # cover a human's commit that happens to share its first letters.

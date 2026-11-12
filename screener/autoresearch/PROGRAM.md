@@ -5,13 +5,6 @@ improves **one file**, `screener/rank.py`, and keeps a change only if the
 ranking gets better at finding land that owners actually sold to
 industrial developers.
 
-> **Do not run the loop yet (2026-11-12).** The answer key in `data/` has
-> been rebuilt under the rules written here and the numbers below describe
-> it, but the last checks of the evaluator and of the keep thresholds on
-> this key are not finished. `--decide` refuses until a human clears that
-> (`REVIEW_PENDING` in `evaluate.py`). If you are an agent asked to run
-> experiments: stop and tell the human.
-
 ## The score
 
 `python -m screener.autoresearch.evaluate` asks one question five times,
@@ -208,7 +201,8 @@ the live ranking, because the live tool scores with the same `rank.py`.
 
 - 35 dev sites in 11 map cells. The bar (+2.5 graded and
   99% of resamples) is set so that a change that is not an improvement is
-  kept about 2% of the time or less; it also means small real
+  kept about 2% of the time (2.4% in the worst setting measured,
+  `reviews/36_screener_eval_cohorts_metric/14`); it also means small real
   improvements are often discarded. Expect a handful of keeps, not
   dozens.
 - The five years are five views of mostly the same sites. They steady the

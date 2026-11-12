@@ -37,8 +37,9 @@ resamples. Each resample draws whole ~5 km map cells, every year of a cell
 together, because positives come in clusters and a site repeats across
 years; both rankings are scored on the same draw. The thresholds are
 checked with --null-test, so that a change that is not an improvement is
-kept about 2% of the time or less; the measured rates, and the key they
-were measured on, are in reviews/36_screener_eval_cohorts_metric (07).
+kept about 2% of the time (2.4% in the worst setting measured); the
+measured rates, and the key they were measured on, are in
+reviews/36_screener_eval_cohorts_metric (14).
 
 What the loop is shown. Scores are printed and logged to one decimal, and
 a decision prints the rounded scores only: no win share, and the gain as
@@ -152,7 +153,7 @@ K_SHARE = 0.02
 # 20% is paid for, so lifting sites through the unread middle earns nothing.
 CREDIT_SPAN = 10.0
 BOOTSTRAP = 500
-# Checked with --null-test (reviews/36, 05 to 07): see there before
+# Checked with --null-test (reviews/36, 05 to 07 and 14): see there before
 # changing, and re-run --null-test after any change to these or to the key.
 MIN_GAIN = 2.5                               # 2.0 kept noise 2.9% of the time on the 2026-11-12 key (reviews/36 14)
 WIN_SHARE_TO_KEEP = 0.99
@@ -169,11 +170,8 @@ UNSTABLE = ("rank.learned_score gave some records a different score the second t
 # Why --decide refuses for now ("" = it does not). Set while a change to this
 # evaluation awaits its review; a human clears it in the change that records
 # the review's outcome. Scoring without --decide still works.
-REVIEW_PENDING = ("the evaluation's review findings are fixed in code (reviews/36, 05 to 07), "
-                  "but the answer key in data/ has not been rebuilt under the new builder "
-                  "rules, and the keep thresholds have not been checked on the rebuilt key. No "
-                  "experiment may be kept or discarded yet. Stop and tell a human "
-                  "(screener/AGENTS_DESIGN.md, \"Next session\")")
+# Cleared 2026-11-12: key rebuilt and thresholds measured on it (reviews/36, 14 and 15).
+REVIEW_PENDING = ""
 # Record fields the ranking never sees. The ranking is handed an allow-list
 # (the key's meta "features" and "banned"), so a new record field is hidden
 # unless it is added there; this tuple only documents the known ones.
@@ -1058,8 +1056,11 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
             # Each logged short hash made full by git: an ambiguous or unknown
             # one gives nothing, so it cannot stand for a human's commit
             # (reviews/36 12, finding 1).
-            discards = {_git("rev-parse", "--verify", "--quiet", f"{c}^{{commit}}") for c in logged}
-            discards.discard("")
+            # A ref name that happens to be hex ("2026") resolves to another
+            # commit: keep only a hash that begins with what was logged.
+            discards = {full for c in logged
+                        for full in [_git("rev-parse", "--verify", "--quiet", f"{c}^{{commit}}")]
+                        if full.startswith(c)}
             if between and all(c in discards for c in between):
                 print(f"Revert the experiment: git reset --keep {best['commit']}")
                 print(f"(this also takes back {len(between)} earlier discarded experiment(s) "
@@ -1099,8 +1100,9 @@ def main(argv: list[str] | None = None) -> int:
     strays = foreign_modules()
     if strays:
         return _refuse("modules were loaded from inside the repository but outside screener/ ("
-                       + ", ".join(strays[:5]) + "): run from a clean checkout; a file there "
-                       "that shadows a standard module would run inside the evaluator.")
+                       + ", ".join(strays[:5]) + "): run from the repository root, with no "
+                       "PYTHONPATH set, in a clean checkout; a file there that shadows a "
+                       "standard module would run inside the evaluator.")
     try:
         records, positives, meta = load()
     except EvalSetError as exc:

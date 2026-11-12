@@ -777,6 +777,12 @@ Known gaps:
   finding 3). Run from a clean checkout.
 - The reset hint trusts `experiments.tsv`: a hand-added discard row that
   names a human's commit gets that commit reset away.
+- The check for repository folders on `sys.path` also runs after the
+  evaluator's own imports, so a planted module that removes its own entry
+  is not seen, and a folder named `site-packages`, or one under the
+  running virtual environment, is exempt
+  (`reviews/36_screener_eval_cohorts_metric/15`). Both need someone who
+  sets `PYTHONPATH` or plants files; the loop's command does neither.
 - The live `python -m screener.run` doesn't run the check.
 - Python 3.14 adds public evaluation hooks (`annotationlib`,
   `ForwardRef.evaluate`, template strings) that these rules haven't been
@@ -787,6 +793,10 @@ Known gaps:
 ```bash
 python -m unittest discover -s screener/tests -t .
 ```
+
+Run it from the repository root with `-t .`: without it `screener/tests`
+lands on `sys.path`, and the evaluator's tests (rightly) see a repository
+folder there.
 
 ## Adding a county
 
