@@ -158,7 +158,7 @@ starts from); the loop never does.
 #   edit screener/rank.py (one idea)
 git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
-#   DISCARD -> run the exact `git reset --hard <commit>` it prints (it
+#   DISCARD -> run the exact `git reset --keep <commit>` it prints (it
 #              takes back discarded experiments and nothing else). If it
 #              prints "Do not reset" instead, stop and ask a human.
 #   KEEP    -> carry on from here

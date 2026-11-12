@@ -696,8 +696,9 @@ never the bootstrap win share (that goes to the log only): finer numbers
 would let one experiment ask whether a band of parcels holds a known site.
 Every scoring that runs `rank.py` and shows a number is logged as a
 `look`, `test` or `null` row with a hash of `rank.py`. After a DISCARD
-the evaluator prints the `git reset --hard` that takes back discarded
-experiments and nothing else; when a reset would remove any other commit
+the evaluator prints the `git reset --keep` that takes back discarded
+experiments and nothing else (`--keep`, not `--hard`: it stops rather than
+delete uncommitted work anywhere in the checkout); when a reset would remove any other commit
 it prints "Do not reset" and no command.
 
 The `rank.py` that is checked is the one that runs: its bytes are compiled
@@ -767,6 +768,14 @@ Known gaps:
   the human read of each kept diff stand against lookups.
 - Changing shared objects through their methods (such as registering a
   class with an ABC) isn't detected.
+- The check for root-level files that shadow a standard module is best
+  effort. It runs inside the evaluator's own process, after its imports:
+  a shadow that does load (an untracked root `csv.py` or `csv.pyc`,
+  against rule 1) can switch the check off before it looks
+  (`reviews/36_screener_eval_cohorts_metric/10_fourth_round_check.md`,
+  finding 3). Run from a clean checkout.
+- The reset hint trusts `experiments.tsv`: a hand-added discard row that
+  names a human's commit gets that commit reset away.
 - The live `python -m screener.run` doesn't run the check.
 - Python 3.14 adds public evaluation hooks (`annotationlib`,
   `ForwardRef.evaluate`, template strings) that these rules haven't been

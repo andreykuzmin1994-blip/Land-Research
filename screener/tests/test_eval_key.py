@@ -484,6 +484,23 @@ class MainTests(unittest.TestCase):
                 self.run_main("--null-test", "20")
         self.assertEqual([r["status"] for r in self.rows()], ["null"])
 
+    def test_a_null_test_never_scores_the_test_split(self):
+        # reviews/36 09 N6 and 10 finding 2: --null-test with --test stays on dev.
+        asked = []
+        real = ev.evaluate
+
+        def only_dev(records, positives, split, **kw):
+            asked.append(split)
+            if split != "dev":
+                raise AssertionError("the sealed split was scored")
+            return real(records, positives, split, **kw)
+        with mock.patch.object(ev, "evaluate", only_dev), \
+                mock.patch.object(ev.concurrent.futures, "ProcessPoolExecutor",
+                                  side_effect=RuntimeError("stopped here")):
+            with self.assertRaises(RuntimeError):
+                self.run_main("--null-test", "20", "--test")
+        self.assertEqual(asked, ["dev"])
+
     def test_main_uses_the_fresh_process_pass_and_says_when_it_cannot_run(self):
         asked = []
         with mock.patch.object(ev, "second_pass",
@@ -704,14 +721,20 @@ class CheckedBytesTests(unittest.TestCase):
             for name in ("csv.py", "json.pyc", "prepare.py", ".gitignore", "CSV.txt",
                          "math" + __import__("importlib.machinery").machinery.EXTENSION_SUFFIXES[0]):
                 Path(tmp, name).write_text("")
-            for folder in ("random", "venv", "site", "types", "screener", "tests"):
+            # A folder without an __init__ is a namespace package: it loses to
+            # a module this Python has (venv/), and wins where there is none
+            # (msvcrt/ or _winapi/ on Linux: reviews/36 10, finding 1).
+            missing = [n for n in ("msvcrt", "_winapi") if not ev._stdlib_has(n)]
+            for folder in ("random", "venv", "site", "types", "screener", "tests", *missing):
                 Path(tmp, folder).mkdir()
             Path(tmp, "random", "__init__.py").write_text("")
+            Path(tmp, "types", "__init__.pyi").write_text("")     # not importable: no shadow
+            Path(tmp, "site", "__init__.txt").write_text("")
             with mock.patch.object(ev, "ROOT", Path(tmp)):
                 found = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
-            self.assertEqual(len(found), 4)
+            self.assertEqual(len(found), 4 + len(missing))
             self.assertEqual([n for n in found if not n.startswith("math")],
-                             ["csv.py", "json.pyc", "random"])
+                             sorted(["csv.py", "json.pyc", "random", *missing]))
 
     def test_git_runs_in_the_repository_root(self):
         seen = []

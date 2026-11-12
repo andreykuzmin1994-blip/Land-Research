@@ -720,6 +720,25 @@ def second_pass(source: bytes):
     return recheck
 
 
+def _stdlib_has(name: str) -> bool:
+    """Is there a module of this name on this Python outside the repository?"""
+    if name in sys.builtin_module_names:
+        return True
+    elsewhere = [p for p in sys.path if p and _outside_repo(p)]
+    try:
+        return importlib.machinery.PathFinder.find_spec(name, elsewhere) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _outside_repo(path: str) -> bool:
+    try:
+        resolved = Path(path).resolve()
+    except OSError:
+        return False
+    return resolved != ROOT and ROOT not in resolved.parents
+
+
 def foreign_modules() -> list[str]:
     """What could run inside the evaluator from the repository but outside
     screener/, where the git checks do not look: a file or folder at the
@@ -729,19 +748,23 @@ def foreign_modules() -> list[str]:
     outside screener/ and is not an installed package."""
     inside = ROOT / "screener"
     installed = {Path(p).resolve() for p in (sys.prefix, sys.base_prefix, sys.exec_prefix)}
+    suffixes = importlib.machinery.all_suffixes()
     out = []
     try:
         for entry in ROOT.iterdir():
             if entry.is_dir():
-                # A folder is importable in a standard module's place only as
-                # a package (venv/ or site/ without an __init__ is not).
-                shadows = (entry.name in sys.stdlib_module_names
-                           and any(entry.glob("__init__.*")))
+                # A package folder takes a standard module's place. A folder
+                # without an __init__ does only when this Python has no such
+                # module of its own (msvcrt/ or _winapi/ on Linux): an
+                # existing module wins over a namespace folder (venv/, site/).
+                package = any((entry / f"__init__{suffix}").exists() for suffix in suffixes)
+                shadows = entry.name in sys.stdlib_module_names and (
+                    package or not _stdlib_has(entry.name))
             else:
                 # csv.py, csv.pyc, csv.cpython-313-x86_64-linux-gnu.so, ...
                 shadows = any(entry.name.endswith(suffix)
                               and entry.name[:-len(suffix)] in sys.stdlib_module_names
-                              for suffix in importlib.machinery.all_suffixes())
+                              for suffix in suffixes)
             if shadows:
                 out.append(f"{entry.name} (shadows a standard module)")
     except OSError:
@@ -1004,18 +1027,20 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
         # kept rank.py unless an earlier discard was left in place; a human's
         # commit to a document or a test may sit between the two.
         if not _git("diff", "--name-only", best["commit"], parent, "--", EXPERIMENT_FILE):
-            print(f"Revert the experiment: git reset --hard {parent}")
+            print(f"Revert the experiment: git reset --keep {parent}")
         else:
             # An earlier discard was left in place. Going back to the best
             # kept run removes every commit since: say so only when each one
             # is a discard this log recorded. Otherwise a human sorts it out.
+            # Full hashes, matched by the logged short form: git lengthens
+            # its short hashes as a repository grows.
             between = [line.split()[0] for line in
-                       _git("log", "--format=%h", f"{best['commit']}..{parent}").splitlines()
+                       _git("log", "--format=%H", f"{best['commit']}..{parent}").splitlines()
                        if line.strip()]
             discards = {r["commit"] for r in _decisions()
-                        if r["status"] == "discard" and r["fingerprint"] == fp}
-            if between and all(c in discards for c in between):
-                print(f"Revert the experiment: git reset --hard {best['commit']}")
+                        if r["status"] == "discard" and r["fingerprint"] == fp and r["commit"]}
+            if between and all(any(c.startswith(d) for d in discards) for c in between):
+                print(f"Revert the experiment: git reset --keep {best['commit']}")
                 print(f"(this also takes back {len(between)} earlier discarded experiment(s) "
                       "that were left in place)")
             else:
@@ -1118,6 +1143,8 @@ def main(argv: list[str] | None = None) -> int:
         # Nothing is shown before decide()'s guards pass: a refused run is not a look.
         return decide(records, positives, dev, args.new_baseline)
     if args.null_test:
+        if args.test:
+            print("--test is ignored with --null-test: the null test uses the dev split only")
         if args.null_test < 20:
             print("--null-test needs at least 20 trials")
             return 2
