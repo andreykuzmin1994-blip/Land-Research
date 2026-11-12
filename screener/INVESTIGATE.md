@@ -29,8 +29,9 @@ session" at the end. It writes nothing of its own into the findings.
      that shows your own request back to you proves nothing). The parts
      of a path that look typed are held to the three-words rule too:
      what follows a segment made of `search`, `query`, `find`, `results`
-     or `lookup` and at most a script's name (`/search/<words>`,
-     `/search.php/<words>`; not a slug such as `/find-your-zoning/`), and
+     or `lookup` (joined by `-` or `_`, with `page` or `for`) and any file
+     extension (`/search/<words>`, `/search.php/<words>`,
+     `/search-results/<words>`; not a slug such as `/find-your-zoning/`), and
      a segment with an encoded space in it (`+`, `%20`, `%09` and the
      like) unless it is the file name of a document that answers as a PDF
      (`Article%2012%20Light%20Industrial.pdf`). Any other path that

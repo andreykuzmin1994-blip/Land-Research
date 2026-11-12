@@ -359,7 +359,12 @@ class MatchTests(Base):
                       "/Search/m-1-warehouses-allowed", "/city/search/m-1-warehouses-allowed",
                       "/search.php/m-1-warehouses-allowed", "/search-results/m-1-warehouses-allowed",
                       "/search;jsessionid=1/m-1-warehouses-allowed",
-                      "/search%2F/m-1-warehouses-allowed"):
+                      "/search%2F/m-1-warehouses-allowed", "/search.json/m-1-warehouses-allowed",
+                      "/search.nsf/m-1-warehouses-allowed", "/search.aspx/m-1-warehouses-allowed",
+                      "/search.jsp/m-1-warehouses-allowed", "/search.do/m-1-warehouses-allowed",
+                      "/search.html/m-1-warehouses-allowed", "/search-for/m-1-warehouses-allowed",
+                      "/search-page/m-1-warehouses-allowed", "/results-page/m-1-warehouses-allowed",
+                      "/search%3Bjsessionid=1/m-1-warehouses-allowed"):
             with self.subTest(typed):
                 self.assertTrue(qc.quote_is_from_url("here: m-1 warehouses allowed", HOST + typed))
         # The 40-character rule is tried at every offset of the quote.
@@ -1033,6 +1038,27 @@ class LeadFileTests(Base):
                 out = qc._plain("see " + text + " now")
                 self.assertIn("(address removed)", out)
                 self.assertNotRegex(out, r"(?i)evil|203\.0|x\.city|y\.example|//|shop|zone|legal|db8")
+
+    def test_hosts_under_any_top_level_name_go_whatever_their_case(self):
+        # reviews/35 14, F1 and F4: IANA's list, matched without regard to case.
+        for text in ("County-Attorney.Legal", "CLERK.ZONE", "Records.Farm", "b\u00fccher.zone",
+                     "EVIL.LY", "Evil.Ly", "Clerk.Us", "COUNTY.GA", "Evil.Zone./x", "Evil.Zone%2Fx",
+                     "Evil.Zone :8443", "https:\\\\Evil.Zone\\x", "203.0.113.9?id=7", "Evil.Zone/x",
+                     "Evil.Zone?id=7", "Evil.Zone#x", "Evil.Zone:8443", "Evil.Zone:/x",
+                     "Evil.Example", "2001:db8::7", "::ffff:cb00:7109", "fe80::1",
+                     "2001:0db8:0000:0000:0000:ff00:0042:8329"):
+            with self.subTest(text):
+                out = qc._plain("see " + text + " now")
+                self.assertIn("(address removed)", out)
+                self.assertNotRegex(out, r"(?i)zone|legal|farm|ly\b|\bus\b|\bga\b|203\.0|db8|ffff|fe80|8329|example")
+        # reviews/35 14, F2 and notes: page context is case-folded, and these
+        # dotted words are no hosts.
+        for text in ("permitted.outdoor", "st.louis", "art.iv", "ft.worth", "u.s.hwy 29",
+                     "4.2.permitted", "m-1.warehouses", "are.not", "is not.permitted",
+                     "district.except where not.allowed by overlay", "1:2:3:4:5 ratio",
+                     "12:00:00:00:00", "fee::due", "at 10:30"):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), text)
 
     def test_a_link_shows_the_address_without_its_fragment(self):
         self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")

@@ -358,16 +358,17 @@ def _query_words(url: str) -> tuple[list[str], list[str]]:
     return _tokens(_decoded(parts.query + " " + parts.fragment)), _tokens(_decoded(values))
 
 
-SCRIPT_WORDS = frozenset({"php", "asp", "aspx", "jsp", "cfm", "htm", "html", "cgi", "do",
-                          "action", "pl"})
+_REQUEST = "(?:" + "|".join(sorted(REQUEST_PATH_WORDS)) + ")"
+REQUEST_SEGMENT = re.compile(_REQUEST + r"(?:[-_](?:" + _REQUEST[3:-1] + r"|page|for))*"
+                             r"(?:\.[a-z0-9]{1,6})*")
 DOCUMENT_SUFFIXES = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".rtf", ".odt")
 
 
 def _path_words(url: str, document_names: bool = True) -> tuple[list[str], list[str]]:
     """The words of the address's path; and the words in it that look typed.
-    Typed: the segments after a whole segment that names a request
-    ("/search/<words>", "/results/<words>"), and a segment with an encoded
-    space ("+" or %20) unless it is the file name of a document
+    Typed: the segments after a segment that names a request
+    ("/search/<words>", "/search-results.php/<words>": REQUEST_SEGMENT), and
+    a segment with an encoded space of any kind unless it is the file name of a document
     ("Article%2012%20Light%20Industrial.pdf"). A request word inside a
     slug ("hearing-results") or as the last segment (ArcGIS ".../query")
     types nothing."""
@@ -381,17 +382,18 @@ def _path_words(url: str, document_names: bool = True) -> tuple[list[str], list[
     for n, seg in enumerate(segments):
         words = _tokens(_decoded(seg))
         # Any encoded space: +, %20, %09, %C2%A0, %E3%80%80, %2B (reviews/35 13, F4).
-        spaced = "+" in seg or " " in _decoded(seg) or "+" in _decoded(seg)
+        # _decoded turns a raw "+" into a space and leaves a decoded one.
+        spaced = " " in _decoded(seg) or "+" in _decoded(seg)
         document = (document_names and n == len(segments) - 1
                     and _decoded(seg).endswith(DOCUMENT_SUFFIXES))
         if after_request or (spaced and not document):
             typed += words
-        # A request segment is made of request words and a script's name
-        # only (search, search.php, search-results, search;jsessionid=1), not
-        # a slug that begins with one ("find-your-zoning": reviews/35 13, F3).
-        head = _tokens(_decoded(seg.split(";", 1)[0]))
-        if head and head[0] in REQUEST_PATH_WORDS and all(
-                w in REQUEST_PATH_WORDS or w in SCRIPT_WORDS for w in head):
+        # A request segment is request words joined by - or _ (with "page" or
+        # "for"), then any file extension: search, search.php, search.json,
+        # search-results, search-page, search;jsessionid=1 (also encoded).
+        # Not a slug that begins with one ("find-your-zoning": reviews/35 13
+        # F3, 14 F3).
+        if REQUEST_SEGMENT.fullmatch(_decoded(seg).split(";", 1)[0].strip(" /")):
             after_request = True
     return _tokens(_decoded(path)), typed
 
@@ -995,12 +997,16 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
     '\u2034\u2035\u2036\u2037\u2039\u203a\u275b\u275c\u275d\u275e\u276e\u276f\u2e42\u301d\u301e'
     '\u301f\uff02\uff07')}
 _PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
-# Top-level names a renderer may link with no "www." or path (markdown-it's
-# linkify list among them); with a "/" after it, any top-level name counts.
-_TLDS = ("com", "org", "net", "gov", "edu", "mil", "int", "info", "biz", "io", "app", "dev",
-         "site", "online", "xyz", "top", "link", "page", "example", "city", "shop", "pro",
-         "land", "museum", "name", "aero", "asia", "cat", "coop", "jobs", "mobi", "tel",
-         "travel", "store", "tech", "club", "law", "realty", "properties")
+# Every top-level domain name (IANA's list, screener/tlds.txt), matched
+# whatever its case: a bare host under any of them is removed, and no other
+# dotted word is (reviews/35 14).
+_TLD_NAMES = sorted([line.strip().lower() for line in
+                     (Path(__file__).with_name("tlds.txt")).read_text().splitlines()
+                     if line.strip() and not line.startswith("#")]
+                    # and the special-use names (RFC 6761, 6762, 7686), not on IANA's list
+                    + ["example", "test", "localhost", "invalid", "local", "onion"],
+                    key=len, reverse=True)
+_TLD = "(?:" + "|".join(map(re.escape, _TLD_NAMES)) + ")"
 _LABEL = r"[^\W_](?:[^\W_]|-)*"
 _HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any script
 # A host name ends in a label of letters (or punycode): "4.2.1.3", "$3.50"
@@ -1008,14 +1014,18 @@ _HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any scrip
 _NAMED_HOST = r"(?:" + _LABEL + r"\.)+(?:[^\W\d_]{2,}|xn--[a-z0-9-]+)"
 _ADDRESS = re.compile(
     r"(?i)\S*:/\s*/\S*"                                  # any scheme, whatever stands before it
-    r"|\S*/\s*/\s*" + _HOST + r"\S*"                     # //host, spaced schemes too
+    r"|\S*[/\\]\s*[/\\]\s*" + _HOST + r"\S*"            # //host or \\host, spaced schemes too
     r"|\S*www\s*\.\s*\S+"
-    # a numeric host with a port, or a path that is no second dotted number
-    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+|/(?!\d+(?:\.\d+)+\b))\S*"
-    r"|\b[0-9a-f]+::[0-9a-f:]*|::[0-9a-f]+[0-9a-f:]*|\b(?:[0-9a-f]{1,4}:){4,7}[0-9a-f]{1,4}\b"
-    r"|" + _NAMED_HOST + r"(?:[/?#]|:\d|:/)\S*"           # a named host with a path, query or port
-    r"|(?:" + _LABEL + r"\.)+(?:" + "|".join(_TLDS) + r")\b"
-    r"|(?-i:\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b)")              # any lowercase all-letter last label
+    # a numeric host with a port, query or fragment, or a path that is no
+    # second dotted number; the hex form
+    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?:[:?#]|/(?!\d+(?:\.\d+)+\b))\S*"
+    r"|\b0x[0-9a-f]+(?:\.0x[0-9a-f]+){1,3}\S*"
+    # IPv6: a "::" form standing alone, or all eight groups
+    r"|(?<![\w:])(?=[0-9a-f:]*::)[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])"
+    r"|\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b"
+    r"|" + _NAMED_HOST + r"/\S*"                            # a named host with a path
+    # a host under a top-level name, with whatever follows it
+    r"|(?<![\w.])(?:" + _LABEL + r"\.)+" + _TLD + r"(?![\w-])\.?(?:\s*(?:[/?#%\\]|:\s*\d|:/)\S*)?")
 # Latin letters that are no ASCII letter plus marks, and look like no
 # quotation mark: kept, so names and streets read right.
 _LATIN_KEPT = frozenset("\u0141\u0142\u00df\u1e9e\u00d8\u00f8\u00c6\u00e6\u0110\u0111\u00d0\u00f0"
