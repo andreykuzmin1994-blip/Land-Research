@@ -1,0 +1,464 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0155  LL0278",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "conditional",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "East Point's Sept 18, 2025 P&Z hearing agenda describes this parcel (with the neighbouring 1692 Empire Ave / 0 Woodberry Ave parcel) as in the I-1 Light Industrial district, and shows that a warehouse there was applied for only with a use permit (Sec. 10-2079 D8) plus a variance from Sec. 10-2150.6(a)(1) because it lies within 5,280 ft of residential property, and a further variance to put some of the use outside a building. So warehouse use here is not by right without relief from the residential-distance rule.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2025/09/Agenda-PZ-Public-Hearing-SEPT-18-2025.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "1688 Empire Avenue and 1692 Empire Ave aka 0 Woodberry Ave PIN: 14 0155 LL0278 and 14 0155 LL0351 The applicant is requesting a use permit and concurrent variances for the purposes of operating an concrete manufacturing facility and the development and operation of a warehouse use per Sec.10-2079 D8 and the associated concurrent variances from 10-2150.6(a)(1) to operate a warehouse within 5,280 ft of residential property in the I-1 Light Industrial zoning district and a variance to allow some of the use to be located outside of the building in accordance with Section 10-2150.6(a)(2).",
+     "context_before": "ck in the r-1a zone on lot divide and minimum lot width to be reduced. variance ",
+     "context_after": " [1] use permit and concurrent variances (page break) 5 p2025rz-002-08 viii. announcements ix.",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0a5872066ddc50803642d92a.pdf"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The August 12, 2025 community zoning meeting notice lists the use permit and variance case for 1688 Empire Avenue alone: a use permit under Sec. 10-2079 D8 to develop and operate a warehouse within 5,280 ft of residential in the I-1 zone.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2025/09/CZIM-Notice-Agenda-August-12-2025-.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Henry Bailey Jr 2150.6(a)(2) to develop and operate a warehouse within 5,280 ft of residential in the I-1 Light Industrial zone",
+     "context_before": "e permit with 10-2079 d8 and concurrent variance per sec. 10concurrent variance ",
+     "context_after": " 1784 west taylor avenue (pin: 14 015800010448) ward b d. muffy charlton the app",
+     "pdf_page": 3,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/f85a6de99cf19a294c555671.pdf"
+    },
+    {
+     "id": "zoning-3",
+     "text": "A Nov 19, 2026 agenda item elsewhere in East Point shows the same 5,280 ft rule is still applied in I-1: a use in I-1 needs a variance from Sec. 10-2079(d) to operate within 5,280 ft of residentially zoned property.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "concurrent variance from Sec. 10-2079(d) to operate within 5,280 ft from residentially zoned properties.",
+     "context_before": "g in the i-1 light industrial district in accordance with sec. 10-2150.10 and a ",
+     "context_after": " use permit w/ concurrent variance variance viii. # new business case number app",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/b77162e39396a7925551b72e.pdf"
+    }
+   ],
+   "open_items": [
+    "The I-1 use table and Secs. 10-2079 and 10-2150.6 are on Municode (a known wall); not read. Confirm with East Point planning whether warehouse/distribution in I-1 within 5,280 ft of residentially zoned land needs a use permit, a variance, or both, and whether the rule can be met here at all.",
+    "Residential land is close: the 1780 E Woodberry Ave parcel (14 0154 LL0204), which the city proposed in Oct 2026 to rezone back to R-3 multifamily, measures about 706 ft from this parcel on the county parcel map (my measurement), and GA EPD says the nearest resident is less than 300 ft from the release area on the adjoining wood-treating site. The 5,280 ft rule therefore very likely applies to any warehouse here.",
+    "Confirm whether the 2025 use-permit/variance applications were withdrawn, denied or approved, and whether any conditions now attach to the parcel."
+   ]
+  },
+  "plans": {
+   "verdict": "against",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "My reading of the Future Development Map image (p. 71 of the 2022-23 plan update) places this parcel inside Town Center Subarea 2: Lawrence Street (shown 257 acres), not in either Industrial character area. That subarea's vision is to convert vacant industrial land into residential, commercial and high-tech industrial development, and says clean-up from prior industrial use is required. A warehouse/distribution use is not among its listed uses.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "convert existing vacant industrial properties into modern residential, commercial, and high-tech industrial developments. Environmental clean-up from prior industrial use is required to ensure future flexibility in use.",
+     "context_before": "sity bonuses, tax abatements, and infrastructure improvements and investment to ",
+     "context_after": " this large tract of land will benefit from being subdivided into small blocks t",
+     "pdf_page": 86,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The Lawrence Street subarea's development pattern calls for 6-12 dwelling units per acre, mixed-use master-planned development and high-tech industrial uses. I1 is among its typical zoning districts, but the pattern is a walkable mixed-use town center.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Typical zoning districts: CR, MIX, BP, I1, EI, MI, OIT, C1, CL, C2, and MX-CI",
+     "context_before": "buildings \u2022 institutional \u2022 variety of housing options \u2022 high-tech industrial \u2022 ",
+     "context_after": " \u2022 public parks, plazas, and open space \u2022 urban agriculture, community gardens \u2022",
+     "pdf_page": 87,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The plan says decision-makers use the character-area descriptions as a policy guide for future rezoning decisions.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Decision-makers will also use the character area descriptions as a policy guide for future rezoning decisions.",
+     "context_before": "estment will need to evolve to accommodate character area goals and principles. ",
+     "context_after": " character areas provide descriptions regarding these planning elements: \u2022 desir",
+     "pdf_page": 70,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "The parcel directly adjoins a GA EPD Hazardous Site Inventory site, the former Southern Wood Piedmont wood-treating site at 1745 Connally Drive (parcel 14-0155-LL-033-6, 38.4 acres). On the county parcel map this parcel (14 0155 LL0336) shares about 553 ft of boundary, the whole south line, with 1688 Empire Ave (my measurement from the county polygons). This parcel's own number does not appear in the 2025 HSI summaries.",
+     "source_url": "https://epd.georgia.gov/document/pdf/2025-hsi-site-summaries/download",
+     "retrieved": "2026-11-12",
+     "quote": "Southern Wood Piedmont - East Point 1745 Connally Drive East Point, Fulton County, GA 30344",
+     "context_before": "nmental protection division hazardous site inventory site name: location: 10084 ",
+     "context_after": " o latitude 33 41 ' 24 \" n acreage site number longitude 84 o 26 ' 41 \" w parcel",
+     "pdf_page": 50,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/45c133a3338b0bb01979623a.pdf"
+    },
+    {
+     "id": "plans-5",
+     "text": "GA EPD's 2025 summary for the adjoining site: cleanup under way for source materials, soil and groundwater; Class IV; the Director has found that corrective action is required; known release of benzo(a)pyrene in soil above the reportable quantity; nearest resident less than 300 ft from the affected area.",
+     "source_url": "https://epd.georgia.gov/document/pdf/2025-hsi-site-summaries/download",
+     "retrieved": "2026-11-12",
+     "quote": "Cleanup activities are being conducted for source materials, soil, and groundwater. CLEANUP PRIORITY: The Director has designated this site as a Class IV GA EPD DIRECTOR'S DETERMINATION REGARDING CORRECTIVE ACTION: The Director has determined that this site requires corrective action. REGULATED SUBSTANCES RELEASED, AND THREATS TO HUMAN HEALTH AND ENVIRONMENT POSED BY THE RELEASE: This site has a known release of Benzo(a)pyrene in soil at levels exceeding the reportable quantity. This site has limited access. The nearest resident individual is less than 300 feet from the area affected by the release.",
+     "context_before": "verplace blvd., suite 2300 jacksonville, fl 32207 status of cleanup activities: ",
+     "context_after": " regulated substances: substance name acenaphthene arsenic benzene benzo(a)pyren",
+     "pdf_page": 49,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/45c133a3338b0bb01979623a.pdf"
+    },
+    {
+     "id": "plans-6",
+     "text": "The county parcel layer, queried by the two parcel ids (this one and 14 0155 LL0336), returns the neighbouring parcel at 1745 Connally Dr. Its polygon touches this parcel's polygon (0 ft apart, about 553 ft of shared line; my computation from the returned geometry).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2714%200155%20%20LL0278%27%2C%2714%200155%20%20LL0336%27)&outFields=ParcelID%2CAddress%2COwner%2CImprAppr%2CLUCode%2CClassCode%2CLandAcres&returnGeometry=true&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Address\":\"1745 CONNALLY DR\",\"Owner\":\"S W P C INC \"",
+     "context_before": "7.2101514973,1344067.2199740708]]]}},{\"attributes\":{\"parcelid\":\"14 0155 ll0336\",",
+     "context_after": ",\"imprappr\":190900,\"lucode\":\"399\",\"classcode\":\"i5\",\"landacres\":38.4},\"geometry\":",
+     "words_shared_with_url": [
+      "address",
+      "owner"
+     ],
+     "page_file": "pages/b50c2a0e6dd08fc65dbb9d94.html"
+    },
+    {
+     "id": "plans-7",
+     "text": "Nearby rezoning: in October 2026 the city itself proposed rezoning 1780 E Woodberry Ave (14 0154 LL0204), about 706 ft from this parcel (my measurement), back to R-3 multifamily.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2026/10/PCPH-Public-Notice-Agenda_10.15.2026.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "1780 E Woodberry Ave (PIN: 14 0154 LL0204) Applicant is requesting a rezoning back to R-3 Multifamily Development per the condition placed on Case #P2026RZ-001-01",
+     "context_before": " case number applicant location/description 1 p2026rz-001-09 city of east point ",
+     "context_after": " p2026v-001-09 cody snyder 1780 e woodberry ave (pin: 14 0154 ll0204) applicant ",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/b86556c10ba39bd5cc683b70.pdf"
+    }
+   ],
+   "open_items": [
+    "The parcel-to-character-area match is my reading of a raster map image, not a quotable text. Confirm with East Point planning which character area covers 1688 Empire Ave. The screener's city layer gave future land use MXD, which fits a mixed-use area.",
+    "The plan file is titled 'Final For Adoption' (July 2023). Confirm it is the adopted version and that no later Lawrence Street master plan or overlay applies.",
+    "Environmental: ask for a Phase I ESA. Ask GA EPD whether groundwater contamination from the adjoining wood-treating site (HSI 10084; groundwater is listed among its affected media) extends under 1688 Empire Ave, and whether the parcel is in any EPD corrective-action area. EPA site profiles (CERCLIS/RCRA) were not checked.",
+    "Not checked: whether the 1780 E Woodberry R-3 case and its variances were approved."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map was read. East Point's GIS is on ArcGIS Online (not fetchable). The county's 2025 CAMA site supplement (a zip file, not quotable) lists water as 'All public' with sewer blank.",
+    "Ask East Point Water & Sewer for the nearest water and sewer mains and their capacity. The site already has about 40,000 SF of buildings, which suggests existing service."
+   ]
+  },
+  "market": {
+   "verdict": "signs_developer_pursuing",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "In 2025 a party other than the tax-roll owner applied for a use permit and variance to develop and operate a warehouse on 1688 Empire Avenue. The applicants named on the city's notice are Douglas Brent Benson Enterprises LLC and Henry Bailey Jr; the tax roll names a different owner. The cases were submitted by the Aug 1, 2025 deadline.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2025/09/CZIM-Notice-Agenda-August-12-2025-.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "1688 Empire Avenue Douglas Brent (PIN: 14 0155 LL0278) WARD B Benson The applicant is requesting a Use permit per Sec. Enterprises LLC",
+     "context_before": "czim) tuesday, august 12, 2025 5 p2025u-003-08, p2025vc-001-08 6 p2025rz-002-08 ",
+     "context_after": " use permit with 10-2079 d8 and concurrent variance per sec. 10concurrent varian",
+     "pdf_page": 3,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/f85a6de99cf19a294c555671.pdf"
+    },
+    {
+     "id": "market-2",
+     "text": "The same application (cases P2025U-002-08/P2025VC-001-08 and P2025U-003-08/P2025VC-002-08) went to the Sept 18, 2025 P&Z public hearing, with Henry Bailey Jr as applicant, for a concrete manufacturing facility and a warehouse on this parcel and the adjacent 23-acre 1692 Empire Ave / 0 Woodberry Ave parcel.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2025/09/Agenda-PZ-Public-Hearing-SEPT-18-2025.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "P2025U-002-08, Henry Bailey Use Permit and",
+     "context_before": "nd 1692 empire ave aka 0 woodberry ave pin: 14 0155 ll0278 and 14 0155 ll0351 4 ",
+     "context_after": " the applicant is requesting a use permit and concurrent variances concurrent /p",
+     "pdf_page": 1,
+     "pdf_order": "layout",
+     "words_shared_with_url": [],
+     "page_file": "pages/0a5872066ddc50803642d92a.pdf"
+    },
+    {
+     "id": "market-3",
+     "text": "The case was still pending as Old Business on the Dec 18, 2025 P&Z agenda.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2026/01/12.18.2025-PCPH-Agenda-Notice.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Old Business # Case Number Applicant Location/Description Case Type 1688 Empire Avenue and 1692 Empire Ave aka 0 Woodberry Ave",
+     "context_before": "ge of allegiance v. adoption of the agenda vi. approval of october minutes vii. ",
+     "context_after": " pin: 14 0155 ll0278 and 14 0155 ll0351 p2025u-002-08, 1 henry bailey jr the app",
+     "pdf_page": 2,
+     "pdf_order": "layout",
+     "words_shared_with_url": [],
+     "page_file": "pages/f07f3c5f8acc397eb11fdaf9.pdf"
+    }
+   ],
+   "open_items": [
+    "Seen only in a search result (citizenportal.ai, a secondary site, not read and not a claim): a report that the P&Z Commission accepted withdrawal of the Empire Avenue concrete-plant and warehouse applications on Dec 18, 2025. Confirm the outcome from the city's own minutes; none were posted on the meetings page.",
+    "The parcel does not appear on the 2026 P&Z public hearing agendas I read (Feb 19, Mar 19, May 21, Jun 18, Jul 16, Aug 20, Sep 17, Oct 15, Nov 19) or the Oct 13 and Nov 17, 2026 CZIM notices. Not read: Jan and Apr 2026 hearings (none listed), and the other 2026 CZIM notices.",
+    "Is the 2025 applicant under contract with the owner, or a tenant? Ask the city for the application's owner-authorization form. Do not contact the owner or applicant from here.",
+    "The applicants' Secretary of State records were not checked (a known wall)."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "The parcel is built on and likely in use, not raw land. The county parcel record (queried by parcel id) carries an improvement appraisal of $950,800 beside $2,341,800 land, class I5, land-use code 401. The county's 2025 CAMA extract (a zip file, not quotable) lists nine commercial structure cards, built 1955-1976, totalling about 40,000 SF.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200155%20%20LL0278%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"TotAppr\":3292600,\"LandAppr\":2341800,\"ImprAppr\":950800,\"LUCode\":\"401\",\"ClassCode\":\"I5\"",
+     "context_before": "344\",\"taxdist\":\"20\",\"totassess\":1317040,\"landassess\":936720,\"imprassess\":380320,",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":10.24,\"nbrhood\":\"c911\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/01743cd5536cc5e6467deb14.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "The owner's mailing address on the county record is the next-door 1692 Empire Ave, part of the neighbouring parcel in the 2025 warehouse/concrete-plant application. This suggests an owner operating on site rather than an absentee holder (my inference).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200155%20%20LL0278%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"OwnerAddr1\":\"1692 EMPIRE AVE\",\"OwnerAddr2\":\"EAST POINT GA 30344\",\"TaxDist\":\"20\"",
+     "context_before": "ve\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,\"owner\":\"mullins bros \",",
+     "context_after": ",\"totassess\":1317040,\"landassess\":936720,\"imprassess\":380320,\"totappr\":3292600,\"",
+     "words_shared_with_url": [],
+     "page_file": "pages/01743cd5536cc5e6467deb14.html"
+    }
+   ],
+   "open_items": [
+    "The Secretary of State record was not checked (a known wall), so the owner's legal form, status and agent are unknown. The screener classed the owner as an individual, but the name reads like a business or partnership.",
+    "What operates on the site now, and under what leases? A drive-by would show it. Existing buildings and any tenancies would have to be cleared before a new building.",
+    "The screener let this parcel through its built-on screen: improvements of $950,800 are below half the land value. The brief's 'no watch item' and open-ground fit ignore about 40,000 SF of existing structures and the adjoining HSI site."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "A warehouse here is not by right, whatever the brief says. East Point lists warehouse/distribution in I-1 as a use-permit use that must sit one mile (5,280 ft) from residential property unless a variance is granted. Residential land is about 706 ft away, and a private applicant is pursuing R-3 multifamily there now (Sept 2026), so any warehouse needs two discretionary approvals in a city whose council has openly debated warehouses. The 2025 warehouse and concrete-plant application, the only sign that someone other than the owner wanted the site, was on the Dec 18, 2025 agenda and appears on no 2026 agenda or notice I or the first pass read. A secondary report says it was withdrawn that night, and no minutes are posted, so the market verdict rests on a stale case. The site also carries about $950,800 of existing improvements and adjoins an active GA EPD corrective-action site. This is not a kill: no document shows the land is unavailable, and the one-mile variance has been sought for other I-1 warehouses.",
+  "disputes": [
+   "plans-5",
+   "market-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "East Point treats warehouse/distribution in I-1 as needing a use permit plus a variance from the one-mile residential distance rule in Sec. 10-2079(d). Its April 17, 2025 P&Z agenda (another site, 0 Welcome All Rd) describes a warehouse/distribution use permit in I-1 with exactly that variance. Read with the 2025 case on this parcel (zoning-1), this makes a warehouse here conditional on two discretionary approvals, not by right.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2025/04/Public-Notice-Agenda-PZ-Public-hearing-APR-17-2025.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "The applicant is requesting Use Permit to develop a 935,233.2 square feet in area site with 2 (two) warehouse/ distribution center buildings totaling approximately 219,090 square feet in area in the I-1 Light Industrial Zoning district with a concurrent variance from Sec. 10-2079(d) to allow development within one mile distance requirement from residential property.",
+    "context_before": "othy helms location/description 0 welcome all rd (pin: 09f-370001795667) ward d ",
+    "context_after": " (21.04 +/acres) 3380 bachelor st (pin: 14 013000010540) ward b the applicant is",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/96624f45b1c647e4982300a5.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "Background on why warehouses need a use permit: East Point's December 2020 ordinance, adopted for the I-2 Heavy Industrial district (Sec. 10-2080), states the city's finding that previously permitted warehouse operations should need a use permit. Its companion change to I-1 (Sec. 10-2079) was not read. This page is the adopted I-2 ordinance, not the I-1 text.",
+    "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/14762/1059755/pdf",
+    "retrieved": "2026-11-12",
+    "quote": "certain previously permitted industrial uses for light and heavy manufacturing, processing assembly, packaging and warehouse operations within the City of East Point should be required to obtain a use permit",
+    "context_before": "sitors within the city; and 18 19 20 whereas, the city of east point finds that ",
+    "context_after": " to have additional development and design standards for approval in 21 order to",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/8a4fd3b1193262777beb64b9.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The same 2020 ordinance's exhibit for I-2 ties every use-permit-only use to a 5,280 ft separation from residential. It is consistent with the I-1 rule that the 2025 and 2026 agendas cite, but it is I-2 text, not I-1.",
+    "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/14762/1059755/pdf",
+    "retrieved": "2026-11-12",
+    "quote": "The following uses may be permitted per the procedures and standards set forth in Article D, Section 10-2115 et seq. in the I-2 District, provided that such use shall be at least 5,280 feet from any residential property or property used for residential use.",
+    "context_before": ") 10-2112. temporary structures. (page break) (d) (e) uses permitted through use permit only. ",
+    "context_after": " (1) 10-2116. adult bookstore. (2) 10-2118. adult entertainment establishments. ",
+    "pdf_page": 7,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/8a4fd3b1193262777beb64b9.pdf"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "Residential pressure next door is current: the Sept 22, 2026 CZIM notice lists a private applicant asking for variances from the R-3 Multifamily development standards at 1780 E Woodberry Ave (14 0154 LL0204). I recomputed the gap from the county parcel geometry (EPSG 2240, US feet): about 706 ft from 1688 Empire Ave, well inside the one-mile rule.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2026/09/CZIM-Public-Notice-Agenda_-9.22.2026.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "1780 E Woodberry Ave (PIN: 14 0154 LL0204) Applicant is requesting variances from the R-3 Multifamily Development District development standards.",
+    "context_before": "tative # case number applicant location/description 1 p2026v-001-09 cody snyder ",
+    "context_after": " 2 p2026zm-001-08 kenneth hillatlanta community food bank (acfb) 3400 north dese",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/dd37fc755d0dd646abaab91a.pdf"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The page of the 2025 HSI summaries that is actually about site 10084 (East Point, p. 50) lists the listed site as one 38.4-acre parcel, 14-0155-LL-033-6. It does not list 1688 Empire Ave (14 0155 LL0278). So the state listing does not reach this parcel on paper, and whether contamination does is unknown.",
+    "source_url": "https://epd.georgia.gov/document/pdf/2025-hsi-site-summaries/download",
+    "retrieved": "2026-11-12",
+    "quote": "38.4 14-0155-LL-033-6 LAST KNOWN PROPERTY OWNER:",
+    "context_before": "24 \" n acreage site number longitude 84 o 26 ' 41 \" w parcel number date listed ",
+    "context_after": " 6/29/1994 southern wood piedmont company 1301 riverplace blvd., suite 2300 jack",
+    "pdf_page": 50,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/45c133a3338b0bb01979623a.pdf"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The zoning rules are under review: the city says it still works from regulations largely adopted in 2009 and is rewriting its zoning ordinance. I-1 warehouse rules could change, and I found no adopted draft.",
+    "source_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+    "retrieved": "2026-11-12",
+    "quote": "Presently, the Planning and Community Development Department is operating from zoning and land development regulations that were originally adopted in 2009.",
+    "context_before": "pportunities for housing, shopping, employment, recreation, and transportation. ",
+    "context_after": " since then, the comprehensive plan has evolved, several corridor planning studi",
+    "words_shared_with_url": [],
+    "page_file": "pages/75792fc96aa136beeeff6ca5.html"
+   }
+  ],
+  "open_items": [
+   "plans-5 dispute: its kept quote was matched on page 49 of the HSI PDF, which is site 10083, Southern Wood Piedmont - Augusta (1650 Nixon Road, Richmond County), not East Point. The same status wording is boilerplate: 'The nearest resident individual is less than 300 feet' appears 97 times in the document. Page 50 (site 10084) carries the same wording, so the substance is probably right, but the kept quote and its context are the Augusta site's.",
+   "market-1 dispute: the quote shows a 2025 application by a party other than the tax-roll owner, but as evidence of a developer pursuing the site now it is stale. The case was Old Business on the Dec 18, 2025 agenda (market-3). It appears on none of the 2026 CZIM notices I read (Feb 10, Feb 17, Apr 14, May 19, Jun 16, Jul 14, Aug 18, Sep 15, Sep 22), and the first pass found it on none of its 2026 agendas. Also, an applicant who wants to operate a concrete plant may be a tenant or operator, not a buyer.",
+   "Outcome of P2025U-002-08/P2025VC-001-08 and P2025U-003-08/P2025VC-002-08: a web search result only (citizenportal.ai, not read: its robots.txt answered 403, so it was not fetched) says the P&Z Commission accepted withdrawal on Dec 18, 2025. No primary record found: the city's meetings page lists no P&Z minutes for 2025-2026, and the council's iqm2 portal (eastpointcityga.iqm2.com) gave an empty reply to robots.txt, so it was not fetched. Ask East Point Planning for the Dec 18, 2025 minutes or the case disposition.",
+   "Whether the one-mile rule is a bar or only a hurdle: search results only (not read, not claims) say the council approved the 0 Welcome All Rd warehouse use permit and one-mile variance in 2025 against staff's recommendation, and that residents later pressed the council over warehouse approvals. If true, the variance can be obtained but is political. Confirm with the city.",
+   "Built on and in use: the county record (owner-1, re-queried by parcel id; tax year 2027) shows improvements appraised at $950,800, land-use code 401, class I5. Whether the buildings are occupied, and by whom, is not shown by any page I read. A drive-by or the owner's disclosure is needed. Existing structures (about 40,000 SF per the first pass's CAMA reading) would have to be removed or reused for any new building.",
+   "plans-1: the plan text for Town Center Subarea 2 (Lawrence Street, 257 acres) does not name Empire Ave, Connally Dr or Woodberry Ave. The parcel-in-subarea match is the first pass's reading of a map image. I could not confirm or refute it from text.",
+   "Environmental reach: no public document I read shows the extent of soil or groundwater contamination from HSI 10084 / EPA RCRA ID GAD067560870 beyond its own parcel. GA EPD's site PDF (epd.georgia.gov/document/document/10084pdf/download) answered 404. Ask GA EPD Land Protection Branch for the site file and any corrective-action-plan plume map, and get a Phase I/II ESA.",
+   "The 2025 case cited Sec. 10-2150.6(a)(1) for the warehouse distance rule, while the April 2025 and Nov 2026 agendas cite Sec. 10-2079(d). Whether these are two rules or one is a question for East Point planning: the code text is on Municode, a known wall."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://eastpointga.gov/wp-content/uploads/2025/09/Agenda-PZ-Public-Hearing-SEPT-18-2025.pdf": {
+   "file": "pages/0a5872066ddc50803642d92a.pdf",
+   "fetched_at": "2026-11-12T19:53:28Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2025/09/Agenda-PZ-Public-Hearing-SEPT-18-2025.pdf",
+   "status": 200,
+   "bytes": 183765,
+   "sha256": "c1b4dafed01e639c80fa7a1e09c3cfd2d35b0d68c2985abd25d939681c02e012"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2025/09/CZIM-Notice-Agenda-August-12-2025-.pdf": {
+   "file": "pages/f85a6de99cf19a294c555671.pdf",
+   "fetched_at": "2026-11-12T19:53:38Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2025/09/CZIM-Notice-Agenda-August-12-2025-.pdf",
+   "status": 200,
+   "bytes": 254938,
+   "sha256": "0b8c9d5d21a49326db25d1e26f9021b95c4339802b6bcca63f0e1de867cc07fa"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf": {
+   "file": "pages/b77162e39396a7925551b72e.pdf",
+   "fetched_at": "2026-11-12T19:53:48Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+   "status": 200,
+   "bytes": 253172,
+   "sha256": "2792a0e9094aa5b7eb3520b9dbb2cf7f91486f92fd8f50e2521e394fe87a3788"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf": {
+   "file": "pages/967ff367e9cd9f3138164ef2.pdf",
+   "fetched_at": "2026-11-12T19:53:58Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+   "status": 200,
+   "bytes": 13393792,
+   "sha256": "ddd2b9dcce075187b52ce93680cefe8916880dd0e4dbc4826f81213c8863b753"
+  },
+  "https://epd.georgia.gov/document/pdf/2025-hsi-site-summaries/download": {
+   "file": "pages/45c133a3338b0bb01979623a.pdf",
+   "fetched_at": "2026-11-12T19:54:00Z",
+   "final_url": "https://epd.georgia.gov/document/pdf/2025-hsi-site-summaries/download",
+   "status": 200,
+   "bytes": 6733809,
+   "sha256": "d9e00279c7715ea497e7ce4da91b294e4e607467f34c6843c8937f4a344160cf"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2714%200155%20%20LL0278%27%2C%2714%200155%20%20LL0336%27)&outFields=ParcelID%2CAddress%2COwner%2CImprAppr%2CLUCode%2CClassCode%2CLandAcres&returnGeometry=true&f=json": {
+   "file": "pages/b50c2a0e6dd08fc65dbb9d94.html",
+   "fetched_at": "2026-11-12T19:54:03Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2714%200155%20%20LL0278%27%2C%2714%200155%20%20LL0336%27)&outFields=ParcelID%2CAddress%2COwner%2CImprAppr%2CLUCode%2CClassCode%2CLandAcres&returnGeometry=true&f=json",
+   "status": 200,
+   "bytes": 2732,
+   "sha256": "1a9d61cbf88f5e4b74384cf9d70d0cb54c61834fa3d2feef871c69b5e3f1911e"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2026/10/PCPH-Public-Notice-Agenda_10.15.2026.pdf": {
+   "file": "pages/b86556c10ba39bd5cc683b70.pdf",
+   "fetched_at": "2026-11-12T19:54:08Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2026/10/PCPH-Public-Notice-Agenda_10.15.2026.pdf",
+   "status": 200,
+   "bytes": 252425,
+   "sha256": "73f40c5c177a8f288c07783ee8ac148247b5d0ce4b865c48a5e1dc1c8a82e6e6"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2026/01/12.18.2025-PCPH-Agenda-Notice.pdf": {
+   "file": "pages/f07f3c5f8acc397eb11fdaf9.pdf",
+   "fetched_at": "2026-11-12T19:54:18Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2026/01/12.18.2025-PCPH-Agenda-Notice.pdf",
+   "status": 200,
+   "bytes": 243408,
+   "sha256": "ad5b344f8455e415f1c309d500e3d0793531772ba67db35c50f4f37559e0c485"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200155%20%20LL0278%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/01743cd5536cc5e6467deb14.html",
+   "fetched_at": "2026-11-12T19:54:18Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200155%20%20LL0278%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4306,
+   "sha256": "de7ff8fa10fd52096e9fc5c0af4288cbc39fa873071e253807dc74e9e4f3ee46"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2025/04/Public-Notice-Agenda-PZ-Public-hearing-APR-17-2025.pdf": {
+   "file": "pages/96624f45b1c647e4982300a5.pdf",
+   "fetched_at": "2026-11-12T19:54:28Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2025/04/Public-Notice-Agenda-PZ-Public-hearing-APR-17-2025.pdf",
+   "status": 200,
+   "bytes": 132004,
+   "sha256": "aef954da48ea37d4ba30081c65a6cbbf7aace10a79d4f56067e4166c28fd048d"
+  },
+  "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/14762/1059755/pdf": {
+   "file": "pages/8a4fd3b1193262777beb64b9.pdf",
+   "fetched_at": "2026-11-12T19:54:30Z",
+   "final_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/14762/1059755/pdf",
+   "status": 200,
+   "bytes": 288912,
+   "sha256": "a4f098d7698b3dc810cdba3453e103e625bfa4d63ea3c0e56b6762ba2857bd37"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2026/09/CZIM-Public-Notice-Agenda_-9.22.2026.pdf": {
+   "file": "pages/dd37fc755d0dd646abaab91a.pdf",
+   "fetched_at": "2026-11-12T19:54:38Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2026/09/CZIM-Public-Notice-Agenda_-9.22.2026.pdf",
+   "status": 200,
+   "bytes": 155104,
+   "sha256": "85091e751bb59be040f0f170cfdae5720cbb18fb43594cd0051ac15a7d1773b4"
+  },
+  "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/": {
+   "file": "pages/75792fc96aa136beeeff6ca5.html",
+   "fetched_at": "2026-11-12T19:54:48Z",
+   "final_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+   "status": 200,
+   "bytes": 249209,
+   "sha256": "9a3cccd1a576e80a4ae9af718e695f1a94f9053e28a14131fd0b77ef51433ca9"
+  }
+ },
+ "quotecheck": {
+  "kept": 21,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:54:48Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "6f2a554e5593967b1b9abe5308700e70efc256ff56ce4dbd45178ece85edcde3",
+   "skeptic.json": "85bebb6787329ec9effe72795d568111fad2745530c61ba664258058e9315f8f"
+  }
+ },
+ "dropped_claims": []
+}

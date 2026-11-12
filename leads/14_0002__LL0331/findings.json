@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "parcel_id": "14 0002  LL0331",
+  "run": "fulton-2026-11-12",
+  "sections": {
+    "zoning": {
+      "verdict": "rezoning_needed",
+      "claims": [
+        {"text": "The City of Atlanta zoning district layer, queried at the parcel's point (-84.35199, 33.661329), returns district RG-2-C, coded Multi-Family Residential, in a 37.3-acre zoning polygon (the parcel is 27.1 acres, so the polygon reaches beyond it). A residential district: warehouse or industrial use would need a rezoning.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"REFERENCE\":\"R717\",\"SHAPE.AREA\":1626190.7094644101,\"SHAPE.LEN\":5595.9590502994897,\"ZONINGCODE\":\"Multi-Family Residential\""},
+        {"text": "Same record: the zoning polygon is RG-2-C, 37.33 acres, reference R717; its rezoning-case fields (CASEIN, CASEOUT) are blank, so the case behind the -C conditions is not named in the layer.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"ACRES\":37.33235111,\"ZONING\":\"RG-2-C\",\"EDITTED\":\" \",\"REFERENCE\":\"R717\""},
+        {"text": "The city's rezoning-cases layer, queried at the same point, returns no case: the rezoning that attached the -C conditions is not in the layer.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]"}
+      ],
+      "open_items": [
+        "The RG-2 district text (Atlanta Code Part 16, Chapter 8) is on Municode, which cannot be fetched; confirm with Atlanta planning that RG-2 permits no warehouse, distribution or light industrial use.",
+        "Find the rezoning ordinance that created the RG-2-C conditions (the zoning polygon carries only reference R717 and no case number); the conditions may tie the land to a specific residential site plan.",
+        "Ask how the parcel would be mapped under the ATL Zoning 2.0 rewrite.",
+        "Seen, not verifiable: www.atlantaga.gov answered robots.txt with 403, so no staff report, ZRB or NPU-Z agenda on that host was read."
+      ]
+    },
+    "plans": {
+      "verdict": "against",
+      "claims": [
+        {"text": "The city's current 'Development Patterns - Future Land Use' layer, queried at the parcel's point, gives development pattern LDR (Low Density Residential). The Industrial value the screener read is the older land-use field (LANDUSEDES) carried in the same record, beside a 'Technical Conversion' note.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"PIN\":\"Low Density Residential\",\"CONVERSION\":\"Technical Conversion\",\"NDP\":\"LDR\",\"FID_L8LAND\":2641,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\""},
+        {"text": "The layer is drawn by the NDP (development pattern) field, whose legend has its own Industrial and Industrial Flex classes; the parcel's class, LDR, is Low Density Residential, not either industrial class.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8?f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"value\":\"LDR\",\"label\":\"Low Density Residential\",\"description\":\"Low Density Residential\""},
+        {"text": "Same layer's legend: Industrial Flex is a separate class, which this parcel does not carry.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8?f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"value\":\"I-Flex\",\"label\":\"Industrial Flex\",\"description\":\"Industrial Flex\""},
+        {"text": "The city's rezoning-cases layer (LandUsePlanning layer 10), asked for cases within 800 m of the parcel's point, returns none.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json&distance=800&units=esriSRUnit_Meter",
+         "retrieved": "2026-11-12",
+         "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]"},
+        {"text": "The city's building-moratorium layer (LandUsePlanning layer 5), asked for moratoria within 800 m of the parcel's point, returns none.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json&distance=800&units=esriSRUnit_Meter",
+         "retrieved": "2026-11-12",
+         "quote": "\"alias\":\"SHAPE.LEN\"}],\"features\":[]"}
+      ],
+      "open_items": [
+        "Confirm with Atlanta planning which map is the adopted future land use map (the 2025 Plan A development patterns or the older land-use field): the screener's 'likely' entitlement path rests on the older Industrial value, while the current pattern reads Low Density Residential.",
+        "Over the parcel's bounding box the same development-pattern layer (OpenDataService1 layer 19) also returned Open Space polygons besides LDR; no industrial pattern touched the box (this query's answer echoes its own field list, so it is not offered as a claim).",
+        "A land use amendment, CDP-09-10 (Industrial to Medium Density Residential, 2009), lies about 1 km south-west of the parcel, not on it: the area has been moving from industrial to residential plans.",
+        "The brief reports 0 industrial parcels within 1 mile."
+      ]
+    },
+    "utilities": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "Water: no public City of Atlanta water-main layer was found (known from another Atlanta lead).",
+        "Sewer: the WasteWater1c sewer-main service on egis.atlantaga.gov now answers 'Service MapWF/WasteWater1c/MapServer not found' on both its ags and arc paths, and the MapWF folders list no services; no sewer main could be checked.",
+        "The assessor reports water/sewer as 'All public'; ask Atlanta Watershed Management for the nearest water and sewer mains and capacity."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {"text": "No rezoning case (by the owner or anyone else) is recorded within 800 m of the parcel's point in the city's rezoning-cases layer (LandUsePlanning layer 10): the answer is empty.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json&distance=800&units=esriSRUnit_Meter",
+         "retrieved": "2026-11-12",
+         "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]"},
+        {"text": "Not built on: the city's tax-parcel record for 14 0002  LL0331 (queried at the parcel's point, tax year 2025) shows an improvement appraisal of 0 and 0 livable units; land only, appraised at $128,800.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.35199%2C33.661329&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&f=json&returnGeometry=true&outSR=4326",
+         "retrieved": "2026-11-12",
+         "quote": "\"TOT_APPR\":128800.0,\"IMPR_APPR\":0.0,\"LANDASSESS\":51520.0,\"IMPRASSESS\":0.0,\"LANDAPPR\":128800.0"},
+        {"text": "The city's building-footprints layer (OpenDataService1 layer 10), asked for footprints in the parcel's bounding box (-84.35553, 33.66013 to -84.34985, 33.66345), returns none.",
+         "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?where=1%3D1&geometry=-84.35553%2C33.66013%2C-84.34985%2C33.66345&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"alias\":\"SHAPE.LEN\"}],\"features\":[]"}
+      ],
+      "open_items": [
+        "Listing sites were not checked (CoStar, LoopNet and Crexi are off limits); a person should look for a sign or listing on site.",
+        "No residential project was found in the city's GIS layers, but the RG-2-C conditions may carry an old multi-family site plan; ask Atlanta planning whether any permit or plan is on file.",
+        "The city's tax-parcel record shows a 2025 appraisal of $128,800, below the $220,100 land value in the brief; check which figure is current.",
+        "Drive the site for current use (outdoor storage, dumping, informal parking): the GIS shows no buildings, not whether the land is in use."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "Owner is an LLC per the assessor; the Georgia Secretary of State record (status, formation, agent, principal office) could not be read (known wall). A person should pull it.",
+        "Pull the 2018 deed (sale of $538,992 per the brief) for the grantor and any recorded restrictions."
+      ]
+    }
+  }
+}

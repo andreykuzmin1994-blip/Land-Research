@@ -1,0 +1,126 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0001  LL0605",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "rezoning_needed",
+   "claims": [
+    {
+     "text": "The City of Atlanta zoning layer (layer 0), queried over the parcel's bounding box (-84.3560,33.6486 to -84.3498,33.6519), returns a single district: R-4, Single Family Residential, part of a 284.6-acre R-4 polygon. A single-family district does not list warehouse or industrial use; industrial use would need a rezoning (e.g. to I-1/I-2).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ZONING\":\"R-4\",\"EDITTED\":\" \",\"REFERENCE\":\"R3094\",\"SHAPE.AREA\":12398313.6893618,\"SHAPE.LEN\":15854.2358461323,\"ZONINGCODE\":\"Single Family Residential\""
+    }
+   ],
+   "open_items": [
+    "The R-4 use table is on Municode (not fetchable by policy here); a person should confirm R-4 permits no warehouse/distribution use, and what an R-4 to I-1/I-2 rezoning would need.",
+    "The zoning record carries no conditional-zoning case number (CASEIN/CASEOUT blank), so no conditions are recorded on this polygon in the layer."
+   ]
+  },
+  "plans": {
+   "verdict": "against",
+   "claims": [
+    {
+     "text": "The City of Atlanta 'Development Patterns - Future Land Use' layer (layer 8), queried over the parcel's bounding box, returns one polygon (1,053 acres) whose current development pattern is LDR, named Low Density Residential. The 'Industrial' value the screener read is the older LANDUSEDES field carried on the same record (marked as a technical conversion), not the current pattern.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NDP\":\"LDR\",\"FID_L8LAND\":2641,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\""
+    },
+    {
+     "text": "Same answer: the current development pattern name on the polygon covering the parcel is Low Density Residential.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"DP_NAME\":\"Low Density Residential\",\"SIMPLE_TRA\":\"Technical Changes\""
+    },
+    {
+     "text": "The layer's own metadata shows its map is drawn on the NDP field under the heading 'Development Pattern', i.e. NDP (here LDR) is the shown future land use, not LANDUSEDES.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8?f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"field1\":\"NDP\",\"uniqueValueGroups\":[{\"heading\":\"Development Pattern\""
+    },
+    {
+     "text": "The service lists the older future land use layer as deprecated, consistent with the 'Industrial' value being legacy.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer?f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"id\":25,\"name\":\"LandUse Future (deprecated)\""
+    },
+    {
+     "text": "The rezoning-cases layer (layer 10), queried over the parcel's bounding box, returns no case: no rezoning is recorded on the parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]"
+    },
+    {
+     "text": "The rezoning-cases layer queried over a wider box around the parcel (-84.3610,33.6440 to -84.3450,33.6565, roughly 500-800 m out) returns only two old cases, Z-09-001 (RG2 to MR-3-C, 2009) and Z-06-095 (OI to C-1-C, 2006); none in the last five years.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FROM_ZONE\":\"RG2\",\"TO_ZONE\":\"MR-3-C\",\"DOCKET_NO\":\"Z-09-001\""
+    },
+    {
+     "text": "The building-moratorium layer (layer 5), queried over the parcel's bounding box, returns no feature: no moratorium mapped on the parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]"
+    }
+   ],
+   "open_items": [
+    "Confirm with Atlanta City Planning that the adopted CDP (Plan A, reported adopted July 2025) shows Low Density Residential here; an industrial project would need a CDP amendment as well as a rezoning.",
+    "The rezoning-case layer was last edited in 2024 on the records seen; cases filed since may not be mapped. Check recent ZRB agendas for Red Oak Dr SE.",
+    "The zoning overlay layer (layer 1) over the parcel bbox also returned no feature (not cited separately)."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "text": "Sewer: the City of Atlanta sewer pipe layer (MapEGIS/manholes layer 1), queried over the parcel's bounding box (which is larger than the parcel), returns 11 pipes, all 8-inch, including outfall segments named RED OAK DR OUTF and laterals on Forest Valley Dr, Conley Rd, Rigby Ct and Erica Wy. Sewer is shown nearby; whether a main touches the parcel itself was not tested. Water: no public water-main layer was found, so water is unknown and the section verdict stays unknown.",
+     "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NAME\":\"RED OAK DR OUTF\",\"UPS_STNO\":\"1025\",\"UPS_PREDIR\":\" \",\"UPS_STNAME\":\"Forest Valley\",\"UPS_SUFFIX\":\"DR\",\"UPS_POSTDIR\":\"SE\",\"ZIP\":\"30354\",\"SEWERSHED\":\"SR11YB\",\"BASIN\":\"BSOC\",\"SEWERGROUP\":1,\"UNITTYPE\":\"OUT\",\"SM_SUBTYPE\":5,\"SURF\":\"G\",\"SERVSTAT\":\"APUB\",\"PIPETYPE\":\"CO\",\"PIPESHP\":\"C\",\"PIPEDIAM\":8"
+    }
+   ],
+   "open_items": [
+    "Water: the City of Atlanta EGIS MapWF folder lists no services publicly and no water-main layer was found; ask Atlanta Watershed Management for the nearest water main and its size.",
+    "Sewer: the pipes found are 8-inch; ask Watershed Management about capacity and whether an 8-inch outfall can serve an industrial user. Service status code APUB is not explained on the page.",
+    "The brief's assessor note says water 'All public' (from the county CAMA extract, a zip file not quotable here)."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "text": "The rezoning-cases layer queried over the parcel's bounding box returns no case, so no rezoning has been applied for on this parcel by anyone (owner or other) per the city's map.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]"
+    },
+    {
+     "text": "The special-use-permit layer (layer 11), queried over a wider box around the parcel (-84.3610,33.6440 to -84.3450,33.6565), returns no permit.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]"
+    },
+    {
+     "text": "Built on or in use: the Fulton County parcel layer, queried by parcel id, shows land appraised at $875,000, improvements at $0 and land-use code 100 (class R5): no building is assessed on the parcel.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200001%20%20LL0605%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"TotAppr\":875000,\"LandAppr\":875000,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R5\""
+    }
+   ],
+   "open_items": [
+    "Two web searches by the site address found no listing, notice or development record; listing sites were not opened. A person may check the owner directly (no contact made here).",
+    "Whether the land is in informal use (dumping, a yard, a trail) was not checked: no aerial image was read. Drive the site.",
+    "The meaning of land-use code 100 / class R5 is not on the page; confirm with the assessor (likely vacant residential)."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Owner is an LLC whose name contains 'Residential'; the Georgia Secretary of State record (status, formation, agent) could not be read (403 wall) and the name was not searched by rule. A person should pull it: a residential-builder owner of an LDR-designated R-4 tract may be holding it for houses, not for sale to industrial.",
+    "The brief notes the same owner holds one other 5-50 acre parcel (13 0128  LL2247); last recorded sale of this parcel 2011 for $45,100 per the brief."
+   ]
+  }
+ }
+}

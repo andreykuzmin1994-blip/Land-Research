@@ -1,0 +1,418 @@
+{
+ "schema": 1,
+ "parcel_id": "17 025700010102",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "The City of Atlanta zoning layer (LandUsePlanning MapServer layer 0), queried at the brief's map point for this parcel, returns an I-2 (heavy industrial) district polygon of about 490 acres, status Current. This shows the district only, not what the I-2 text permits.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ACRES\":490.58788953,\"ZONING\":\"I-2\",\"EDITTED\":\" \",\"REFERENCE\":\"R2907\"",
+     "context_before": "_edited_date\":1595635200000,\"globalid\":\"{a9e984ba-3ce5-4486-b37f-6497ae5d3ee3}\",",
+     "context_after": ",\"shape.area\":21369922.988046501,\"shape.len\":28221.9505778288,\"zoningcode\":\"indu",
+     "words_shared_with_url": [],
+     "page_file": "pages/c6970036ffded88c3f118dc6.html"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The parcel is in the City of Atlanta's 'NW Atlanta Affordable WH' zoning overlay (layer 1, queried within 500 ft of the parcel point); the overlay record was created in 2025. What, if anything, it changes for industrial use was not read.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ZONECLASS\":\"NW Atlanta Affordable WH\",\"ZONEDESC\":\"NW Atlanta AWH\"",
+     "context_before": "eldtypedouble\",\"alias\":\"shape.len\"}],\"features\":[{\"attributes\":{\"objectid\":9281,",
+     "context_after": ",\"label\":\"nw atalnta awh\",\"spi\":\" \",\"created_user\":\"shenderson\",\"created_date\":1",
+     "words_shared_with_url": [],
+     "page_file": "pages/3884482486493331f4779121.html"
+    }
+   ],
+   "open_items": [
+    "The I-2 use table (Atlanta code sec. 16-17.003) was not read: Municode is a known wall, www.atlantaga.gov answered 403 to robots.txt, atlantacityga.iqm2.com gave no reply to robots.txt, and the atlanta.elaws.us robots.txt request timed out, so none of them was fetched. Confirm with Atlanta planning that warehouse / distribution is permitted by right in I-2 here and whether any BeltLine 500 ft limit or other condition applies.",
+    "Confirm what the Northwest Atlanta Affordable Workforce Housing overlay (expanded in 2025, Z-25-51 / 25-O-1334 per search results only, not read) requires of non-residential development on this parcel."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "The City of Atlanta future land use layer (Development Patterns - Future Land Use, layer 8), queried at the parcel point, returns Industrial.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\"",
+     "context_before": "d_1\":0.0,\"pin\":\"industrial\",\"conversion\":\"flu only\",\"ndp\":\"i\",\"fid_l8land\":3630,",
+     "context_after": ",\"lastupdate\":1517875200000,\"lasteditor\":\"gis\",\"density\":\" \",\"far\":\" \",\"history\"",
+     "words_shared_with_url": [],
+     "page_file": "pages/827ee0299a1bf01480cf869b.html"
+    },
+    {
+     "id": "plans-2",
+     "text": "The city's Rezoning Cases layer (layer 10), queried within 1,500 ft of the parcel point, returns one case only: Z-16-074, R-4/C-1 to MRC-3-C, about 2.7 acres, complete, ordinance 16-O-1680 (2016-17). It is not this I-2 parcel and is older than five years. The Special Use Permits (layer 11) and Building Moratorium (layer 5) layers returned no features for the same 1,500 ft query.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FROM_ZONE\":\"R-4/C-1\",\"TO_ZONE\":\"MRC-3-C\",\"DOCKET_NO\":\"Z-16-074\",\"STATUS\":\"COMPLETE\"",
+     "context_before": ":\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":3630,",
+     "context_after": ",\"final_upda\":1508198400000,\"status_subtype\":2,\"ordinance\":\"16-o-1680\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/09efb422324b4059af168fbe.html"
+    },
+    {
+     "id": "plans-3",
+     "text": "The city's Land Use Amendments layer, queried within 1,500 ft of the parcel point, returns only CDP-17-003 (Industrial to MDR, tied to Z-16-074, heard 2017 Q1), the same nearby 2.7 acre site; nothing newer.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/18/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"CASENO\":\"CDP-17-003\",\"CURRENTLU\":\"I\",\"PROPOSEDLU\":\"MDR\",\"ZONING_NO\":\"Z-16-074\"",
+     "context_before": "ble\",\"alias\":\"shape.len\"}],\"features\":[{\"attributes\":{\"objectid\":4648,\"id\":null,",
+     "context_after": ",\"hearing\":\"2017 q1\",\"approved\":1509062400000,\"mapped\":1509926400000,\"status\":\"c",
+     "words_shared_with_url": [],
+     "page_file": "pages/461b22b0f484c659eb90423b.html"
+    }
+   ],
+   "open_items": [
+    "The rezoning and land-use-amendment layers may lag recent filings; ask Atlanta planning whether any case is pending on or beside the parcel.",
+    "The MRPA (Chattahoochee corridor) buffer layer returned no features within 500 ft of the parcel point."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No public water or sewer main layer was found: the City of Atlanta dpcd GIS 'Utilities' folder holds only geocoding, geometry, printing, raster and symbol services, and the city's water GIS is known to have no public main layer. Ask Atlanta Department of Watershed Management for the nearest water and sewer mains and capacity.",
+    "The county CAMA extract (local copy, not quotable) records water as 'All public' and sewer blank for this parcel."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "No sign of a sale or developer: the city's Rezoning Cases layer, queried within 1,500 ft of the parcel point, shows no case on this parcel (only Z-16-074 on a nearby R-4/C-1 site, 2016-17). The parcel is instead in use as a petroleum terminal (see owner section).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FROM_ZONE\":\"R-4/C-1\",\"TO_ZONE\":\"MRC-3-C\",\"DOCKET_NO\":\"Z-16-074\",\"STATUS\":\"COMPLETE\"",
+     "context_before": ":\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":3630,",
+     "context_after": ",\"final_upda\":1508198400000,\"status_subtype\":2,\"ordinance\":\"16-o-1680\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/09efb422324b4059af168fbe.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The site at this parcel's address is a working fuel terminal on the state air permit: a Georgia EPD Title V renewal review (printed November 4, 2021) describes it as a petroleum products storage and distribution terminal.",
+     "source_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+     "retrieved": "2026-11-12",
+     "quote": "This facility is a petroleum products storage and distribution terminal.",
+     "context_before": "essly reference sic code(s) shall not be affected. 2. description of product(s) ",
+     "context_after": " 3. overall facility process description this petroleum products storage and dis",
+     "pdf_page": 3,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/abdada5b51b0f4e890e8003a.pdf"
+    },
+    {
+     "id": "market-3",
+     "text": "The same EPD review lists the terminal's equipment: twelve bulk petroleum storage tanks, nine smaller tanks or totes, a six-bay truck loading rack and vapor recovery and combustion units.",
+     "source_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+     "retrieved": "2026-11-12",
+     "quote": "This petroleum products storage and distribution terminal consists of twelve bulk petroleum storage tanks, nine smaller tanks or totes (additive, slop, etc.), a six-bay truck loading rack, one vapor recovery unit, and one vapor combustion unit.",
+     "context_before": "ucts storage and distribution terminal. 3. overall facility process description ",
+     "context_after": " the terminal receives petroleum products printed: november 4, 2021 page 3 of 16",
+     "pdf_page": 3,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/abdada5b51b0f4e890e8003a.pdf"
+    },
+    {
+     "id": "market-4",
+     "text": "The county parcel record for 17 025700010102 carries improvements appraised at $230,700, land use code 398, class I5: the parcel is not vacant land in the county record.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2717%20025700010102%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"LandAppr\":2235800,\"ImprAppr\":230700,\"LUCode\":\"398\",\"ClassCode\":\"I5\"",
+     "context_before": "05\",\"totassess\":986600,\"landassess\":894320,\"imprassess\":92280,\"totappr\":2466500,",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":20.95,\"nbrhood\":\"c403\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/6a944d9bca5d7dc88b30e7ae.html"
+    }
+   ],
+   "open_items": [
+    "This parcel at 3132 Parrott Ave NW appears to be (part of) an operating petroleum storage and distribution terminal, not raw land. Confirm with aerial imagery or a drive-by which terminal facilities (tanks, loading rack) stand on this parcel and which on the adjacent same-owner parcel 17 0263 LL0262.",
+    "The EPD review is from 2021; current operating status in 2026 was not confirmed from a primary source. Search results (snippets only, pages not opened, company pages not cited) indicate a current company terminal page and a fuel-supplier listing for this address.",
+    "The county CAMA extract (local copy, not quotable) lists three commercial structures built 1941 on this parcel and prior deeds from GULF OIL CORP (1995) and BP PRODUCTS NORTH AMERICA INC (2016-02-01).",
+    "A former and current fuel terminal implies likely petroleum contamination and pipeline connections (EPA FRS shows RCRA ID GAD000609909 and an NPDES record for the site); a Phase I / II would be needed before any other use.",
+    "The City of Atlanta building-footprint layer query for this parcel failed twice (connection reset); not retried."
+   ]
+  },
+  "owner": {
+   "verdict": "operator",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Georgia EPD's Title V review names the facility after the tax-roll owner, KM Phoenix Holdings - Chattahoochee Terminal, at 3132 Parrott Avenue N.W., and gives KM Phoenix Holdings LLC as the parent/holding company.",
+     "source_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+     "retrieved": "2026-11-12",
+     "quote": "2. Parent/Holding Company Name KM Phoenix Holdings LLC",
+     "context_before": "y identification 1. facility name: km phoenix holdings - chattahoochee terminal ",
+     "context_after": " 3. previous and/or other name(s) this facility was permitted in 1975 under the ",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/abdada5b51b0f4e890e8003a.pdf"
+    },
+    {
+     "id": "owner-2",
+     "text": "The EPD review says Kinder Morgan bought the terminal on February 1, 2016, the same date as this parcel's last recorded sale in the brief.",
+     "source_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+     "retrieved": "2026-11-12",
+     "quote": "On February 1, 2016, the facility was purchased by Kinder Morgan.",
+     "context_before": "issued on march 21, 2011, to bp products north america inc. - atlanta terminal. ",
+     "context_after": " application no. 23791 was received on april 21, 2016 for the name change from b",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/abdada5b51b0f4e890e8003a.pdf"
+    },
+    {
+     "id": "owner-3",
+     "text": "EPA's Facility Registry Service lists a facility at 3132 Parrott Avenue NW named after the owner entity.",
+     "source_url": "https://data.epa.gov/efservice/frs.frs_facility_site/state_code/equals/GA/location_address/beginsWith/3132/city_name/equals/ATLANTA/JSON",
+     "retrieved": "2026-11-12",
+     "quote": "\"primary_name\": \"KM PHOENIX HOLDINGS - CHATTAHOOCHEE TERMINAL\",",
+     "context_before": "erating_status\": null, \"parent_registry_id\": null, \"postal_code\": \"30318-3306\", ",
+     "context_after": " \"public_ind\": \"y\", \"refresh_date\": null, \"registry_id\": \"110000492887\", \"review",
+     "words_shared_with_url": [],
+     "page_file": "pages/b8d37844b78faf9da880be43.html"
+    },
+    {
+     "id": "owner-4",
+     "text": "The same EPA registry entry (registry id 110000492887) carries a state air program record whose id ends in the EPD AIRS number 121-00221.",
+     "source_url": "https://data.epa.gov/efservice/frs.frs_program_facility/registry_id/equals/110000492887/JSON",
+     "retrieved": "2026-11-12",
+     "quote": "\"pgm_sys_acrnm\": \"AIR\", \"pgm_sys_id\": \"GA0000001312100221\",",
+     "context_before": "a\", \"location_address\": \"3132 parrott avenue nw\", \"location_description\": null, ",
+     "context_after": " \"postal_code\": \"303183306\", \"primary_name\": \"km phoenix holdings chattahoochee ",
+     "words_shared_with_url": [],
+     "page_file": "pages/e8444c9f9ee92c56c71df311.html"
+    }
+   ],
+   "open_items": [
+    "The Georgia Secretary of State record (status, formation, registered agent) was not checked: known wall. The entity appears to be an operating subsidiary of a pipeline / terminal company holding a working terminal, not a land investor.",
+    "The owner also holds the adjacent parcel 17 0263 LL0262 (per the brief); together they likely form the terminal site."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "killed",
+  "objection": "The first pass's central finding holds and is now current: the IRS list of active fuel terminals as of 9/30/2026 (a federal record published November 2026) still carries terminal T-58-GA-2511 at 3132 Parrott Avenue N.W., Atlanta, operated by Kinder Morgan Liquids Terminals LLC. The site is a working petroleum terminal in 2026, not available land, and no closure, decommissioning or sale record was found. It has been a fuel terminal since at least 1975 under several operators, so any future sale would bring a petroleum-contamination question that no public record read here answers.",
+  "disputes": [
+   "zoning-2",
+   "owner-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The IRS Terminal Control Numbers list (Active Fuel Terminals) has a row for terminal T-58-GA-2511 at 3132 Parrott Avenue N.W., Atlanta GA 30318, with the operator named as Kinder Morgan Liquids Terminals LLC (the operator name runs onto a second line in the table, so the row reads in layout order).",
+    "source_url": "https://www.irs.gov/pub/irs-sbse/tcn-db.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "T-58-GA-2511 Kinder Morgan Liquids 3132 Parrott Avenue Atlanta GA 30318",
+    "context_before": "7 t-58-ga-2510 global companies llc 4127 winters chapel doraville ga 30360 road ",
+    "context_after": " terminals llc n.w. t-58-ga-2514 global companies llc 1803 east shotwell bainbri",
+    "pdf_page": 18,
+    "pdf_order": "layout",
+    "words_shared_with_url": [],
+    "page_file": "pages/700ba4fb97a147ecf642a8d1.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The same IRS document dates itself as the list of active fuel terminals as of 9/30/2026, so the Parrott Avenue terminal was a registered, active terminal at the end of September 2026.",
+    "source_url": "https://www.irs.gov/pub/irs-sbse/tcn-db.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "ACTIVE FUEL TERMINALS @9/30/2026",
+    "context_before": "1 t-99-hi-4562 t-99-hi-4563 t-99-hi-4566 t-99-hi-4567 t-99-hi-4568 t-99-hi-4570 ",
+    "context_after": " tesoro hawaii corporation aloha petroleum ltd. p.o. box 218 3145 waapa road mai",
+    "pdf_page": 33,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/700ba4fb97a147ecf642a8d1.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "Georgia EPD's Title V review traces the facility back to a 1975 air permit, as a multi-company fuel terminal (later Unocal, Louis Dreyfus, TransMontaigne, BP, then Kinder Morgan): about 50 years of petroleum storage and truck loading on this address, which is what a buyer's Phase I would have to address.",
+    "source_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+    "retrieved": "2026-11-12",
+    "quote": "This facility was permitted in 1975 under the name Southeast Terminals.",
+    "context_before": "t/holding company name km phoenix holdings llc 3. previous and/or other name(s) ",
+    "context_after": " it contained separate storage tanks for different companies with shared loading",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/abdada5b51b0f4e890e8003a.pdf"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "Against zoning-2: the City of Atlanta overlay layer (LandUsePlanning MapServer layer 1), queried with this parcel's own polygon (the Fulton County parcel shape for 17 025700010102, simplified to within about 1 m) and no buffer, returns no features. The NW Atlanta Affordable WH overlay the first pass found lies within 500 ft of the parcel point, not on the parcel.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.482647%2C33.805396%5D%2C%5B-84.482862%2C33.80504%5D%2C%5B-84.484044%2C33.805046%5D%2C%5B-84.48357%2C33.804745%5D%2C%5B-84.483788%2C33.804366%5D%2C%5B-84.484239%2C33.803781%5D%2C%5B-84.484297%2C33.803814%5D%2C%5B-84.484347%2C33.803756%5D%2C%5B-84.484979%2C33.803267%5D%2C%5B-84.485179%2C33.802835%5D%2C%5B-84.485287%2C33.802768%5D%2C%5B-84.485115%2C33.802599%5D%2C%5B-84.485595%2C33.802285%5D%2C%5B-84.486093%2C33.802199%5D%2C%5B-84.486544%2C33.802042%5D%2C%5B-84.486613%2C33.802039%5D%2C%5B-84.48669%2C33.80208%5D%2C%5B-84.486717%2C33.802133%5D%2C%5B-84.486725%2C33.802271%5D%2C%5B-84.486592%2C33.803765%5D%2C%5B-84.486588%2C33.803964%5D%2C%5B-84.48663%2C33.804261%5D%2C%5B-84.486796%2C33.804805%5D%2C%5B-84.48572%2C33.804807%5D%2C%5B-84.485725%2C33.805573%5D%2C%5B-84.484962%2C33.806081%5D%2C%5B-84.484093%2C33.805599%5D%2C%5B-84.483942%2C33.805552%5D%2C%5B-84.483631%2C33.805475%5D%2C%5B-84.483314%2C33.805423%5D%2C%5B-84.482992%2C33.805397%5D%2C%5B-84.482647%2C33.805396%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"alias\":\"SHAPE.LEN\"}],\"features\":[]",
+    "context_before": "edouble\",\"alias\":\"shape.area\"},{\"name\":\"shape.len\",\"type\":\"esrifieldtypedouble\",",
+    "context_after": "}",
+    "words_shared_with_url": [],
+    "page_file": "pages/7428b945dbce2595ee6e334a.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "Also against zoning-2: the same overlay layer queried at the brief's map point (33.804185, -84.485238) with no 500 ft buffer returns no features.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"alias\":\"SHAPE.LEN\"}],\"features\":[]",
+    "context_before": "edouble\",\"alias\":\"shape.area\"},{\"name\":\"shape.len\",\"type\":\"esrifieldtypedouble\",",
+    "context_after": "}",
+    "words_shared_with_url": [],
+    "page_file": "pages/c0b848a4de05b52fc7282dd4.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "Georgia EPD's 2026 Hazardous Site Inventory list by county (dated June 2026) has no Fulton County entry named for this terminal or any of its past operators (Southeast Terminals, Unocal, Louis Dreyfus, TransMontaigne, BP, Kinder Morgan or KM Phoenix). The list gives site names, not addresses, so this is a name check only, and it is not a clean bill of health.",
+    "source_url": "https://epd.georgia.gov/document/pdf/hsi-list-county-2026/download",
+    "retrieved": "2026-11-12",
+    "quote": "Site Summary List by County",
+    "context_before": "",
+    "context_after": " hsi # county class 10221 10022 akzo coatings (former) baxley creosoting company",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/20d4bbad69be843182c50574.pdf"
+   }
+  ],
+  "open_items": [
+   "zoning-2 is disputed: its claim says the parcel is in the NW Atlanta Affordable WH overlay, but its own URL asks for features within 500 ft of the parcel point. A point query with no buffer and a query with the parcel polygon both return nothing. The overlay is beside the parcel, not on it. A person should confirm on the city's zoning map.",
+   "owner-1 is disputed as support for the 'operator' verdict: its quote says EPD lists the tax-roll owner as the 'Parent/Holding Company', and the IRS 2026 terminal list names a different entity, Kinder Morgan Liquids Terminals LLC, as the terminal operator. The tax-roll owner looks like a holding company inside an operating pipeline and terminal group. For a buyer, the practical answer is the same: it is part of an operating business, not a land seller.",
+   "plans-2's claim also says the Special Use Permits (layer 11) and Building Moratorium (layer 5) layers returned nothing, but its cited page is the layer 10 query only. That part is the investigator's word, not shown by its quote.",
+   "No closure, sale or decommissioning record was found. Searches by address (3132 Parrott) and by Title V permit number found none. The Georgia Title V application index (gatv.gaepd.org, ListApplications.asp?c=0) shows only an old renewal application for AIRS 121-00221 (number 19213, under the BP name), with nothing newer. The Title V permit 5171-121-0221-V-06-0 reviewed in 2021 would run to about 2026-27, so its renewal application is the next state record to look for. Ask Georgia EPD Air Protection Branch whether it has been filed.",
+   "EPA ECHO compliance and inspection history (registry 110000492887; NPDES GAIS13091; RCRA GAD000609909) was not read: echodata.epa.gov robots.txt disallows everything, so it was not fetched. Two guessed Envirofacts RCRAInfo table names returned 404. A person should look up the RCRA handler status and any corrective-action record for GAD000609909 in a browser.",
+   "Contamination record a buyer would face: none found on the 2026 HSI by name. Releases from a petroleum bulk terminal may be tracked by other EPD programs or not listed publicly, so a Phase I/II and a records request to Georgia EPD would be needed before any change of use. Not contacted.",
+   "Which parcel holds the tanks is still open. The county record for the adjacent same-owner parcel 17 0263 LL0262 (3100 Parrott Ave NW, 15.07 ac, improvements appraised at $191,700, land use code 449) shows it is also improved. EPD's narrative says no other contiguous facility is under common control, so both parcels are likely one terminal site. Check with aerial imagery.",
+   "Search snippets only, not opened and not cited (company and directory pages): a terminal page under the operator's company site gives a storage capacity for a 'Chattahoochee Terminal' at this address, and a business listing updated in 2026 shows a pipeline company name at 3132 Parrott Ave NW. A snippet gave the IRS list date as 8/30/2026, but the document itself reads 9/30/2026."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/c6970036ffded88c3f118dc6.html",
+   "fetched_at": "2026-11-12T19:47:30Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3774,
+   "sha256": "023b29f683656066b864a78008d9db09b8c30044a45d6726de7f584a31b25c3f"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/3884482486493331f4779121.html",
+   "fetched_at": "2026-11-12T19:47:31Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1706,
+   "sha256": "e9331afcb5d4f4563892597f4b56d300f36f223e4cffc9c61586f54db4f44d71"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/827ee0299a1bf01480cf869b.html",
+   "fetched_at": "2026-11-12T19:47:32Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3846,
+   "sha256": "1d66009f771b207c1f5fc2efddb3c1b073305d14a5e17716017f45bf7d6072ce"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/09efb422324b4059af168fbe.html",
+   "fetched_at": "2026-11-12T19:47:33Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 2680,
+   "sha256": "2dd94daf5a45342ef5302dcb50ebed63bb3d0c80ce2c895110ea7374a35c438b"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/18/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/461b22b0f484c659eb90423b.html",
+   "fetched_at": "2026-11-12T19:47:34Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/18/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 2391,
+   "sha256": "096a12cfda84b997898f527e690daa491c47a839a3f81743e788d01773502112"
+  },
+  "https://epd.georgia.gov/document/document/tv549944-narrative/download": {
+   "file": "pages/abdada5b51b0f4e890e8003a.pdf",
+   "fetched_at": "2026-11-12T19:47:35Z",
+   "final_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+   "status": 200,
+   "bytes": 228673,
+   "sha256": "ddf246fd8aa5631ed57b47976e9a8d8b2c0e936d5076d18f005bbfe44786426c"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2717%20025700010102%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6a944d9bca5d7dc88b30e7ae.html",
+   "fetched_at": "2026-11-12T19:47:37Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2717%20025700010102%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4326,
+   "sha256": "54e81e2978727460eb8c60483866779f44d34acb7d3aaa900bd52a690a2b2e77"
+  },
+  "https://data.epa.gov/efservice/frs.frs_facility_site/state_code/equals/GA/location_address/beginsWith/3132/city_name/equals/ATLANTA/JSON": {
+   "file": "pages/b8d37844b78faf9da880be43.html",
+   "fetched_at": "2026-11-12T19:47:40Z",
+   "final_url": "https://data.epa.gov/efservice/frs.frs_facility_site/state_code/equals/GA/location_address/beginsWith/3132/city_name/equals/ATLANTA/JSON",
+   "status": 200,
+   "bytes": 18816,
+   "sha256": "49ad71522d4c35c3a7eedca6883f10ff48ff8468a1fde89dd29fffcc22b4c6e1"
+  },
+  "https://data.epa.gov/efservice/frs.frs_program_facility/registry_id/equals/110000492887/JSON": {
+   "file": "pages/e8444c9f9ee92c56c71df311.html",
+   "fetched_at": "2026-11-12T19:47:41Z",
+   "final_url": "https://data.epa.gov/efservice/frs.frs_program_facility/registry_id/equals/110000492887/JSON",
+   "status": 200,
+   "bytes": 13818,
+   "sha256": "871eae23b60836aa46174bbec6dc684f4280391ad286ed6fb3547850146a00ac"
+  },
+  "https://www.irs.gov/pub/irs-sbse/tcn-db.pdf": {
+   "file": "pages/700ba4fb97a147ecf642a8d1.pdf",
+   "fetched_at": "2026-11-12T19:47:43Z",
+   "final_url": "https://www.irs.gov/pub/irs-sbse/tcn-db.pdf",
+   "status": 200,
+   "bytes": 636302,
+   "sha256": "ed551a417e4c434eb02be9fb12f69be2ff0a21a14e8ce854e48e4bfa0833c7d2"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.482647%2C33.805396%5D%2C%5B-84.482862%2C33.80504%5D%2C%5B-84.484044%2C33.805046%5D%2C%5B-84.48357%2C33.804745%5D%2C%5B-84.483788%2C33.804366%5D%2C%5B-84.484239%2C33.803781%5D%2C%5B-84.484297%2C33.803814%5D%2C%5B-84.484347%2C33.803756%5D%2C%5B-84.484979%2C33.803267%5D%2C%5B-84.485179%2C33.802835%5D%2C%5B-84.485287%2C33.802768%5D%2C%5B-84.485115%2C33.802599%5D%2C%5B-84.485595%2C33.802285%5D%2C%5B-84.486093%2C33.802199%5D%2C%5B-84.486544%2C33.802042%5D%2C%5B-84.486613%2C33.802039%5D%2C%5B-84.48669%2C33.80208%5D%2C%5B-84.486717%2C33.802133%5D%2C%5B-84.486725%2C33.802271%5D%2C%5B-84.486592%2C33.803765%5D%2C%5B-84.486588%2C33.803964%5D%2C%5B-84.48663%2C33.804261%5D%2C%5B-84.486796%2C33.804805%5D%2C%5B-84.48572%2C33.804807%5D%2C%5B-84.485725%2C33.805573%5D%2C%5B-84.484962%2C33.806081%5D%2C%5B-84.484093%2C33.805599%5D%2C%5B-84.483942%2C33.805552%5D%2C%5B-84.483631%2C33.805475%5D%2C%5B-84.483314%2C33.805423%5D%2C%5B-84.482992%2C33.805397%5D%2C%5B-84.482647%2C33.805396%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/7428b945dbce2595ee6e334a.html",
+   "fetched_at": "2026-11-12T19:47:44Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.482647%2C33.805396%5D%2C%5B-84.482862%2C33.80504%5D%2C%5B-84.484044%2C33.805046%5D%2C%5B-84.48357%2C33.804745%5D%2C%5B-84.483788%2C33.804366%5D%2C%5B-84.484239%2C33.803781%5D%2C%5B-84.484297%2C33.803814%5D%2C%5B-84.484347%2C33.803756%5D%2C%5B-84.484979%2C33.803267%5D%2C%5B-84.485179%2C33.802835%5D%2C%5B-84.485287%2C33.802768%5D%2C%5B-84.485115%2C33.802599%5D%2C%5B-84.485595%2C33.802285%5D%2C%5B-84.486093%2C33.802199%5D%2C%5B-84.486544%2C33.802042%5D%2C%5B-84.486613%2C33.802039%5D%2C%5B-84.48669%2C33.80208%5D%2C%5B-84.486717%2C33.802133%5D%2C%5B-84.486725%2C33.802271%5D%2C%5B-84.486592%2C33.803765%5D%2C%5B-84.486588%2C33.803964%5D%2C%5B-84.48663%2C33.804261%5D%2C%5B-84.486796%2C33.804805%5D%2C%5B-84.48572%2C33.804807%5D%2C%5B-84.485725%2C33.805573%5D%2C%5B-84.484962%2C33.806081%5D%2C%5B-84.484093%2C33.805599%5D%2C%5B-84.483942%2C33.805552%5D%2C%5B-84.483631%2C33.805475%5D%2C%5B-84.483314%2C33.805423%5D%2C%5B-84.482992%2C33.805397%5D%2C%5B-84.482647%2C33.805396%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1337,
+   "sha256": "16e717ddaa52870a0b50866d722028848735e785b3e7ef1f0667d9e8408c0409"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/c0b848a4de05b52fc7282dd4.html",
+   "fetched_at": "2026-11-12T19:47:45Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1337,
+   "sha256": "16e717ddaa52870a0b50866d722028848735e785b3e7ef1f0667d9e8408c0409"
+  },
+  "https://epd.georgia.gov/document/pdf/hsi-list-county-2026/download": {
+   "file": "pages/20d4bbad69be843182c50574.pdf",
+   "fetched_at": "2026-11-12T19:47:45Z",
+   "final_url": "https://epd.georgia.gov/document/pdf/hsi-list-county-2026/download",
+   "status": 200,
+   "bytes": 857349,
+   "sha256": "789874bd23810ae2a41c02c117b46b14fc0b1296c3b42ad025f07f6a11d0adfb"
+  }
+ },
+ "quotecheck": {
+  "kept": 19,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:47:45Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "e155becbc22545782d932d7d4bd01343b1fd09cb50f85a545d63918a63ef0118",
+   "skeptic.json": "3e823dcfedcb68db0a14b3fe6a193be527e110af385252eeb0f478f09f1fbeda"
+  }
+ },
+ "dropped_claims": []
+}

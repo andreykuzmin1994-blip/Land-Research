@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0096  LL0322",
+  "run": "fulton-2026-11-12",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "This is not a stray lot. It belongs to the real-estate arm of the company that runs the Red Oak granite quarry (EPD permit 085-16, 288 acres), and quarry-related land runs unbroken from its east line to the quarry. Next to it on the east is 12.46 ac held by the quarry landowner's family company. Beyond that is 39.6 ac of the same family's industrial-class land, and then the parcel that holds EPD's listed quarry point. Together with the owner's two residential-class parcels to the north and south, it forms a strip of about 25 acres between the quarry land and the homes and church on Buffington Rd. That is the shape of a buffer or reserve. A 2019 Corps report, known here only from a news account, described a 50-year pit expansion, a plant move and overburden stored nearby. I found no document I could reach that shows the permit boundary, so a person must settle whether this parcel is inside the permitted area, a required buffer or an overburden area, and whether the owner would sell land it may hold for that purpose.",
+    "claims": [
+      {
+        "text": "The parcel holding the quarry's listed point: Georgia EPD lists the Red Oak Quarry point at 33.6053, -84.4894 (claim owner-2). In this county parcel query (a box around the quarry and this lead, by coordinates only), that point falls inside parcel 13 0095 LL0109 at 5414 Rock Quarry Rd: 17.15 ac, industrial class I5, held by a family investment company, not by the lead's owner. Which parcel holds the point is my computation from the geometry on this page, not stated on it.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5000,33.5960,-84.4800,33.6150&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"ParcelID\":\"13 0095  LL0109\",\"Address\":\"5414 ROCK QUARRY RD\",\"Owner\":\"THAMES FAMILY INVESTMENTS LLC \",\"LUCode\":\"398\",\"ClassCode\":\"I5\",\"LandAcres\":17.15"
+      },
+      {
+        "text": "The land between: parcel 13 0095 LL0091, 0 Rock Quarry Rd, 39.6 ac, industrial class I5, is held by the same family company as the quarry-point parcel. From this page's geometry (my computation), it runs from about 360 ft east of this lead to the west line of the quarry-point parcel. With 13 0095 LL1347 (the lead's east neighbour, same family name, claim zoning-3), it closes the gap from this lead's east line to the quarry, so the lead touches quarry-landowner land directly.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5000,33.5960,-84.4800,33.6150&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"ParcelID\":\"13 0095  LL0091\",\"Address\":\"0 ROCK QUARRY RD\",\"Owner\":\"THAMES FAMILY INVESTMENTS LLC \",\"LUCode\":\"400\",\"ClassCode\":\"I5\",\"LandAcres\":39.6"
+      },
+      {
+        "text": "Jurisdiction (this backs the first pass and the brief): queried at a point inside this parcel (state plane 2195633, 1311898), Fulton County's tax city layer returns Union City, tax code 50. That code matches the TaxDist 50 in the parcel record (claim owner-1). The lead is in Union City, not the City of South Fulton, so Union City's code governs; its M-1 text is still unquoted.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Tax/Tyler_Cities/MapServer/0/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"Name\":\"Union City\",\"TaxCode\":50,\"AreaAc\":12646.98459754"
+      }
+    ],
+    "open_items": [
+      "Settle the permit boundary first. The US Army Corps of Engineers Savannah District host (www.sas.usace.army.mil) answers 403 even for robots.txt, so I did not fetch it, and its public notices could not be read. The national Regulatory Request System (rrs.usace.army.mil) is JavaScript-only. A person should get the 2019 Corps public notice for the Red Oak Quarry plant move and pit expansion, with its site map, and the Georgia EPD surface mining permit 085-16 map and land-use plan (permit boundary, buffers, overburden areas). With those, check whether 13 0096 LL0322, LL0306 or LL0330 is inside the permitted area or a buffer the permit requires.",
+      "My computation, not on any page: EPD lists 288 permitted acres. In the county parcel query (claim 1's address), the industrial-class parcels held by the quarry landowner's family companies and by the lead's owner add up to about 221 ac within roughly 0.6 mile of the quarry point. Either the permit takes in land beyond that box, or it takes in residential-class parcels such as this lead's strip (about 25 ac). The parcel data cannot tell which.",
+      "Secondary source (news, not a claim): the SaportaReport article of September 15, 2019 (updated February 17, 2023) says the 2019 request covered 55.6 acres, a plant relocation 'to another site on its property', an aggregate conveyor and road access, and overburden 'stored nearby'. It also says a 2015 Nationwide Permit 44 verification covered a berm for a 34.5-acre expansion pit. Where the plant, the conveyor and the overburden were to go is the open question for this lead.",
+      "My computation from Fulton County's elevation contour layer (PropertyMapViewer layer 25, its date not stated): in a box from this parcel east to the far line of 13 0095 LL0091, no contour is below 904 ft. On that layer, then, the pit does not reach within about a quarter mile of the lead. Contours rise to about 1,010-1,022 ft some 300-900 ft east of the lead (on LL1347 or LL0091), above most of the lead's own ground. That ridge could be an overburden stockpile or a berm, or natural ground. Check it on current aerial imagery or on a site visit.",
+      "Blasting, vibration, dust and quarry truck traffic within about half a mile of an active granite quarry: ask Union City and the operator's permit file what setbacks or blasting limits apply to a new building here. I made no contact with anyone.",
+      "Market: an owner that runs a quarry next door and holds about 25 contiguous residential-class acres between its quarry and a neighbourhood is likely holding the land as buffer or reserve. Treat a sale as unlikely until the owner says otherwise, and do not make that approach without the boundary answer above.",
+      "Access is not my objection. The same county parcel query shows large distribution parcels further east on Buffington Rd (5200 and 5300 Buffington Rd, 5295 and 5297 Buffington Rd), so the road already carries industrial traffic. The curb cut for this frontage, and sharing the road with quarry trucks, remain to be checked with the city (GDOT if a state route).",
+      "On utilities-2: the sewer service-area polygon it quotes is about 10.17 billion sq ft (about 365 sq mi, per the text just after the quote in the checked file). Its 'ServiceAva: Yes' is an attribute of the whole district, not a statement about this site. Sewer near the site rests on utilities-1. I re-ran that layer query and computed the nearer 8-inch segment at about 188 ft from the parcel line, which agrees with the first pass.",
+      "The water provider is still unknown: Fulton County shows no water main here (utilities-3). Union City or the City of Atlanta Department of Watershed Management are the likely providers. Ask which serves the site and where the nearest main is."
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+{
+ "schema": 1,
+ "parcel_id": "09F350001311327",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "The screener reads M-1 from Union City's zoning layer on ArcGIS Online, which no polite fetch can reach (robots.txt answers 403); Union City's own site answers 403 and its code is on Municode (a known wall). Not verified here: a person should confirm the district, any conditions attached at a past rezoning, and whether warehouse/distribution is permitted by right in M-1.",
+    "A search-result snippet (not verified, a listing site) described the owner's neighbouring distribution centre as zoned M1C, i.e. possibly a conditional M-1. Ask Union City planning whether this parcel was part of the same conditional zoning and what conditions bind it.",
+    "The county tax roll gives this parcel class R5 and land-use code 100 (see the market claim's quote), not an industrial class; the tax class does not decide zoning, but a person should ask why it is classed that way."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "text": "Union City's 2020 comprehensive plan (as submitted to ARC, January 2021) applies its District-Industrial character area near US-29, South Fulton Parkway and rail lines; this parcel fronts SR 14 / US-29 (Roosevelt Hwy) beside the CSX line and adjoins the owner's distribution centre on South Fulton Parkway. That the parcel itself sits inside the D-I area on the Future Development Map (pdf page 78) is the investigator's reading of a low-resolution map image, not a verified fact.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Application: D-I in close proximity to I-85, US-29, South Fulton Parkway and rail lines for the purpose of convenient transportation access."
+    },
+    {
+     "text": "The same plan's District-Industrial intent is to keep and add industrial facilities, including large-scale distribution.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Building development should be variable within D-I to promote the specific needs of industrial activities or businesses and accommodate large-scale distribution facilities, industrial activities, or office park developments."
+    }
+   ],
+   "open_items": [
+    "Confirm on Union City's current Future Development Map (and any update after 2020) which character area covers this parcel; the map in the ARC copy is too coarse to place a 13-acre parcel with certainty.",
+    "Rezoning history of the last five years not checked: Union City's agendas and minutes are on its own site, which answers 403. Ask the city for any rezoning, variance or site-plan case on this parcel and the owner's neighbouring parcels since 2021.",
+    "No ARC DRI was found for this parcel in ten web searches; nearby DRIs (Union City Commerce Center 2021, Airport Distribution Center Four 2022, ATL11 2024) are on other sites (Evans Drive and Stonewall Tell Road)."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "text": "Sewer: Fulton County's Waste Water Pipe layer (WaterResourcesSewer MapServer layer 4), asked for pipes intersecting this parcel's outline (the county parcel polygon simplified to 5 ft, state plane), returns six active 8-inch gravity segments, Fulton County service area, Camp Creek basin, i.e. a public sewer line runs across the parcel.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B2186303.8%2C1316648.6%5D%2C%5B2186408.3%2C1315619.4%5D%2C%5B2186458.6%2C1315618.5%5D%2C%5B2186542.0%2C1314758.3%5D%2C%5B2185821.6%2C1314763.5%5D%2C%5B2185839.5%2C1314900.4%5D%2C%5B2185828.4%2C1315507.1%5D%2C%5B2185830.6%2C1316017.2%5D%2C%5B2186193.4%2C1316086.6%5D%2C%5B2186169.0%2C1316661.0%5D%2C%5B2186303.8%2C1316648.6%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A2240%7D%7D&geometryType=esriGeometryPolygon&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"UNION CITY\""
+    },
+    {
+     "text": "Water: Fulton County's Water Pipe layer (same service, layer 18), asked for pipes within 1,000 ft of this parcel's outline, returns no feature. Fulton County may not be the water provider in Union City (its service-area layers 19 and 22 also returned nothing here), so this is not evidence of no water; the provider's own map was not found.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WaterResourcesSewer/MapServer/18/query?geometry=%7B%22rings%22%3A%5B%5B%5B2186303.8%2C1316648.6%5D%2C%5B2186408.3%2C1315619.4%5D%2C%5B2186458.6%2C1315618.5%5D%2C%5B2186542.0%2C1314758.3%5D%2C%5B2185821.6%2C1314763.5%5D%2C%5B2185839.5%2C1314900.4%5D%2C%5B2185828.4%2C1315507.1%5D%2C%5B2185830.6%2C1316017.2%5D%2C%5B2186193.4%2C1316086.6%5D%2C%5B2186169.0%2C1316661.0%5D%2C%5B2186303.8%2C1316648.6%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A2240%7D%7D&geometryType=esriGeometryPolygon&inSR=2240&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=2240&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"PipeSize2\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Pipe Size\"},{\"name\":\"Enabled\",\"type\":\"esriFieldTypeSmallInteger\",\"alias\":\"Enabled\"},{\"name\":\"CITY_NAME\",\"type\":\"esriFieldTypeString\",\"alias\":\"CITY_NAME\",\"length\":30},{\"name\":\"LengthInFeet\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"LengthInFeet\"},{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"
+    }
+   ],
+   "open_items": [
+    "Identify the water provider for this part of Union City and ask for the nearest main and its size; the owner's distribution centre on the adjoining parcel is presumably served, but that was not checked.",
+    "Sewer capacity and whether the 8-inch line crossing the parcel sits in an easement that constrains the building pad: only the utility and a title search can say.",
+    "The assessor's 'Septic' entry in the brief predates or ignores the mapped sewer line; treat it as unreliable."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "text": "Asked by parcel id, Fulton County's tax parcel layer (tax year 2027) still lists the operator itself as owner of this parcel, with no improvement value. In the places looked (this record, ARC DRI reviews reached by search, ten web searches by site address and parcel id) no listing, contract, third-party rezoning or development-authority action on this parcel was found. This is not evidence it is for sale; see the owner section.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350001311327%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Address\":\"0 COOKS RD\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"COOKS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"COSTCO WHOLESALE CORPORATION \",\"OwnerAddr1\":\"999 LAKE DR\",\"OwnerAddr2\":\"ISSAQUAH WA 98027\",\"TaxDist\":\"50\",\"TotAssess\":109360,\"LandAssess\":109360,\"ImprAssess\":0,\"TotAppr\":273400,\"LandAppr\":273400,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":12.94"
+    }
+   ],
+   "open_items": [
+    "Search-result snippets (not verified; news sites, not read) carried headlines that the owner paid about $40M to expand its land holdings near its Atlanta-airport distribution centre, about 33 acres along Roosevelt Highway straddling Union City and South Fulton. If that purchase includes this parcel (the brief's 2021-08-26 sale and the three same-owner neighbours total about 30 acres), the land was bought as expansion land for the operator's own facility and is unlikely to be sold. A person should read those articles.",
+    "The county GIS polygon for this parcel measures about 20.8 acres (Shape area 907,300 sq ft) while the roll says 12.94 acres; check the deed and plat before relying on either."
+   ]
+  },
+  "owner": {
+   "verdict": "operator",
+   "claims": [
+    {
+     "text": "The same owner name holds the 94.3-acre industrial parcel at 4250 South Fulton Pkwy, Union City, appraised with $19.2M of improvements (class I5). By the investigator's own computation from the county parcel geometry, that parcel shares about 2,050 ft of boundary with this lead: the lead adjoins the owner's operating facility (search results name it the owner's distribution centre; not verified on a primary page).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID+IN+%28%2709F350001311319%27%2C%2709F260301261363%27%29&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Address\":\"4250 SOUTH FULTON PKWY\",\"AddrNumber\":\"4250\",\"AddrPreDir\":null,\"AddrStreet\":\"SOUTH FULTON\",\"AddrSuffix\":\"PKWY\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"COSTCO WHOLESALE CORP \",\"OwnerAddr1\":\"999 LAKE DR\",\"OwnerAddr2\":\"ISSAQUAH WA 98027-8990\",\"TaxDist\":\"50\",\"TotAssess\":9418000,\"LandAssess\":1752880,\"ImprAssess\":7665120,\"TotAppr\":23545000,\"LandAppr\":4382200,\"ImprAppr\":19162800,\"LUCode\":\"391\",\"ClassCode\":\"I5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":94.3"
+    },
+    {
+     "text": "The same owner name also holds a 65.66-acre industrial parcel at 5390 Hunter Rd, Union City, with $54.6M of improvements, about 800 ft from this lead: a second large operating site nearby.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID+IN+%28%2709F350001311319%27%2C%2709F260301261363%27%29&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Address\":\"5390 HUNTER RD\",\"AddrNumber\":\"5390\",\"AddrPreDir\":null,\"AddrStreet\":\"HUNTER\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"COSTCO WHOLESALE CORPORATION \",\"OwnerAddr1\":\"45940 HORSESHOE DR\",\"OwnerAddr2\":\"STERLING VA 20166\",\"TaxDist\":\"50\",\"TotAssess\":23000000,\"LandAssess\":1177840,\"ImprAssess\":21822160,\"TotAppr\":57500000,\"LandAppr\":2944600,\"ImprAppr\":54555400,\"LUCode\":\"394\",\"ClassCode\":\"I5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":65.66"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State record not read (known wall: 403). On the county roll the owner holds improved industrial parcels next door (claims above); the lead looks like expansion or buffer land for its distribution centre rather than surplus land.",
+    "Ask (through the person, not by contact from here) whether the owner has a site plan, permit or expansion plan for this parcel and its three same-owner neighbours; the screen's 'possible assemblage' is most likely the operator's own expansion holding."
+   ]
+  }
+ }
+}

@@ -1,0 +1,60 @@
+{
+ "schema": 1,
+ "parcel_id": "09F080000300639",
+ "run": "fulton-2026-11-12",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The owner is not a passive land holder: it is the waste company that runs the Fairburn Transfer Station, and that station sits at 609 Bohannon Rd, an address the county places on the owner's 11.96 ac parcel 09F080000300621, which touches this one. The county's own 2024 aerial photo shows this 9.2 ac parcel used as the station's outdoor yard (thousands of waste carts, rows of roll-off containers, trucks on gravel), so it is neither vacant nor likely for sale apart from the operation, and waste handling raises a contamination question the screen did not look at. The photo is not quotable, so a person must look at it before acting; if it reads as I read it, the lead is dead. The first pass's two plan worries are smaller than they looked: the Curry Bend plat is about 2 miles south, and the touching neighbours are industrial and rail.",
+  "disputes": [
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "text": "Fulton County's address points place 609 Bohannon Rd on parcel 09F080000300621, the same-owner parcel that touches this one (asked: all address points in an envelope around this parcel).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/8/query?geometry=-84.6000,33.5440,-84.5900,33.5530&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"09F080000300621\",\"StreetID\":\"TSL0004236\",\"FCStreetID\":\"TSL0004236\",\"StructID\":null,\"PreAddrNum\":null,\"StNumber\":609,\"PreMod\":null,\"PreDir\":null,\"PreType\":null,\"Separator\":null,\"Name\":\"Bohannon\",\"PostType\":\"Road\",\"PostDir\":null,\"PostMod\":null,\"Label\":\"609 Bohannon Rd\""
+   },
+   {
+    "text": "The county parcel layer shows that adjoining parcel 09F080000300621 (11.96 ac) has the same owner as this lead (asked: all parcels in an envelope around this parcel).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5983,33.5474,-84.5940,33.5511&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"09F080000300621\",\"TaxYear\":2027,\"Address\":\"0 BOHANNON RD\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"BOHANNON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CLM SANITATION LLC"
+   },
+   {
+    "text": "A City of Chattahoochee Hills list of sanitation services and landfills (2022) gives the Fairburn Transfer Station's address as 609 Bohannon Rd, i.e. on the owner's adjoining parcel.",
+    "source_url": "https://cms3.revize.com/revize/chattahoocheehillsga/Sanitation%20Services%20and%20Landfill%20Locations.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Fairburn Transfer Station 609 Bohannon Rd Fairburn, GA"
+   },
+   {
+    "text": "The 6500 block of Bohannon Rd, where the Curry Bend plat's second address (6560 Bohannon Road) falls, is near latitude 33.517, about 2 miles south of this parcel (latitude about 33.549); Curry Bend is not next to it (asked: parcels in an envelope at 33.5165-33.5185 N).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5165,-84.5970,33.5185&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Address\":\"6550 BOHANNON RD\",\"AddrNumber\":\"6550\""
+   },
+   {
+    "text": "A parcel that touches this one on the north, 605 Bohannon Rd, is an improved industrial parcel (class I4); the other touching parcels are the same owner's and 7000 Creekwood Rd (also I4), with CSX land across Creekwood Rd. No residential subdivision touches the parcel.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5983,33.5474,-84.5940,33.5511&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Address\":\"605 BOHANNON RD\",\"AddrNumber\":\"605\",\"AddrPreDir\":null,\"AddrStreet\":\"BOHANNON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"GKI INFILL ATLANTA LLC \",\"OwnerAddr1\":\"10275 W HIGGINS RD 810\",\"OwnerAddr2\":\"DES PLAINES IL 60018\",\"TaxDist\":\"25D\",\"TotAssess\":2509240,\"LandAssess\":144000,\"ImprAssess\":2365240,\"TotAppr\":6273100,\"LandAppr\":360000,\"ImprAppr\":5913100,\"LUCode\":\"398\",\"ClassCode\":\"I4\""
+   },
+   {
+    "text": "The 2025 plan proposes impact fees on development in the Light Industrial and Industrial areas, aimed at high-truck-traffic uses: a possible added cost for a warehouse here.",
+    "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+    "retrieved": "2026-11-12",
+    "quote": "The City should consider levying impact fees for developments in the Light Industrial and Industrial future development areas with emphasis on uses with high truck traffic"
+   }
+  ],
+  "open_items": [
+   "Seen, not verifiable: Fulton County 2024 orthophoto, https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Imagery/Pictometry2024_NAIP/MapServer/export?bbox=-84.5965,33.5475,-84.5945,33.5500&bboxSR=4326&imageSR=4326&size=800,1110&format=jpg&f=image . On this parcel (checked against the county parcel outline): a gravel yard with thousands of blue waste carts, rows of rusty roll-off containers, trailers and trucks. The station building sits just south, on parcel 09F080000300621. A person should look at this image (or drive by) first; if it shows what I saw, the lead is not usable as vacant land.",
+   "Seen, not verifiable: Georgia EPD Regulated Solid Waste Facilities list (April 2026, an .xlsx quotecheck cannot read), https://epd.georgia.gov/document/document/apr-2026-regulated-solid-waste-facilitiesxlsx/download . One row names the owner LLC 'd/b/a FAIRBURN TRANSFER STATION, a Waste INDUSTRIES COMPANY (formerly Walker Transfer and Recycling Facility)', type SW- Transfer Station, permit PBR-060-250TS, status Operating. Other rows list the same LLC with solid-waste collection permits.",
+   "The first pass's owner section is unknown, but on this evidence the owner is an operator using the land (an operating waste business), not a holding entity. The same-owner 'assemblage' in the brief (26.1 ac) is the transfer station's own site. Ask whether the operation would move or sell as a going concern; a bare-land sale is unlikely.",
+   "Environmental: years of waste-cart and container storage next to a transfer station call for a Phase I ESA (and probably soil testing) before any offer. The screen's fit, pond and earthwork numbers treat the yard as open ground.",
+   "The assessor carries this parcel as class R4, land use code 100, with no improvement value, although the aerial shows it in active use. The 'vacant land' reading comes from the tax roll, not the ground.",
+   "Seen, not verifiable: the 2025 plan's Future Development Map (PDF page 125, printed p. 123; an image) shows the whole Bohannon Rd corridor between US-29 and I-85, this parcel included, in the light grey Light Industrial category, not the dark grey Industrial one. I agree with the first pass's reading. Light Industrial's listed zoning districts omit M-2. Existing M-2 rights still govern, but a rezoning, variance or the planned zoning ordinance rewrite would be judged against Light Industrial.",
+   "Curry Bend: a search snippet (not used as evidence) describes it as a 64.5 ac DRB Group project. Its 6560 Bohannon Road address lies in the 6500 block about 2 miles south. Where its other parcel, '0 Bohannon Road', lies is still not established.",
+   "No page I read addressed instructions to an automated reader."
+  ]
+ }
+}

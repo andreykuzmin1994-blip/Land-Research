@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0096  LL0322",
+  "run": "fulton-2026-11-12",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "The county tax parcel record for this parcel (queried by parcel id) shows 7.6 acres of land with no improvement value, land-use code 100 and class code R4. These are assessor codes, not zoning: no quotable source confirmed the M-1 zoning the screener read from Union City's layer.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0322%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"TotAppr\":74700,\"LandAppr\":74700,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R4\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":7.6"},
+        {"text": "Residential neighbour: a query of the county parcel layer for a box about 100 ft around this parcel returns 5545 Buffington Rd, a 1.5-acre parcel with land-use code 101 and class R3 (assessor's residential codes). From the returned geometry it sits about 70 ft from this parcel's line, across Buffington Rd (my computation, not on the page). Other returns in the same box: two vacant R4 parcels on Bluegrass Dr about 60-65 ft away and a church at 5445 Buffington Rd about 110 ft away. Residential buffers or screening may apply.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=2195124,1311541,2196106,1312214&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,LUCode,ClassCode,LandAcres&returnGeometry=true&outSR=2240&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"ParcelID\":\"13 0096  LL4423\",\"Address\":\"5545 BUFFINGTON RD\",\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"LandAcres\":1.5}"},
+        {"text": "Neighbour on the east: parcel 13 0095 LL1347, 0 Rock Quarry Rd, 12.46 acres, class C5, vacant, held by a family investment company, shares about 480 ft of boundary with this parcel (shared length computed from the county geometry, not on the page). Its street name and the permitted quarry nearby (owner section) suggest the land east of this parcel is tied to quarry operations; not confirmed.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5045,33.6015,-84.4920,33.6105&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"ParcelID\":\"13 0095  LL1347\",\"Address\":\"0 ROCK QUARRY RD\",\"Owner\":\"THAMES FAMILY INVESTMENTS II LLC \",\"LUCode\":\"400\",\"ClassCode\":\"C5\",\"LandAcres\":12.46"}
+      ],
+      "open_items": [
+        "Union City's own site (unioncityga.gov) answers 403 even for robots.txt and its zoning layer is on ArcGIS Online, so neither the M-1 designation nor the M-1 use table could be quoted. Ask Union City planning whether warehouse/distribution is permitted by right in M-1 and whether any conditions of zoning attach to this parcel.",
+        "The assessor class R4 and land-use code 100 on an M-1 parcel: ask the Fulton assessor what they mean here (assessor classes are not zoning, but a residential class can signal a mapped or historic residential designation).",
+        "Ask Union City what buffer or screening its code requires between M-1 and the homes across Buffington Rd (5545 Buffington Rd, Estes Dr) and the church at 5445 Buffington Rd.",
+        "Ask whether quarry-related setbacks or blasting limits apply to new buildings this close to an active quarry (the permitted Red Oak Quarry, owner section)."
+      ]
+    },
+    "plans": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "Union City's comprehensive plan, future development map and planning agendas are hosted on unioncityga.gov, which answers 403; none could be read. Ask the city for the future development map designation of this parcel and for any rezoning, variance or plat case on it or beside it since 2021.",
+        "Search result only, page not opened (host answers 403): a search listed a 2026 application on unioncityga.gov titled as a Union City future development map update. Ask the city whether it changes the designation of this parcel or its neighbours.",
+        "Search results only, pages not opened: Union City rezoning cases in 2025 for a data center near Buffington Rd and Jonesboro Rd (to O-I), and an ARC DRI for that project (#4315, Red Oak Rd). Nothing seen places them on or beside this parcel; ask the city.",
+        "Secondary source (news, not used as a claim): a SaportaReport article dated September 15, 2019 (updated February 17, 2023) says the Red Oak Quarry owner sought federal (US Army Corps of Engineers, Savannah) and state permits to move its plant and expand the mine pit, adding about 50 years to the mine's life, with overburden stored nearby, and that the Sable Chase neighbourhood lies west of the quarry. Find the Corps public notice and its site map to see whether this parcel lies inside the permit area, a planned overburden area or a buffer."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {"text": "Sewer, nearby: Fulton County's public water resources map returns two 8-inch PVC gravity sewer segments (Morning Creek basin, Fulton County service area) in a box about 300 ft around this parcel. From the returned geometry the nearer one is about 190 ft from the parcel line (my computation, not on the page).",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FULTON COUNTY\",\"LengthInFeet\":108.33467164"},
+        {"text": "Sewer service area: a point inside this parcel (state plane 2195633, 1311898) falls in Fulton County's water/sewer service area layer as a Fulton County sewer area with service available.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""},
+        {"text": "Water, not shown: the same Fulton County map's water pipe layer returns no pipe in the same box about 300 ft around this parcel (an empty feature list). A count over a box about a mile around it also returned zero, so Fulton County is probably not the water provider here; the assessor lists public water, but the provider's map was not found.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"alias\":\"Shape.STLength()\"}],\"features\":[]}"}
+      ],
+      "open_items": [
+        "Find out who supplies water at this address (Union City or the City of Atlanta are candidates; not checked) and where the nearest main is.",
+        "Sewer capacity and the connection route to the 8-inch line about 190 ft away: only Fulton County Public Works can say."
+      ]
+    },
+    "market": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "No public notice, surplus list, development-authority release or third-party rezoning naming this parcel was found; Union City's agendas (the likeliest place for a rezoning by a buyer) could not be read (403). Ask the city whether any application has been filed on 13 0096 LL0322 or its same-owner neighbours (13 0096 LL0306, 13 0096 LL0330).",
+        "The owner group runs the neighbouring quarry (owner section) and, per the 2019 news report in plans, was planning a 50-year mine expansion. The parcel may be held as quarry buffer or reserve and not be for sale; only the owner can say, and no contact was made.",
+        "The last recorded sale (2014-12-24, $2,236,074) is far above this parcel's assessed land value; it may cover several parcels. Pull the deed to see what it conveyed and whether it carries restrictions."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "The county tax parcel record (queried by parcel id) gives the owner as a real-estate investment company with a P.O. box mailing address in Fort Wayne, Indiana.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0322%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"Owner\":\"MARTIN MARIETTA MATERIALS REAL ESTATE INVESTMENTS INC\",\"OwnerAddr1\":\"P.O. BOX 8040\",\"OwnerAddr2\":\"FORT WAYNE IN 46898-8040\",\"TaxDist\":\"50\""},
+        {"text": "Georgia EPD's list of permitted surface mines (August 2024) has a 288-acre granite quarry in Fulton County, the Red Oak Quarry, under a company of the same name as the owner without the real-estate suffix, located off Buffington Road. Its listed point (33.6053, -84.4894) is about 0.5 mile east of this parcel's centre (my computation). The permit boundary was not seen, so whether this parcel is inside it is unknown.",
+         "source_url": "https://epd.georgia.gov/document/document/surface-mining-permitted-facilities-08282024/download",
+         "retrieved": "2026-11-12",
+         "quote": "Fulton,085-16,\"MARTIN MARIETTA MATERIALS, INC. - RED OAK QUARRY\",Quarry,Granite,288,\"Off Buffington Road, south of Exit 1 (spur 14)\",Red Oak,33.6053,-84.4894"},
+        {"text": "The federal Mine Safety and Health Administration lists the Red Oak Quarry as a surface crushed-granite mine whose controller is the same-named operating company.",
+         "source_url": "https://www.msha.gov/data-reports/statistics/mines/ga/red-oak-quarry",
+         "retrieved": "2026-11-12",
+         "quote": "Crushed, Broken Granite Mine Controller Martin Marietta Materials Inc"},
+        {"text": "The parcel to the south, 13 0096 LL0330 (5.3 acres, vacant, class R4), is recorded under a truncated form of the same owner name and shares about 790 ft of boundary with this parcel (shared length computed from county geometry, not on the page). With 13 0096 LL0306 to the north (about 737 ft shared), this parcel sits inside a block of same-owner land of about 25 acres.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5045,33.6015,-84.4920,33.6105&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=false&f=json",
+         "retrieved": "2026-11-12",
+         "quote": "\"ParcelID\":\"13 0096  LL0330\",\"Address\":\"0 BUFFINGTON RD\",\"Owner\":\"MARTIN MARIETTA MATERIALS REAL ESTATE \",\"LUCode\":\"100\",\"ClassCode\":\"R4\",\"LandAcres\":5.3"}
+      ],
+      "open_items": [
+        "Georgia Secretary of State records answer 403, so status, formation date, principal office and registered agent of the owner entity are unknown. The name suggests a real-estate holding arm of the aggregates company that runs the neighbouring quarry, but that link is not documented here.",
+        "The screener's same-owner note covers only 5-50 acre parcels; 13 0096 LL0330 (5.3 ac, owner name truncated in the record) was not counted as the same owner. Confirm by deed whether it is the same entity: with it, the assemblage is about 25 acres, not 19.6.",
+        "The screener brief did not flag the operating quarry next door; a person should weigh blasting, dust, truck traffic and any quarry buffer obligations."
+      ]
+    }
+  }
+}

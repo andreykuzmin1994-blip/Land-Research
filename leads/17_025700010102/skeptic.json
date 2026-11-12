@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "parcel_id": "17 025700010102",
+  "run": "fulton-2026-11-12",
+  "skeptic": {
+    "verdict": "killed",
+    "objection": "The first pass's central finding holds and is now current: the IRS list of active fuel terminals as of 9/30/2026 (a federal record published November 2026) still carries terminal T-58-GA-2511 at 3132 Parrott Avenue N.W., Atlanta, operated by Kinder Morgan Liquids Terminals LLC. The site is a working petroleum terminal in 2026, not available land, and no closure, decommissioning or sale record was found. It has been a fuel terminal since at least 1975 under several operators, so any future sale would bring a petroleum-contamination question that no public record read here answers.",
+    "disputes": ["zoning-2", "owner-1"],
+    "claims": [
+      {
+        "text": "The IRS Terminal Control Numbers list (Active Fuel Terminals) has a row for terminal T-58-GA-2511 at 3132 Parrott Avenue N.W., Atlanta GA 30318, with the operator named as Kinder Morgan Liquids Terminals LLC (the operator name runs onto a second line in the table, so the row reads in layout order).",
+        "source_url": "https://www.irs.gov/pub/irs-sbse/tcn-db.pdf",
+        "retrieved": "2026-11-12",
+        "quote": "T-58-GA-2511 Kinder Morgan Liquids 3132 Parrott Avenue Atlanta GA 30318"
+      },
+      {
+        "text": "The same IRS document dates itself as the list of active fuel terminals as of 9/30/2026, so the Parrott Avenue terminal was a registered, active terminal at the end of September 2026.",
+        "source_url": "https://www.irs.gov/pub/irs-sbse/tcn-db.pdf",
+        "retrieved": "2026-11-12",
+        "quote": "ACTIVE FUEL TERMINALS @9/30/2026"
+      },
+      {
+        "text": "Georgia EPD's Title V review traces the facility back to a 1975 air permit, as a multi-company fuel terminal (later Unocal, Louis Dreyfus, TransMontaigne, BP, then Kinder Morgan): about 50 years of petroleum storage and truck loading on this address, which is what a buyer's Phase I would have to address.",
+        "source_url": "https://epd.georgia.gov/document/document/tv549944-narrative/download",
+        "retrieved": "2026-11-12",
+        "quote": "This facility was permitted in 1975 under the name Southeast Terminals."
+      },
+      {
+        "text": "Against zoning-2: the City of Atlanta overlay layer (LandUsePlanning MapServer layer 1), queried with this parcel's own polygon (the Fulton County parcel shape for 17 025700010102, simplified to within about 1 m) and no buffer, returns no features. The NW Atlanta Affordable WH overlay the first pass found lies within 500 ft of the parcel point, not on the parcel.",
+        "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.482647%2C33.805396%5D%2C%5B-84.482862%2C33.80504%5D%2C%5B-84.484044%2C33.805046%5D%2C%5B-84.48357%2C33.804745%5D%2C%5B-84.483788%2C33.804366%5D%2C%5B-84.484239%2C33.803781%5D%2C%5B-84.484297%2C33.803814%5D%2C%5B-84.484347%2C33.803756%5D%2C%5B-84.484979%2C33.803267%5D%2C%5B-84.485179%2C33.802835%5D%2C%5B-84.485287%2C33.802768%5D%2C%5B-84.485115%2C33.802599%5D%2C%5B-84.485595%2C33.802285%5D%2C%5B-84.486093%2C33.802199%5D%2C%5B-84.486544%2C33.802042%5D%2C%5B-84.486613%2C33.802039%5D%2C%5B-84.48669%2C33.80208%5D%2C%5B-84.486717%2C33.802133%5D%2C%5B-84.486725%2C33.802271%5D%2C%5B-84.486592%2C33.803765%5D%2C%5B-84.486588%2C33.803964%5D%2C%5B-84.48663%2C33.804261%5D%2C%5B-84.486796%2C33.804805%5D%2C%5B-84.48572%2C33.804807%5D%2C%5B-84.485725%2C33.805573%5D%2C%5B-84.484962%2C33.806081%5D%2C%5B-84.484093%2C33.805599%5D%2C%5B-84.483942%2C33.805552%5D%2C%5B-84.483631%2C33.805475%5D%2C%5B-84.483314%2C33.805423%5D%2C%5B-84.482992%2C33.805397%5D%2C%5B-84.482647%2C33.805396%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"alias\":\"SHAPE.LEN\"}],\"features\":[]"
+      },
+      {
+        "text": "Also against zoning-2: the same overlay layer queried at the brief's map point (33.804185, -84.485238) with no 500 ft buffer returns no features.",
+        "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/1/query?geometry=-84.485238%2C33.804185&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-12",
+        "quote": "\"alias\":\"SHAPE.LEN\"}],\"features\":[]"
+      },
+      {
+        "text": "Georgia EPD's 2026 Hazardous Site Inventory list by county (dated June 2026) has no Fulton County entry named for this terminal or any of its past operators (Southeast Terminals, Unocal, Louis Dreyfus, TransMontaigne, BP, Kinder Morgan or KM Phoenix). The list gives site names, not addresses, so this is a name check only, and it is not a clean bill of health.",
+        "source_url": "https://epd.georgia.gov/document/pdf/hsi-list-county-2026/download",
+        "retrieved": "2026-11-12",
+        "quote": "Site Summary List by County"
+      }
+    ],
+    "open_items": [
+      "zoning-2 is disputed: its claim says the parcel is in the NW Atlanta Affordable WH overlay, but its own URL asks for features within 500 ft of the parcel point. A point query with no buffer and a query with the parcel polygon both return nothing. The overlay is beside the parcel, not on it. A person should confirm on the city's zoning map.",
+      "owner-1 is disputed as support for the 'operator' verdict: its quote says EPD lists the tax-roll owner as the 'Parent/Holding Company', and the IRS 2026 terminal list names a different entity, Kinder Morgan Liquids Terminals LLC, as the terminal operator. The tax-roll owner looks like a holding company inside an operating pipeline and terminal group. For a buyer, the practical answer is the same: it is part of an operating business, not a land seller.",
+      "plans-2's claim also says the Special Use Permits (layer 11) and Building Moratorium (layer 5) layers returned nothing, but its cited page is the layer 10 query only. That part is the investigator's word, not shown by its quote.",
+      "No closure, sale or decommissioning record was found. Searches by address (3132 Parrott) and by Title V permit number found none. The Georgia Title V application index (gatv.gaepd.org, ListApplications.asp?c=0) shows only an old renewal application for AIRS 121-00221 (number 19213, under the BP name), with nothing newer. The Title V permit 5171-121-0221-V-06-0 reviewed in 2021 would run to about 2026-27, so its renewal application is the next state record to look for. Ask Georgia EPD Air Protection Branch whether it has been filed.",
+      "EPA ECHO compliance and inspection history (registry 110000492887; NPDES GAIS13091; RCRA GAD000609909) was not read: echodata.epa.gov robots.txt disallows everything, so it was not fetched. Two guessed Envirofacts RCRAInfo table names returned 404. A person should look up the RCRA handler status and any corrective-action record for GAD000609909 in a browser.",
+      "Contamination record a buyer would face: none found on the 2026 HSI by name. Releases from a petroleum bulk terminal may be tracked by other EPD programs or not listed publicly, so a Phase I/II and a records request to Georgia EPD would be needed before any change of use. Not contacted.",
+      "Which parcel holds the tanks is still open. The county record for the adjacent same-owner parcel 17 0263 LL0262 (3100 Parrott Ave NW, 15.07 ac, improvements appraised at $191,700, land use code 449) shows it is also improved. EPD's narrative says no other contiguous facility is under common control, so both parcels are likely one terminal site. Check with aerial imagery.",
+      "Search snippets only, not opened and not cited (company and directory pages): a terminal page under the operator's company site gives a storage capacity for a 'Chattahoochee Terminal' at this address, and a business listing updated in 2026 shows a pipeline company name at 3132 Parrott Ave NW. A snippet gave the IRS list date as 8/30/2026, but the document itself reads 9/30/2026."
+    ]
+  }
+}

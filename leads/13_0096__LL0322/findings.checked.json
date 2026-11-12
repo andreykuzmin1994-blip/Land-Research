@@ -1,0 +1,345 @@
+{
+ "schema": 1,
+ "parcel_id": "13 0096  LL0322",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "The county tax parcel record for this parcel (queried by parcel id) shows 7.6 acres of land with no improvement value, land-use code 100 and class code R4. These are assessor codes, not zoning: no quotable source confirmed the M-1 zoning the screener read from Union City's layer.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0322%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"TotAppr\":74700,\"LandAppr\":74700,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R4\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":7.6",
+     "context_before": " 46898-8040\",\"taxdist\":\"50\",\"totassess\":29880,\"landassess\":29880,\"imprassess\":0,",
+     "context_after": ",\"nbrhood\":\"9600\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":n",
+     "words_shared_with_url": [],
+     "page_file": "pages/e1e0bc3da32a01a2befbe602.html"
+    },
+    {
+     "id": "zoning-2",
+     "text": "Residential neighbour: a query of the county parcel layer for a box about 100 ft around this parcel returns 5545 Buffington Rd, a 1.5-acre parcel with land-use code 101 and class R3 (assessor's residential codes). From the returned geometry it sits about 70 ft from this parcel's line, across Buffington Rd (my computation, not on the page). Other returns in the same box: two vacant R4 parcels on Bluegrass Dr about 60-65 ft away and a church at 5445 Buffington Rd about 110 ft away. Residential buffers or screening may apply.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=2195124,1311541,2196106,1312214&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,LUCode,ClassCode,LandAcres&returnGeometry=true&outSR=2240&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ParcelID\":\"13 0096  LL4423\",\"Address\":\"5545 BUFFINGTON RD\",\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"LandAcres\":1.5}",
+     "context_before": ",1311653.3740407377],[2195985.2296721637,1311336.0003316551]]]}},{\"attributes\":{",
+     "context_after": ",\"geometry\":{\"rings\":[[[2195149.3802939951,1311625.7258020714],[2195138.94363508",
+     "words_shared_with_url": [
+      "parcelid",
+      "address",
+      "lucode",
+      "classcode",
+      "landacres"
+     ],
+     "page_file": "pages/3d80d736369efda44a03767e.html"
+    },
+    {
+     "id": "zoning-3",
+     "text": "Neighbour on the east: parcel 13 0095 LL1347, 0 Rock Quarry Rd, 12.46 acres, class C5, vacant, held by a family investment company, shares about 480 ft of boundary with this parcel (shared length computed from the county geometry, not on the page). Its street name and the permitted quarry nearby (owner section) suggest the land east of this parcel is tied to quarry operations; not confirmed.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5045,33.6015,-84.4920,33.6105&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ParcelID\":\"13 0095  LL1347\",\"Address\":\"0 ROCK QUARRY RD\",\"Owner\":\"THAMES FAMILY INVESTMENTS II LLC \",\"LUCode\":\"400\",\"ClassCode\":\"C5\",\"LandAcres\":12.46",
+     "context_before": "classcode\":\"r5\",\"landacres\":12.0,\"totappr\":117900,\"imprappr\":0}},{\"attributes\":{",
+     "context_after": ",\"totappr\":314100,\"imprappr\":0}},{\"attributes\":{\"parcelid\":\"13 0096 ll0025\",\"add",
+     "words_shared_with_url": [
+      "parcelid",
+      "address",
+      "owner",
+      "lucode",
+      "classcode",
+      "landacres"
+     ],
+     "page_file": "pages/0e312ed1647124eb75d0f58d.html"
+    }
+   ],
+   "open_items": [
+    "Union City's own site (unioncityga.gov) answers 403 even for robots.txt and its zoning layer is on ArcGIS Online, so neither the M-1 designation nor the M-1 use table could be quoted. Ask Union City planning whether warehouse/distribution is permitted by right in M-1 and whether any conditions of zoning attach to this parcel.",
+    "The assessor class R4 and land-use code 100 on an M-1 parcel: ask the Fulton assessor what they mean here (assessor classes are not zoning, but a residential class can signal a mapped or historic residential designation).",
+    "Ask Union City what buffer or screening its code requires between M-1 and the homes across Buffington Rd (5545 Buffington Rd, Estes Dr) and the church at 5445 Buffington Rd.",
+    "Ask whether quarry-related setbacks or blasting limits apply to new buildings this close to an active quarry (the permitted Red Oak Quarry, owner section)."
+   ]
+  },
+  "plans": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Union City's comprehensive plan, future development map and planning agendas are hosted on unioncityga.gov, which answers 403; none could be read. Ask the city for the future development map designation of this parcel and for any rezoning, variance or plat case on it or beside it since 2021.",
+    "Search result only, page not opened (host answers 403): a search listed a 2026 application on unioncityga.gov titled as a Union City future development map update. Ask the city whether it changes the designation of this parcel or its neighbours.",
+    "Search results only, pages not opened: Union City rezoning cases in 2025 for a data center near Buffington Rd and Jonesboro Rd (to O-I), and an ARC DRI for that project (#4315, Red Oak Rd). Nothing seen places them on or beside this parcel; ask the city.",
+    "Secondary source (news, not used as a claim): a SaportaReport article dated September 15, 2019 (updated February 17, 2023) says the Red Oak Quarry owner sought federal (US Army Corps of Engineers, Savannah) and state permits to move its plant and expand the mine pit, adding about 50 years to the mine's life, with overburden stored nearby, and that the Sable Chase neighbourhood lies west of the quarry. Find the Corps public notice and its site map to see whether this parcel lies inside the permit area, a planned overburden area or a buffer."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer, nearby: Fulton County's public water resources map returns two 8-inch PVC gravity sewer segments (Morning Creek basin, Fulton County service area) in a box about 300 ft around this parcel. From the returned geometry the nearer one is about 190 ft from the parcel line (my computation, not on the page).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FULTON COUNTY\",\"LengthInFeet\":108.33467164",
+     "context_before": "enance\":\"unk\",\"createdby\":null,\"createdate\":null,\"flowmeter\":\"mc51\",\"enabled\":1,",
+     "context_after": ",\"shape.stlength()\":108.33454283612528},\"geometry\":{\"paths\":[[[2195075.637987412",
+     "words_shared_with_url": [],
+     "page_file": "pages/242812d6268fb2b5a507b45a.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "Sewer service area: a point inside this parcel (state plane 2195633, 1311898) falls in Fulton County's water/sewer service area layer as a Fulton County sewer area with service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\"",
+     "context_before": "\":{\"objectid\":1,\"orig_fid\":1,\"shape_star\":73.23144531,\"shape_stle\":769.14763871,",
+     "context_after": ",\"shape.starea()\":10173715022.83869,\"shape.stlength()\":1481074.5223924106}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/23f643ac0975537611a83e73.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Water, not shown: the same Fulton County map's water pipe layer returns no pipe in the same box about 300 ft around this parcel (an empty feature list). A count over a box about a mile around it also returned zero, so Fulton County is probably not the water provider here; the assessor lists public water, but the provider's map was not found.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "surveydate\",\"length\":8},{\"name\":\"shape.stlength()\",\"type\":\"esrifieldtypedouble\",",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/54d76ed5b1aff97867913cef.html"
+    }
+   ],
+   "open_items": [
+    "Find out who supplies water at this address (Union City or the City of Atlanta are candidates; not checked) and where the nearest main is.",
+    "Sewer capacity and the connection route to the 8-inch line about 190 ft away: only Fulton County Public Works can say."
+   ]
+  },
+  "market": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No public notice, surplus list, development-authority release or third-party rezoning naming this parcel was found; Union City's agendas (the likeliest place for a rezoning by a buyer) could not be read (403). Ask the city whether any application has been filed on 13 0096 LL0322 or its same-owner neighbours (13 0096 LL0306, 13 0096 LL0330).",
+    "The owner group runs the neighbouring quarry (owner section) and, per the 2019 news report in plans, was planning a 50-year mine expansion. The parcel may be held as quarry buffer or reserve and not be for sale; only the owner can say, and no contact was made.",
+    "The last recorded sale (2014-12-24, $2,236,074) is far above this parcel's assessed land value; it may cover several parcels. Pull the deed to see what it conveyed and whether it carries restrictions."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "The county tax parcel record (queried by parcel id) gives the owner as a real-estate investment company with a P.O. box mailing address in Fort Wayne, Indiana.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0322%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Owner\":\"MARTIN MARIETTA MATERIALS REAL ESTATE INVESTMENTS INC\",\"OwnerAddr1\":\"P.O. BOX 8040\",\"OwnerAddr2\":\"FORT WAYNE IN 46898-8040\",\"TaxDist\":\"50\"",
+     "context_before": "ffington\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"totassess\":29880,\"landassess\":29880,\"imprassess\":0,\"totappr\":74700,\"landappr\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/e1e0bc3da32a01a2befbe602.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "Georgia EPD's list of permitted surface mines (August 2024) has a 288-acre granite quarry in Fulton County, the Red Oak Quarry, under a company of the same name as the owner without the real-estate suffix, located off Buffington Road. Its listed point (33.6053, -84.4894) is about 0.5 mile east of this parcel's centre (my computation). The permit boundary was not seen, so whether this parcel is inside it is unknown.",
+     "source_url": "https://epd.georgia.gov/document/document/surface-mining-permitted-facilities-08282024/download",
+     "retrieved": "2026-11-12",
+     "quote": "Fulton,085-16,\"MARTIN MARIETTA MATERIALS, INC. - RED OAK QUARRY\",Quarry,Granite,288,\"Off Buffington Road, south of Exit 1 (spur 14)\",Red Oak,33.6053,-84.4894",
+     "context_before": "roducts,quarry,granite,179,georgia highway 106,carnesville,34.365963,-83.233186 ",
+     "context_after": " fulton,2036-19.1,\"3039 amwiler property, llc - forrest park rd borrow pit\",borr",
+     "words_shared_with_url": [],
+     "page_file": "pages/176c9b484fb1586487863f2b.html"
+    },
+    {
+     "id": "owner-3",
+     "text": "The federal Mine Safety and Health Administration lists the Red Oak Quarry as a surface crushed-granite mine whose controller is the same-named operating company.",
+     "source_url": "https://www.msha.gov/data-reports/statistics/mines/ga/red-oak-quarry",
+     "retrieved": "2026-11-12",
+     "quote": "Crushed, Broken Granite Mine Controller Martin Marietta Materials Inc",
+     "context_before": "face mine category metal and non-metal primary standard industry classification ",
+     "context_after": " mine district m3 location ga united states scroll to top forms fatality databas",
+     "words_shared_with_url": [],
+     "page_file": "pages/0fe19ce87329383ac93609e3.html"
+    },
+    {
+     "id": "owner-4",
+     "text": "The parcel to the south, 13 0096 LL0330 (5.3 acres, vacant, class R4), is recorded under a truncated form of the same owner name and shares about 790 ft of boundary with this parcel (shared length computed from county geometry, not on the page). With 13 0096 LL0306 to the north (about 737 ft shared), this parcel sits inside a block of same-owner land of about 25 acres.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5045,33.6015,-84.4920,33.6105&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ParcelID\":\"13 0096  LL0330\",\"Address\":\"0 BUFFINGTON RD\",\"Owner\":\"MARTIN MARIETTA MATERIALS REAL ESTATE \",\"LUCode\":\"100\",\"ClassCode\":\"R4\",\"LandAcres\":5.3",
+     "context_before": "code\":\"r3\",\"landacres\":1.1918,\"totappr\":94000,\"imprappr\":58300}},{\"attributes\":{",
+     "context_after": ",\"totappr\":62500,\"imprappr\":0}},{\"attributes\":{\"parcelid\":\"13 0096 ll0124\",\"addr",
+     "words_shared_with_url": [
+      "parcelid",
+      "address",
+      "owner",
+      "lucode",
+      "classcode",
+      "landacres"
+     ],
+     "page_file": "pages/0e312ed1647124eb75d0f58d.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State records answer 403, so status, formation date, principal office and registered agent of the owner entity are unknown. The name suggests a real-estate holding arm of the aggregates company that runs the neighbouring quarry, but that link is not documented here.",
+    "The screener's same-owner note covers only 5-50 acre parcels; 13 0096 LL0330 (5.3 ac, owner name truncated in the record) was not counted as the same owner. Confirm by deed whether it is the same entity: with it, the assemblage is about 25 acres, not 19.6.",
+    "The screener brief did not flag the operating quarry next door; a person should weigh blasting, dust, truck traffic and any quarry buffer obligations."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "This is not a stray lot. It belongs to the real-estate arm of the company that runs the Red Oak granite quarry (EPD permit 085-16, 288 acres), and quarry-related land runs unbroken from its east line to the quarry. Next to it on the east is 12.46 ac held by the quarry landowner's family company. Beyond that is 39.6 ac of the same family's industrial-class land, and then the parcel that holds EPD's listed quarry point. Together with the owner's two residential-class parcels to the north and south, it forms a strip of about 25 acres between the quarry land and the homes and church on Buffington Rd. That is the shape of a buffer or reserve. A 2019 Corps report, known here only from a news account, described a 50-year pit expansion, a plant move and overburden stored nearby. I found no document I could reach that shows the permit boundary, so a person must settle whether this parcel is inside the permitted area, a required buffer or an overburden area, and whether the owner would sell land it may hold for that purpose.",
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The parcel holding the quarry's listed point: Georgia EPD lists the Red Oak Quarry point at 33.6053, -84.4894 (claim owner-2). In this county parcel query (a box around the quarry and this lead, by coordinates only), that point falls inside parcel 13 0095 LL0109 at 5414 Rock Quarry Rd: 17.15 ac, industrial class I5, held by a family investment company, not by the lead's owner. Which parcel holds the point is my computation from the geometry on this page, not stated on it.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5000,33.5960,-84.4800,33.6150&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"13 0095  LL0109\",\"Address\":\"5414 ROCK QUARRY RD\",\"Owner\":\"THAMES FAMILY INVESTMENTS LLC \",\"LUCode\":\"398\",\"ClassCode\":\"I5\",\"LandAcres\":17.15",
+    "context_before": "56,33.608484600097],[-84.484450732195327,33.608358312069811]]]}},{\"attributes\":{",
+    "context_after": ",\"totappr\":310600,\"imprappr\":134600},\"geometry\":{\"rings\":[[[-84.491947048655661,",
+    "words_shared_with_url": [
+     "parcelid",
+     "address",
+     "owner",
+     "lucode",
+     "classcode",
+     "landacres"
+    ],
+    "page_file": "pages/87fea5029e9deb1530c305f4.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The land between: parcel 13 0095 LL0091, 0 Rock Quarry Rd, 39.6 ac, industrial class I5, is held by the same family company as the quarry-point parcel. From this page's geometry (my computation), it runs from about 360 ft east of this lead to the west line of the quarry-point parcel. With 13 0095 LL1347 (the lead's east neighbour, same family name, claim zoning-3), it closes the gap from this lead's east line to the quarry, so the lead touches quarry-landowner land directly.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5000,33.5960,-84.4800,33.6150&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"13 0095  LL0091\",\"Address\":\"0 ROCK QUARRY RD\",\"Owner\":\"THAMES FAMILY INVESTMENTS LLC \",\"LUCode\":\"400\",\"ClassCode\":\"I5\",\"LandAcres\":39.6",
+    "context_before": "33.608632588049034],[-84.491947048655661,33.608608866062298]]]}},{\"attributes\":{",
+    "context_after": ",\"totappr\":148000,\"imprappr\":0},\"geometry\":{\"rings\":[[[-84.494193840631908,33.60",
+    "words_shared_with_url": [
+     "parcelid",
+     "address",
+     "owner",
+     "lucode",
+     "classcode",
+     "landacres"
+    ],
+    "page_file": "pages/87fea5029e9deb1530c305f4.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "Jurisdiction (this backs the first pass and the brief): queried at a point inside this parcel (state plane 2195633, 1311898), Fulton County's tax city layer returns Union City, tax code 50. That code matches the TaxDist 50 in the parcel record (claim owner-1). The lead is in Union City, not the City of South Fulton, so Union City's code governs; its M-1 text is still unquoted.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Tax/Tyler_Cities/MapServer/0/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Name\":\"Union City\",\"TaxCode\":50,\"AreaAc\":12646.98459754",
+    "context_before": "ypedouble\",\"alias\":\"shape.stlength()\"}],\"features\":[{\"attributes\":{\"objectid\":7,",
+    "context_after": ",\"areasqmi\":19.76091345,\"geoid10\":null,\"featureid\":\"ocl0000014\",\"municode\":\"620\"",
+    "words_shared_with_url": [],
+    "page_file": "pages/ed7a0fff71d0612d151d884a.html"
+   }
+  ],
+  "open_items": [
+   "Settle the permit boundary first. The US Army Corps of Engineers Savannah District host (www.sas.usace.army.mil) answers 403 even for robots.txt, so I did not fetch it, and its public notices could not be read. The national Regulatory Request System (rrs.usace.army.mil) is JavaScript-only. A person should get the 2019 Corps public notice for the Red Oak Quarry plant move and pit expansion, with its site map, and the Georgia EPD surface mining permit 085-16 map and land-use plan (permit boundary, buffers, overburden areas). With those, check whether 13 0096 LL0322, LL0306 or LL0330 is inside the permitted area or a buffer the permit requires.",
+   "My computation, not on any page: EPD lists 288 permitted acres. In the county parcel query (claim 1's address), the industrial-class parcels held by the quarry landowner's family companies and by the lead's owner add up to about 221 ac within roughly 0.6 mile of the quarry point. Either the permit takes in land beyond that box, or it takes in residential-class parcels such as this lead's strip (about 25 ac). The parcel data cannot tell which.",
+   "Secondary source (news, not a claim): the SaportaReport article of September 15, 2019 (updated February 17, 2023) says the 2019 request covered 55.6 acres, a plant relocation 'to another site on its property', an aggregate conveyor and road access, and overburden 'stored nearby'. It also says a 2015 Nationwide Permit 44 verification covered a berm for a 34.5-acre expansion pit. Where the plant, the conveyor and the overburden were to go is the open question for this lead.",
+   "My computation from Fulton County's elevation contour layer (PropertyMapViewer layer 25, its date not stated): in a box from this parcel east to the far line of 13 0095 LL0091, no contour is below 904 ft. On that layer, then, the pit does not reach within about a quarter mile of the lead. Contours rise to about 1,010-1,022 ft some 300-900 ft east of the lead (on LL1347 or LL0091), above most of the lead's own ground. That ridge could be an overburden stockpile or a berm, or natural ground. Check it on current aerial imagery or on a site visit.",
+   "Blasting, vibration, dust and quarry truck traffic within about half a mile of an active granite quarry: ask Union City and the operator's permit file what setbacks or blasting limits apply to a new building here. I made no contact with anyone.",
+   "Market: an owner that runs a quarry next door and holds about 25 contiguous residential-class acres between its quarry and a neighbourhood is likely holding the land as buffer or reserve. Treat a sale as unlikely until the owner says otherwise, and do not make that approach without the boundary answer above.",
+   "Access is not my objection. The same county parcel query shows large distribution parcels further east on Buffington Rd (5200 and 5300 Buffington Rd, 5295 and 5297 Buffington Rd), so the road already carries industrial traffic. The curb cut for this frontage, and sharing the road with quarry trucks, remain to be checked with the city (GDOT if a state route).",
+   "On utilities-2: the sewer service-area polygon it quotes is about 10.17 billion sq ft (about 365 sq mi, per the text just after the quote in the checked file). Its 'ServiceAva: Yes' is an attribute of the whole district, not a statement about this site. Sewer near the site rests on utilities-1. I re-ran that layer query and computed the nearer 8-inch segment at about 188 ft from the parcel line, which agrees with the first pass.",
+   "The water provider is still unknown: Fulton County shows no water main here (utilities-3). Union City or the City of Atlanta Department of Watershed Management are the likely providers. Ask which serves the site and where the nearest main is."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0322%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/e1e0bc3da32a01a2befbe602.html",
+   "fetched_at": "2026-11-12T19:45:05Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200096%20%20LL0322%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4329,
+   "sha256": "5ad9b6fcdd6e3a2f979c26352cc126e2da7506e69fecb434e6b0cef8883c9e72"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=2195124,1311541,2196106,1312214&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,LUCode,ClassCode,LandAcres&returnGeometry=true&outSR=2240&f=json": {
+   "file": "pages/3d80d736369efda44a03767e.html",
+   "fetched_at": "2026-11-12T19:45:06Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=2195124,1311541,2196106,1312214&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,LUCode,ClassCode,LandAcres&returnGeometry=true&outSR=2240&f=json",
+   "status": 200,
+   "bytes": 11263,
+   "sha256": "1f344d1d3bf36c3916e3ad3f7c83290fc845d6c55c531785b0ae257958de32ff"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5045,33.6015,-84.4920,33.6105&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=false&f=json": {
+   "file": "pages/0e312ed1647124eb75d0f58d.html",
+   "fetched_at": "2026-11-12T19:45:07Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5045,33.6015,-84.4920,33.6105&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 93419,
+   "sha256": "26e115b35c0e2585d4d6c08eb7225f7586ab97b4ee848e732a8d66e9f72eca03"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json": {
+   "file": "pages/242812d6268fb2b5a507b45a.html",
+   "fetched_at": "2026-11-12T19:45:08Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json",
+   "status": 200,
+   "bytes": 10313,
+   "sha256": "43e6e5100a364d71c8eecabe5302398b4f2eb83d2488034299d4579bb19f367a"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/23f643ac0975537611a83e73.html",
+   "fetched_at": "2026-11-12T19:45:09Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1213,
+   "sha256": "515af0b1e3eab932009564b816c35b707d1a81da7f271e9f1a5dcda11320f0d7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json": {
+   "file": "pages/54d76ed5b1aff97867913cef.html",
+   "fetched_at": "2026-11-12T19:45:10Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?geometry=2194924,1311341,2196306,1312414&geometryType=esriGeometryEnvelope&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=2240&f=json",
+   "status": 200,
+   "bytes": 4032,
+   "sha256": "cc63e209995cfe69acd98d7e9a0d713f92dd2f59bcfced4185e7f50a0b4835ad"
+  },
+  "https://epd.georgia.gov/document/document/surface-mining-permitted-facilities-08282024/download": {
+   "file": "pages/176c9b484fb1586487863f2b.html",
+   "fetched_at": "2026-11-12T19:45:11Z",
+   "final_url": "https://epd.georgia.gov/document/document/surface-mining-permitted-facilities-08282024/download",
+   "status": 200,
+   "bytes": 113533,
+   "sha256": "d15ac84086b24e2b11cc3c2258961de11821e696049612ae6f9c58bec0bf5961"
+  },
+  "https://www.msha.gov/data-reports/statistics/mines/ga/red-oak-quarry": {
+   "file": "pages/0fe19ce87329383ac93609e3.html",
+   "fetched_at": "2026-11-12T19:45:13Z",
+   "final_url": "https://www.msha.gov/data-reports/statistics/mines/ga/red-oak-quarry",
+   "status": 200,
+   "bytes": 90846,
+   "sha256": "87c41a482f31c5321d6970ce3338c1426a0bb1402a0e18d2398bd78315c68b07"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5000,33.5960,-84.4800,33.6150&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/87fea5029e9deb1530c305f4.html",
+   "fetched_at": "2026-11-12T19:45:14Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5000,33.5960,-84.4800,33.6150&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,TotAppr,ImprAppr&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 650071,
+   "sha256": "470d4d10bec71c7e1cbc944b2dfc1409369804399e7c5f85c12e3a2e1444a4f7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Tax/Tyler_Cities/MapServer/0/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/ed7a0fff71d0612d151d884a.html",
+   "fetched_at": "2026-11-12T19:45:14Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Tax/Tyler_Cities/MapServer/0/query?geometry=2195633,1311898&geometryType=esriGeometryPoint&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1319,
+   "sha256": "7da80b5130877a87e03b2fa655e5297470f6c59873028889ac38af0fffb69631"
+  }
+ },
+ "quotecheck": {
+  "kept": 13,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:45:14Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "c3f33830bfe980938ee6f094b3c2b684ae826ba45aa46b604ca360d4c859902f",
+   "skeptic.json": "6766c129e7f8e968a02c3cb78bb0cf6405fce5b09e7b348fb11307ff0fe2483f"
+  }
+ },
+ "dropped_claims": []
+}

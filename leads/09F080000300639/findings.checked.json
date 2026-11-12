@@ -1,0 +1,351 @@
+{
+ "schema": 1,
+ "parcel_id": "09F080000300639",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Fairburn's zoning text (Chapter 80) is only on Municode, a known wall: the M-2 use table could not be read or quoted. Ask Fairburn planning whether warehouse / distribution is permitted by right in M-2 and whether any conditions of zoning attach to this parcel.",
+    "Seen, not verifiable: Fairburn's ArcGIS layer Current_Zoning_FLU (services8.arcgis.com, robots.txt answers 403), queried by ParcelID 09F080000300639 with f=json, returned ZoningCurr 'M-2', ZoningPrev empty, FLU 'Office/Industrial', TaxYear 2025. The FLU value there looks like the older plan's category name, not one of the 2025 plan's categories.",
+    "A third-party tracker (not a primary source, not used) says Fairburn Sec. 80-239 sets extra standards for truck terminals in M-2; if the intended use is a truck terminal rather than a warehouse, ask the city about those standards."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "Fairburn's 2025 comprehensive plan (state DCA copy) describes the 'Industrial' future development category with warehousing as an appropriate development type, and M-2 is listed among its appropriate zoning districts.",
+     "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+     "retrieved": "2026-11-12",
+     "quote": "large office; warehousing; manufacturing; utilities. Density/Intensity 1 to 2 stories Appropriate Zoning District(s) O&I, C-2, M-1, M-2, P&O",
+     "context_before": " public/ institutional uses (schools, places of worship, and civic facilities); ",
+     "context_after": " 142 city of fairburn comprehensive plan image source: google earth (page break) industrial le",
+     "pdf_page": 144,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/22437915bb856b12a5ad60e2.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The same plan's 'Light Industrial' category also lists warehousing and commercial storage as appropriate, but its appropriate zoning districts do not include M-2. On the plan's Future Development Map (an image, read by eye, not quotable) the Bohannon Road corridor around this parcel appears to be Light Industrial, so the existing M-2 zoning may not match the category the plan names for it.",
+     "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+     "retrieved": "2026-11-12",
+     "quote": "flex space; commercial storage; warehousing, utilities. Density/Intensity 1 to 2 stories Appropriate Zoning District(s) O&I, C-1, C-2, M-1, P&O",
+     "context_before": " office; small-scale production (breweries, makerspaces, food processing, etc); ",
+     "context_after": " 140 city of fairburn comprehensive plan image source: google earth (page break) light industr",
+     "pdf_page": 142,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/22437915bb856b12a5ad60e2.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The plan's Light Industrial description stresses low-impact uses next to residential areas.",
+     "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+     "retrieved": "2026-11-12",
+     "quote": "This area supports low-impact industrial and office development that complements nearby residential areas.",
+     "context_before": "d-use corridor that serves residents, commuters, and visitors. light industrial ",
+     "context_after": " industrial this area is designated for traditional and heavy industrial uses th",
+     "pdf_page": 124,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/22437915bb856b12a5ad60e2.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "The plan's land-use policy directs new industrial growth to truck routes and infrastructure and against residential edges and rural land. The parcel is already zoned M-2 per the screener, so this matters mainly for any rezoning, variance or use permit.",
+     "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+     "retrieved": "2026-11-12",
+     "quote": "Direct any future industrial growth to areas already served by established truck routes and infrastructure.",
+     "context_before": "owth, better streetscapes, and opportunities to create a better sense of place. ",
+     "context_after": " \u2022 do not approve additional industrial uses adjacent to residential areas witho",
+     "pdf_page": 123,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/22437915bb856b12a5ad60e2.pdf"
+    },
+    {
+     "id": "plans-5",
+     "text": "The plan states that new industrial development should not be allowed next to residential neighbourhoods.",
+     "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+     "retrieved": "2026-11-12",
+     "quote": "New industrial development should only be allowed where there is direct access to an official truck route; where it is not adjacent to residential neighborhoods",
+     "context_before": "r mechanism for keeping up with wear and tear on local roadways from the truck. ",
+     "context_after": "; and where it does not \"open up\" previously rural land to a potential cascade o",
+     "pdf_page": 113,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/22437915bb856b12a5ad60e2.pdf"
+    },
+    {
+     "id": "plans-6",
+     "text": "An older Fairburn case list shows a final plat named Curry Bend (commercial and residential) at '0 Bohannon Road & 6560 Bohannon Road'. Whether it is on or beside this parcel (also addressed 0 Bohannon Rd) is not established: the county parcel layer returned no parcel for the address 6560 Bohannon Rd.",
+     "source_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+     "retrieved": "2026-11-12",
+     "quote": "Curry Bend (Commercial and Residential) Commercial and Residential Final Plat 0 Bohannon Road & 6560 Bohannon Road",
+     "context_before": "station) gas station concept plan 101 durham lake pkwy. pz meeting - 09/02/2025 ",
+     "context_after": " pz meeting - 09/02/2025 chick-fil-a restaurant / construction complete final pl",
+     "words_shared_with_url": [],
+     "page_file": "pages/07157d4229d0e9e15fd26812.html"
+    }
+   ],
+   "open_items": [
+    "Confirm with Fairburn planning which 2025 Future Development category the parcel is in (Light Industrial or Industrial). My reading of the map image (plan p. 123 and p. 141) puts the Bohannon Road corridor between US-29 and I-85 in Light Industrial, whose listed zoning districts omit M-2. That is a visual reading, not a quote.",
+    "Ask where the Curry Bend final plat (0 and 6560 Bohannon Road) lies and whether it puts homes next to this parcel; the plan asks for buffers or refusal of industrial uses adjacent to residential areas.",
+    "The data-center rezoning reviewed by ARC as DRI 4213 (AG to M-1, 8125 Bohannon Dr) sits about a mile south of this parcel per the county parcel layer; it is not beside it. Its outcome was not found."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Context only, not this parcel: in an August 2024 regional review of a site at 8125 Bohannon Dr, about a mile south of this parcel, Fairburn said water there is supplied by the City of Atlanta and sewer by Fulton County. No map of mains at or near this parcel was found.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5441/2024%20Fairburn%20Technology%20Center%20DRI%204213%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "UTILITY (WATER) \u2013 Water is City of Atlanta. Sewer is Fulton County.",
+     "context_before": " project. staff will also require details on consumption (kwh) and other items. ",
+     "context_after": " the applicant will need to provide the basis of design data for water system ad",
+     "pdf_page": 4,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/ffeee2ab1d966ddb649e1e38.pdf"
+    }
+   ],
+   "open_items": [
+    "Fulton County's GIS Utilities folder answers 'Token Required' (not public); no published water or sewer map for this parcel was found. Ask City of Atlanta Watershed (water) and Fulton County Public Works (sewer) for the nearest mains and capacity. The assessor shows public water and septic.",
+    "The 8125 Bohannon Dr site may not share this parcel's service area; confirm the provider for 0 Bohannon Rd itself."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "Fairburn's current list of pending zoning and development cases (items dated to 10/26/2026 and 11/09/2026) does not include parcel 09F080000300639 or any Bohannon Road site.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-12",
+     "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each.",
+     "context_before": "oning pending zoning and development cases pending zoning and development cases ",
+     "context_after": " to request copies of the files, please contact the planning and zoning staff at",
+     "words_shared_with_url": [],
+     "page_file": "pages/63c2340b4ce15a08451d89f9.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The newest case on that list is a Milam Road rezoning, a different site; nothing on the list names this parcel.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-12",
+     "quote": "0 Milam Road, Fairburn, GA, Parcels: 09F020400070093 & 09F020400070143",
+     "context_before": "n, and institutional rezoning oi and ag to pd -planned development and variance ",
+     "context_after": " mayor and city council 11/09/2026 make a payment report an issue fairburn today",
+     "words_shared_with_url": [],
+     "page_file": "pages/63c2340b4ce15a08451d89f9.html"
+    }
+   ],
+   "open_items": [
+    "No listing, public notice, surplus list or development-authority release naming this parcel was found in the places looked (Fairburn's two case lists, the 2025 plan, one ARC DRI report, web searches by site address). That is not proof it is off the market.",
+    "Same owner holds two adjoining parcels (09F080000300621 and 07 280001760191, 26.1 ac together per the brief); ask whether they would sell together."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Fulton County's parcel layer, queried by parcel id 09F080000300639, shows the owner as CLM SANITATION LLC with a Raleigh NC mailing address. No Secretary of State record was read, so status, formation date and agents are unknown.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F080000300639%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"Owner\":\"CLM SANITATION LLC \",\"OwnerAddr1\":\"3301 BENSON DR STE 601\",\"OwnerAddr2\":\"RALEIGH NC 27609\"",
+     "context_before": "bohannon\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"taxdist\":\"25a\",\"totassess\":60720,\"landassess\":60720,\"imprassess\":0,\"totappr\":1",
+     "words_shared_with_url": [],
+     "page_file": "pages/1cb7cfef7b15f9904ee519e4.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State business search is a known wall (403, a form); not tried. A person should look up the entity (and, since it mails from Raleigh, the North Carolina record) by hand.",
+    "The name suggests a waste or sanitation business; whether the land is or was used for that (fill, dumping, a transfer yard) is worth checking on the site visit and in GA EPD records."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The owner is not a passive land holder: it is the waste company that runs the Fairburn Transfer Station, and that station sits at 609 Bohannon Rd, an address the county places on the owner's 11.96 ac parcel 09F080000300621, which touches this one. The county's own 2024 aerial photo shows this 9.2 ac parcel used as the station's outdoor yard (thousands of waste carts, rows of roll-off containers, trucks on gravel), so it is neither vacant nor likely for sale apart from the operation, and waste handling raises a contamination question the screen did not look at. The photo is not quotable, so a person must look at it before acting; if it reads as I read it, the lead is dead. The first pass's two plan worries are smaller than they looked: the Curry Bend plat is about 2 miles south, and the touching neighbours are industrial and rail.",
+  "disputes": [
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "Fulton County's address points place 609 Bohannon Rd on parcel 09F080000300621, the same-owner parcel that touches this one (asked: all address points in an envelope around this parcel).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/8/query?geometry=-84.6000,33.5440,-84.5900,33.5530&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"09F080000300621\",\"StreetID\":\"TSL0004236\",\"FCStreetID\":\"TSL0004236\",\"StructID\":null,\"PreAddrNum\":null,\"StNumber\":609,\"PreMod\":null,\"PreDir\":null,\"PreType\":null,\"Separator\":null,\"Name\":\"Bohannon\",\"PostType\":\"Road\",\"PostDir\":null,\"PostMod\":null,\"Label\":\"609 Bohannon Rd\"",
+    "context_before": "\"attributes\":{\"objectid\":11613,\"featureid\":\"tap0475372\",\"fcfeatid\":\"tap0475372\",",
+    "context_after": ",\"unitlow\":null,\"unithigh\":null,\"unitactual\":null,\"city\":\"fairburn\",\"state\":\"ga\"",
+    "words_shared_with_url": [],
+    "page_file": "pages/a83794f784c50c397c659f35.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The county parcel layer shows that adjoining parcel 09F080000300621 (11.96 ac) has the same owner as this lead (asked: all parcels in an envelope around this parcel).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5983,33.5474,-84.5940,33.5511&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"09F080000300621\",\"TaxYear\":2027,\"Address\":\"0 BOHANNON RD\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"BOHANNON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CLM SANITATION LLC",
+    "context_before": "62],[-84.596274755445009,33.548000991890667]]]}},{\"attributes\":{\"objectid\":7747,",
+    "context_after": " \",\"owneraddr1\":\"3301 benson dr ste 601\",\"owneraddr2\":\"raleigh nc 27609\",\"taxdis",
+    "words_shared_with_url": [],
+    "page_file": "pages/ca5fc68780f105834607d509.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "A City of Chattahoochee Hills list of sanitation services and landfills (2022) gives the Fairburn Transfer Station's address as 609 Bohannon Rd, i.e. on the owner's adjoining parcel.",
+    "source_url": "https://cms3.revize.com/revize/chattahoocheehillsga/Sanitation%20Services%20and%20Landfill%20Locations.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Fairburn Transfer Station 609 Bohannon Rd Fairburn, GA",
+    "context_before": "airburn, ga (770) 969-1363 | (888) 905-8898 hr: 6:30am-4:30pm construction only ",
+    "context_after": " (770) 306-8806 hours: status unknown safeguard landfill landfill, garbage servi",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/ec00bfe4758be41c352888ac.pdf"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "The 6500 block of Bohannon Rd, where the Curry Bend plat's second address (6560 Bohannon Road) falls, is near latitude 33.517, about 2 miles south of this parcel (latitude about 33.549); Curry Bend is not next to it (asked: parcels in an envelope at 33.5165-33.5185 N).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5165,-84.5970,33.5185&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Address\":\"6550 BOHANNON RD\",\"AddrNumber\":\"6550\"",
+    "context_before": "412}},{\"attributes\":{\"objectid\":605,\"parcelid\":\"07 400001800066\",\"taxyear\":2027,",
+    "context_after": ",\"addrpredir\":null,\"addrstreet\":\"bohannon\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"",
+    "words_shared_with_url": [],
+    "page_file": "pages/6a5f8a31618b054cccb8e429.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "A parcel that touches this one on the north, 605 Bohannon Rd, is an improved industrial parcel (class I4); the other touching parcels are the same owner's and 7000 Creekwood Rd (also I4), with CSX land across Creekwood Rd. No residential subdivision touches the parcel.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5983,33.5474,-84.5940,33.5511&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"Address\":\"605 BOHANNON RD\",\"AddrNumber\":\"605\",\"AddrPreDir\":null,\"AddrStreet\":\"BOHANNON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"GKI INFILL ATLANTA LLC \",\"OwnerAddr1\":\"10275 W HIGGINS RD 810\",\"OwnerAddr2\":\"DES PLAINES IL 60018\",\"TaxDist\":\"25D\",\"TotAssess\":2509240,\"LandAssess\":144000,\"ImprAssess\":2365240,\"TotAppr\":6273100,\"LandAppr\":360000,\"ImprAppr\":5913100,\"LUCode\":\"398\",\"ClassCode\":\"I4\"",
+    "context_before": "]]}},{\"attributes\":{\"objectid\":8256,\"parcelid\":\"09f080000300605\",\"taxyear\":2027,",
+    "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":6.5,\"nbrhood\":\"c805\",\"subdiv\":null,\"subd",
+    "words_shared_with_url": [],
+    "page_file": "pages/ca5fc68780f105834607d509.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The 2025 plan proposes impact fees on development in the Light Industrial and Industrial areas, aimed at high-truck-traffic uses: a possible added cost for a warehouse here.",
+    "source_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+    "retrieved": "2026-11-12",
+    "quote": "The City should consider levying impact fees for developments in the Light Industrial and Industrial future development areas with emphasis on uses with high truck traffic",
+    "context_before": "orm the corridor into a place where there is a \"there\" to visit. \u2022 impact fees. ",
+    "context_after": " to fund improvements to fix roads with heavy wear and tear. city of fairburn co",
+    "pdf_page": 147,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/22437915bb856b12a5ad60e2.pdf"
+   }
+  ],
+  "open_items": [
+   "Seen, not verifiable: Fulton County 2024 orthophoto, https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Imagery/Pictometry2024_NAIP/MapServer/export?bbox=-84.5965,33.5475,-84.5945,33.5500&bboxSR=4326&imageSR=4326&size=800,1110&format=jpg&f=image . On this parcel (checked against the county parcel outline): a gravel yard with thousands of blue waste carts, rows of rusty roll-off containers, trailers and trucks. The station building sits just south, on parcel 09F080000300621. A person should look at this image (or drive by) first; if it shows what I saw, the lead is not usable as vacant land.",
+   "Seen, not verifiable: Georgia EPD Regulated Solid Waste Facilities list (April 2026, an .xlsx quotecheck cannot read), https://epd.georgia.gov/document/document/apr-2026-regulated-solid-waste-facilitiesxlsx/download . One row names the owner LLC 'd/b/a FAIRBURN TRANSFER STATION, a Waste INDUSTRIES COMPANY (formerly Walker Transfer and Recycling Facility)', type SW- Transfer Station, permit PBR-060-250TS, status Operating. Other rows list the same LLC with solid-waste collection permits.",
+   "The first pass's owner section is unknown, but on this evidence the owner is an operator using the land (an operating waste business), not a holding entity. The same-owner 'assemblage' in the brief (26.1 ac) is the transfer station's own site. Ask whether the operation would move or sell as a going concern; a bare-land sale is unlikely.",
+   "Environmental: years of waste-cart and container storage next to a transfer station call for a Phase I ESA (and probably soil testing) before any offer. The screen's fit, pond and earthwork numbers treat the yard as open ground.",
+   "The assessor carries this parcel as class R4, land use code 100, with no improvement value, although the aerial shows it in active use. The 'vacant land' reading comes from the tax roll, not the ground.",
+   "Seen, not verifiable: the 2025 plan's Future Development Map (PDF page 125, printed p. 123; an image) shows the whole Bohannon Rd corridor between US-29 and I-85, this parcel included, in the light grey Light Industrial category, not the dark grey Industrial one. I agree with the first pass's reading. Light Industrial's listed zoning districts omit M-2. Existing M-2 rights still govern, but a rezoning, variance or the planned zoning ordinance rewrite would be judged against Light Industrial.",
+   "Curry Bend: a search snippet (not used as evidence) describes it as a 64.5 ac DRB Group project. Its 6560 Bohannon Road address lies in the 6500 block about 2 miles south. Where its other parcel, '0 Bohannon Road', lies is still not established.",
+   "No page I read addressed instructions to an automated reader."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://dca.georgia.gov/document/document/plan-update-2025-7/download": {
+   "file": "pages/22437915bb856b12a5ad60e2.pdf",
+   "fetched_at": "2026-11-12T19:46:51Z",
+   "final_url": "https://dca.georgia.gov/document/document/plan-update-2025-7/download",
+   "status": 200,
+   "bytes": 158602610,
+   "sha256": "11f1a0b5cf4972d0dc6a341515c0a3add030347a0b2a57b1ea9d4230f39bc83f"
+  },
+  "https://www.fairburn.com/257/Pending-Zoning-Development-Cases": {
+   "file": "pages/07157d4229d0e9e15fd26812.html",
+   "fetched_at": "2026-11-12T19:47:03Z",
+   "final_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+   "status": 200,
+   "bytes": 96407,
+   "sha256": "a1abf820f41bcdc19aa97344080571ad521390a3d312ce3966768593a1d10157"
+  },
+  "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5441/2024%20Fairburn%20Technology%20Center%20DRI%204213%20-%20Final%20Report.pdf": {
+   "file": "pages/ffeee2ab1d966ddb649e1e38.pdf",
+   "fetched_at": "2026-11-12T19:47:04Z",
+   "final_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5441/2024%20Fairburn%20Technology%20Center%20DRI%204213%20-%20Final%20Report.pdf",
+   "status": 200,
+   "bytes": 4935904,
+   "sha256": "b802daba7106e6f6bd15e89a5fdd7fd45e01759b46508c8c6847f0f48ca8735d"
+  },
+  "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases": {
+   "file": "pages/63c2340b4ce15a08451d89f9.html",
+   "fetched_at": "2026-11-12T19:47:13Z",
+   "final_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+   "status": 200,
+   "bytes": 105559,
+   "sha256": "a1f54a518523ec523dedbd5f6d07f287d1f53d6f005521f5e3b07a2c658cd447"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F080000300639%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/1cb7cfef7b15f9904ee519e4.html",
+   "fetched_at": "2026-11-12T19:47:14Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F080000300639%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4296,
+   "sha256": "826819eb4fdfbd342433bf48aeadca83f5b8755a3c66f65a1f20239a0613be54"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/8/query?geometry=-84.6000,33.5440,-84.5900,33.5530&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/a83794f784c50c397c659f35.html",
+   "fetched_at": "2026-11-12T19:47:15Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/8/query?geometry=-84.6000,33.5440,-84.5900,33.5530&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 19305,
+   "sha256": "67c6cdbe703369e7573b0b490000e8735b19b40f6aaa8d26c1b7b11925fc75d3"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5983,33.5474,-84.5940,33.5511&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/ca5fc68780f105834607d509.html",
+   "fetched_at": "2026-11-12T19:47:17Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5983,33.5474,-84.5940,33.5511&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 28460,
+   "sha256": "577c6202019ca61e6caceee17c71fcb35cc1e04dd531a362f041c58222cb233a"
+  },
+  "https://cms3.revize.com/revize/chattahoocheehillsga/Sanitation%20Services%20and%20Landfill%20Locations.pdf": {
+   "file": "pages/ec00bfe4758be41c352888ac.pdf",
+   "fetched_at": "2026-11-12T19:47:18Z",
+   "final_url": "https://cms3.revize.com/revize/chattahoocheehillsga/Sanitation%20Services%20and%20Landfill%20Locations.pdf",
+   "status": 200,
+   "bytes": 107440,
+   "sha256": "5f9a31c57211650cd89963467d633640e1f368c9b55d7d8c90ad11daebc701c6"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5165,-84.5970,33.5185&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6a5f8a31618b054cccb8e429.html",
+   "fetched_at": "2026-11-12T19:47:18Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5165,-84.5970,33.5185&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 12207,
+   "sha256": "cf467fe5834dd2057551584aa67e73a9c8c0400b9370b97cda5a57584353c11d"
+  }
+ },
+ "quotecheck": {
+  "kept": 16,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:47:18Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "6c9425b15cf3e205bf069cf312f7d25b107712fb4fce9f4c5f589f33cacfd35b",
+   "skeptic.json": "5c4b26f3c6467566ceadff96a4d6015fb7e6e00afc0cad3b2b7d4ed6b325bb39"
+  }
+ },
+ "dropped_claims": []
+}

@@ -1,0 +1,431 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0001  LL0605",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "rezoning_needed",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "The City of Atlanta zoning layer (layer 0), queried over the parcel's bounding box (-84.3560,33.6486 to -84.3498,33.6519), returns a single district: R-4, Single Family Residential, part of a 284.6-acre R-4 polygon. A single-family district does not list warehouse or industrial use; industrial use would need a rezoning (e.g. to I-1/I-2).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"ZONING\":\"R-4\",\"EDITTED\":\" \",\"REFERENCE\":\"R3094\",\"SHAPE.AREA\":12398313.6893618,\"SHAPE.LEN\":15854.2358461323,\"ZONINGCODE\":\"Single Family Residential\"",
+     "context_before": "200000,\"globalid\":\"{1ac64bdb-53e2-4eb1-bb94-08ca9411e263}\",\"acres\":284.62725626,",
+     "context_after": "}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/dc7523966c16de809feb352a.html"
+    }
+   ],
+   "open_items": [
+    "The R-4 use table is on Municode (not fetchable by policy here); a person should confirm R-4 permits no warehouse/distribution use, and what an R-4 to I-1/I-2 rezoning would need.",
+    "The zoning record carries no conditional-zoning case number (CASEIN/CASEOUT blank), so no conditions are recorded on this polygon in the layer."
+   ]
+  },
+  "plans": {
+   "verdict": "against",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "The City of Atlanta 'Development Patterns - Future Land Use' layer (layer 8), queried over the parcel's bounding box, returns one polygon (1,053 acres) whose current development pattern is LDR, named Low Density Residential. The 'Industrial' value the screener read is the older LANDUSEDES field carried on the same record (marked as a technical conversion), not the current pattern.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NDP\":\"LDR\",\"FID_L8LAND\":2641,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\"",
+     "context_before": "\"fid_1\":0.0,\"pin\":\"low density residential\",\"conversion\":\"technical conversion\",",
+     "context_after": ",\"lastupdate\":null,\"lasteditor\":\" \",\"density\":\" \",\"far\":\" \",\"history\":\" \",\"acres",
+     "words_shared_with_url": [],
+     "page_file": "pages/3024b51fa501bcca95e52020.html"
+    },
+    {
+     "id": "plans-2",
+     "text": "Same answer: the current development pattern name on the polygon covering the parcel is Low Density Residential.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"DP_NAME\":\"Low Density Residential\",\"SIMPLE_TRA\":\"Technical Changes\"",
+     "context_before": "1504000000,\"last_edite\":\"shenderson\",\"last_edi_1\":1615939200000,\"unitcount\":0.0,",
+     "context_after": ",\"shape_leng\":1695.96092464,\"shape.area\":117264.081138365,\"shape.len\":1695.96092",
+     "words_shared_with_url": [],
+     "page_file": "pages/3024b51fa501bcca95e52020.html"
+    },
+    {
+     "id": "plans-3",
+     "text": "The layer's own metadata shows its map is drawn on the NDP field under the heading 'Development Pattern', i.e. NDP (here LDR) is the shown future land use, not LANDUSEDES.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8?f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"field1\":\"NDP\",\"uniqueValueGroups\":[{\"heading\":\"Development Pattern\"",
+     "context_before": "axscale\":0,\"referencescale\":0.0,\"drawinginfo\":{\"renderer\":{\"type\":\"uniquevalue\",",
+     "context_after": ",\"classes\":[{\"label\":\"large lot single family\",\"description\":\"large lot single f",
+     "words_shared_with_url": [],
+     "page_file": "pages/0450e0c2343ed96763f39e3d.html"
+    },
+    {
+     "id": "plans-4",
+     "text": "The service lists the older future land use layer as deprecated, consistent with the 'Industrial' value being legacy.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer?f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"id\":25,\"name\":\"LandUse Future (deprecated)\"",
+     "context_before": "ture layer\",\"geometrytype\":\"esrigeometrypolygon\",\"supportsdynamiclegends\":true},",
+     "context_after": ",\"parentlayerid\":-1,\"defaultvisibility\":false,\"sublayerids\":null,\"minscale\":0,\"m",
+     "words_shared_with_url": [],
+     "page_file": "pages/cf384be5724ec438954d896d.html"
+    },
+    {
+     "id": "plans-5",
+     "text": "The rezoning-cases layer (layer 10), queried over the parcel's bounding box, returns no case: no rezoning is recorded on the parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]",
+     "context_before": "edouble\",\"alias\":\"shape.len\"},{\"name\":\"addl_legis\",\"type\":\"esrifieldtypestring\",",
+     "context_after": "}",
+     "words_shared_with_url": [],
+     "page_file": "pages/b6133c42ec62b24fbab5de1a.html"
+    },
+    {
+     "id": "plans-6",
+     "text": "The rezoning-cases layer queried over a wider box around the parcel (-84.3610,33.6440 to -84.3450,33.6565, roughly 500-800 m out) returns only two old cases, Z-09-001 (RG2 to MR-3-C, 2009) and Z-06-095 (OI to C-1-C, 2006); none in the last five years.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"FROM_ZONE\":\"RG2\",\"TO_ZONE\":\"MR-3-C\",\"DOCKET_NO\":\"Z-09-001\"",
+     "context_before": ":\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":2948,",
+     "context_after": ",\"status\":null,\"final_upda\":null,\"status_subtype\":2,\"ordinance\":\"09-o-0205\",\"ord",
+     "words_shared_with_url": [],
+     "page_file": "pages/6c814799e30ffa9a0bd1af39.html"
+    },
+    {
+     "id": "plans-7",
+     "text": "The building-moratorium layer (layer 5), queried over the parcel's bounding box, returns no feature: no moratorium mapped on the parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]",
+     "context_before": "gth\":8},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "}",
+     "words_shared_with_url": [],
+     "page_file": "pages/43a630499dee9d87308b6e55.html"
+    }
+   ],
+   "open_items": [
+    "Confirm with Atlanta City Planning that the adopted CDP (Plan A, reported adopted July 2025) shows Low Density Residential here; an industrial project would need a CDP amendment as well as a rezoning.",
+    "The rezoning-case layer was last edited in 2024 on the records seen; cases filed since may not be mapped. Check recent ZRB agendas for Red Oak Dr SE.",
+    "The zoning overlay layer (layer 1) over the parcel bbox also returned no feature (not cited separately)."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer: the City of Atlanta sewer pipe layer (MapEGIS/manholes layer 1), queried over the parcel's bounding box (which is larger than the parcel), returns 11 pipes, all 8-inch, including outfall segments named RED OAK DR OUTF and laterals on Forest Valley Dr, Conley Rd, Rigby Ct and Erica Wy. Sewer is shown nearby; whether a main touches the parcel itself was not tested. Water: no public water-main layer was found, so water is unknown and the section verdict stays unknown.",
+     "source_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"NAME\":\"RED OAK DR OUTF\",\"UPS_STNO\":\"1025\",\"UPS_PREDIR\":\" \",\"UPS_STNAME\":\"Forest Valley\",\"UPS_SUFFIX\":\"DR\",\"UPS_POSTDIR\":\"SE\",\"ZIP\":\"30354\",\"SEWERSHED\":\"SR11YB\",\"BASIN\":\"BSOC\",\"SEWERGROUP\":1,\"UNITTYPE\":\"OUT\",\"SM_SUBTYPE\":5,\"SURF\":\"G\",\"SERVSTAT\":\"APUB\",\"PIPETYPE\":\"CO\",\"PIPESHP\":\"C\",\"PIPEDIAM\":8",
+     "context_before": "20206201\",\"install_date\":null,\"mapno\":\"233202\",\"source\":\"sses\",\"invmethod\":null,",
+     "context_after": ",\"pipeht\":0,\"pipelen\":257.52134183999999,\"upsxcoord\":null,\"upsycoord\":null,\"upsz",
+     "words_shared_with_url": [],
+     "page_file": "pages/8274bd0e6bef2bca31d85c1d.html"
+    }
+   ],
+   "open_items": [
+    "Water: the City of Atlanta EGIS MapWF folder lists no services publicly and no water-main layer was found; ask Atlanta Watershed Management for the nearest water main and its size.",
+    "Sewer: the pipes found are 8-inch; ask Watershed Management about capacity and whether an 8-inch outfall can serve an industrial user. Service status code APUB is not explained on the page.",
+    "The brief's assessor note says water 'All public' (from the county CAMA extract, a zip file not quotable here)."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "The rezoning-cases layer queried over the parcel's bounding box returns no case, so no rezoning has been applied for on this parcel by anyone (owner or other) per the city's map.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"alias\":\"ADDINALL LEGISLATIN\",\"length\":50}],\"features\":[]",
+     "context_before": "edouble\",\"alias\":\"shape.len\"},{\"name\":\"addl_legis\",\"type\":\"esrifieldtypestring\",",
+     "context_after": "}",
+     "words_shared_with_url": [],
+     "page_file": "pages/b6133c42ec62b24fbab5de1a.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The special-use-permit layer (layer 11), queried over a wider box around the parcel (-84.3610,33.6440 to -84.3450,33.6565), returns no permit.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "}",
+     "words_shared_with_url": [],
+     "page_file": "pages/d831155fcbed1932a0203080.html"
+    },
+    {
+     "id": "market-3",
+     "text": "Built on or in use: the Fulton County parcel layer, queried by parcel id, shows land appraised at $875,000, improvements at $0 and land-use code 100 (class R5): no building is assessed on the parcel.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200001%20%20LL0605%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-12",
+     "quote": "\"TotAppr\":875000,\"LandAppr\":875000,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R5\"",
+     "context_before": " ga 30071\",\"taxdist\":\"05\",\"totassess\":350000,\"landassess\":350000,\"imprassess\":0,",
+     "context_after": ",\"excode\":null,\"livunits\":null,\"landacres\":36.71,\"nbrhood\":\"14461\",\"subdiv\":null",
+     "words_shared_with_url": [],
+     "page_file": "pages/6ac44244b6d5172369260e13.html"
+    }
+   ],
+   "open_items": [
+    "Two web searches by the site address found no listing, notice or development record; listing sites were not opened. A person may check the owner directly (no contact made here).",
+    "Whether the land is in informal use (dumping, a yard, a trail) was not checked: no aerial image was read. Drive the site.",
+    "The meaning of land-use code 100 / class R5 is not on the page; confirm with the assessor (likely vacant residential)."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Owner is an LLC whose name contains 'Residential'; the Georgia Secretary of State record (status, formation, agent) could not be read (403 wall) and the name was not searched by rule. A person should pull it: a residential-builder owner of an LDR-designated R-4 tract may be holding it for houses, not for sale to industrial.",
+    "The brief notes the same owner holds one other 5-50 acre parcel (13 0128  LL2247); last recorded sale of this parcel 2011 for $45,100 per the brief."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The lead's grade A and its 'likely' entitlement path rest on a future land use of Industrial. The city's own authoritative record for its July 2025 Comprehensive Development Plan says the development-pattern layer replaced that future land use dataset, and on the parcel's own polygon that layer shows only Low Density Residential. So the Industrial value is superseded, and the adopted plan points to houses. The tract is also zoned R-4, and recorded single-family subdivisions touch it: The Villages at Oakshire Phase 2 along its north line and Forest Valley lots. Industrial use would need a plan amendment and a rezoning next to existing homes, and a residential-named owner may intend houses. A person must settle whether any such path is realistic before this is treated as an industrial lead.",
+  "disputes": [
+   "plans-2",
+   "market-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The city's own ArcGIS Online record for its development-pattern layer calls it the authoritative layer created by the Comprehensive Development Plan passed in July 2025, replacing the now-deprecated Future Land Use dataset. So the development pattern, not the old future land use value, is the adopted plan's designation.",
+    "source_url": "https://www.arcgis.com/sharing/rest/content/items/4deacd62fd36463fa33afa87b45acaf3?f=json",
+    "retrieved": "2026-11-12",
+    "quote": "The authoritative Development Patterns GIS layer created by the Comprehensive Development Plan passed in July 2025. The Development Patterns replaces the Future Land Use dataset, which is now deprecated.",
+    "context_before": "oration-style:initial; text-indent:0px; text-transform:none; word-spacing:0px;'>",
+    "context_after": "<\\/p><p><span style='background-color:rgb(248,248,248); color:rgb(76,76,76); fon",
+    "words_shared_with_url": [],
+    "page_file": "pages/6bb83d0bd461e90725819b74.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "That authoritative record points to exactly the layer the first pass queried (LandUsePlanning MapServer layer 8 on gis.atlantaga.gov).",
+    "source_url": "https://www.arcgis.com/sharing/rest/content/items/4deacd62fd36463fa33afa87b45acaf3?f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"url\":\"https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8\",\"proxyFilter\":null,\"access\":\"public\"",
+    "context_before": ",\"licenseinfo\":null,\"culture\":\"en-us\",\"properties\":null,\"advancedsettings\":null,",
+    "context_after": ",\"size\":88,\"subinfo\":0,\"appcategories\":[],\"industries\":[],\"languages\":[],\"larget",
+    "words_shared_with_url": [],
+    "page_file": "pages/6bb83d0bd461e90725819b74.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The same record says the layer carries the previous Future Land Use fields alongside the development patterns, with the logic used to translate one into the other. This confirms the 'Industrial' value the screener used (LANDUSEDES) is the superseded field, not the adopted designation.",
+    "source_url": "https://www.arcgis.com/sharing/rest/content/items/4deacd62fd36463fa33afa87b45acaf3?f=json",
+    "retrieved": "2026-11-12",
+    "quote": "This layer contains both Development Patterns as well as previous Future Land Use fields. Additionally, it contains the Translation Logic, which was the way the Future Land Use was translated into the new Development Patterns.",
+    "context_before": "oration-style:initial; text-indent:0px; text-transform:none; word-spacing:0px;'>",
+    "context_after": " the data is for parcels across the city, and has the right of way (row) removed",
+    "words_shared_with_url": [],
+    "page_file": "pages/6bb83d0bd461e90725819b74.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "Queried with the parcel's own polygon (from the Fulton parcel layer), not a bounding box, the development-pattern layer returns exactly one feature, OBJECTID 16892: development pattern LDR (Low Density Residential), with the old field reading Industrial. Its SHAPE.AREA is 8,660,485 sq ft (about 199 acres); the ACRES value of 1,053 is a carried-over attribute, not this polygon's size.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"OBJECTID\":16892,\"FID_L4NDP_\":779,\"FID_1\":0.0,\"PIN\":\"Low Density Residential\",\"CONVERSION\":\"Technical Conversion\",\"NDP\":\"LDR\",\"FID_L8LAND\":2641,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\"",
+    "context_before": "eldtypedate\",\"alias\":\"last_edited_date\",\"length\":8}],\"features\":[{\"attributes\":{",
+    "context_after": ",\"lastupdate\":null,\"lasteditor\":\" \",\"density\":\" \",\"far\":\" \",\"history\":\" \",\"acres",
+    "words_shared_with_url": [],
+    "page_file": "pages/1da09bd04737288847be7709.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The Fulton County subdivisions layer, queried with the parcel's polygon, returns one recorded subdivision touching the parcel: The Villages at Oakshire Phase 2 (recorded 2005, about 45.8 acres). The parcel sits beside a platted single-family subdivision; it is not inside it (see open items).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/19/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"SubdivName\":\"The Villages at Oakshire Phase 2\",\"CreateDate\":null,\"LastEdit\":1695898188000,\"FeatureID\":\"LSD0002608\",\"City\":\"Atlanta\"",
+    "context_before": "\"alias\":\"document type\",\"length\":5}],\"features\":[{\"attributes\":{\"objectid\":2622,",
+    "context_after": ",\"shape.starea()\":1994211.1293031038,\"shape.stlength()\":7249.8414206296675,\"year",
+    "words_shared_with_url": [],
+    "page_file": "pages/f8b1082638d6b29ee7522d8d.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The City of Atlanta cadastral city-lots layer, queried with the parcel's polygon, returns platted house lots of The Villages at Oakshire Phase 2 (plat book 277, pages 55-57) touching the parcel. The query also returns about 21 such lots.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"PLAT_NAME\":\"THE_VILLAGES_AT_OAKSHIRE_PHASE2\",\"BOOK\":\"277\",\"PAGE\":\"55,56,57\"",
+    "context_before": "jobid_in\":null,\"jobid_out\":null,\"old_pin\":null,\"research\":null,\"qc_status\":\"uv\",",
+    "context_after": ",\"plat_footprint\":null,\"plat_id\":null,\"siteaddress\":null,\"sitecity\":null,\"sitezi",
+    "words_shared_with_url": [],
+    "page_file": "pages/a54c5ecd40210032459de027.html"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "The same query also returns platted lots of Forest Valley Unit 2 (plat book 80, page 11) and Forest Valley Subdivision Unit 1 touching the parcel. Single-family subdivisions adjoin it on more than one side.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"PLAT_NAME\":\"FOREST_VALLEY_UNIT2\",\"BOOK\":\"80\",\"PAGE\":\"11\"",
+    "context_before": "jobid_in\":null,\"jobid_out\":null,\"old_pin\":null,\"research\":null,\"qc_status\":\"uv\",",
+    "context_after": ",\"plat_footprint\":null,\"plat_id\":null,\"siteaddress\":null,\"sitecity\":null,\"sitezi",
+    "words_shared_with_url": [],
+    "page_file": "pages/a54c5ecd40210032459de027.html"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "At a point inside the parcel (-84.3525, 33.6505) the city-lots layer returns one unplatted city lot (PIN 14 0001 LL060, about 35.8 GIS acres) with no plat name, book or page. No residential subdivision plat is recorded on the land itself in this layer.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=-84.3525%2C33.6505&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"QC_STATUS\":\"UV\",\"PLAT_NAME\":null,\"BOOK\":null,\"PAGE\":null,\"PLAT_FOOTPRINT\":null",
+    "context_before": "98,\"status\":\"a\",\"jobid_in\":null,\"jobid_out\":null,\"old_pin\":null,\"research\":null,",
+    "context_after": ",\"plat_id\":null,\"siteaddress\":null,\"sitecity\":null,\"sitezip\":null,\"zoning\":null,",
+    "words_shared_with_url": [],
+    "page_file": "pages/324b52c119897e9b8d8d126c.html"
+   }
+  ],
+  "open_items": [
+   "plans-2: the quote is on the page, but the surrounding text quotecheck matched (shape.area 117264, shape_leng 1695.96) belongs to feature OBJECTID 16895, a 2.7-acre polygon that my parcel-polygon query shows does not touch the parcel. Its words are identical to those of the feature that does (16892), so the conclusion stands, but the quote is not from 'the polygon covering the parcel'.",
+   "plans-1 detail: the bounding-box query returned two features, not one (16895 and 16892), and '1,053 acres' is a carried ACRES attribute, not either polygon's size (about 2.7 and 199 acres). The LDR reading is right (my claims 1 to 4).",
+   "market-1: an empty answer from the mapped rezoning-cases layer shows only that no case is mapped. It does not show that 'no rezoning has been applied for by anyone'. The first pass itself notes the layer may lag (last edits 2024). Recent Zoning Review Board agendas were not read (www.atlantaga.gov answered 403 to robots.txt, so it was not fetched).",
+   "Geometry check (my own, not a quote): I fetched the Oakshire Phase 2 boundary (Fulton layer 19, OBJECTID 2622, outSR 4326) and the parcel polygon (Fulton layer 11) and ran a point-in-polygon test. None of about 2,800 sample points inside the parcel falls inside the subdivision. The subdivision's south edge runs along the parcel's north line at latitude about 33.6515, from about -84.3563 to -84.3499, i.e. the whole north side. A person can confirm on the county map.",
+   "Search snippets only, not a source: web results describe The Villages at Oakshire as a D.R. Horton new-home community on Erica Way SE, with homes sold around 2022-23. The first pass's sewer claim names laterals on Erica Wy inside the bounding box. If confirmed, the north neighbour is a recently built subdivision, likely to oppose an industrial rezoning.",
+   "Is this tract an unbuilt later phase of the Oakshire development or of another residential plan? The owner's name contains 'Residential', and the last recorded sale (2011, $45,100 for 36.7 acres per the brief) looks like a distressed sale. A person should pull the deed and any preliminary plat or land-disturbance permit. No permit search was made: the city's permit portal is a search form.",
+   "Stream buffer not tested. The USGS hydrography host answered 403 to robots.txt, and the NWI mapper host redirected its robots.txt to another site, so neither was fetched. The brief shows 2% ponds/streams, and the first pass found a sewer segment named RED OAK DR OUTF (an outfall, often laid along a creek). If a stream crosses the parcel, city and state stream buffers would remove more ground than the brief's netting of mapped water polygons. Atlanta's buffer text is on Municode, so it was not read. A person should check.",
+   "The city's small-area plans layer (layer 19) over the parcel returns the NPU-Z Redevelopment Plan (2007) and the Jonesboro Road Corridor Redevelopment Plan Update (2006). Their recommendations for this land were not read.",
+   "The city's land-use amendments layer, queried with the parcel's polygon, returned no amendment: no pending plan change toward industrial is mapped (not cited separately).",
+   "Slope and earthwork are in the brief (26% of open ground steeper than 15%; about 730,000 cubic yards cut and fill), and they add cost on top of the entitlement problem."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/dc7523966c16de809feb352a.html",
+   "fetched_at": "2026-11-12T19:51:34Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3788,
+   "sha256": "1f749e3db25c65b9804e36462ff6398cafc098cae051c3c0da49d0773333d0aa"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/3024b51fa501bcca95e52020.html",
+   "fetched_at": "2026-11-12T19:51:35Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4560,
+   "sha256": "915193470a6a08e2611677022f25174b4bb1aacdc62139c549c376ad05e0d797"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8?f=json": {
+   "file": "pages/0450e0c2343ed96763f39e3d.html",
+   "fetched_at": "2026-11-12T19:51:36Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8?f=json",
+   "status": 200,
+   "bytes": 14344,
+   "sha256": "8af41b022cf4051a89d8bf2d748c7e28f4527af2ee76c5306fbf0564af739e62"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer?f=json": {
+   "file": "pages/cf384be5724ec438954d896d.html",
+   "fetched_at": "2026-11-12T19:51:37Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer?f=json",
+   "status": 200,
+   "bytes": 8322,
+   "sha256": "984630e62288402f4ca067531adde7520f8093941525ec1cfd658e12c18554b7"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b6133c42ec62b24fbab5de1a.html",
+   "fetched_at": "2026-11-12T19:51:38Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 2126,
+   "sha256": "1ec314cea5160f6f38fd0aadfa436df171e9cc5894d06e7f052f83d0a7575e73"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6c814799e30ffa9a0bd1af39.html",
+   "fetched_at": "2026-11-12T19:51:39Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/10/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3200,
+   "sha256": "a2d6a0f51433891215172f7eb532d9ec218ec6ff9c4c8e639ae66cbb18bf3a83"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/43a630499dee9d87308b6e55.html",
+   "fetched_at": "2026-11-12T19:51:40Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/5/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1579,
+   "sha256": "4ed791fe9d9f56ee37efa14190bb7f307a0e4b131ed8158411cd8bb29d9e6ba6"
+  },
+  "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/8274bd0e6bef2bca31d85c1d.html",
+   "fetched_at": "2026-11-12T19:51:41Z",
+   "final_url": "https://egis.atlantaga.gov/arc/rest/services/MapEGIS/manholes/MapServer/1/query?geometry=-84.3560%2C33.6486%2C-84.3498%2C33.6519&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 25316,
+   "sha256": "99c348de79107c3ca693a1ef9848b8cadbdc3edad760cd4fc4e4cc170312c050"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/d831155fcbed1932a0203080.html",
+   "fetched_at": "2026-11-12T19:51:42Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/11/query?geometry=-84.3610%2C33.6440%2C-84.3450%2C33.6565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1812,
+   "sha256": "181ed0ad18b7d634f32b01b95a543571d1afba2d671d90c8154a38315efad8d1"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200001%20%20LL0605%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6ac44244b6d5172369260e13.html",
+   "fetched_at": "2026-11-12T19:51:43Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200001%20%20LL0605%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4315,
+   "sha256": "0a748e03ab7a11133c849519026692fe87e139a69f7d070be076a339d86633c5"
+  },
+  "https://www.arcgis.com/sharing/rest/content/items/4deacd62fd36463fa33afa87b45acaf3?f=json": {
+   "file": "pages/6bb83d0bd461e90725819b74.html",
+   "fetched_at": "2026-11-12T19:51:45Z",
+   "final_url": "https://www.arcgis.com/sharing/rest/content/items/4deacd62fd36463fa33afa87b45acaf3?f=json",
+   "status": 200,
+   "bytes": 2927,
+   "sha256": "e660bb7e472e390fb6f65088bfbcc198eefdb62fa03906e18530958d1df1c34b"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/1da09bd04737288847be7709.html",
+   "fetched_at": "2026-11-12T19:51:45Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3851,
+   "sha256": "161e1fc12265eebd3728c9559b33f45ee0c4bfa02c880d755b3a6438916f40e3"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/19/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/f8b1082638d6b29ee7522d8d.html",
+   "fetched_at": "2026-11-12T19:51:45Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/19/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1658,
+   "sha256": "306091a04114325ba3f8426153754360e34444b9469ad1dee54e3fdb57dbff53"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/a54c5ecd40210032459de027.html",
+   "fetched_at": "2026-11-12T19:51:46Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.355408%2C33.651782%5D%2C%5B-84.355167%2C33.651768%5D%2C%5B-84.354884%2C33.651751%5D%2C%5B-84.354575%2C33.651733%5D%2C%5B-84.35428%2C33.651716%5D%2C%5B-84.353966%2C33.651698%5D%2C%5B-84.353819%2C33.65169%5D%2C%5B-84.353413%2C33.651666%5D%2C%5B-84.353063%2C33.651646%5D%2C%5B-84.352824%2C33.651632%5D%2C%5B-84.352584%2C33.651619%5D%2C%5B-84.352347%2C33.651604%5D%2C%5B-84.352115%2C33.651591%5D%2C%5B-84.351936%2C33.651581%5D%2C%5B-84.351706%2C33.651568%5D%2C%5B-84.351428%2C33.651552%5D%2C%5B-84.351164%2C33.651536%5D%2C%5B-84.350879%2C33.65152%5D%2C%5B-84.350632%2C33.651505%5D%2C%5B-84.350401%2C33.651492%5D%2C%5B-84.34989%2C33.651462%5D%2C%5B-84.349881%2C33.649122%5D%2C%5B-84.351964%2C33.64889%5D%2C%5B-84.352371%2C33.648844%5D%2C%5B-84.352416%2C33.64873%5D%2C%5B-84.353955%2C33.648709%5D%2C%5B-84.354263%2C33.648705%5D%2C%5B-84.354598%2C33.6487%5D%2C%5B-84.354998%2C33.649109%5D%2C%5B-84.355234%2C33.64935%5D%2C%5B-84.355239%2C33.649356%5D%2C%5B-84.355366%2C33.649422%5D%2C%5B-84.355159%2C33.649746%5D%2C%5B-84.35508%2C33.649868%5D%2C%5B-84.354676%2C33.6505%5D%2C%5B-84.35475%2C33.650535%5D%2C%5B-84.354824%2C33.65057%5D%2C%5B-84.35499%2C33.650649%5D%2C%5B-84.355162%2C33.65073%5D%2C%5B-84.355364%2C33.650825%5D%2C%5B-84.355479%2C33.65088%5D%2C%5B-84.355522%2C33.650961%5D%2C%5B-84.355613%2C33.651135%5D%2C%5B-84.355699%2C33.651298%5D%2C%5B-84.355659%2C33.651294%5D%2C%5B-84.355634%2C33.651429%5D%2C%5B-84.355707%2C33.651436%5D%2C%5B-84.355876%2C33.651742%5D%2C%5B-84.355914%2C33.651811%5D%2C%5B-84.355408%2C33.651782%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 26447,
+   "sha256": "78b4cffbe484b1e3ee8bc18fa0ab83781ee7078ce47a80d8fe72b527537b1cbb"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=-84.3525%2C33.6505&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/324b52c119897e9b8d8d126c.html",
+   "fetched_at": "2026-11-12T19:51:47Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/CadastralLots/MapServer/17/query?geometry=-84.3525%2C33.6505&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3705,
+   "sha256": "e059be79cdf91182860a4e64794328d4e5e7367476c362d5fe3428f9f25642c8"
+  }
+ },
+ "quotecheck": {
+  "kept": 20,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:51:47Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "3dbc89a2be919a4d8bf60c05d6cd1047eb7e3d320318c404f5b742900e897158",
+   "skeptic.json": "6aafbc719e8954b9f1a27cf02561d22cf75fd7652018623f8e62d7644807e5a9"
+  }
+ },
+ "dropped_claims": []
+}

@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "parcel_id": "14 0155  LL0278",
+  "run": "fulton-2026-11-12",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "A warehouse here is not by right, whatever the brief says. East Point lists warehouse/distribution in I-1 as a use-permit use that must sit one mile (5,280 ft) from residential property unless a variance is granted. Residential land is about 706 ft away, and a private applicant is pursuing R-3 multifamily there now (Sept 2026), so any warehouse needs two discretionary approvals in a city whose council has openly debated warehouses. The 2025 warehouse and concrete-plant application, the only sign that someone other than the owner wanted the site, was on the Dec 18, 2025 agenda and appears on no 2026 agenda or notice I or the first pass read. A secondary report says it was withdrawn that night, and no minutes are posted, so the market verdict rests on a stale case. The site also carries about $950,800 of existing improvements and adjoins an active GA EPD corrective-action site. This is not a kill: no document shows the land is unavailable, and the one-mile variance has been sought for other I-1 warehouses.",
+    "disputes": ["plans-5", "market-1"],
+    "claims": [
+      {
+        "text": "East Point treats warehouse/distribution in I-1 as needing a use permit plus a variance from the one-mile residential distance rule in Sec. 10-2079(d). Its April 17, 2025 P&Z agenda (another site, 0 Welcome All Rd) describes a warehouse/distribution use permit in I-1 with exactly that variance. Read with the 2025 case on this parcel (zoning-1), this makes a warehouse here conditional on two discretionary approvals, not by right.",
+        "source_url": "https://eastpointga.gov/wp-content/uploads/2025/04/Public-Notice-Agenda-PZ-Public-hearing-APR-17-2025.pdf",
+        "retrieved": "2026-11-12",
+        "quote": "The applicant is requesting Use Permit to develop a 935,233.2 square feet in area site with 2 (two) warehouse/ distribution center buildings totaling approximately 219,090 square feet in area in the I-1 Light Industrial Zoning district with a concurrent variance from Sec. 10-2079(d) to allow development within one mile distance requirement from residential property."
+      },
+      {
+        "text": "Background on why warehouses need a use permit: East Point's December 2020 ordinance, adopted for the I-2 Heavy Industrial district (Sec. 10-2080), states the city's finding that previously permitted warehouse operations should need a use permit. Its companion change to I-1 (Sec. 10-2079) was not read. This page is the adopted I-2 ordinance, not the I-1 text.",
+        "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/14762/1059755/pdf",
+        "retrieved": "2026-11-12",
+        "quote": "certain previously permitted industrial uses for light and heavy manufacturing, processing assembly, packaging and warehouse operations within the City of East Point should be required to obtain a use permit"
+      },
+      {
+        "text": "The same 2020 ordinance's exhibit for I-2 ties every use-permit-only use to a 5,280 ft separation from residential. It is consistent with the I-1 rule that the 2025 and 2026 agendas cite, but it is I-2 text, not I-1.",
+        "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/14762/1059755/pdf",
+        "retrieved": "2026-11-12",
+        "quote": "The following uses may be permitted per the procedures and standards set forth in Article D, Section 10-2115 et seq. in the I-2 District, provided that such use shall be at least 5,280 feet from any residential property or property used for residential use."
+      },
+      {
+        "text": "Residential pressure next door is current: the Sept 22, 2026 CZIM notice lists a private applicant asking for variances from the R-3 Multifamily development standards at 1780 E Woodberry Ave (14 0154 LL0204). I recomputed the gap from the county parcel geometry (EPSG 2240, US feet): about 706 ft from 1688 Empire Ave, well inside the one-mile rule.",
+        "source_url": "https://eastpointga.gov/wp-content/uploads/2026/09/CZIM-Public-Notice-Agenda_-9.22.2026.pdf",
+        "retrieved": "2026-11-12",
+        "quote": "1780 E Woodberry Ave (PIN: 14 0154 LL0204) Applicant is requesting variances from the R-3 Multifamily Development District development standards."
+      },
+      {
+        "text": "The page of the 2025 HSI summaries that is actually about site 10084 (East Point, p. 50) lists the listed site as one 38.4-acre parcel, 14-0155-LL-033-6. It does not list 1688 Empire Ave (14 0155 LL0278). So the state listing does not reach this parcel on paper, and whether contamination does is unknown.",
+        "source_url": "https://epd.georgia.gov/document/pdf/2025-hsi-site-summaries/download",
+        "retrieved": "2026-11-12",
+        "quote": "38.4 14-0155-LL-033-6 LAST KNOWN PROPERTY OWNER:"
+      },
+      {
+        "text": "The zoning rules are under review: the city says it still works from regulations largely adopted in 2009 and is rewriting its zoning ordinance. I-1 warehouse rules could change, and I found no adopted draft.",
+        "source_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+        "retrieved": "2026-11-12",
+        "quote": "Presently, the Planning and Community Development Department is operating from zoning and land development regulations that were originally adopted in 2009."
+      }
+    ],
+    "open_items": [
+      "plans-5 dispute: its kept quote was matched on page 49 of the HSI PDF, which is site 10083, Southern Wood Piedmont - Augusta (1650 Nixon Road, Richmond County), not East Point. The same status wording is boilerplate: 'The nearest resident individual is less than 300 feet' appears 97 times in the document. Page 50 (site 10084) carries the same wording, so the substance is probably right, but the kept quote and its context are the Augusta site's.",
+      "market-1 dispute: the quote shows a 2025 application by a party other than the tax-roll owner, but as evidence of a developer pursuing the site now it is stale. The case was Old Business on the Dec 18, 2025 agenda (market-3). It appears on none of the 2026 CZIM notices I read (Feb 10, Feb 17, Apr 14, May 19, Jun 16, Jul 14, Aug 18, Sep 15, Sep 22), and the first pass found it on none of its 2026 agendas. Also, an applicant who wants to operate a concrete plant may be a tenant or operator, not a buyer.",
+      "Outcome of P2025U-002-08/P2025VC-001-08 and P2025U-003-08/P2025VC-002-08: a web search result only (citizenportal.ai, not read: its robots.txt answered 403, so it was not fetched) says the P&Z Commission accepted withdrawal on Dec 18, 2025. No primary record found: the city's meetings page lists no P&Z minutes for 2025-2026, and the council's iqm2 portal (eastpointcityga.iqm2.com) gave an empty reply to robots.txt, so it was not fetched. Ask East Point Planning for the Dec 18, 2025 minutes or the case disposition.",
+      "Whether the one-mile rule is a bar or only a hurdle: search results only (not read, not claims) say the council approved the 0 Welcome All Rd warehouse use permit and one-mile variance in 2025 against staff's recommendation, and that residents later pressed the council over warehouse approvals. If true, the variance can be obtained but is political. Confirm with the city.",
+      "Built on and in use: the county record (owner-1, re-queried by parcel id; tax year 2027) shows improvements appraised at $950,800, land-use code 401, class I5. Whether the buildings are occupied, and by whom, is not shown by any page I read. A drive-by or the owner's disclosure is needed. Existing structures (about 40,000 SF per the first pass's CAMA reading) would have to be removed or reused for any new building.",
+      "plans-1: the plan text for Town Center Subarea 2 (Lawrence Street, 257 acres) does not name Empire Ave, Connally Dr or Woodberry Ave. The parcel-in-subarea match is the first pass's reading of a map image. I could not confirm or refute it from text.",
+      "Environmental reach: no public document I read shows the extent of soil or groundwater contamination from HSI 10084 / EPA RCRA ID GAD067560870 beyond its own parcel. GA EPD's site PDF (epd.georgia.gov/document/document/10084pdf/download) answered 404. Ask GA EPD Land Protection Branch for the site file and any corrective-action-plan plume map, and get a Phase I/II ESA.",
+      "The 2025 case cited Sec. 10-2150.6(a)(1) for the warehouse distance rule, while the April 2025 and Nov 2026 agendas cite Sec. 10-2079(d). Whether these are two rules or one is a question for East Point planning: the code text is on Municode, a known wall."
+    ]
+  }
+}

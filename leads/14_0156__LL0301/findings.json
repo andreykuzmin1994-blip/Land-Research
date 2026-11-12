@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "parcel_id": "14 0156  LL0301",
+  "run": "fulton-2026-11-12",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "East Point says its planning department still works from zoning and land development regulations adopted in 2009, and a rewrite of the whole ordinance (zoning, subdivision, overlay districts) is under way. The I-1 rules that apply to this parcel could change. This page does not give the I-1 use table.",
+         "source_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+         "retrieved": "2026-11-12",
+         "quote": "Presently, the Planning and Community Development Department is operating from zoning and land development regulations that were originally adopted in 2009."},
+        {"text": "The 19 Nov 2026 Planning and Zoning Commission agenda has a city-wide data center ordinance on it. This shows East Point is changing industrial-type use rules right now. It is not about warehousing and not about this parcel.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+         "retrieved": "2026-11-12",
+         "quote": "Applicant is presenting an ordinance to establish City wide data center provisions."}
+      ],
+      "open_items": [
+        "The I-1 district text (permitted, conditional and use-permit uses) is on Municode, a known wall, so it was not read. Ask East Point Planning whether warehouse / distribution is permitted by right in I-1 and whether any conditions apply to this parcel.",
+        "Zoning I1 comes from the screener's East Point GIS join (an ArcGIS Online host that quotecheck cannot fetch). This investigation did not confirm the parcel's district from a quotable primary source.",
+        "The 19 Nov 2026 agenda lists a towing use permit in I-1 with a variance from Sec. 10-2079(d) to operate within 5,280 ft of residentially zoned property. Ask whether any I-1 separation rule from residential zoning applies to warehouse or truck uses. Homes are close by: the HSI entry for the adjacent site puts the nearest resident under 300 ft from its affected area.",
+        "Ask what the zoning ordinance rewrite proposes for I-1 and when it is expected to be adopted."
+      ]
+    },
+    "plans": {
+      "verdict": "against",
+      "claims": [
+        {"text": "East Point's adopted 2022 comprehensive plan update (final for adoption July 2023) lists, among the key land-use points from public engagement, that warehouse/logistics/light industrial is only appropriate in the business park south of Camp Creek Parkway and west of I-285. Per the screener, this parcel is at about 33.688 N, -84.443 W, near downtown East Point and about 1.9 miles from I-85, so it is not in that area. This is an engagement key point, not a parcel-level policy.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+         "retrieved": "2026-11-12",
+         "quote": "Warehouse/logistics/light industrial is only appropriate in business park area south of Camp Creek Parkway and west of I-285"},
+        {"text": "The plan's Future Development Map of character areas replaces the old parcel-based future land use map. The screener's future land use value for this parcel (MXD) may therefore come from a superseded layer. The parcel's character area on the new map is not confirmed by a quote.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+         "retrieved": "2026-11-12",
+         "quote": "This replaces the old tool of a parcel-based Future Land Use (FLU) map, which typically only narrowly defined a desired use."},
+        {"text": "The plan's Town Center Subarea 2 (Lawrence Street, 257 acres) envisions turning vacant industrial land into mixed residential, commercial and high-tech industrial use after environmental clean-up. Its listed uses include high-tech industrial but not warehousing. Whether this parcel is inside this subarea is not proven by a quote; see open items.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+         "retrieved": "2026-11-12",
+         "quote": "convert existing vacant industrial properties into modern residential, commercial, and high-tech industrial developments. Environmental clean-up from prior industrial use is required to ensure future flexibility in use."},
+        {"text": "Pointing the other way: the city's economic development page still markets the Lawrence Avenue Industrial Park, 200+ acres with Connally Drive on its southern section, as an industrial area.",
+         "source_url": "https://eastpointga.gov/economic-development/",
+         "retrieved": "2026-11-12",
+         "quote": "Lawrence Avenue Industrial Park is flanked on the northern section by Arthur Langford Parkway and Connally Drive on the southern section of the park consisting of 200 plus acres of land."}
+      ],
+      "open_items": [
+        "Seen, not verifiable: the Future Development Map (comprehensive plan PDF, page 71; https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf) is an image. My rough reading of it, from the screener's coordinates, places the parcel in or at the edge of Town Center 2: Lawrence Street (mixed use, brownfield redevelopment) rather than Legacy Industrial. This needs confirming on the city's map or with Planning. If it is Legacy Industrial instead, that area lists warehouse with rail connections and the verdict would move toward supports.",
+        "No rezoning, moratorium or overlay case on or beside this parcel was found in the 2026 Planning and Zoning public hearing agendas read (Mar 19, May 21, Jun 18, Jul 16, Aug 20, Sep 17, Oct 15, Nov 19). Agendas for 2021-2025 and City Council actions were not checked. The city's zoning-cases page answered 404, and its agenda system (iqm2) did not respond.",
+        "A city-wide data center ordinance (19 Nov 2026) and a zoning ordinance rewrite are pending. Ask Planning whether either touches I-1 here.",
+        "The 2006 East Point Corridors TAD plan's parcel list was searched and does not include this parcel."
+      ]
+    },
+    "utilities": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "No published East Point water or sewer map was found on a fetchable host. The city's GIS maps are on ArcGIS Online, a known wall. The 2022 comprehensive plan and the 2006 TAD plan give no main location at Connally Drive.",
+        "The screener's assessor data says water/sewer 'All public'. Ask the City of East Point Water and Sewer Department for the nearest water and sewer mains and their capacity for a roughly 166,000 SF warehouse.",
+        "Connally Drive is listed as a major collector in the 2006 TAD plan. A city sidewalk project on Connally Drive (between Judson Ave and Collins Dr) was noticed for 2026. Whether it touches this frontage was not checked."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {"text": "The 19 Nov 2026 East Point Planning and Zoning Commission public hearing agenda lists three new-business items: a towing use permit at 1392 Central Ave, a fence variance at 1780 E Woodberry Ave, and a city-wide data center ordinance. None is on Connally Drive or this parcel id (14 0156 LL0301). The seven other 2026 public hearing agendas read (Mar 19, May 21, Jun 18, Jul 16, Aug 20, Sep 17, Oct 15) also show no Connally Drive case.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+         "retrieved": "2026-11-12",
+         "quote": "Applicant is presenting an ordinance to establish City wide data center provisions."}
+      ],
+      "open_items": [
+        "Only 2026 public hearing agendas were checked. Business and Industrial Development Authority agendas, City Council agendas, and agendas before 2026 were not read.",
+        "Web searches by site address found no sale, listing or development notice for Connally Drive industrial land. Listing sites were excluded on purpose.",
+        "The same owner holds the adjacent 38.4-acre parcel 14 0155 LL0336 (1745 Connally Dr, screen rank 25), which is a state Hazardous Site Inventory site under cleanup (see owner). Any sale would likely be negotiated together with or around that remediation. Ask the owner's side, through a person, whether both parcels are available."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "Georgia EPD's 2026 Hazardous Site Inventory lists Southern Wood Piedmont Company as last known owner of HSI site 10084 (1745 Connally Drive, the adjacent rank-25 parcel). Its address, 1301 Riverplace Blvd Suite 2300, Jacksonville FL 32207, is the same mailing address as this parcel's tax-roll owner S W P C INC. That links the two parcels' owner to a listed hazardous site. The Secretary of State record was not reached.",
+         "source_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+         "retrieved": "2026-11-12",
+         "quote": "LAST KNOWN PROPERTY OWNER(S): Southern Wood Piedmont Company 1301 Riverplace Blvd., Suite 2300 Jacksonville, FL 32207"},
+        {"text": "The HSI site is recorded as 38.4 acres on parcel 14-0155-LL-033-6 (the screener's 14 0155 LL0336, rank 25). This parcel, 14 0156 LL0301, is not the listed parcel. Whether contamination or the cleanup area extends onto it is not stated.",
+         "source_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+         "retrieved": "2026-11-12",
+         "quote": "ACREAGE 38.4 PARCEL NUMBER 14-0155-LL-033-6"},
+        {"text": "At HSI site 10084, cleanup of source materials, soil and groundwater is under way, and it is a Class IV site requiring corrective action. The release recorded is benzo(a)pyrene in soil, and the site has limited access.",
+         "source_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+         "retrieved": "2026-11-12",
+         "quote": "Cleanup activities are being conducted for source materials, soil, and groundwater. CLEANUP PRIORITY: The Director has designated this site as a Class IV"},
+        {"text": "The HSI defines Class IV as corrective action under way or completed under other federal or state authority. The owner of a Class IV site must file deed notices. (From the July 2024 HSI edition held by the Digital Library of Georgia.)",
+         "source_url": "https://dlg.usg.edu/record/dlg_ggpd_50553986-2024-07-14/fulltext.text",
+         "retrieved": "2026-11-12",
+         "quote": "They are designated as needing corrective action, remain on the HSI, and the property owner is required to file deed notices."}
+      ],
+      "open_items": [
+        "Georgia Secretary of State business search is a known wall (403). Status, formation date and registered agent of S W P C INC are unknown, and so is whether it is the same legal entity as the 'Southern Wood Piedmont Company' named by EPD. My reading only: a company holding a long-held former industrial site under state-supervised cleanup looks more like a holding or remediation entity than an operator or developer. This is not verified.",
+        "Ask EPD (through a person), or read the site's corrective action file, whether the cleanup area, groundwater plume or any deed notice or environmental covenant reaches parcel 14 0156 LL0301. The screener put the listed site 169 ft away. EPA's Facility Registry also lists an 'East Point Surface Impoundment' at 1745 Connally Drive (registry id 110045459026), whose location relative to this parcel is unknown.",
+        "Title search: look for deed notices, environmental covenants or access agreements tied to the adjacent cleanup on this parcel's chain of title."
+      ]
+    }
+  }
+}

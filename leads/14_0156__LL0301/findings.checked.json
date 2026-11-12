@@ -1,0 +1,449 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0156  LL0301",
+ "run": "fulton-2026-11-12",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "East Point says its planning department still works from zoning and land development regulations adopted in 2009, and a rewrite of the whole ordinance (zoning, subdivision, overlay districts) is under way. The I-1 rules that apply to this parcel could change. This page does not give the I-1 use table.",
+     "source_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+     "retrieved": "2026-11-12",
+     "quote": "Presently, the Planning and Community Development Department is operating from zoning and land development regulations that were originally adopted in 2009.",
+     "context_before": "pportunities for housing, shopping, employment, recreation, and transportation. ",
+     "context_after": " since then, the comprehensive plan has evolved, several corridor planning studi",
+     "words_shared_with_url": [],
+     "page_file": "pages/75792fc96aa136beeeff6ca5.html"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The 19 Nov 2026 Planning and Zoning Commission agenda has a city-wide data center ordinance on it. This shows East Point is changing industrial-type use rules right now. It is not about warehousing and not about this parcel.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Applicant is presenting an ordinance to establish City wide data center provisions.",
+     "context_before": "yard (sec.10-20279) (d) 3 p2026ta-001-10 city of east point city wide ordinance ",
+     "context_after": " ix. x. announcements \u2022 zoning ordinance re-write updates adjourn [1] zoning mod",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/b77162e39396a7925551b72e.pdf"
+    }
+   ],
+   "open_items": [
+    "The I-1 district text (permitted, conditional and use-permit uses) is on Municode, a known wall, so it was not read. Ask East Point Planning whether warehouse / distribution is permitted by right in I-1 and whether any conditions apply to this parcel.",
+    "Zoning I1 comes from the screener's East Point GIS join (an ArcGIS Online host that quotecheck cannot fetch). This investigation did not confirm the parcel's district from a quotable primary source.",
+    "The 19 Nov 2026 agenda lists a towing use permit in I-1 with a variance from Sec. 10-2079(d) to operate within 5,280 ft of residentially zoned property. Ask whether any I-1 separation rule from residential zoning applies to warehouse or truck uses. Homes are close by: the HSI entry for the adjacent site puts the nearest resident under 300 ft from its affected area.",
+    "Ask what the zoning ordinance rewrite proposes for I-1 and when it is expected to be adopted."
+   ]
+  },
+  "plans": {
+   "verdict": "against",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "East Point's adopted 2022 comprehensive plan update (final for adoption July 2023) lists, among the key land-use points from public engagement, that warehouse/logistics/light industrial is only appropriate in the business park south of Camp Creek Parkway and west of I-285. Per the screener, this parcel is at about 33.688 N, -84.443 W, near downtown East Point and about 1.9 miles from I-85, so it is not in that area. This is an engagement key point, not a parcel-level policy.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Warehouse/logistics/light industrial is only appropriate in business park area south of Camp Creek Parkway and west of I-285",
+     "context_before": " areas for are key for adaptive reuse and future redevelopment transportation \u2022 ",
+     "context_after": " \u2022 improve roadway conditions/maintenance in general \u2022 fully leverage marta rail",
+     "pdf_page": 26,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The plan's Future Development Map of character areas replaces the old parcel-based future land use map. The screener's future land use value for this parcel (MXD) may therefore come from a superseded layer. The parcel's character area on the new map is not confirmed by a quote.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "This replaces the old tool of a parcel-based Future Land Use (FLU) map, which typically only narrowly defined a desired use.",
+     "context_before": "ct principles related to design and elements like transportation and economics. ",
+     "context_after": " 70 (page break) future development map 71",
+     "pdf_page": 70,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The plan's Town Center Subarea 2 (Lawrence Street, 257 acres) envisions turning vacant industrial land into mixed residential, commercial and high-tech industrial use after environmental clean-up. Its listed uses include high-tech industrial but not warehousing. Whether this parcel is inside this subarea is not proven by a quote; see open items.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "convert existing vacant industrial properties into modern residential, commercial, and high-tech industrial developments. Environmental clean-up from prior industrial use is required to ensure future flexibility in use.",
+     "context_before": "sity bonuses, tax abatements, and infrastructure improvements and investment to ",
+     "context_after": " this large tract of land will benefit from being subdivided into small blocks t",
+     "pdf_page": 86,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "Pointing the other way: the city's economic development page still markets the Lawrence Avenue Industrial Park, 200+ acres with Connally Drive on its southern section, as an industrial area.",
+     "source_url": "https://eastpointga.gov/economic-development/",
+     "retrieved": "2026-11-12",
+     "quote": "Lawrence Avenue Industrial Park is flanked on the northern section by Arthur Langford Parkway and Connally Drive on the southern section of the park consisting of 200 plus acres of land.",
+     "context_before": "s hotels, more shops and fast food restaurants. lawrence avenue industrial park ",
+     "context_after": " the strength of lawrence avenue has been maintained by the manufacturing compan",
+     "words_shared_with_url": [],
+     "page_file": "pages/aa61b80f6cf513b167f7ae1a.html"
+    }
+   ],
+   "open_items": [
+    "Seen, not verifiable: the Future Development Map (comprehensive plan PDF, page 71; https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf) is an image. My rough reading of it, from the screener's coordinates, places the parcel in or at the edge of Town Center 2: Lawrence Street (mixed use, brownfield redevelopment) rather than Legacy Industrial. This needs confirming on the city's map or with Planning. If it is Legacy Industrial instead, that area lists warehouse with rail connections and the verdict would move toward supports.",
+    "No rezoning, moratorium or overlay case on or beside this parcel was found in the 2026 Planning and Zoning public hearing agendas read (Mar 19, May 21, Jun 18, Jul 16, Aug 20, Sep 17, Oct 15, Nov 19). Agendas for 2021-2025 and City Council actions were not checked. The city's zoning-cases page answered 404, and its agenda system (iqm2) did not respond.",
+    "A city-wide data center ordinance (19 Nov 2026) and a zoning ordinance rewrite are pending. Ask Planning whether either touches I-1 here.",
+    "The 2006 East Point Corridors TAD plan's parcel list was searched and does not include this parcel."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published East Point water or sewer map was found on a fetchable host. The city's GIS maps are on ArcGIS Online, a known wall. The 2022 comprehensive plan and the 2006 TAD plan give no main location at Connally Drive.",
+    "The screener's assessor data says water/sewer 'All public'. Ask the City of East Point Water and Sewer Department for the nearest water and sewer mains and their capacity for a roughly 166,000 SF warehouse.",
+    "Connally Drive is listed as a major collector in the 2006 TAD plan. A city sidewalk project on Connally Drive (between Judson Ave and Collins Dr) was noticed for 2026. Whether it touches this frontage was not checked."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "The 19 Nov 2026 East Point Planning and Zoning Commission public hearing agenda lists three new-business items: a towing use permit at 1392 Central Ave, a fence variance at 1780 E Woodberry Ave, and a city-wide data center ordinance. None is on Connally Drive or this parcel id (14 0156 LL0301). The seven other 2026 public hearing agendas read (Mar 19, May 21, Jun 18, Jul 16, Aug 20, Sep 17, Oct 15) also show no Connally Drive case.",
+     "source_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+     "retrieved": "2026-11-12",
+     "quote": "Applicant is presenting an ordinance to establish City wide data center provisions.",
+     "context_before": "yard (sec.10-20279) (d) 3 p2026ta-001-10 city of east point city wide ordinance ",
+     "context_after": " ix. x. announcements \u2022 zoning ordinance re-write updates adjourn [1] zoning mod",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/b77162e39396a7925551b72e.pdf"
+    }
+   ],
+   "open_items": [
+    "Only 2026 public hearing agendas were checked. Business and Industrial Development Authority agendas, City Council agendas, and agendas before 2026 were not read.",
+    "Web searches by site address found no sale, listing or development notice for Connally Drive industrial land. Listing sites were excluded on purpose.",
+    "The same owner holds the adjacent 38.4-acre parcel 14 0155 LL0336 (1745 Connally Dr, screen rank 25), which is a state Hazardous Site Inventory site under cleanup (see owner). Any sale would likely be negotiated together with or around that remediation. Ask the owner's side, through a person, whether both parcels are available."
+   ]
+  },
+  "owner": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Georgia EPD's 2026 Hazardous Site Inventory lists Southern Wood Piedmont Company as last known owner of HSI site 10084 (1745 Connally Drive, the adjacent rank-25 parcel). Its address, 1301 Riverplace Blvd Suite 2300, Jacksonville FL 32207, is the same mailing address as this parcel's tax-roll owner S W P C INC. That links the two parcels' owner to a listed hazardous site. The Secretary of State record was not reached.",
+     "source_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+     "retrieved": "2026-11-12",
+     "quote": "LAST KNOWN PROPERTY OWNER(S): Southern Wood Piedmont Company 1301 Riverplace Blvd., Suite 2300 Jacksonville, FL 32207",
+     "context_before": "38.4 parcel number 14-0155-ll-033-6 longitude: -84.444722 date listed 6/29/1994 ",
+     "context_after": " status of cleanup activities: cleanup activities are being conducted for source",
+     "pdf_page": 51,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/2ed92029730ed2dc60903f28.pdf"
+    },
+    {
+     "id": "owner-2",
+     "text": "The HSI site is recorded as 38.4 acres on parcel 14-0155-LL-033-6 (the screener's 14 0155 LL0336, rank 25). This parcel, 14 0156 LL0301, is not the listed parcel. Whether contamination or the cleanup area extends onto it is not stated.",
+     "source_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+     "retrieved": "2026-11-12",
+     "quote": "ACREAGE 38.4 PARCEL NUMBER 14-0155-LL-033-6",
+     "context_before": "745 connally drive east point, fulton county, georgia 30344 latitude: 33.690000 ",
+     "context_after": " longitude: -84.444722 date listed 6/29/1994 last known property owner(s): south",
+     "pdf_page": 51,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/2ed92029730ed2dc60903f28.pdf"
+    },
+    {
+     "id": "owner-3",
+     "text": "At HSI site 10084, cleanup of source materials, soil and groundwater is under way, and it is a Class IV site requiring corrective action. The release recorded is benzo(a)pyrene in soil, and the site has limited access.",
+     "source_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+     "retrieved": "2026-11-12",
+     "quote": "Cleanup activities are being conducted for source materials, soil, and groundwater. CLEANUP PRIORITY: The Director has designated this site as a Class IV",
+     "context_before": "hesterbrook blvd, suite 300 berwyn, pa 19312-1084 status of cleanup activities: ",
+     "context_after": " ga epd director's determination regarding corrective action: the director has d",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/2ed92029730ed2dc60903f28.pdf"
+    },
+    {
+     "id": "owner-4",
+     "text": "The HSI defines Class IV as corrective action under way or completed under other federal or state authority. The owner of a Class IV site must file deed notices. (From the July 2024 HSI edition held by the Digital Library of Georgia.)",
+     "source_url": "https://dlg.usg.edu/record/dlg_ggpd_50553986-2024-07-14/fulltext.text",
+     "retrieved": "2026-11-12",
+     "quote": "They are designated as needing corrective action, remain on the HSI, and the property owner is required to file deed notices.",
+     "context_before": "hese sites are presumed to be in compliance with the type 5 clean-up standards. ",
+     "context_after": " if it is ever determined that the corrective action at a class iv site does not",
+     "words_shared_with_url": [],
+     "page_file": "pages/3f5bb24010dbcda5dfe3009e.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State business search is a known wall (403). Status, formation date and registered agent of S W P C INC are unknown, and so is whether it is the same legal entity as the 'Southern Wood Piedmont Company' named by EPD. My reading only: a company holding a long-held former industrial site under state-supervised cleanup looks more like a holding or remediation entity than an operator or developer. This is not verified.",
+    "Ask EPD (through a person), or read the site's corrective action file, whether the cleanup area, groundwater plume or any deed notice or environmental covenant reaches parcel 14 0156 LL0301. The screener put the listed site 169 ft away. EPA's Facility Registry also lists an 'East Point Surface Impoundment' at 1745 Connally Drive (registry id 110045459026), whose location relative to this parcel is unknown.",
+    "Title search: look for deed notices, environmental covenants or access agreements tied to the adjacent cleanup on this parcel's chain of title."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The parcel is not in a Legacy Industrial area. By the plan's own map it sits in Town Center 2: Lawrence Street, which the adopted 2022 plan reserves for a walkable mixed-use neighbourhood on redeveloped brownfields (housing, retail, offices, high-tech industrial, not warehousing), and the plan says character areas guide rezoning, while the zoning rewrite under way is meant to implement that plan. It also shares about 1,050 ft of boundary with the same owner's Class IV HSI site, which is under soil and groundwater cleanup (not 169 ft away, as the brief reads). Single-family homes on Connally Drive touch it, and a second wood-treating facility's address sits next to it. A by-right I1 warehouse may still be possible, but a person must settle the plan conflict, the residential edge and the contamination reach before this is a grade-A lead.",
+  "disputes": [
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The adopted comprehensive plan's character-area table (PDF page 95) describes Town Center Subarea 2: Lawrence Street as redeveloped brownfield sites with mixed use. Warehouse infill belongs to a different character area, Industrial Subarea 1: Legacy Industrial. My own overlay of the county parcel shapes on the plan's Future Development Map (PDF page 71, an image) puts this parcel and the adjoining HSI parcel inside Town Center 2, west of the main rail line. Legacy Industrial lies east of the rail line. The overlay is my reading, not a quote; see open items.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Redeveloped brownfield sites with mixed use",
+    "context_before": "\uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c \uf06c development, and public space ",
+    "context_after": ": town center subarea 2: residential, retail, and office buildings; high-tech la",
+    "pdf_page": 95,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The plan's goals for Town Center 2 (PDF page 86) assume single-family subdivisions directly adjacent to the area. Those subdivisions are the neighbours a truck-served warehouse would face.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Identify locations for connections between the future uses and the adjacent single-family residential subdivisions.",
+    "context_before": " a master planning process to establish flexible zoning and design standards. \u2022 ",
+    "context_after": " \u2022 preserve natural and cultural features, including hillcrest cemetery, and inc",
+    "pdf_page": 86,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The plan (PDF page 70) says the character-area descriptions guide future rezoning decisions. So for any rezoning, variance or use permit a warehouse here needs, the Town Center 2 mixed-use vision is the yardstick, not Legacy Industrial.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Decision-makers will also use the character area descriptions as a policy guide for future rezoning decisions.",
+    "context_before": "estment will need to evolve to accommodate character area goals and principles. ",
+    "context_after": " character areas provide descriptions regarding these planning elements: \u2022 desir",
+    "pdf_page": 70,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/967ff367e9cd9f3138164ef2.pdf"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "The zoning ordinance rewrite under way is meant to implement the comprehensive plan and other adopted plans. The I-1 rules on this parcel could be reshaped toward the Town Center 2 vision. Nothing found shows a draft map yet.",
+    "source_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+    "retrieved": "2026-11-12",
+    "quote": "Support the goals and visions of the Comprehensive Plan, the Willingham Drive Corridor Study, the Transit Orientated Development Master Plan, and other adopted community plans.",
+    "context_before": "ulations, and other land development regulations, and to achieve the following: ",
+    "context_after": " address the changing patterns of development and redevelopment. improve organiz",
+    "words_shared_with_url": [],
+    "page_file": "pages/75792fc96aa136beeeff6ca5.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The query asked Fulton County's tax parcel service for parcels over 30 acres within 5 ft of this parcel's county polygon. It returns 1745 CONNALLY DR (14 0155 LL0336, 38.4 acres), the parcel EPD lists as HSI site 10084 (first pass, owner-2). So the listed hazardous site is not '169 ft away', as the brief's watch-out reads (that is the distance to EPD's site point). It touches this parcel: by my own measurement from the county polygons they share about 1,050 ft of boundary.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=LandAcres%20%3E%2030&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "Address\":\"1745 CONNALLY DR\",\"AddrNumber\":\"1745",
+    "context_before": "s\":[{\"attributes\":{\"objectid\":98779,\"parcelid\":\"14 0155 ll0336\",\"taxyear\":2027,\"",
+    "context_after": "\",\"addrpredir\":null,\"addrstreet\":\"connally\",\"addrsuffix\":\"dr\",\"addrposdir\":null,",
+    "words_shared_with_url": [],
+    "page_file": "pages/77ceb28643a05ee4089de6dd.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The query asked the same county service for residential-class parcels (class code starting with R) within 5 ft of this parcel's polygon. It returns four house lots on Connally Drive that touch the parcel: 1637, 1641, 1645 and 1647 Connally Dr. Each record shows class R3 and one living unit. A second query of mine (not quoted) found more R3 lots across Connally Drive within 150 ft (1654 to 1688 and 1712 to 1714 Connally Dr).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=ClassCode%20LIKE%20%27R%25%27&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "Address\":\"1641 CONNALLY DR\",\"AddrNumber\":\"1641",
+    "context_before": "}},{\"attributes\":{\"objectid\":95589,\"parcelid\":\"14 015600050347\",\"taxyear\":2027,\"",
+    "context_after": "\",\"addrpredir\":null,\"addrstreet\":\"connally\",\"addrsuffix\":\"dr\",\"addrposdir\":null,",
+    "words_shared_with_url": [],
+    "page_file": "pages/82a49bf9da28d404b364dddf.html"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "Georgia's digest rule defines the Residential class (the R in the neighbours' R3 class code) as land used or best suited as a single-family homesite.",
+    "source_url": "https://www.law.cornell.edu/regulations/georgia/Ga-Comp-R-Regs-R-560-11-2-.20",
+    "retrieved": "2026-11-12",
+    "quote": "This classification shall apply to all land utilized, or best suited to be utilized as a single family homesite, the residential improvements and other nonresidential homesite improvements thereon.",
+    "context_before": "neral use classification that might otherwise be appropriate. (a) residential - ",
+    "context_after": " for the purposes of this subparagraph, duplexes and triplexes shall also be con",
+    "words_shared_with_url": [],
+    "page_file": "pages/e295d41e118c55b02ab34947.html"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "A second wood-treating site adjoins. My county parcel query (not quoted) found 2335 LAWRENCE AVE (14 0155 LL0070, 3.43 acres, class I4) within 5 ft of this parcel. EPD's 2024 permit file puts William C. Meredith Company, a RCRA hazardous waste permittee (HW-062(D)), at that address. Whether that 3.43-acre parcel is part of the permitted facility is not confirmed.",
+    "source_url": "https://epd.georgia.gov/document/pdf/facility-descriptionpdf/download",
+    "retrieved": "2026-11-12",
+    "quote": "William C. Meredith Company, Inc. (WCM) is located at 2335 Lawrence Avenue in East Point, Fulton County, Georgia.",
+    "context_before": "th an overview of the facility. b-1 general description (40 cfr 270.14 (b) (1)) ",
+    "context_after": " the facility is located at latitude n33o 41' 46\" and longitude w84o 26' 27\" wit",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/83c11a74eb9fea7bc8a347b4.pdf"
+   },
+   {
+    "id": "skeptic-9",
+    "text": "EPD's fact sheet for that facility's draft permit records releases of wood-treating chemicals to soil and groundwater.",
+    "source_url": "https://epd.georgia.gov/document/pdf/fact-sheetpdf/download",
+    "retrieved": "2026-11-12",
+    "quote": "In the application of the wood treating chemicals, releases to the soil and groundwater underlying the site have occurred.",
+    "context_before": "ty to treat utility poles, utility conduit, cross arms, and groundwire molding. ",
+    "context_after": " some of the contaminated soils have been excavated and disposed of off-site and",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/b497e50982595c766624083c.pdf"
+   },
+   {
+    "id": "skeptic-10",
+    "text": "Pointing the other way (for the lead): the city's 2012 Main Street TOD Plan, which the zoning rewrite names as an adopted plan, makes the large tract fronting Lawrence Street a Technology and Research focus area and allows distribution uses there, though as adaptive reuse of existing warehouse buildings. Figure 15 (PDF page 79) appears to include this parcel in that area (my reading of the map). The 2022 comprehensive plan is the newer policy.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2024/01/Main_Street_Transit_Oriented_Development_Plan.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "There is potential for adaptive reuse of existing warehouse buildings into research and development, technology-oriented businesses, light industrial, and distribution uses.",
+    "context_before": "h-tech industrial and office uses within close proximity of downtown amenities. ",
+    "context_after": " this large tract of land fronting lawrence street benefits from being subdivide",
+    "pdf_page": 84,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/7d93a1c171545ae087b800a8.pdf"
+   }
+  ],
+  "open_items": [
+   "Why plans-1 is disputed: its quote is one bullet from a list of key points raised in public engagement, not the plan's adopted policy, and the adopted plan itself contradicts it. The Legacy Industrial character area, near downtown, lists warehouse with rail connections (PDF page 91). The section's against verdict still stands, but on the parcel's Town Center 2 location (plans-3 and my claims), not on plans-1, which lead.md shows first.",
+   "Seen, not verifiable: my own overlay of this parcel on the Future Development Map. The map is in the comprehensive plan PDF at https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf, page 71, an image titled 2017 Future Development Map. I drew the parcel polygons and the East Point city limits (both from gismaps.fultoncountyga.gov, the Tax_Parcels service and the FultonStreetBaseMap City Limits layer) onto the map image, fitted by bounding box. Both this parcel and 1745 Connally Dr fall inside the violet Town Center 2: Lawrence Street area, and the notch of the violet area's west edge matches the HSI parcel's shape. The light-blue Legacy Industrial area is east of the main rail line, not here. So the first pass's open-item reading holds and the parcel is not in a Legacy Industrial area. Ask East Point Planning to confirm the character area on its own map.",
+   "Against my objection: the plan's Town Center 2 page lists I1 among its typical zoning districts and high-tech industrial among its uses (PDF page 87). Existing I1 rights may survive. Warehouse or distribution, though, is not among Town Center 2's listed uses, while it is listed for Legacy Industrial and Industrial/Business Park. Ask Planning whether a 166,000 SF distribution building on I1 land in Town Center 2 needs any permit, variance or design review that the plan would govern.",
+   "Seen, not verifiable as tied to this parcel: the 2012 TOD Plan (PDF page 85) proposes redeveloping the Nelms House and 'an undeveloped parcel of land across Connally Drive into a mid-rise multi-family development'. Its project T-9 (PDF page 118) proposes a new public roadway connecting Connally Drive at the Norman Berry Drive ramps to Lawrence Street. This parcel is undeveloped land on the odd-numbered side of Connally Drive, next to that area. Whether either proposal touches this parcel, and whether either is still a city project, is unknown. Ask Planning.",
+   "Homes border the parcel: 1637 to 1647 Connally Dr touch it, and residential-class lots across Connally Drive lie within 150 ft. Truck access off Connally Drive would pass houses. The plan's industrial pages call for 50 to 100 ft buffers between residential and industrial uses. The first pass's open item on the I-1 residential separation rule (Sec. 10-2079(d), 5,280 ft, raised in a towing case) matters more here than it first appears: ask Planning whether it reaches warehouse or truck-terminal uses.",
+   "Contamination: the HSI-listed parcel touches this one along about 1,050 ft (my measurement from the county polygons). EPD's 2026 summary lists groundwater constituents for site 10084 (benzene, chromium, naphthalene and others) and says cleanup covers soil and groundwater. Whether a plume, a deed notice or an access agreement reaches 14 0156 LL0301 is unknown. EPA's RCRA ID for 1745 Connally Dr is GAD067560870; EPA's corrective-action page under that id answered 404, and the EPD site page I tried answered 404. Ask EPD (through a person) for the site's corrective action plan and groundwater maps, and have title checked for deed notices.",
+   "A second neighbour, 2335 Lawrence Ave (14 0155 LL0070), carries the address of the William C. Meredith wood-treating facility (RCRA permit HW-062(D)). That facility's 2024 Part B report gives groundwater flow to the northwest, which is away from this parcel, and puts the facility centre about 0.4 mile north. Ask whether its corrective-action area includes the 3.43-acre parcel next to this one.",
+   "First-pass claim owner-3: its quote was matched on PDF page 1 of the HSI summaries, another site's entry (the context shows a Berwyn, PA owner address), not on site 10084's page. The same words do appear in site 10084's entry on PDF page 51, so the claim's substance holds. A person reading the kept context should not mistake it for this site's.",
+   "Tax roll: the county records this parcel as class C5 and land-use code 400, not industrial class I. Under Georgia's digest rule the letter is the use class (C = commercial) and the stratum is size. The parcel is not on the digest as brownfield property. This is only a note: it neither confirms nor contradicts the I1 zoning, which still rests on the screener's join from an ArcGIS Online layer.",
+   "Zoning text (I-1 use table, Municode) and the parcel's zoning district were not confirmed from a quotable source by me either."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/": {
+   "file": "pages/75792fc96aa136beeeff6ca5.html",
+   "fetched_at": "2026-11-12T19:38:26Z",
+   "final_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+   "status": 200,
+   "bytes": 249209,
+   "sha256": "f4d75d3315a9a912aa1f6a5156d8cc86e108d57533a5121fee206051208670d6"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf": {
+   "file": "pages/b77162e39396a7925551b72e.pdf",
+   "fetched_at": "2026-11-12T19:38:36Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2026/10/Notice-Agenda-PZC-Public-Hearing_Nov-19-2026.pdf",
+   "status": 200,
+   "bytes": 253172,
+   "sha256": "2792a0e9094aa5b7eb3520b9dbb2cf7f91486f92fd8f50e2521e394fe87a3788"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf": {
+   "file": "pages/967ff367e9cd9f3138164ef2.pdf",
+   "fetched_at": "2026-11-12T19:38:45Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+   "status": 200,
+   "bytes": 13393792,
+   "sha256": "ddd2b9dcce075187b52ce93680cefe8916880dd0e4dbc4826f81213c8863b753"
+  },
+  "https://eastpointga.gov/economic-development/": {
+   "file": "pages/aa61b80f6cf513b167f7ae1a.html",
+   "fetched_at": "2026-11-12T19:38:55Z",
+   "final_url": "https://eastpointga.gov/economic-development/",
+   "status": 200,
+   "bytes": 360041,
+   "sha256": "5ff76a8e92a2b44f8766c28e03cf2a606a6049ad7dd44c12976320107903b2a4"
+  },
+  "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download": {
+   "file": "pages/2ed92029730ed2dc60903f28.pdf",
+   "fetched_at": "2026-11-12T19:38:59Z",
+   "final_url": "https://epd.georgia.gov/document/pdf/hsi-site-summaries-2026/download",
+   "status": 200,
+   "bytes": 16148700,
+   "sha256": "efcf9c4f91fa88664f8a941ccbc53b7f936c7bb5cb0d8c545ac6aca39e375d06"
+  },
+  "https://dlg.usg.edu/record/dlg_ggpd_50553986-2024-07-14/fulltext.text": {
+   "file": "pages/3f5bb24010dbcda5dfe3009e.html",
+   "fetched_at": "2026-11-12T19:39:02Z",
+   "final_url": "https://dlg.usg.edu/record/dlg_ggpd_50553986-2024-07-14/fulltext.text",
+   "status": 200,
+   "bytes": 952056,
+   "sha256": "3884d1a967d19acc2e8b8ae6ec946bd2c48a4a499c9d30632e845402dff8ad04"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=LandAcres%20%3E%2030&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/77ceb28643a05ee4089de6dd.html",
+   "fetched_at": "2026-11-12T19:39:03Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=LandAcres%20%3E%2030&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3645,
+   "sha256": "79da0156ac7d05a14e455d51b94af691f8f0dcde2a72230f7836ad266e799537"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=ClassCode%20LIKE%20%27R%25%27&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/82a49bf9da28d404b364dddf.html",
+   "fetched_at": "2026-11-12T19:39:05Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=ClassCode%20LIKE%20%27R%25%27&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 5492,
+   "sha256": "152ca6626a74ca0d4a943efdf46f72fd5ef2523d56b432739a6fa2d09e04b231"
+  },
+  "https://www.law.cornell.edu/regulations/georgia/Ga-Comp-R-Regs-R-560-11-2-.20": {
+   "file": "pages/e295d41e118c55b02ab34947.html",
+   "fetched_at": "2026-11-12T19:39:15Z",
+   "final_url": "https://www.law.cornell.edu/regulations/georgia/Ga-Comp-R-Regs-R-560-11-2-.20",
+   "status": 200,
+   "bytes": 41931,
+   "sha256": "a9644ac5a246ec353bcfaf8af8c08416adf056e3d8eb9b9fed18ced27e28c982"
+  },
+  "https://epd.georgia.gov/document/pdf/facility-descriptionpdf/download": {
+   "file": "pages/83c11a74eb9fea7bc8a347b4.pdf",
+   "fetched_at": "2026-11-12T19:39:15Z",
+   "final_url": "https://epd.georgia.gov/document/pdf/facility-descriptionpdf/download",
+   "status": 200,
+   "bytes": 188682,
+   "sha256": "352530973ec4097b5165f46f23140c72d9515f62b525d01a37a3f1493fb1e301"
+  },
+  "https://epd.georgia.gov/document/pdf/fact-sheetpdf/download": {
+   "file": "pages/b497e50982595c766624083c.pdf",
+   "fetched_at": "2026-11-12T19:39:16Z",
+   "final_url": "https://epd.georgia.gov/document/pdf/fact-sheetpdf/download",
+   "status": 200,
+   "bytes": 280816,
+   "sha256": "24d3836752abfa478de145f57f6650845edf3cdb3843177e04ee3128b8992876"
+  },
+  "https://eastpointga.gov/wp-content/uploads/2024/01/Main_Street_Transit_Oriented_Development_Plan.pdf": {
+   "file": "pages/7d93a1c171545ae087b800a8.pdf",
+   "fetched_at": "2026-11-12T19:39:17Z",
+   "final_url": "https://eastpointga.gov/wp-content/uploads/2024/01/Main_Street_Transit_Oriented_Development_Plan.pdf",
+   "status": 200,
+   "bytes": 8643223,
+   "sha256": "3984d06e9bfa1d4dce0314aea9577cad76d0d756a9c585b1d4cc3f319d6ff86b"
+  }
+ },
+ "quotecheck": {
+  "kept": 21,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-12T19:39:17Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "68ef687441d0e3c9f73539e8f588590c07ec9e67906284318ca6c675b689a911",
+   "skeptic.json": "85242d02d0acd169c6de05581932c09f2bfe12e53f49801a6c65b9614167c639"
+  }
+ },
+ "dropped_claims": []
+}

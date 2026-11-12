@@ -1,0 +1,86 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0156  LL0301",
+ "run": "fulton-2026-11-12",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The parcel is not in a Legacy Industrial area. By the plan's own map it sits in Town Center 2: Lawrence Street, which the adopted 2022 plan reserves for a walkable mixed-use neighbourhood on redeveloped brownfields (housing, retail, offices, high-tech industrial, not warehousing), and the plan says character areas guide rezoning, while the zoning rewrite under way is meant to implement that plan. It also shares about 1,050 ft of boundary with the same owner's Class IV HSI site, which is under soil and groundwater cleanup (not 169 ft away, as the brief reads). Single-family homes on Connally Drive touch it, and a second wood-treating facility's address sits next to it. A by-right I1 warehouse may still be possible, but a person must settle the plan conflict, the residential edge and the contamination reach before this is a grade-A lead.",
+  "disputes": [
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "text": "The adopted comprehensive plan's character-area table (PDF page 95) describes Town Center Subarea 2: Lawrence Street as redeveloped brownfield sites with mixed use. Warehouse infill belongs to a different character area, Industrial Subarea 1: Legacy Industrial. My own overlay of the county parcel shapes on the plan's Future Development Map (PDF page 71, an image) puts this parcel and the adjoining HSI parcel inside Town Center 2, west of the main rail line. Legacy Industrial lies east of the rail line. The overlay is my reading, not a quote; see open items.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Redeveloped brownfield sites with mixed use"
+   },
+   {
+    "text": "The plan's goals for Town Center 2 (PDF page 86) assume single-family subdivisions directly adjacent to the area. Those subdivisions are the neighbours a truck-served warehouse would face.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Identify locations for connections between the future uses and the adjacent single-family residential subdivisions."
+   },
+   {
+    "text": "The plan (PDF page 70) says the character-area descriptions guide future rezoning decisions. So for any rezoning, variance or use permit a warehouse here needs, the Town Center 2 mixed-use vision is the yardstick, not Legacy Industrial.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Decision-makers will also use the character area descriptions as a policy guide for future rezoning decisions."
+   },
+   {
+    "text": "The zoning ordinance rewrite under way is meant to implement the comprehensive plan and other adopted plans. The I-1 rules on this parcel could be reshaped toward the Town Center 2 vision. Nothing found shows a draft map yet.",
+    "source_url": "https://eastpointga.gov/planning-community-development/zoning-ordinance-rewrite/",
+    "retrieved": "2026-11-12",
+    "quote": "Support the goals and visions of the Comprehensive Plan, the Willingham Drive Corridor Study, the Transit Orientated Development Master Plan, and other adopted community plans."
+   },
+   {
+    "text": "The query asked Fulton County's tax parcel service for parcels over 30 acres within 5 ft of this parcel's county polygon. It returns 1745 CONNALLY DR (14 0155 LL0336, 38.4 acres), the parcel EPD lists as HSI site 10084 (first pass, owner-2). So the listed hazardous site is not '169 ft away', as the brief's watch-out reads (that is the distance to EPD's site point). It touches this parcel: by my own measurement from the county polygons they share about 1,050 ft of boundary.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=LandAcres%20%3E%2030&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "Address\":\"1745 CONNALLY DR\",\"AddrNumber\":\"1745"
+   },
+   {
+    "text": "The query asked the same county service for residential-class parcels (class code starting with R) within 5 ft of this parcel's polygon. It returns four house lots on Connally Drive that touch the parcel: 1637, 1641, 1645 and 1647 Connally Dr. Each record shows class R3 and one living unit. A second query of mine (not quoted) found more R3 lots across Connally Drive within 150 ft (1654 to 1688 and 1712 to 1714 Connally Dr).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/OpenData/Tax_Parcels/MapServer/0/query?where=ClassCode%20LIKE%20%27R%25%27&geometry=%7B%22rings%22%3A%5B%5B%5B-84.4442301%2C33.6896057%5D%2C%5B-84.4423149%2C33.6896038%5D%2C%5B-84.4409404%2C33.6875223%5D%2C%5B-84.4408069%2C33.6873786%5D%2C%5B-84.4409007%2C33.6873278%5D%2C%5B-84.4407031%2C33.6871123%5D%2C%5B-84.4408224%2C33.6870472%5D%2C%5B-84.4407207%2C33.6869564%5D%2C%5B-84.4406244%2C33.6868616%5D%2C%5B-84.4405335%2C33.6867631%5D%2C%5B-84.4404484%2C33.686661%5D%2C%5B-84.4403692%2C33.6865557%5D%2C%5B-84.4402961%2C33.6864474%5D%2C%5B-84.4404527%2C33.6863897%5D%2C%5B-84.4412615%2C33.6860917%5D%2C%5B-84.4413582%2C33.6862593%5D%2C%5B-84.4415169%2C33.686534%5D%2C%5B-84.4415403%2C33.686541%5D%2C%5B-84.4417231%2C33.6865953%5D%2C%5B-84.4418886%2C33.6866446%5D%2C%5B-84.4420543%2C33.6866939%5D%2C%5B-84.4421903%2C33.6867343%5D%2C%5B-84.4423303%2C33.686776%5D%2C%5B-84.4424584%2C33.6868141%5D%2C%5B-84.4430104%2C33.6869783%5D%2C%5B-84.4430799%2C33.6870851%5D%2C%5B-84.4431559%2C33.6871886%5D%2C%5B-84.4432384%2C33.6872887%5D%2C%5B-84.4433271%2C33.6873851%5D%2C%5B-84.4434217%2C33.6874774%5D%2C%5B-84.443522%2C33.6875654%5D%2C%5B-84.4436277%2C33.6876488%5D%2C%5B-84.4443297%2C33.688171%5D%2C%5B-84.444579%2C33.6883506%5D%2C%5B-84.4448318%2C33.6885268%5D%2C%5B-84.445088%2C33.6886995%5D%2C%5B-84.4453475%2C33.6888687%5D%2C%5B-84.4444234%2C33.6896059%5D%2C%5B-84.4442301%2C33.6896057%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=5&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "Address\":\"1641 CONNALLY DR\",\"AddrNumber\":\"1641"
+   },
+   {
+    "text": "Georgia's digest rule defines the Residential class (the R in the neighbours' R3 class code) as land used or best suited as a single-family homesite.",
+    "source_url": "https://www.law.cornell.edu/regulations/georgia/Ga-Comp-R-Regs-R-560-11-2-.20",
+    "retrieved": "2026-11-12",
+    "quote": "This classification shall apply to all land utilized, or best suited to be utilized as a single family homesite, the residential improvements and other nonresidential homesite improvements thereon."
+   },
+   {
+    "text": "A second wood-treating site adjoins. My county parcel query (not quoted) found 2335 LAWRENCE AVE (14 0155 LL0070, 3.43 acres, class I4) within 5 ft of this parcel. EPD's 2024 permit file puts William C. Meredith Company, a RCRA hazardous waste permittee (HW-062(D)), at that address. Whether that 3.43-acre parcel is part of the permitted facility is not confirmed.",
+    "source_url": "https://epd.georgia.gov/document/pdf/facility-descriptionpdf/download",
+    "retrieved": "2026-11-12",
+    "quote": "William C. Meredith Company, Inc. (WCM) is located at 2335 Lawrence Avenue in East Point, Fulton County, Georgia."
+   },
+   {
+    "text": "EPD's fact sheet for that facility's draft permit records releases of wood-treating chemicals to soil and groundwater.",
+    "source_url": "https://epd.georgia.gov/document/pdf/fact-sheetpdf/download",
+    "retrieved": "2026-11-12",
+    "quote": "In the application of the wood treating chemicals, releases to the soil and groundwater underlying the site have occurred."
+   },
+   {
+    "text": "Pointing the other way (for the lead): the city's 2012 Main Street TOD Plan, which the zoning rewrite names as an adopted plan, makes the large tract fronting Lawrence Street a Technology and Research focus area and allows distribution uses there, though as adaptive reuse of existing warehouse buildings. Figure 15 (PDF page 79) appears to include this parcel in that area (my reading of the map). The 2022 comprehensive plan is the newer policy.",
+    "source_url": "https://eastpointga.gov/wp-content/uploads/2024/01/Main_Street_Transit_Oriented_Development_Plan.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "There is potential for adaptive reuse of existing warehouse buildings into research and development, technology-oriented businesses, light industrial, and distribution uses."
+   }
+  ],
+  "open_items": [
+   "Why plans-1 is disputed: its quote is one bullet from a list of key points raised in public engagement, not the plan's adopted policy, and the adopted plan itself contradicts it. The Legacy Industrial character area, near downtown, lists warehouse with rail connections (PDF page 91). The section's against verdict still stands, but on the parcel's Town Center 2 location (plans-3 and my claims), not on plans-1, which lead.md shows first.",
+   "Seen, not verifiable: my own overlay of this parcel on the Future Development Map. The map is in the comprehensive plan PDF at https://eastpointga.gov/wp-content/uploads/2023/07/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy.pdf, page 71, an image titled 2017 Future Development Map. I drew the parcel polygons and the East Point city limits (both from gismaps.fultoncountyga.gov, the Tax_Parcels service and the FultonStreetBaseMap City Limits layer) onto the map image, fitted by bounding box. Both this parcel and 1745 Connally Dr fall inside the violet Town Center 2: Lawrence Street area, and the notch of the violet area's west edge matches the HSI parcel's shape. The light-blue Legacy Industrial area is east of the main rail line, not here. So the first pass's open-item reading holds and the parcel is not in a Legacy Industrial area. Ask East Point Planning to confirm the character area on its own map.",
+   "Against my objection: the plan's Town Center 2 page lists I1 among its typical zoning districts and high-tech industrial among its uses (PDF page 87). Existing I1 rights may survive. Warehouse or distribution, though, is not among Town Center 2's listed uses, while it is listed for Legacy Industrial and Industrial/Business Park. Ask Planning whether a 166,000 SF distribution building on I1 land in Town Center 2 needs any permit, variance or design review that the plan would govern.",
+   "Seen, not verifiable as tied to this parcel: the 2012 TOD Plan (PDF page 85) proposes redeveloping the Nelms House and 'an undeveloped parcel of land across Connally Drive into a mid-rise multi-family development'. Its project T-9 (PDF page 118) proposes a new public roadway connecting Connally Drive at the Norman Berry Drive ramps to Lawrence Street. This parcel is undeveloped land on the odd-numbered side of Connally Drive, next to that area. Whether either proposal touches this parcel, and whether either is still a city project, is unknown. Ask Planning.",
+   "Homes border the parcel: 1637 to 1647 Connally Dr touch it, and residential-class lots across Connally Drive lie within 150 ft. Truck access off Connally Drive would pass houses. The plan's industrial pages call for 50 to 100 ft buffers between residential and industrial uses. The first pass's open item on the I-1 residential separation rule (Sec. 10-2079(d), 5,280 ft, raised in a towing case) matters more here than it first appears: ask Planning whether it reaches warehouse or truck-terminal uses.",
+   "Contamination: the HSI-listed parcel touches this one along about 1,050 ft (my measurement from the county polygons). EPD's 2026 summary lists groundwater constituents for site 10084 (benzene, chromium, naphthalene and others) and says cleanup covers soil and groundwater. Whether a plume, a deed notice or an access agreement reaches 14 0156 LL0301 is unknown. EPA's RCRA ID for 1745 Connally Dr is GAD067560870; EPA's corrective-action page under that id answered 404, and the EPD site page I tried answered 404. Ask EPD (through a person) for the site's corrective action plan and groundwater maps, and have title checked for deed notices.",
+   "A second neighbour, 2335 Lawrence Ave (14 0155 LL0070), carries the address of the William C. Meredith wood-treating facility (RCRA permit HW-062(D)). That facility's 2024 Part B report gives groundwater flow to the northwest, which is away from this parcel, and puts the facility centre about 0.4 mile north. Ask whether its corrective-action area includes the 3.43-acre parcel next to this one.",
+   "First-pass claim owner-3: its quote was matched on PDF page 1 of the HSI summaries, another site's entry (the context shows a Berwyn, PA owner address), not on site 10084's page. The same words do appear in site 10084's entry on PDF page 51, so the claim's substance holds. A person reading the kept context should not mistake it for this site's.",
+   "Tax roll: the county records this parcel as class C5 and land-use code 400, not industrial class I. Under Georgia's digest rule the letter is the use class (C = commercial) and the stratum is size. The parcel is not on the digest as brownfield property. This is only a note: it neither confirms nor contradicts the I1 zoning, which still rests on the screener's join from an ArcGIS Online layer.",
+   "Zoning text (I-1 use table, Municode) and the parcel's zoning district were not confirmed from a quotable source by me either."
+  ]
+ }
+}

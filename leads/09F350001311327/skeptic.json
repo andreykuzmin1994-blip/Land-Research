@@ -1,0 +1,61 @@
+{
+ "schema": 1,
+ "parcel_id": "09F350001311327",
+ "run": "fulton-2026-11-12",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "No document found (site plan, permit, ARC DRI, development-authority item) shows what the owner plans for this parcel, so 'expansion or buffer land, not available' is still an inference. But the inference holds up: the county map confirms the lead touches the owner's improved 94.3-acre operating parcel and one of its vacant same-owner neighbours, and nothing shows it for sale. The lead's acreage is also in doubt: its map shape is 20.83 acres against 12.94 on the roll, while the adjoining parcel's map and roll agree exactly. The screener's building fit and pond allowance rest on the map shape, so the usable area and the 104,000 SF fit are unproven until a deed and plat are read.",
+  "disputes": [
+   "plans-1",
+   "plans-2"
+  ],
+  "claims": [
+   {
+    "text": "Acreage: Fulton County's tax parcel layer, asked for the parcels intersecting this lead's outline, gives this parcel (FeatureID 09F350001311327) a roll acreage of 12.94 but a map shape of 907,300.5 sq ft (Georgia West state plane feet), i.e. 20.83 acres: the map shape is about 7.9 acres (61%) larger than the roll. The first pass's 20.8-acre figure is confirmed.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B2186303.8%2C1316648.6%5D%2C%5B2186408.3%2C1315619.4%5D%2C%5B2186458.6%2C1315618.5%5D%2C%5B2186542.0%2C1314758.3%5D%2C%5B2185821.6%2C1314763.5%5D%2C%5B2185839.5%2C1314900.4%5D%2C%5B2185828.4%2C1315507.1%5D%2C%5B2185830.6%2C1316017.2%5D%2C%5B2186193.4%2C1316086.6%5D%2C%5B2186169.0%2C1316661.0%5D%2C%5B2186303.8%2C1316648.6%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A2240%7D%7D&geometryType=esriGeometryPolygon&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"LandAcres\":12.94,\"NbrHood\":\"9606\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":null,\"SubdivBlck\":null,\"FeatureID\":\"09F350001311327\",\"Shape.STArea()\":907300.5143078157"
+   },
+   {
+    "text": "Acreage control: on the same page the adjoining 94.3-acre parcel (FeatureID 09F350001311319) has a map shape of 4,107,725 sq ft, i.e. 94.30 acres, matching its roll acreage exactly. The gap on the lead is specific to this parcel, not a projection or map-wide effect; the screener's building fit (largest open part 14.8 acres, more than the 12.94 roll acres) rests on a map shape the deed may not support.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B2186303.8%2C1316648.6%5D%2C%5B2186408.3%2C1315619.4%5D%2C%5B2186458.6%2C1315618.5%5D%2C%5B2186542.0%2C1314758.3%5D%2C%5B2185821.6%2C1314763.5%5D%2C%5B2185839.5%2C1314900.4%5D%2C%5B2185828.4%2C1315507.1%5D%2C%5B2185830.6%2C1316017.2%5D%2C%5B2186193.4%2C1316086.6%5D%2C%5B2186169.0%2C1316661.0%5D%2C%5B2186303.8%2C1316648.6%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A2240%7D%7D&geometryType=esriGeometryPolygon&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"LandAcres\":94.3,\"NbrHood\":\"C801\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":null,\"SubdivBlck\":null,\"FeatureID\":\"09F350001311319\",\"Shape.STArea()\":4107724.9612368424"
+   },
+   {
+    "text": "Adjacency: the county tax parcel layer, asked for parcels intersecting this lead's outline (the same simplified polygon the first pass used in its sewer query), returns the owner's improved 94.3-acre parcel at 4250 South Fulton Pkwy. This supports owner-1's statement that the lead touches the owner's operating site (the length of the shared line is not shown here).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B2186303.8%2C1316648.6%5D%2C%5B2186408.3%2C1315619.4%5D%2C%5B2186458.6%2C1315618.5%5D%2C%5B2186542.0%2C1314758.3%5D%2C%5B2185821.6%2C1314763.5%5D%2C%5B2185839.5%2C1314900.4%5D%2C%5B2185828.4%2C1315507.1%5D%2C%5B2185830.6%2C1316017.2%5D%2C%5B2186193.4%2C1316086.6%5D%2C%5B2186169.0%2C1316661.0%5D%2C%5B2186303.8%2C1316648.6%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A2240%7D%7D&geometryType=esriGeometryPolygon&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"09F350001311319\",\"TaxYear\":2027,\"Address\":\"4250 SOUTH FULTON PKWY\""
+   },
+   {
+    "text": "The same intersect query also returns the same-owner 5.49-acre parcel at 5190 Cooks Rd (09F260301261215), so the lead touches the owner's operating parcel and one of its three vacant same-owner neighbours directly; the other two (09F260301260944, 09F260301261181) are not returned and connect only through 5190 Cooks Rd, if at all.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B2186303.8%2C1316648.6%5D%2C%5B2186408.3%2C1315619.4%5D%2C%5B2186458.6%2C1315618.5%5D%2C%5B2186542.0%2C1314758.3%5D%2C%5B2185821.6%2C1314763.5%5D%2C%5B2185839.5%2C1314900.4%5D%2C%5B2185828.4%2C1315507.1%5D%2C%5B2185830.6%2C1316017.2%5D%2C%5B2186193.4%2C1316086.6%5D%2C%5B2186169.0%2C1316661.0%5D%2C%5B2186303.8%2C1316648.6%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A2240%7D%7D&geometryType=esriGeometryPolygon&inSR=2240&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"ParcelID\":\"09F260301261215\",\"TaxYear\":2027,\"Address\":\"5190 COOKS RD\""
+   },
+   {
+    "text": "Fulton County's Yearly Sales 2021 layer, asked by parcel id, lists this lead as a 2021 sale record with price 0 (no price shown) and already with the 907,300 sq ft (20.8-acre) map shape. The oversized map shape is not a recent map edit: it was on the county map in the year of the brief's 2021-08-26 sale. The layer does not confirm the brief's $9,097,000 price.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Tax/Tyler_YearlySales/MapServer/5/query?where=ParID+IN+%28%2709F350001311327%27%2C%2709F260301261215%27%2C%2709F260301260944%27%2C%2709F260301261181%27%29&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-12",
+    "quote": "\"TaxYear\":\"2021\",\"Price\":0,\"Cur\":\"Y\",\"SHAPE.STArea()\":907300.82237438182"
+   },
+   {
+    "text": "Regional review: the ARC DRI on Roosevelt Highway in Union City that the first pass names (Union City Commerce Center, DRI 3266, 277 acres at the end of Evans Drive) is located at these coordinates, about 1.7 miles south-west of this lead (33.6159, -84.5294). It does not cover this parcel. No DRI covering this parcel or the owner's expansion was found.",
+    "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2104/ARC%20Final%20Report%20-%20Union%20City%20Commerce%20Center%20DRI%203266.pdf",
+    "retrieved": "2026-11-12",
+    "quote": "Latitude: 33.59527 - Longitude: -84.54630"
+   }
+  ],
+  "open_items": [
+   "plans-1 and plans-2 quote the generic intent and 'Application' text of the District-Industrial character area; neither quote places this parcel in D-I, and plans-1's own text says the placement is an unverified reading of a coarse map. They do not carry the 'supports' verdict; treat plans as unknown until the Future Development Map is read at parcel scale.",
+   "Search-result snippets only (Union City's own site answers 403, so it was not fetched and nothing here is verified): the city appears to have adopted, on 2026-03-24, a 180-day moratorium on accepting, processing and approving rezonings, text amendments and conditional use applications while a comprehensive zoning ordinance rewrite (zoning districts, development standards) is under way. Another result is a 2026 application titled as a Future Development Map update. Ask Union City planning whether the rewrite changes M-1 or the D-I area here, and whether the moratorium is still in force.",
+   "Search-result snippets only (news sites, not read): a $40M purchase of 33 acres along Roosevelt Highway straddling Union City and South Fulton, near the owner's distribution centre at 4250 South Fulton Pkwy, from a seller that had assembled it, described as vacant land and truck parking. The search tool dated that story about 1,185 days before today (about August 2023), which would not match the brief's 2021-08-26 sale of this parcel. The tie between this parcel and that purchase is unproven either way. A person should read the articles and the deeds.",
+   "By my own reading of the county parcel layer (not quoted above): the four same-owner parcels total 30.06 roll acres but about 35.35 map acres. 5190 Cooks Rd maps at 5.14 ac (roll 5.49), 5220 Cooks Rd at 4.58 ac (roll 5.63), and 0 Roosevelt Hwy Rear at 4.80 ac (roll 6.00). A third-party vacant I5 parcel of 10.16 roll acres that touches the lead maps at 10.10 ac. Only the lead's map shape is much larger than its roll. Pull the deed and plat for all four before relying on any acreage.",
+   "No site plan, land-disturbance permit, DRI or Development Authority of Fulton County item was found for this parcel or for an expansion at 4250 South Fulton Pkwy. I ran nine web searches by site address, parcel ids, and DRI and development-authority terms; the ARC DRI search found only other sites (DRI 3266 at Evans Drive; ATL11 and Airport Distribution Center Four on Stonewall Tell Road). This is weak evidence: an expansion of truck parking or a building under the DRI threshold need not reach ARC. Ask Union City and, for the South Fulton side, the City of South Fulton for permits or site plans on the four parcels since 2021.",
+   "The 5 ft simplified outline used in the intersect query can touch a neighbour that the true outline does not. The adjacency claims are only as good as that polygon; owner-1's 2,050 ft shared boundary was not re-measured here.",
+   "Not tested: whether the lead already serves the owner's operating site (for example a detention pond for the distribution centre, given the brief's 11% ponds and the 8-inch public sewer segments crossing the parcel). If it does, it is not surplus land at all. A drive-by or the permit record would tell.",
+   "The Fulton County assessor's public-access host (iaspublicaccess.fultoncountyga.gov) reset the connection on its robots.txt and was not fetched, so the 2021 sale price and deed reference were not read from a primary page."
+  ]
+ }
+}
