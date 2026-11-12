@@ -84,7 +84,8 @@ ZONING_SOURCES: list[dict[str, Any]] = [
     # the superseded future land use: it read "Industrial" on parcels the plan
     # now calls Low Density Residential (leads #156 and #195, 2026-11-12). The
     # long names follow the layer's own legend; DP_NAME is not used because it
-    # disagrees with NDP on some records.
+    # disagrees with NDP on some records. IF and LD-MU are in use but not in the
+    # legend (3 records and 1): named for their legend twins I-Flex and LDMU.
     {"name": "Atlanta future land use", "kind": "overlay", "jurisdictions": {"Atlanta"},
      "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8",
      "flu_field": "NDP",
