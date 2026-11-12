@@ -187,7 +187,7 @@ class KeepRuleTests(unittest.TestCase):
     def test_thresholds_are_the_reviewed_ones(self):
         # Changing these needs the null test re-run and recorded (reviews/36).
         self.assertEqual((ev.MIN_GAIN, ev.WIN_SHARE_TO_KEEP, ev.CREDIT_SPAN, ev.K_SHARE,
-                          ev.BOOTSTRAP), (2.0, 0.99, 10.0, 0.02, 500))
+                          ev.BOOTSTRAP), (2.5, 0.99, 10.0, 0.02, 500))
         self.assertGreaterEqual(ev.NULL_TRIALS, 1000)
 
     def test_null_test_is_deterministic_and_counts_false_keeps(self):
@@ -297,7 +297,7 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual((saved["commit"], sorted(saved["order"])), ("bbb", ["2015", "2016"]))
         text = self.out.getvalue()
         self.assertIn("DECISION: KEEP", text)
-        self.assertIn("needs +2 graded, hits not lower, and a win in 99% of resamples", text)
+        self.assertIn("needs +2.5 graded, hits not lower, and a win in 99% of resamples", text)
         self.assertNotIn("wins", text)
 
     def test_a_log_from_the_old_evaluator_is_refused(self):

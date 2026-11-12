@@ -154,7 +154,7 @@ CREDIT_SPAN = 10.0
 BOOTSTRAP = 500
 # Checked with --null-test (reviews/36, 05 to 07): see there before
 # changing, and re-run --null-test after any change to these or to the key.
-MIN_GAIN = 2.0
+MIN_GAIN = 2.5                               # 2.0 kept noise 2.9% of the time on the 2026-11-12 key (reviews/36 14)
 WIN_SHARE_TO_KEEP = 0.99
 SHOWN_DECIMALS = 1                           # what the loop is shown; comparisons are exact
 NULL_NOISE = (4.0, 8.0, 16.0)                # --null-test: score-point noise levels tried

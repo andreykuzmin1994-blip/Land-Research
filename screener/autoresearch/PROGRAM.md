@@ -182,7 +182,7 @@ When `--decide` prints REFUSED, it logs nothing:
   `best_ranking.json` was lost, a human checks out the best kept commit
   and re-records it with `--decide --new-baseline`.
 
-A change is kept only if `graded` is at least 2.0 above the best kept
+A change is kept only if `graded` is at least 2.5 above the best kept
 run, `hits` is not lower, **and** it beats the best kept run in at least
 99% of clustered bootstrap resamples (whole map cells are resampled, every
 year of a cell together, because sites cluster and repeat across years).
@@ -206,7 +206,7 @@ the live ranking, because the live tool scores with the same `rank.py`.
 
 ## Known limits (state them in reports)
 
-- 35 dev sites in 11 map cells. The bar (+2.0 graded and
+- 35 dev sites in 11 map cells. The bar (+2.5 graded and
   99% of resamples) is set so that a change that is not an improvement is
   kept about 2% of the time or less; it also means small real
   improvements are often discarded. Expect a handful of keeps, not
