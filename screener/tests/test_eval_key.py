@@ -739,6 +739,17 @@ class CheckedBytesTests(unittest.TestCase):
             self.assertEqual(len(found), 4 + len(missing))
             self.assertEqual([n for n in found if not n.startswith("math")],
                              sorted(["csv.py", "json.pyc", "random", *missing]))
+            # A repository folder on sys.path is refused whatever it holds.
+            Path(tmp, "reviews").mkdir()
+            with mock.patch.object(ev, "ROOT", Path(tmp).resolve()), \
+                    mock.patch.object(sys, "path", [tmp, str(Path(tmp, "reviews")), *sys.path]):
+                self.assertIn("reviews (a repository folder on sys.path)", ev.foreign_modules())
+            # Builtin and frozen modules are this Python's own.
+            self.assertTrue(ev._stdlib_has("sys"))
+            self.assertTrue(ev._stdlib_has("_frozen_importlib"))
+            self.assertTrue(ev._stdlib_has("json"))
+            if sys.platform != "win32":
+                self.assertFalse(ev._stdlib_has("msvcrt"))
             # An empty folder of the same name elsewhere on sys.path is no
             # standard module either (reviews/36 12, finding 2).
             with tempfile.TemporaryDirectory() as other:

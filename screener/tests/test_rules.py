@@ -705,6 +705,20 @@ class DecideTests(unittest.TestCase):
         self.assertTrue(text.rstrip().splitlines()[-1].startswith("Do not reset"))
         self.assertNotIn("git reset", text[text.rindex("DECISION:"):])
 
+    def test_a_logged_row_that_is_no_hash_stands_for_nothing(self):
+        # reviews/36 13, note 2: rev-parse would resolve "HEAD~1" or a branch.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        rows = self.log.read_text().replace("\tbbb\t", "\tHEAD~1\t")
+        self.log.write_text(rows)
+        real = self.repo.git
+        self.repo.git = lambda *a: ("bbb".ljust(40, "0") if a[:3] == ("rev-parse", "--verify", "--quiet")
+                                    and a[3].startswith("HEAD~1") else real(*a))
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertTrue(text.rstrip().splitlines()[-1].startswith("Do not reset"))
+
     def test_the_reset_hint_keeps_a_humans_commit_made_since_the_best_run(self):
         self.baseline_then_experiment()
         self.repo.history[-1] = ("bbb", ["screener/README.md", "screener/tests/test_rules.py"])

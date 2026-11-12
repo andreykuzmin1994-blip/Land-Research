@@ -772,6 +772,17 @@ def foreign_modules() -> list[str]:
                 out.append(f"{entry.name} (shadows a standard module)")
     except OSError:
         pass
+    # A folder inside the repository on sys.path, other than the root itself
+    # (PYTHONPATH=reviews): what is in it is imported before the standard
+    # library and no git check looks there (reviews/36 13, note 3).
+    for entry in sys.path:
+        try:
+            where = Path(entry or ".").resolve()
+        except OSError:
+            continue
+        if (where != ROOT and ROOT in where.parents and "site-packages" not in where.parts
+                and not set(where.parents) & installed and where not in installed):
+            out.append(f"{where.relative_to(ROOT)} (a repository folder on sys.path)")
     for name, module in list(sys.modules.items()):
         file = getattr(module, "__file__", None)
         if not isinstance(file, str):
@@ -1040,8 +1051,10 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
             between = [line.split()[0] for line in
                        _git("log", "--format=%H", f"{best['commit']}..{parent}").splitlines()
                        if line.strip()]
+            # Hex only: rev-parse would also resolve "HEAD~1" or a branch name.
             logged = {r["commit"] for r in _decisions()
-                      if r["status"] == "discard" and r["fingerprint"] == fp and r["commit"]}
+                      if r["status"] == "discard" and r["fingerprint"] == fp
+                      and re.fullmatch(r"[0-9a-f]+", r["commit"] or "")}
             # Each logged short hash made full by git: an ambiguous or unknown
             # one gives nothing, so it cannot stand for a human's commit
             # (reviews/36 12, finding 1).
