@@ -259,18 +259,18 @@ def same_owner(a: str | None, b: str | None) -> bool:
     LAND PARTNERS LLC" / "SOUTH FULTON LAND CO", "OAK RIDGE LLC" / "OAK
     RIDGE HOMEOWNERS ASSOCIATION INC"). "X LLC & Y LLC" matches X or Y.
 
-    A name at the deed file's limit is also tried without its last word,
-    which the cut may have left as a stray letter or a half tail ("... CO
+    The deed seller `a` (every caller passes it first) is also tried
+    without its last word when it fills all 30 characters, so the cut fell
+    inside a word and may have left a stray letter or a half tail ("... CO
     INC" cut to "... COMPANY I"; "..., LLC A DELAWARE" cut from "..., LLC A
-    DELAWARE LIMITED LIABILITY COMPANY": reviews/36 11).
+    DELAWARE LIMITED LIABILITY COMPANY": reviews/36 11). Never the tax-roll
+    owner `b`, whose names are not cut (reviews/36 13).
     """
     if _same_owner(a, b):
         return True
-    for x, y in ((a, b), (b, a)):
-        x = (x or "").strip()
-        if len(x) >= DEED_NAME_CAP and " " in x and _same_owner(x.rsplit(" ", 1)[0], y):
-            return True
-    return False
+    seller = (a or "").strip()
+    return (len(seller) == DEED_NAME_CAP + 1 and " " in seller
+            and _same_owner(seller.rsplit(" ", 1)[0], b))
 
 
 def _same_owner(a: str | None, b: str | None) -> bool:
