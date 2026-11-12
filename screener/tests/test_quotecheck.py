@@ -955,7 +955,7 @@ class LeadFileTests(Base):
         self.assertIn("It disputes these first-pass claims: zoning-1.", self.lead)
         self.assertIn("and 2 more kept claims", self.lead)
         self.assertIn("**In one line (the launching session's reading, not checked):** County "
-                      "confirms at https: (address removed) listing", self.lead)
+                      "confirms at https: evil. example listing", self.lead)
 
     def test_a_downgraded_verdict_and_an_unbacked_skeptic_say_so(self):
         r = self.check(findings(claim(quote="words that never appear on that page at all")),
@@ -1011,13 +1011,16 @@ class LeadFileTests(Base):
             with self.subTest(text):
                 self.assertTrue(all(ch.isascii() for ch in qc._plain(text)))
         self.assertEqual(qc._plain("a {b} ^c"), "a b c")
-        for text in ("Sec. 4.2.1.3/4.2.1.4 of the code", "permitted.Outdoor storage is not",
+        for text in ("Sec. 4.2.1.3/4.2.1.4 of the code",
                      "See Sec. 27-4.3/27-4.4 and Table 4.1/4.2.", "FAR 0.5/1.0", "$3.50/sf",
                      "18.2/acre", "1.5/2.0 stories", "PIN 14F.0001.0001/A", "Rev. 2.1/2026",
                      "Exh. A.1/A.2", "Fig. 3.a/3.b", "the S.E.1/4 of the N.E.1/4", "at 10:30:15",
+                     "permitted.Outdoor storage is not",
                      "Note: // see below", "\u00a7 27-4 applies"):
             with self.subTest(text):
-                self.assertEqual(qc._plain(text), text)
+                # Every word stays; a dot before a letter becomes ". " (reviews/35 15).
+                self.assertEqual(qc._plain(text), qc._DOTTED.sub(". ", text))
+        self.assertEqual(qc._plain("Fig. 3.a/3.b, the S.E.1/4"), "Fig. 3. a/3. b, the S. E.1/4")
         self.assertEqual(qc._plain("1\u00bd acres, 2\u00be and \u00bd"), "1 1/2 acres, 2 3/4 and 1/2")
         name = "\u0141\u00f3d\u017a Stra\u00dfe S\u00f8ren \u00c6r\u00f8 \u0110or\u0111evi\u0107"
         self.assertEqual(qc._plain(name), name)
@@ -1035,22 +1038,30 @@ class LeadFileTests(Base):
                      "evil.zone:/x", "[2001:db8::7]:443", "xn--bcher-kva.zone", "EVIL.CITY",
                      "203.0.113.9:8080", "evil.church"):
             with self.subTest(text):
-                out = qc._plain("see " + text + " now")
-                self.assertIn("(address removed)", out)
-                self.assertNotRegex(out, r"(?i)evil|203\.0|x\.city|y\.example|//|shop|zone|legal|db8")
+                self.assert_no_address(qc._plain("see " + text + " now"))
+
+    def assert_no_address(self, out):
+        """Nothing in `out` reads or links as an address: no dotted word with
+        a letter after the dot, no scheme, no //, no www, no numeric or IPv6
+        host. A bare host is split at its dots; the rest is removed."""
+        self.assertNotRegex(out, r"[^\W_]\.[^\W\d_]", out)
+        self.assertNotRegex(out, r"(?i)://|//|www|203\.0|db8|ffff|fe80|8329|0xcb", out)
 
     def test_hosts_under_any_top_level_name_go_whatever_their_case(self):
-        # reviews/35 14, F1 and F4: IANA's list, matched without regard to case.
+        # reviews/35 14 F1 and F4, 15 F1 and F2: whatever its case and its
+        # top-level name, a host is removed (with a path, port or query) or
+        # split at its dots (bare).
         for text in ("County-Attorney.Legal", "CLERK.ZONE", "Records.Farm", "b\u00fccher.zone",
                      "EVIL.LY", "Evil.Ly", "Clerk.Us", "COUNTY.GA", "Evil.Zone./x", "Evil.Zone%2Fx",
                      "Evil.Zone :8443", "https:\\\\Evil.Zone\\x", "203.0.113.9?id=7", "Evil.Zone/x",
                      "Evil.Zone?id=7", "Evil.Zone#x", "Evil.Zone:8443", "Evil.Zone:/x",
                      "Evil.Example", "2001:db8::7", "::ffff:cb00:7109", "fe80::1",
-                     "2001:0db8:0000:0000:0000:ff00:0042:8329"):
+                     "2001:0db8:0000:0000:0000:ff00:0042:8329", "confirmed...clerk.com today",
+                     ".evil.city", "1..Clerk.Zone", "clerk.com--the county site",
+                     "Clerk.Zone-confirmed", "clerk.com- see", "Zoning.Gov- today",
+                     "evil.verm\u00f6gensberater", "0xcb.0x0.0x71.0x9/listing"):
             with self.subTest(text):
-                out = qc._plain("see " + text + " now")
-                self.assertIn("(address removed)", out)
-                self.assertNotRegex(out, r"(?i)zone|legal|farm|ly\b|\bus\b|\bga\b|203\.0|db8|ffff|fe80|8329|example")
+                self.assert_no_address(qc._plain("see " + text + " now"))
         # reviews/35 14, F2 and notes: page context is case-folded, and these
         # dotted words are no hosts.
         for text in ("permitted.outdoor", "st.louis", "art.iv", "ft.worth", "u.s.hwy 29",
@@ -1058,7 +1069,14 @@ class LeadFileTests(Base):
                      "district.except where not.allowed by overlay", "1:2:3:4:5 ratio",
                      "12:00:00:00:00", "fee::due", "at 10:30"):
             with self.subTest(text):
-                self.assertEqual(qc._plain(text), text)
+                self.assertEqual(qc._plain(text), qc._DOTTED.sub(". ", text))
+        # reviews/35 15, F2: no word is lost, a "No" before a quote included.
+        for text, out in (("limited in M-2.No warehouses", "limited in M-2. No warehouses"),
+                          ("permitted.By right", "permitted. By right"),
+                          ("P.O.Box 1234", "P. O. Box 1234"), ("Farm.Co-op", "Farm. Co-op"),
+                          ("for.Sale or for.Rent", "for. Sale or for. Rent")):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), out)
 
     def test_a_link_shows_the_address_without_its_fragment(self):
         self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")

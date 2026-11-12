@@ -997,16 +997,6 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
     '\u2034\u2035\u2036\u2037\u2039\u203a\u275b\u275c\u275d\u275e\u276e\u276f\u2e42\u301d\u301e'
     '\u301f\uff02\uff07')}
 _PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
-# Every top-level domain name (IANA's list, screener/tlds.txt), matched
-# whatever its case: a bare host under any of them is removed, and no other
-# dotted word is (reviews/35 14).
-_TLD_NAMES = sorted([line.strip().lower() for line in
-                     (Path(__file__).with_name("tlds.txt")).read_text().splitlines()
-                     if line.strip() and not line.startswith("#")]
-                    # and the special-use names (RFC 6761, 6762, 7686), not on IANA's list
-                    + ["example", "test", "localhost", "invalid", "local", "onion"],
-                    key=len, reverse=True)
-_TLD = "(?:" + "|".join(map(re.escape, _TLD_NAMES)) + ")"
 _LABEL = r"[^\W_](?:[^\W_]|-)*"
 _HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any script
 # A host name ends in a label of letters (or punycode): "4.2.1.3", "$3.50"
@@ -1023,9 +1013,12 @@ _ADDRESS = re.compile(
     # IPv6: a "::" form standing alone, or all eight groups
     r"|(?<![\w:])(?=[0-9a-f:]*::)[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])"
     r"|\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b"
-    r"|" + _NAMED_HOST + r"/\S*"                            # a named host with a path
-    # a host under a top-level name, with whatever follows it
-    r"|(?<![\w.])(?:" + _LABEL + r"\.)+" + _TLD + r"(?![\w-])\.?(?:\s*(?:[/?#%\\]|:\s*\d|:/)\S*)?")
+    # a named host with a path, query, fragment, encoded slash or port
+    r"|" + _NAMED_HOST + r"\.?(?:[/?#%]|:\d|:/)\S*")
+# What is left of a bare host ("clerk.zone", "M-2.No") is split at its dots
+# instead of removed: every word stays, and no host can be read or linked
+# (reviews/35 15). A dot before a digit stays: "4.2.1.3", "$3.50".
+_DOTTED = re.compile(r"(?<=[^\W_])\.(?=[^\W\d_])")
 # Latin letters that are no ASCII letter plus marks, and look like no
 # quotation mark: kept, so names and streets read right.
 _LATIN_KEPT = frozenset("\u0141\u0142\u00df\u1e9e\u00d8\u00f8\u00c6\u00e6\u0110\u0111\u00d0\u00f0"
@@ -1050,14 +1043,16 @@ def _kept_char(ch: str) -> bool:
 def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
     """An agent's (or a page's) words made safe to sit in lead.md: one line
     of letters, digits and plain punctuation. No quotation marks but the
-    apostrophe, no markup, no entities, no web or mail addresses. Characters
-    are reduced first and addresses removed after, so nothing removed can
-    leave an address behind. In lead.md only this code writes quotation
+    apostrophe, no markup, no entities, no web or mail addresses: an address
+    with a scheme, a path, a port or a query is removed, and any other
+    dotted word is split at its dots. Characters are reduced first and
+    addresses removed after, so nothing removed can leave an address behind. In lead.md only this code writes quotation
     marks and links."""
     raw = str(text)
     if keep_end:
         raw = raw[-limit * 4:]
     t = html.unescape(html.unescape(clean(raw, limit * 4)))       # &quot; and &amp;quot;
+    t = t.replace("\\", "/")                     # https:\\host\\x reads as an address
     t = _FRACTIONS.sub(" ", t)                    # 1\u00bd reads 1 1/2, not 11/2
     t = unicodedata.normalize("NFKC", clean(t, limit * 4)).translate(_QUOTE_MARKS)
     t = t.replace("\u2044", "/")
@@ -1068,6 +1063,7 @@ def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
         if again == t:
             break
         t = again
+    t = _DOTTED.sub(". ", t)
     t = re.sub(r"'{2,}", "'", re.sub(r"\s+", " ", t)).strip()
     if len(t) <= limit:
         return t

@@ -285,9 +285,12 @@ claim's address, because only the code puts them there. A quote is shown
 as a code span, so markup or an address inside the page's own words is
 displayed, not followed. Everything an agent wrote (claim text, objection,
 open items, the headline) is labelled as the agent's own and reduced to
-Latin letters, digits and plain punctuation, with web addresses removed
-(a link shows its address without the `#` part, which is never sent). It
-gives:
+Latin letters, digits and plain punctuation. An address with a scheme, a
+path, a port or a query is removed; any other dotted word is split at a
+dot before a letter (`clerk. zone`, `M-2. No`), so no host can be read
+and no word is lost. A link shows its address without the `#` part,
+which is never sent. The page's words around a quote get the same
+treatment. It gives:
 
 - per section, the checked verdict and the section's first kept claim
   with its quote and link (a section with none reads `unknown`, and says
