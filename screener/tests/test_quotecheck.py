@@ -336,13 +336,25 @@ class MatchTests(Base):
         for url, quote in cases:
             with self.subTest(url):
                 self.assertEqual(qc.claim_problem(claim(source_url=url, quote=quote)), "")
+        # reviews/35 13, F3: a slug that begins with a request word types nothing.
+        for url, quote in ((HOST + "/find-your-zoning/zoning-districts/m-1-light-industrial",
+                            "M-1 Light Industrial District: warehouses are permitted by right."),
+                           (HOST + "/results-of-rezoning-vote/attachments/rz-26-004-staff-report",
+                            "The RZ-26-004 staff report recommends approval"),
+                           (HOST + "/Planning/Search-Zoning-Cases/RZ-26-004-Campbellton-Road",
+                            "Case RZ-26-004 Campbellton Road was approved in March")):
+            with self.subTest(url):
+                self.assertEqual(qc.claim_problem(claim(source_url=url, quote=quote)), "")
         # Each request word, as a whole segment, types what follows it; an
         # encoded space alone types a segment that is not a document's name.
         for word in sorted(qc.REQUEST_PATH_WORDS):
             with self.subTest(word):
                 self.assertTrue(qc.quote_is_from_url("here: m-1 warehouses allowed",
                                                      f"{HOST}/{word}/m-1-warehouses-allowed"))
-        for typed in ("/tags/m-1+warehouses+allowed", "/tags/m-1%20warehouses%20allowed",
+        for typed in ("/s/m-1%09warehouses%09allowed", "/s/m-1%C2%A0warehouses%C2%A0allowed",
+                      "/s/m-1%E3%80%80warehouses%E3%80%80allowed", "/s/m-1%2Bwarehouses%2Ballowed",
+                      "/s/m-1%252Bwarehouses%252Ballowed",
+                      "/tags/m-1+warehouses+allowed", "/tags/m-1%20warehouses%20allowed",
                       "/tags/m-1%20warehouses%20allowed.aspx", "/s/m-1+warehouses+allowed.pdf/x",
                       "/Search/m-1-warehouses-allowed", "/city/search/m-1-warehouses-allowed",
                       "/search.php/m-1-warehouses-allowed", "/search-results/m-1-warehouses-allowed",
@@ -704,6 +716,17 @@ class PdfTests(Base):
         self.assertEqual(self.modes, [[], ["-layout"]])
         self.assertTrue(r.checked["pages"][URL]["file"].endswith(".pdf"))
 
+    def test_a_pdf_whose_file_name_holds_the_quote_is_kept(self):
+        # reviews/35 13, mutation gap: the document exemption end to end.
+        url = HOST + "/Documents/Article%2012%20Light%20Industrial.pdf"
+        self.fetcher.pages[url] = b"%PDF-1.7 binary"
+        self.reading = "Article 12, Light Industrial: warehouses are permitted by right."
+        self.layout = self.reading
+        r = self.check(findings(claim(source_url=url,
+                                      quote="Article 12, Light Industrial: warehouses are permitted")))
+        self.assertEqual(r.kept, 1)
+        self.assertTrue(r.checked["sections"]["zoning"]["claims"][0]["words_shared_with_url"])
+
     def test_a_quote_found_only_across_columns_is_marked(self):
         r = self.check(findings(claim(quote="uses are Right column says terminals")))
         kept = r.checked["sections"]["zoning"]["claims"][0]
@@ -983,7 +1006,10 @@ class LeadFileTests(Base):
             with self.subTest(text):
                 self.assertTrue(all(ch.isascii() for ch in qc._plain(text)))
         self.assertEqual(qc._plain("a {b} ^c"), "a b c")
-        for text in ("Sec. 4.2.1.3 and 4.2.1.4 of the code", "permitted.Outdoor storage is not",
+        for text in ("Sec. 4.2.1.3/4.2.1.4 of the code", "permitted.Outdoor storage is not",
+                     "See Sec. 27-4.3/27-4.4 and Table 4.1/4.2.", "FAR 0.5/1.0", "$3.50/sf",
+                     "18.2/acre", "1.5/2.0 stories", "PIN 14F.0001.0001/A", "Rev. 2.1/2026",
+                     "Exh. A.1/A.2", "Fig. 3.a/3.b", "the S.E.1/4 of the N.E.1/4", "at 10:30:15",
                      "Note: // see below", "\u00a7 27-4 applies"):
             with self.subTest(text):
                 self.assertEqual(qc._plain(text), text)
@@ -999,11 +1025,14 @@ class LeadFileTests(Base):
                      "evil.land/parcel", "evil.museum", "evil.com", "evil.ly", "203.0.113.9/123",
                      "203.0.113.9:8080/1", "https\u2236//evil.city/x", "https\u00b7//evil.city/x",
                      "https\u02d0//evil.city/x", "_://evil.city/x", "\u2044\u2044evil.city",
-                     "x2://y.example", "verify.shop/ok"):
+                     "x2://y.example", "verify.shop/ok", "county-attorney.legal",
+                     "records at clerk.zone", "clerk.zone:8443", "clerk.zone?id=7", "evil.zone#x",
+                     "evil.zone:/x", "[2001:db8::7]:443", "xn--bcher-kva.zone", "EVIL.CITY",
+                     "203.0.113.9:8080", "evil.church"):
             with self.subTest(text):
                 out = qc._plain("see " + text + " now")
                 self.assertIn("(address removed)", out)
-                self.assertNotRegex(out, r"(?i)evil|203\.0|x\.city|y\.example|//|shop")
+                self.assertNotRegex(out, r"(?i)evil|203\.0|x\.city|y\.example|//|shop|zone|legal|db8")
 
     def test_a_link_shows_the_address_without_its_fragment(self):
         self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")

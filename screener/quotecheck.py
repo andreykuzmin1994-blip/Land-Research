@@ -358,6 +358,8 @@ def _query_words(url: str) -> tuple[list[str], list[str]]:
     return _tokens(_decoded(parts.query + " " + parts.fragment)), _tokens(_decoded(values))
 
 
+SCRIPT_WORDS = frozenset({"php", "asp", "aspx", "jsp", "cfm", "htm", "html", "cgi", "do",
+                          "action", "pl"})
 DOCUMENT_SUFFIXES = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".rtf", ".odt")
 
 
@@ -378,12 +380,18 @@ def _path_words(url: str, document_names: bool = True) -> tuple[list[str], list[
     after_request = False
     for n, seg in enumerate(segments):
         words = _tokens(_decoded(seg))
-        spaced = "+" in seg or "%20" in seg.lower()
+        # Any encoded space: +, %20, %09, %C2%A0, %E3%80%80, %2B (reviews/35 13, F4).
+        spaced = "+" in seg or " " in _decoded(seg) or "+" in _decoded(seg)
         document = (document_names and n == len(segments) - 1
                     and _decoded(seg).endswith(DOCUMENT_SUFFIXES))
         if after_request or (spaced and not document):
             typed += words
-        if words and words[0] in REQUEST_PATH_WORDS:     # search, search.php, search-results
+        # A request segment is made of request words and a script's name
+        # only (search, search.php, search-results, search;jsessionid=1), not
+        # a slug that begins with one ("find-your-zoning": reviews/35 13, F3).
+        head = _tokens(_decoded(seg.split(";", 1)[0]))
+        if head and head[0] in REQUEST_PATH_WORDS and all(
+                w in REQUEST_PATH_WORDS or w in SCRIPT_WORDS for w in head):
             after_request = True
     return _tokens(_decoded(path)), typed
 
@@ -993,15 +1001,21 @@ _TLDS = ("com", "org", "net", "gov", "edu", "mil", "int", "info", "biz", "io", "
          "site", "online", "xyz", "top", "link", "page", "example", "city", "shop", "pro",
          "land", "museum", "name", "aero", "asia", "cat", "coop", "jobs", "mobi", "tel",
          "travel", "store", "tech", "club", "law", "realty", "properties")
-_HOST = r"[^\W_](?:[^\W_]|-)*(?:\.[^\W_](?:[^\W_]|-)*)+"    # dotted, any script
+_LABEL = r"[^\W_](?:[^\W_]|-)*"
+_HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any script
+# A host name ends in a label of letters (or punycode): "4.2.1.3", "$3.50"
+# and "S.E.1" are numbers, not hosts (reviews/35 13, F1).
+_NAMED_HOST = r"(?:" + _LABEL + r"\.)+(?:[^\W\d_]{2,}|xn--[a-z0-9-]+)"
 _ADDRESS = re.compile(
     r"(?i)\S*:/\s*/\S*"                                  # any scheme, whatever stands before it
-    r"|\S*:\s*/\s*/\s*" + _HOST + r"\S*"                 # ... spaced out, before a dotted host
-    r"|\S*/\s*/\s*" + _HOST + r"\S*"                     # //host, whatever stands before it
+    r"|\S*/\s*/\s*" + _HOST + r"\S*"                     # //host, spaced schemes too
     r"|\S*www\s*\.\s*\S+"
-    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+|/)\S*"            # a numeric host with a port or path
-    r"|" + _HOST + r"/\S*"                                # a dotted host with a path
-    r"|(?:[^\W_](?:[^\W_]|-)*\.)+(?:[a-z]{2}|" + "|".join(_TLDS) + r")\b")
+    # a numeric host with a port, or a path that is no second dotted number
+    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+|/(?!\d+(?:\.\d+)+\b))\S*"
+    r"|\b[0-9a-f]+::[0-9a-f:]*|::[0-9a-f]+[0-9a-f:]*|\b(?:[0-9a-f]{1,4}:){4,7}[0-9a-f]{1,4}\b"
+    r"|" + _NAMED_HOST + r"(?:[/?#]|:\d|:/)\S*"           # a named host with a path, query or port
+    r"|(?:" + _LABEL + r"\.)+(?:" + "|".join(_TLDS) + r")\b"
+    r"|(?-i:\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b)")              # any lowercase all-letter last label
 # Latin letters that are no ASCII letter plus marks, and look like no
 # quotation mark: kept, so names and streets read right.
 _LATIN_KEPT = frozenset("\u0141\u0142\u00df\u1e9e\u00d8\u00f8\u00c6\u00e6\u0110\u0111\u00d0\u00f0"

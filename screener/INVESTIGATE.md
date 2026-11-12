@@ -28,10 +28,11 @@ session" at the end. It writes nothing of its own into the findings.
      word from the part after the "?" or the "#" (a search or query page
      that shows your own request back to you proves nothing). The parts
      of a path that look typed are held to the three-words rule too:
-     what follows a segment that begins with `search`, `query`, `find`,
-     `results` or `lookup` (`/search/<words>`, `/search.php/<words>`),
-     and a segment with a `+` or `%20` in it unless it is the file name
-     of a document that answers as a PDF
+     what follows a segment made of `search`, `query`, `find`, `results`
+     or `lookup` and at most a script's name (`/search/<words>`,
+     `/search.php/<words>`; not a slug such as `/find-your-zoning/`), and
+     a segment with an encoded space in it (`+`, `%20`, `%09` and the
+     like) unless it is the file name of a document that answers as a PDF
      (`Article%2012%20Light%20Industrial.pdf`). Any other path that
      shares three words in a row with the quote is flagged in `lead.md`,
      not dropped. Every address a redirect
