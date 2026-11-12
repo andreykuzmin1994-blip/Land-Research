@@ -30,18 +30,24 @@ Open items, most important first:
    and `best_ranking.json` are untracked; a new container has neither and
    `--decide` then stops for a human baseline. Decide where a batch's log
    is kept before starting one.
-3. **The quote checker's eighth round** (`reviews/35_screener_lead_layer`,
-   10 to 14) is being read by a fresh reviewer. Do not run a new lead
-   check until that read is recorded and acted on. Four operator decisions
-   are still listed in `09` (an allow-list of government hosts, other
-   listing sites, a contact address in the User-Agent, the ArcGIS
-   robots.txt question).
-4. **Leads.** The 2026-11-12 run (`screener-data`, `runs/fulton-2026-11-12`)
-   has the same 14 grade A and 96 grade B leads as 2026-11-10. 11 of the
-   14 grade A leads have had no document check. #6 is `killed` and #44
-   `weakened` (skeptic step); the seven parcels of the #6 assemblage are
-   marked `maybe`. For a person: pull the deeds for those seven; ask
-   Fairburn Planning what the 2025 plan and the C-2 text allow at #44.
+3. **The quote checker** went through twelve rounds on 2026-11-12
+   (`reviews/35_screener_lead_layer`, 10 to 18). The rule it meets is:
+   nothing in `lead.md` can be linked or pasted as an address. A split host
+   ("clerk. zone") can still be read, and a dotted number stays. The
+   twelfth round (`18`'s fixes) has not had an independent read. Four
+   operator decisions are still listed in `09`.
+4. **Leads: every grade A lead of 2026-11-12 has had a document check
+   (`screener-data`: `leads/` and the digest's last section). None
+   survives as written: #29 is `killed`, the rest are `weakened`.** The
+   checks found four gaps in the screen:
+   - built sites pass the land-only screen (`screens.py`, human-owned);
+   - Atlanta's future land use came from a superseded field (fixed on
+     this branch, `reviews/35/19`);
+   - a listed hazardous site next door does not count;
+   - operating companies' own buffer land ranks as a lead.
+
+   The first, third and fourth are the operator's to decide. No lead is
+   marked in `decisions.csv`.
 5. **Still open from before:** whether to add the owner the pilot flagged
    to the excluded-owner rules (`screens.py` / `owners.py`, human-owned,
    needs a new baseline).
