@@ -9,7 +9,23 @@ across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
-## Next session: start here (written 2026-11-12)
+## Next session: start here (updated 2026-11-13)
+
+**2026-11-13, on `claude/upbeat-feynman-4bc1be` (not yet merged to
+`main`):** at the operator's request, the three screen gaps in item 4 below
+are closed. Built sites are screened out using the county's commercial
+buildings (live only). Norfolk Southern's realty company is railroad-owned.
+The lead grade now counts a contamination site within 250 ft or on a
+bordering parcel, the owner's built parcel next door of any size
+(`nextdoor.py`), and quarry or waste owner names. One independent review;
+its findings were fixed. The baseline was recorded on 5d40e25 (graded 11.7,
+2.4 hits). 15 loop experiments ran and none was kept. The loop log is on
+`screener-data` under `autoresearch/`, which answers item 2. Lead
+decisions are recorded (1 `pass`, 11 `maybe`). Run and digest:
+`screener-data` `digests/fulton-2026-11-13-screens.md`. Grade A is down
+to 3, all already marked `maybe`. Merging this branch needs a new
+`--new-baseline` on `main`'s merge commit.
+
 
 Open items, most important first:
 
