@@ -1,0 +1,161 @@
+{
+ "schema": 1,
+ "parcel_id": "14 006800060376",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "text": "City of Atlanta's own zoning district layer, queried at a point inside this parcel (33.674261, -84.39638), returns district I-1, and the layer itself links I-1 to the Light Industrial District Regulations chapter of the city code. The district text (on Municode) could not be read under the rules, so whether warehouse/distribution is permitted by right is not confirmed from the text; the verdict is left unknown for that reason only.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ZONECLASS\":\"I-1\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH16LIINDIRE\""
+    },
+    {
+     "text": "The same zoning record has blank SPI, subarea, TSA and rezoning case-in fields and status Current: the city's map shows plain I-1, with no conditional (-C) suffix, special public interest district or case number attached.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"SPI\":\" \",\"SUBAREA\":\" \",\"TSA\":\" \",\"STATUS\":\"Current\",\"CASEIN\":\" \",\"CASEOUT\":\" \",\"SUNRISE\":-2208988800000"
+    },
+    {
+     "text": "City zoning queried with a box around the parcel plus 100 ft returns, besides the I-1 district, an R-4 single-family residential district. My own measurement from the returned shapes (approximate, local projection) puts the R-4 district touching the parcel along roughly 400 ft of its north-east side. Atlanta's code typically requires transitional yards/screening where industrial abuts residential; that text was not read (Municode wall).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39718%2C33.67312%2C-84.39526%2C33.67540&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"OBJECTID\":12090,\"ZONECLASS\":\"R-4\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH6SIMIREDIRE\""
+    },
+    {
+     "text": "The same box query also returns a small RG-2 (residential general) district; by my measurement from the shapes it lies about 25 ft from the parcel's east side.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39718%2C33.67312%2C-84.39526%2C33.67540&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"OBJECTID\":10743,\"ZONECLASS\":\"RG-2\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH8REGEDIRE\""
+    },
+    {
+     "text": "The city's zoning overlay layer, queried at the same point inside the parcel, returns no overlay district.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+    }
+   ],
+   "open_items": [
+    "Atlanta's zoning text is on Municode (known wall), and the city's main site (atlantaga.gov) answers robots.txt with 403; an attempt to read a third-party copy of the code (atlanta.elaws.us) timed out at robots.txt. Ask Atlanta Office of Zoning and Development for a zoning verification letter confirming warehouse/distribution is a permitted use in I-1 on this parcel and listing any conditions.",
+    "The parcel abuts R-4 single-family zoning and single-family homes (see market claims): ask what transitional yard, buffer, screening, height and truck-access restrictions apply on the residential sides; these could take a large share of a 9.4 ac site and may explain why the screener found no building envelope.",
+    "Confirm frontage/truck access: the parcel's road frontage is on Mount Zion Rd SW, which the county parcel layer shows lined with single-family homes; trucks may have to pass homes to reach I-75."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "text": "The city's Development Patterns / Future Land Use layer, queried at a point inside the parcel, returns land use code I, Industrial.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\",\"LASTUPDATE\":null"
+    },
+    {
+     "text": "The city's rezoning case layer, queried within 1,500 ft of a point inside the parcel, returns four cases, all from R-4 residential (three R-4 to R-4A in 2024-2025, one R-4 to MR-2 in 2006); none is industrial and none covers this I-1 parcel, so no rezoning of this parcel is on the city's case layer.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"R-4A\",\"DOCKET_NO\":\"Z-24-052\",\"STATUS\":\"COMPLETE\""
+    },
+    {
+     "text": "Second of the four nearby cases: a 2006 rezoning from R-4 to MR-2 (4.85 ac); residential, not on this parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"MR-2\",\"DOCKET_NO\":\"Z-06-068\",\"STATUS\":\"COMPLETE\""
+    },
+    {
+     "text": "The city's special use permit layer, queried within 1,500 ft, returns a 2025 'New Application', docket U-25-028, on a site of about 923,000 sq ft (about 21 ac). By my measurement from its shape it lies about 515 ft north of this parcel and does not touch it. A web search result (third-party summary, not verified) described U-25-28 as a park-for-hire facility at 200/230 Cleveland Ave SW.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"APPSTATUS\":\"New Application\",\"CREATED_DATE\":1754927419000,\"CREATED_USER\":\"SHENDERSON\",\"DATE_APP\":null,\"GRANTEE\":null,\"LAST_EDITED_DATE\":1754927814000,\"LAST_EDITED_USER\":\"SHENDERSON\",\"ORDINANCE\":null,\"SUP_DOCKET\":\"U-25-028\",\"SUP_TYPE\":null,\"GLOBALID\":\"{01066FF3-631A-4525-8BE6-73B0D2D72333}\",\"SHAPE.AREA\":923180.06530026102"
+    },
+    {
+     "text": "The city's building moratorium layer, queried at a point inside the parcel, returns no moratorium.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+    }
+   ],
+   "open_items": [
+    "Seen, not verifiable: the Atlanta Zoning Committee agenda on atlantacityga.iqm2.com (search result) lists U-25-28 / 26-O-1054 for 200 Cleveland Ave SW; iqm2's robots.txt asks a 60 s crawl delay, so it was not fetched. Ask the city for the outcome of U-25-28 (a large truck/park-for-hire use about 500 ft north would be a logistics neighbour).",
+    "The future land use layer's link to the adopted Comprehensive Development Plan (and its adoption date) was not read; confirm the parcel's character area in the current Atlanta CDP.",
+    "Nearby rezonings are residential (R-4 to R-4A, 2024-2025), so the surrounding neighbourhood is being reinforced as residential; ask planning whether opposition to industrial/truck use on this edge is likely."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map could be read: the Watershed Management GIS server (egis.atlantaga.gov) lists no public services in its MapWF folder and the WasteWater1c service named in search results answers 'not found'. Ask the City of Atlanta Department of Watershed Management for the nearest water main and sewer line to 0 Mount Zion Rd SW and for capacity.",
+    "The assessor's code in the brief reads all public / unknown; the neighbouring single-family homes suggest water at least is in the street, but no map shows it."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "text": "The county parcel record (queried by parcel id) shows land value only and zero improvement value: vacant land, not an operating or built use, assessed at $293,600.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20006800060376%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":117440,\"LandAssess\":117440,\"ImprAssess\":0,\"TotAppr\":293600,\"LandAppr\":293600,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"I4\""
+    },
+    {
+     "text": "The city's special use permit layer queried exactly at a point inside the parcel returns nothing: no special use permit application on this parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+    },
+    {
+     "text": "No rezoning on this parcel appears on the city's rezoning case layer within 1,500 ft (the four cases returned are residential R-4 cases, none on this I-1 parcel); there is no sign of an application by a developer.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"R-4A\",\"DOCKET_NO\":\"Z-24-052\",\"STATUS\":\"COMPLETE\""
+    },
+    {
+     "text": "The county parcel layer queried by a map box around the parcel (not by owner) shows the same LLC also owns a 1.0 ac vacant industrial-coded parcel at 0 Waters Rd SW rear, so the industrial land on offer may be about 10.4 ac together.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"0 WATERS RD SW REAR\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"WATERS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":\"REAR\",\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD STE 100\",\"OwnerAddr2\":\"ATLANTA GA 30342\",\"TaxDist\":\"05\",\"TotAssess\":31360,\"LandAssess\":31360,\"ImprAssess\":0,\"TotAppr\":78400,\"LandAppr\":78400,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"I3\",\"ExCode\":null,\"LivUnits\":null,\"LandAcres\":1.0"
+    },
+    {
+     "text": "The same box query shows single-family homes on Mount Zion Rd beside the parcel, e.g. 167 Mount Zion Rd, a 0.225 ac residential lot with a homestead exemption.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":\"HA01\",\"LivUnits\":1,\"LandAcres\":0.225"
+    }
+   ],
+   "open_items": [
+    "Three web searches (by site address and road names, not owner) found no listing, news, development authority release or DRI for this parcel; listing sites were not visited and CoStar/LoopNet/Crexi were not used. Absence of a sign is not 'not for sale'.",
+    "Ask the city whether any land disturbance or building permit has been filed on 0 Mount Zion Rd SW (permit records on the city's main site could not be read)."
+   ]
+  },
+  "owner": {
+   "verdict": "holding_entity",
+   "claims": [
+    {
+     "text": "The county record for this parcel (queried by parcel id) gives the owner as an LLC mailing to an office suite on Roswell Rd in Atlanta (30342).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20006800060376%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD STE 100\",\"OwnerAddr2\":\"ATLANTA GA 30342\""
+    },
+    {
+     "text": "Reading of county records, not a Secretary of State record: the same LLC owns 2931 Waters Rd SW, a house lot next to this parcel, alongside the 9.4 ac industrial parcel.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"2931 WATERS RD SW\",\"AddrNumber\":\"2931\",\"AddrPreDir\":null,\"AddrStreet\":\"WATERS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD STE 100\",\"OwnerAddr2\":\"ATLANTA GA 30342\",\"TaxDist\":\"05\",\"TotAssess\":63200,\"LandAssess\":38560,\"ImprAssess\":24640,\"TotAppr\":158000,\"LandAppr\":96400,\"ImprAppr\":61600,\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":null,\"LivUnits\":1"
+    },
+    {
+     "text": "It also owns 2925 Waters Rd SW, another house lot, so the LLC holds a small assemblage (the industrial parcel, a 1.0 ac rear industrial lot, two house lots and a 0.27 ac lot) that looks like a long-held land-holding vehicle named for the site (the brief gives the last sale as 2000).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"2925 WATERS RD SW\",\"AddrNumber\":\"2925\",\"AddrPreDir\":null,\"AddrStreet\":\"WATERS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD NE\",\"OwnerAddr2\":\"ATLANTA GA 30342\",\"TaxDist\":\"05\",\"TotAssess\":63200,\"LandAssess\":36360,\"ImprAssess\":26840,\"TotAppr\":158000,\"LandAppr\":90900,\"ImprAppr\":67100,\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":null,\"LivUnits\":1"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State business search is a known wall: entity status, formation date, principal office and registered agent were not read. Pull the record by hand.",
+    "Ask whether the two house lots the LLC owns are rented or vacant, and whether they could serve as access or buffer for the industrial parcel."
+   ]
+  }
+ }
+}

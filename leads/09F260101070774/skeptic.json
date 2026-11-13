@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "parcel_id": "09F260101070774",
+  "skeptic": {
+    "verdict": "killed",
+    "objection": "This parcel is not open industrial land. It is the site of a data center project by its owner. The owner is that developer's numbered project LLC, which paid $23.5M in January 2024, about $1.1M an acre against a $57,863/acre assessor land value. The regional review (DRI 4257, closed February 2025) names this exact parcel. Georgia EPD issued an air quality permit on 05/06/2025 for the construction and operation of 66 emergency generators for a data processing facility at 4380 Stacks Road, the lead's site address. A developer holding permitted land for its own hyperscale project is neither a seller nor a land-priced industrial target. That holds unless a person finds the project dead, and even then the owner's cost basis is roughly 20 times the assessed land value.",
+    "disputes": ["plans-5", "plans-1"],
+    "claims": [
+      {
+        "text": "Georgia EPD air quality permit 7374-121-0981-S-01-0 was issued on 05/06/2025 to an affiliate of the lead's owner (facility name GA1) at 4380 Stacks Road. The lead's own county address is 4380 STACKS RD # REAR, and ARC's DRI site plan ties this parcel id to 4380 Stacks Road.",
+        "source_url": "https://air.gaepd.org/Permits/View/OP-29392",
+        "retrieved": "2026-11-13",
+        "quote": "PERMIT NO. 7374-121-0981-S-01-0 ISSUANCE DATE: 05/06/2025"
+      },
+      {
+        "text": "The permitted facility is at 4380 Stacks Road, Fulton County.",
+        "source_url": "https://air.gaepd.org/Permits/View/OP-29392",
+        "retrieved": "2026-11-13",
+        "quote": "Facility Address: 4380 Stacks Road Atlanta, Georgia 30349 Fulton County"
+      },
+      {
+        "text": "What the state permitted is construction of the data center's backup power plant, 66 diesel generators of 2.75 MW each. This is a project that has gone past planning into state permitting, not a stalled land holding.",
+        "source_url": "https://air.gaepd.org/Permits/View/OP-29392",
+        "retrieved": "2026-11-13",
+        "quote": "The construction and operation of sixty-six (66) 2.75 MW diesel-fired emergency stationary generators, and their associated diesel-belly tanks at a computer processing, data preparation and processing facility."
+      }
+    ],
+    "open_items": [
+      "The air permit names facility GA1 while the parcel owner is GA11. A person should confirm with Georgia EPD or the county that the permitted facility footprint is on this parcel and not only on an adjoining one at the same street number.",
+      "Whether construction has started was not seen. The county record shows $0 improvements for tax year 2027, and no city land disturbance or building permit and no EPD stormwater NOI was read. Ask the City of South Fulton about permits issued for 4380 Stacks Rd.",
+      "Whether the city's new data center ordinance (TA26-003 / ORD2026-024, Planning Commission recommendation July 15, 2026) was adopted, and whether this already-reviewed project is vested, was not confirmed. If the project is stopped, the owner might sell, but at a basis near $1.1M an acre.",
+      "plans-5 disputed: its kept quote only shows a Winston Cir street address in the parcel layer's answer. It does not show the residential class or land use code, how many lots there are, or their distance from the parcel line, which is what the claim rests on.",
+      "plans-1 doubted as the basis for 'supports': it is the applicant's summary of the future land use map, and plans-7 records ARC finding the project not aligned with the regional Developing Suburbs policies. The city's own future land use map was not read by either pass.",
+      "Read but not made a claim: the draft text amendment (cityofsouthfultonga.gov DocumentCenter View 15891) also sets a minimum 100-foot buffer adjacent to residentially zoned or used property, in addition to the 2,640 ft setback the first pass quoted. The draft does not say whether projects already under review are exempt."
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "parcel_id": "09F060000350917",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "Fairburn's zoning text is on Municode (known wall), so the M-2 use table could not be quoted, and the city's zoning map is on ArcGIS Online (fairburn.maps.arcgis.com, known wall). The M-2 designation in the brief comes from the screener's own layer and was not re-checked here.",
+        "Fulton County's own zoning layer (PropertyMapViewer layer 34), asked at the brief's map point (-84.551315, 33.549753), returned an empty answer: it covers unincorporated land only, so it says nothing about this Fairburn parcel.",
+        "Ask Fairburn planning to confirm M-2 on this parcel, whether warehouse / distribution is permitted by right in M-2 (the city's comprehensive plan lists M-2 as an appropriate district for its Industrial area, plans section), and whether any conditions of zoning or a use permit bind the land."
+      ]
+    },
+    "plans": {
+      "verdict": "supports",
+      "claims": [
+        {"text": "Fairburn's adopted comprehensive plan (Final Approved Comp Plan, Future Development Strategy) describes its Industrial character area as meant for heavy industrial, manufacturing and logistics use. The brief gives this parcel's future land use as Industrial; the plan's map was not read at parcel scale here.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "This area is designated for traditional and heavy industrial uses that drive economic development through manufacturing, processing, and logistics operations."},
+        {"text": "The same plan's Industrial area lists warehousing and manufacturing among its appropriate development types and M-2 among its appropriate zoning districts.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "large office; warehousing; manufacturing; utilities."},
+        {"text": "The plan places existing industrial land in a pocket south of I-85 around Oakley Industrial Boulevard; the parcel lies about 115 ft from parcels fronting Oakley Industrial Blvd (county parcel map, investigator's computation), inside that pocket.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "Industrial and utility uses are concentrated between the two corridors along and south of Fairburn Industrial Boulevard and a pocket south of I-85 around Oakley Industrial Boulevard."},
+        {"text": "Condition to check: the plan says new industrial development should have direct access to an official truck route and not adjoin residential neighbourhoods. The parcel's neighbours within 1,500 ft are industrial or commercial (county parcel layer), but whether its road is a designated truck route was not checked.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "New industrial development should only be allowed where there is direct access to an official truck route; where it is not adjacent to residential neighborhoods;"},
+        {"text": "Rezoning check: Fairburn's list of pending zoning and development cases (read 2026-11-13) has four cases (two gas stations, Campbell Commons on Campbellton Fairburn Road, NexMetro on Milam Road); none is on Terminus Drive or this parcel.",
+         "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+         "retrieved": "2026-11-13",
+         "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each."}
+      ],
+      "open_items": [
+        "Rezoning history of the last five years on or beside the parcel was checked only against the city's current pending-cases list; past cases and agendas were not read. Ask Fairburn planning for any rezoning, variance or use permit on 09F060000350917 and its neighbours since 2021.",
+        "Confirm on the adopted Future Development Map that the parcel is in the Industrial (not Light Industrial) character area, and whether its road is an official truck route.",
+        "Fairburn's comprehensive plan records strong resident concern about industrial growth and truck traffic; a person should expect scrutiny of any discretionary approval here."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {"text": "Sewer, pipes nearby: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 1,000 ft of the brief's map point (-84.551315, 33.549753), returns 8 active 8-inch ductile-iron gravity sewer segments in the Morning Creek basin, county service area, city Fairburn. The point is the parcel's centre; the exact distance from the pipes to the parcel line was not measured.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"FlowMeter\":\"WW62\",\"Enabled\":1,\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FAIRBURN\",\"LengthInFeet\":381.78918756"},
+        {"text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the same point, answers Fulton County, sewer, service available.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""},
+        {"text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 1,000 ft of the same point, returns an empty feature list. That is expected if the city, not the county, runs water here (next claim): city-owned mains would not be on this county layer.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"},
+        {"text": "Water provider: the Development Authority of Fulton County lists Fairburn among the cities that run their own water service, so the City of Fairburn is the likely water provider. No city water map was read.",
+         "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+         "retrieved": "2026-11-13",
+         "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park, Palmetto, Roswell and Union City."}
+      ],
+      "open_items": [
+        "Sewer looks nearby (county pipes within 1,000 ft of the centre); water is not shown on any map read here. Both abutting parcels and the owner's plant about 490 ft away are built and operating, so water service in the street is likely, but only Fairburn utilities can confirm the nearest main.",
+        "Capacity: only the utility can say (Fairburn for water, Fulton County Public Works for sewer)."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {"text": "No public sign of a sale or developer: the parcel is not on Fairburn's list of pending zoning and development cases (read 2026-11-13; the four cases listed are elsewhere in the city).",
+         "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+         "retrieved": "2026-11-13",
+         "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each."},
+        {"text": "The county parcel layer (asked by map point, not by name) carries the lead parcel with land value only and no improvements ($423,600 land, $0 improvements, 14.19 ac): vacant on the tax roll, held by the manufacturer whose pet food plant is about 490 ft away (owner section).",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"TotAssess\":169440,\"LandAssess\":169440,\"ImprAssess\":0,\"TotAppr\":423600,\"LandAppr\":423600,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"C5\""},
+        {"text": "Activity next door, not on this parcel: the Development Authority of Fulton County's October 27, 2026 agenda carries a $32,000,000 bond resolution for a roughly 301,320 sq ft addition to the 700,000 sq ft Post Consumer Brands warehouse at 4955 Oakley Industrial Blvd. That DAFC-held parcel lies about 115 ft from the lead across the road (county parcel map, investigator's computation); the agenda does not name the lead parcel or Terminus Drive.",
+         "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_41_963367144.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "The Post Consumer Brands Expansion would involve an approximately 301,320 square-foot addition to Post Consumer Brands’ existing 700,000 square-foot warehouse and distribution facility."}
+      ],
+      "open_items": [
+        "Seen, not verifiable (search snippet only, a private trucking app, not a public source; not opened): a TruckMap listing described 5009 Terminus Dr as a carrier drop yard. If true, the parcel may already be paved or used for trailer parking, possibly for the nearby plant, which the screen would not see. Check aerial imagery and drive the site.",
+        "The owner bought this land in 2009 (brief) and runs a plant about 490 ft away: it may be held as expansion or trailer land for that plant rather than surplus. Nothing public read here shows it for sale.",
+        "The 2026 DAFC Post expansion beside the parcel shows active industrial demand in this pocket; ask whether the Post landlord or the DAFC has approached this owner (a person's question; no contact made)."
+      ]
+    },
+    "owner": {
+      "verdict": "operator",
+      "claims": [
+        {"text": "The owner named on the lead parcel's county record operates a dry pet food plant at 5001 Fayetteville Rd, Fairburn (Georgia EPD Air Protection Branch public advisory, comment period to March 28, 2025, application 29463).",
+         "source_url": "https://epd.georgia.gov/document/document/pa0225-4/download",
+         "retrieved": "2026-11-13",
+         "quote": "Facility Name: Nestle Purina PetCare Company Application No: 29463 Facility Address: 5001 Fayetteville Rd, Fairburn, 30213 EPD Notice Type: Proposed Permit Description of Operation: Dry Pet Food Plant"},
+        {"text": "The plant parcel, 5001 Fayetteville Rd (37.64 ac, $13,584,400 of improvements), is held on the county roll under the company's former name (Ralston Purina Co) at the same St Louis mailing address and ZIP as the lead. By the county parcel geometry (investigator's computation from the same query with returnGeometry=true) it lies about 490 ft north-northeast of the lead and does not touch it: 5025 Fayetteville Rd, a built parcel held by another company, sits between them. The neighbour check by owner name would miss this plant.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Address\":\"5001 FAYETTEVILLE RD\",\"AddrNumber\":\"5001\",\"AddrPreDir\":null,\"AddrStreet\":\"FAYETTEVILLE\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"RALSTON PURINA CO \",\"OwnerAddr1\":\"1 CHECKERBOARD SQ\",\"OwnerAddr2\":\"ST LOUIS MO 63164-0001\""},
+        {"text": "The lead parcel's own county record (same answer) gives the owner as the operating company, mailing from the company's St Louis headquarters address.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Address\":\"5009 TERMINUS DR\",\"AddrNumber\":\"5009\",\"AddrPreDir\":null,\"AddrStreet\":\"TERMINUS\",\"AddrSuffix\":\"DR\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"NESTLE PURINA PETCARE COMPANY \""},
+        {"text": "The two parcels that share a line with the lead (investigator's computation from the parcel geometry, about 900 ft and 850 ft of shared line) are 5007 Terminus Dr and 5025 Fayetteville Rd, both built and held by an Atlanta development company group, not by the owner.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Address\":\"5007 TERMINUS DR\",\"AddrNumber\":\"5007\",\"AddrPreDir\":null,\"AddrStreet\":\"TERMINUS\",\"AddrSuffix\":\"DR\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"M D DEVELOPMENTS LLC \""}
+      ],
+      "open_items": [
+        "Georgia Secretary of State record not read (known wall; the owner's name may not be put into an outside service). Status, formation date and registered agent are unknown.",
+        "An operating manufacturer holding land 490 ft from its plant may treat it as strategic (expansion, trailer staging) and be a reluctant seller; a person should weigh that before an approach.",
+        "Pull the 2009-11-25 deed ($400,000, brief) for any restrictive covenant, reverter or easement in favour of the plant parcel."
+      ]
+    }
+  }
+}

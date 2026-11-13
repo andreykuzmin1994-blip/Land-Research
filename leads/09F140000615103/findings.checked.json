@@ -1,0 +1,283 @@
+{
+ "schema": 1,
+ "parcel_id": "09F140000615103",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Union City's own site (unioncityga.gov) answered 403 to earlier investigators even for robots.txt, its zoning layer is on ArcGIS Online and its code is on Municode (known walls), so neither the M-1 designation nor the M-1 use table could be quoted. Not re-tried here.",
+    "The parcel is already built on (market section): ask Union City planning what use and conditions the existing roughly 156,000 sq ft building was approved under, and whether any conditions of zoning or a site plan approval bind the land around it."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "Union City's 2020 comprehensive plan update (as submitted for ARC review, January 2021) applies its District-Industrial character area close to I-85, US-29, South Fulton Parkway and rail lines. This parcel is in an industrial park about 0.8 mi from I-85 exit 64 (brief), but the plan's map was not read at parcel scale.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Application: D-I in close proximity to I-85, US-29, South Fulton Parkway and rail lines for the purpose of convenient transportation access.",
+     "context_before": "n that include employment uses such as industrial, commercial and service uses. ",
+     "context_after": " green space \u2022 formal landscaping and appropriate buffering with built areas \u2022 i",
+     "pdf_page": 74,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/84ef73de8a02f710c70c0fb9.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The same plan's District-Industrial area is meant for large-scale distribution and industrial uses.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Building development should be variable within D-I to promote the specific needs of industrial activities or businesses and accommodate large-scale distribution facilities, industrial activities, or office park developments.",
+     "context_before": "thin the community elements (open space, neighborhoods, centers and corridors). ",
+     "context_after": " density/intensity \u2022 moderate density/intensity \u2022 1-3 story buildings appropriat",
+     "pdf_page": 74,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/84ef73de8a02f710c70c0fb9.pdf"
+    }
+   ],
+   "open_items": [
+    "Confirm on Union City's adopted Future Development Map which character area covers this parcel (the ARC copy was not read at parcel scale; the word Oakley does not appear in its text).",
+    "Rezoning history of the last five years not checked: Union City agendas and minutes are on its own site, which answered 403 to earlier investigators. Ask the city for any rezoning, variance or site plan case on 09F140000615103 and the improvements record 09F140000615111.",
+    "Search snippets only, not read or verified: earlier search results mentioned a 2026 Union City moratorium on rezonings while the zoning ordinance is rewritten. Ask the city whether it is still in force."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer, service area: Fulton County's water/sewer service area layer (WR_Public_Map_Viewer layer 16), asked at the brief's map point for this parcel (-84.520819, 33.572517), answers Fulton County, sewer, service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\"",
+     "context_before": "\":{\"objectid\":1,\"orig_fid\":1,\"shape_star\":73.23144531,\"shape_stle\":769.14763871,",
+     "context_after": ",\"shape.starea()\":10173715022.83869,\"shape.stlength()\":1481074.5223924106}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/d8124f2c6bdfdc3babc846b1.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "Sewer, pipes not shown: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 800 ft of the same point, returns an empty feature list. The parcel is about 13.9 ac, so parts of it lie beyond 800 ft of that point; a private or city-owned line would not be on this county layer.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=800&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "\"type\":\"esrifieldtypedouble\",\"alias\":\"lengthinfeet\"},{\"name\":\"shape.stlength()\",",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/0e64309be51d106a80008418.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Water: no published water main map was read. The Development Authority of Fulton County lists Union City among the cities that run their own water service, so Union City (not Fulton County) is the likely water provider here.",
+     "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+     "retrieved": "2026-11-13",
+     "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park, Palmetto, Roswell and Union City.",
+     "context_before": "tect publicly owned treatment works and prevent the introduction of pollutants. ",
+     "context_after": " electricity & natural gas electricity and natural gas are supplied by divisions",
+     "words_shared_with_url": [],
+     "page_file": "pages/5858d37902c1eecd3d4ac3d1.html"
+    }
+   ],
+   "open_items": [
+    "The site already carries an operating manufacturing building (market section), so water and sewer are very likely connected; the verdict only says no map read here shows the lines. Ask Union City utilities and Fulton County Public Works for the service lines and capacity.",
+    "Capacity: only the utility can say."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "ALREADY BUILT: asked by the site address, Fulton County's parcel layer returns a second record at 6715 Oakley Industrial Blvd, 09F140000615111, held by an abbreviated form of the same owner name, with no land, $22,407,900 of improvements, class I1, and a shape of about 156,000 sq ft. In the same answer's geometry (outSR=4326 query) this shape sits as a hole cut out of the lead parcel's polygon (investigator's own computation): the lead's 13.9 ac include a roughly 156,000 sq ft building that the parcel map shows as a hole, which is why the screen found no open envelope and treated it as unbuilt.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":22407900,\"LUCode\":\"405\",\"ClassCode\":\"I1\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":null,\"NbrHood\":\"C810\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":null,\"SubdivBlck\":null,\"FeatureID\":\"09F140000615111\",\"Shape.STArea()\":156036.69247538838",
+     "context_before": "ss\":8963160,\"landassess\":0,\"imprassess\":8963160,\"totappr\":22407900,\"landappr\":0,",
+     "context_after": ",\"shape.stlength()\":1551.5119393173418}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/781fa581acb670520240888c.html"
+    },
+    {
+     "id": "market-2",
+     "text": "OPERATING USE: the Oregon Board of Pharmacy's list of registered drug distribution agents, manufacturers and wholesalers (as of 10/26/2026) carries a manufacturer registration for Dendreon Pharmaceuticals LLC at this site address, issued 2011 and expiring 09/30/2027. A pharmaceutical manufacturer operates here; the parcel is not vacant land.",
+     "source_url": "https://www.oregon.gov/pharmacy/Documents/List_of_DDA_Man_Wholesalers.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "M-0002251 DENDREON PHARMACEUTICALS LLC 6715 OAKLEY INDUSTRIAL BLVD UNION CITY GA 30291 08/12/2011 09/30/2027",
+     "context_before": "th us llc 400 somerset corporate blvd bridgewater nj 8807 08/12/2011 09/30/2027 ",
+     "context_after": " m-0002252 dendreon pharmaceuticals llc 1700 saturn way seal beach ca 90740 08/1",
+     "pdf_page": 24,
+     "pdf_order": "layout",
+     "words_shared_with_url": [],
+     "page_file": "pages/1517619e112053ef16ae2532.pdf"
+    },
+    {
+     "id": "market-3",
+     "text": "The lead parcel's own record (same answer) shows only $198,600 of improvements and land-use code 999 on 13.91 ac, with a mapped shape of about 416,000 sq ft (about 9.6 ac): the building's value sits on the separate improvements record above, so a screen that reads only this record sees near-vacant land.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":198600,\"LUCode\":\"999\",\"ClassCode\":\"I5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":13.91,\"NbrHood\":\"C810\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":null,\"SubdivBlck\":null,\"FeatureID\":\"09F140000615103\",\"Shape.STArea()\":416073.34617291571",
+     "context_before": "2280,\"landassess\":332840,\"imprassess\":79440,\"totappr\":1030700,\"landappr\":832100,",
+     "context_after": ",\"shape.stlength()\":4915.1839436751652}},{\"attributes\":{\"objectid\":16132,\"parcel",
+     "words_shared_with_url": [],
+     "page_file": "pages/781fa581acb670520240888c.html"
+    }
+   ],
+   "open_items": [
+    "No sale, contract or developer sign was found, and none was expected: this is an improved, occupied industrial property, not a land lead. A person should treat it as screened out (already built on) rather than as a land opportunity.",
+    "Seen, not verifiable: search-result snippets (not opened: atlmainstreet.com robots.txt disallows all agents; businesswire.com and cresa.com refused the fetch) described a December 2019 Dendreon press release on a 10-year lease to keep its roughly 155,000 sq ft Union City manufacturing facility, through about 2029. If true, the building is leased to the operator until about 2029.",
+    "The other same-owner parcel in the brief (09F260001250088) was screened out as already built on; check whether the owner name is a portfolio of leased buildings.",
+    "Screener gap (for the person, not fixed here): the built-on screen reads only the land record's improvement value; Fulton carries some buildings on a separate improvements-only record (no land, class I1) at the same address. Same-address improvement records could be checked before ranking."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "The county parcel record (asked by site address) gives the land owner as a building-numbered LLC mailing from New York; the improvements record carries an abbreviated form of the same name. The registered manufacturer at the address is a different company (market section), so the owner reads as a landlord or investor vehicle holding one building, not the operator. This is a reading of the records; the Secretary of State record was not read.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"B9 MALBEC OAKLEY BUILDING 3 LLC \",\"OwnerAddr1\":\"345 PARK AVE\",\"OwnerAddr2\":\"NEW YORK NY 10154\",\"TaxDist\":\"50\"",
+     "context_before": "strial\",\"addrsuffix\":\"blvd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"totassess\":412280,\"landassess\":332840,\"imprassess\":79440,\"totappr\":1030700,\"la",
+     "words_shared_with_url": [
+      "oakley"
+     ],
+     "page_file": "pages/781fa581acb670520240888c.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State record not read (known wall: 403 and a search form; the owner name may not be put into an outside service). Status, formation date, principal office and registered agent are unknown.",
+    "Pull the 2021-03-17 deed ($16,700,000 per the brief) to see whether it conveyed the land and building together and whether a lease is of record."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "killed",
+  "objection": "This is not land: it is the site of an operating roughly 156,000 sq ft manufacturing building. Fulton County's parcel map draws the lead parcel as an outer boundary with an inner ring cut out of it, and that inner ring is, point for point, the polygon of the separate improvements-only record at the same address (no land, $22.4 million of improvements, class I1). The 13.9 ac therefore surround the building, and the open ground the screen saw is the plant's yard, parking and truck court, which is why no envelope fitted. A pharmaceutical manufacturer is registered at the address through 2027 (first-pass market-2), and the 2021 sale at $16.7 million is a building price, not a land price.",
+  "disputes": [
+   "plans-1",
+   "plans-2"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "Asked by parcel id (09F140000615103 and 09F140000615111, outSR=4326), Fulton County's parcel layer returns the lead parcel's polygon with two rings: an outer boundary and, after it, an inner ring (a hole). The quote runs from the last point of the outer ring into the first points of the inner ring. The inner ring's points are the same points as the improvements record's polygon (next claim), so the hole in the lead parcel is the building record.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "[-84.519940943419144,33.574427331212199]],[[-84.521760204507473,33.572805926389179],[-84.521767700906281,33.571862065899687],[-84.520536461854277,33.571840839256829],[-84.520518412887512,33.573005109771209]",
+    "context_before": "-84.520568290260869,33.57396017797808],[-84.519941115918016,33.574487658335116],",
+    "context_after": ",[-84.521493175070844,33.573019019171028],[-84.521760204507473,33.57280592638917",
+    "words_shared_with_url": [],
+    "page_file": "pages/b93d67d203154e88e9a5c987.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "In the same answer, the improvements-only record at 6715 Oakley Industrial Blvd has one ring made of the same five corner points as the hole in the lead parcel (listed in a different order). Computed by the skeptic from these coordinates: the hole is about 156,000 sq ft, the outer boundary about 13.2 ac, and the land left around the building about 9.6 ac.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"rings\":[[[-84.520518412887512,33.573005109771209],[-84.520536461854277,33.571840839256829],[-84.521767700906281,33.571862065899687],[-84.521760204507473,33.572805926389179],[-84.521493175070844,33.573019019171028]",
+    "context_before": "starea()\":156036.69247538838,\"shape.stlength()\":1551.5119393173418},\"geometry\":{",
+    "context_after": ",[-84.520518412887512,33.573005109771209]]]}},{\"attributes\":{\"objectid\":16829,\"p",
+    "words_shared_with_url": [],
+    "page_file": "pages/b93d67d203154e88e9a5c987.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The same answer gives that improvements record no land value and no acreage, $22,407,900 of improvements, land-use code 405 and class I1: a building appraised at about 27 times the lead parcel's land value ($832,100).",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"TotAppr\":22407900,\"LandAppr\":0,\"ImprAppr\":22407900,\"LUCode\":\"405\",\"ClassCode\":\"I1\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":null",
+    "context_before": "y 10154\",\"taxdist\":\"50\",\"totassess\":8963160,\"landassess\":0,\"imprassess\":8963160,",
+    "context_after": ",\"nbrhood\":\"c810\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":n",
+    "words_shared_with_url": [],
+    "page_file": "pages/b93d67d203154e88e9a5c987.html"
+   }
+  ],
+  "open_items": [
+   "The brief's map point (-84.520819, 33.572517) falls inside the hole, that is, on the building record and not on the lead parcel's land (skeptic's own computation from the coordinates above). The first pass's utility queries (utilities-1, utilities-2) were asked at that point. That does not change the verdict, but the empty pipe answer in utilities-2 says nothing about service to an operating plant.",
+   "plans-1 and plans-2 describe what the District-Industrial character area is for, in general. Neither quote places this parcel in that area, so they do not carry the 'supports' verdict at parcel scale. The question is moot for a built site.",
+   "Seen, not verifiable: a search result title from atlmainstreet.com reads 'Dendreon commits to 10 more years in Union City'. The page was not opened (the first pass reports that its robots.txt disallows all agents). If it is right, the building is leased to its operator until about 2029.",
+   "Not reached: dendreon.com did not answer (protocol error, then an empty reply on robots.txt), so the operator's own page was not read.",
+   "Screener gap for the person: a land record with a hole in its polygon and an improvements-only record (no land, class I1) at the same address should count as built on. The same-owner parcel 09F260001250088 was screened out as built on, which fits an owner holding leased industrial buildings rather than land.",
+   "If the 9.6 ac around the building matter at all, they are the occupant's yard, parking and truck court. Any surplus would have to come from the owner or tenant carving it out, not from a land purchase."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf": {
+   "file": "pages/84ef73de8a02f710c70c0fb9.pdf",
+   "fetched_at": "2026-11-13T17:46:35Z",
+   "final_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+   "status": 200,
+   "bytes": 10399524,
+   "sha256": "934443a1b3b261f14b31ec858a5813d9c33d12d1789a8b836198099607a9e6f4"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/d8124f2c6bdfdc3babc846b1.html",
+   "fetched_at": "2026-11-13T17:46:37Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1213,
+   "sha256": "515af0b1e3eab932009564b816c35b707d1a81da7f271e9f1a5dcda11320f0d7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=800&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/0e64309be51d106a80008418.html",
+   "fetched_at": "2026-11-13T17:46:38Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=800&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 7348,
+   "sha256": "8f6f9d08d821735e0d6581612a7f4384753c803c505e910a0e80785fb43f67c7"
+  },
+  "https://www.developfultoncounty.com/infrastructure.php": {
+   "file": "pages/5858d37902c1eecd3d4ac3d1.html",
+   "fetched_at": "2026-11-13T17:46:39Z",
+   "final_url": "https://www.developfultoncounty.com/infrastructure.php",
+   "status": 200,
+   "bytes": 26591,
+   "sha256": "a80f3fbb9847c431ee513e41ab31fe383d1398f166412c747463aea109da047f"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/781fa581acb670520240888c.html",
+   "fetched_at": "2026-11-13T17:46:39Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 5088,
+   "sha256": "e2f1f4fea69b95e2804019724734f9e1a90638dff41f6b6356f903194e757f50"
+  },
+  "https://www.oregon.gov/pharmacy/Documents/List_of_DDA_Man_Wholesalers.pdf": {
+   "file": "pages/1517619e112053ef16ae2532.pdf",
+   "fetched_at": "2026-11-13T17:46:41Z",
+   "final_url": "https://www.oregon.gov/pharmacy/Documents/List_of_DDA_Man_Wholesalers.pdf",
+   "status": 200,
+   "bytes": 1311861,
+   "sha256": "e2e2665d95c8b4945290f715f7cdebc93a8e13dad6ed350c23e912b9421961f2"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/b93d67d203154e88e9a5c987.html",
+   "fetched_at": "2026-11-13T17:46:42Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 7192,
+   "sha256": "d7db51793c9911a351fc1b5ecb24309a4debfc35fde91f2bfbf731838fec9a0f"
+  }
+ },
+ "quotecheck": {
+  "kept": 12,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-13T17:46:42Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "1586382ddf7a87a44b7b5fbe57680e11a61869ac85d900d606d22f3e02c18ece",
+   "skeptic.json": "d22dc6f06b5b24d233502cc106ac2b281a754238e10ee9d24613af7058151efa"
+  }
+ },
+ "dropped_claims": []
+}

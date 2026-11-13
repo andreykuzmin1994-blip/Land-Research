@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "parcel_id": "09F060000350917",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "This parcel is not raw land. Fulton County's own 2024 and 2020 orthophotos show that roughly the western half of it is a paved trailer yard holding well over a hundred parked trailers, with what looks like a pond in its south-west corner. The rest is a wooded, sloping strip. The county roll still carries $0 of improvements, so the screen counted the yard as open ground. The owner is an operating manufacturer whose plant is about 490 ft away, and it has held the land since 2009. The yard looks like a working piece of an operating business, not surplus land, which makes a sale unlikely and changes what the site is. A person must find out who uses the yard and whether the owner would part with it before this lead is pursued. The imagery is not a quotable page, so this rests on the open items below. The quoted claims only show that the tax roll lists no improvements and that the city's adopted plan has a goal of slowing industrial growth.",
+    "disputes": ["market-2"],
+    "claims": [
+      {
+        "text": "The county tax roll carries the lead parcel with land value only: improvements $0, land use code 300, 14.19 acres. The roll therefore does not record the paved trailer yard visible on the county's own 2020 and 2024 orthophotos (open items). 'Vacant on the tax roll' (market-2) does not mean the land is unused. The query was the county parcel layer, asked by the brief's map point within 1,500 ft, not by name.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"TotAppr\":423600,\"LandAppr\":423600,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"C5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":14.19"
+      },
+      {
+        "text": "Fairburn's adopted comprehensive plan states among its main goals that the city should slow industrial growth. The plan's Industrial character area still supports industrial use (plans-1, plans-2), but any discretionary approval this site needs (a use permit, variance or rezoning condition) would face that stated policy.",
+        "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+        "retrieved": "2026-11-13",
+        "quote": "Balance economic development. Attract more retail and grocery stores while slowing industrial growth."
+      }
+    ],
+    "open_items": [
+      "Seen, not verifiable: Fulton County's 2024 orthophoto (https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Imagery/Pictometry2024_NAIP/MapServer/export?bbox=-84.5543,33.5478,-84.5476,33.5518&bboxSR=4326&imageSR=4326&size=1000,600&format=png&f=image), with the parcel outline drawn from the county parcel layer (ParcelID query, returnGeometry=true), shows the western half or so of the parcel paved and filled with parked semi-trailers in rows. There is a small pond or basin in the south-west corner, a rail line along the north edge, and woods on the eastern part and the southern slope. The 2020 orthophoto (same address with Pictometry2020_NAIP) shows the same yard, likewise full. It is an image, not text, so quotecheck cannot check it. A person should open it and judge for themselves.",
+      "The screener's open-ground area, building envelope (520 x 260 ft) and 'no pond room' result treat the paved yard as open land. The existing yard and basin mean this is a redevelopment of an operating site, not a greenfield acquisition: it needs re-fitting, and existing stormwater permits or easements may come into play.",
+      "Who uses the yard? It may be trailer staging for the owner's plant at 5001 Fayetteville Rd, about 490 ft away (owner-1, owner-2), or it may be leased to a carrier. A search snippet of a private trucking app, which I did not open and which is not a public source, lists 5009 Terminus Dr as a carrier drop yard. Either way the land earns its keep today. Ask through a broker or by title review, without contacting the owner from this process.",
+      "Seen in search snippets only, not verifiable and not a primary source: a commercial news headline says the owner bought buildings at 5005 and 5007 Terminus Dr that it had leased. The county roll read here (tax year 2027) still lists 5005 and 5007 Terminus Dr under other companies. If the owner has since bought them, it controls the land on two sides of this yard, and a sale is even less likely. A person should check the recorded deeds.",
+      "Fairburn's comprehensive plan proposes 'No Through Trucks' signage on 'Fayetteville Road' to emphasize residential character, and also lists truck-route signage 'on SR 92/Fayetteville Road near Oakley Industrial Boulevard'. I did not establish which road the parcel's 1,246 ft of frontage (GDOT route 1121200150509) lies on, or whether it is an official truck route, which the plan makes a condition for new industrial development (plans-4).",
+      "One web search result list contained a CoStar article link. I did not open it and did not use it."
+    ]
+  }
+}

@@ -1,0 +1,555 @@
+{
+ "schema": 1,
+ "parcel_id": "09F350101520306",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "Nearest quotable statement of the zoning here: the city's April 2026 staff report on case Z26-002 (4700 Welcome All Road, on the east side of the road, about 100 m south-east of this parcel by my measurement from the county parcel shapes) lists the land to its west as M-2 Heavy Industrial, Chester Industrial Park. It does not name this parcel; that this parcel is part of that M-2 park is my reading (it adjoins two built park parcels on its south side and its owner mails from the same address as the park's owner; see owner).",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+     "retrieved": "2026-11-13",
+     "quote": "West: M-2 (Heavy Industrial District)/ Chester Industrial Park",
+     "context_before": "an)/ kensington heights subdivision east: sub c (suburban c)/ broad subdivision ",
+     "context_after": " community and property owners' notification/comments per the requirements of se",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/6a9332aef776107deaa2eed2.pdf"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The same report says the 4700 Welcome All Road site borders industrial-zoned property to the west and single-family homes on its other sides: industrial and residential zoning meet along this stretch of Welcome All Road.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+     "retrieved": "2026-11-13",
+     "quote": "This property borders single-family developments as well as industrial use and zoned properties to the west.",
+     "context_before": "ll subdivision is suitable in view of the use and adjacent and nearby property. ",
+     "context_after": " however, this rezoning proposal does not meet the intent of the cup zoning cate",
+     "pdf_page": 3,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/6a9332aef776107deaa2eed2.pdf"
+    },
+    {
+     "id": "zoning-3",
+     "text": "A 2026 city staff report (Z26-001, Bridge Logistics, a different site) says M-2 heavy industrial uses may need extra performance standards. It does not quote the M-2 use table, so whether warehouse/distribution is permitted by right in M-2 is not shown by any page I could read.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+     "retrieved": "2026-11-13",
+     "quote": "Heavy industrial uses (M-2) may require additional performance standards for air, noise, and traffic mitigation.",
+     "context_before": "portation access, such as proximity to interstates, railroads, or freight hubs. ",
+     "context_after": " regarding the proposed zoning, m-1 light industrial district is described in th",
+     "pdf_page": 6,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/c67f7bf26c75799059306249.pdf"
+    },
+    {
+     "id": "zoning-4",
+     "text": "For comparison, the same report quotes the adopted South Fulton Zoning Code's M-1 intent, which names industrial parks, warehousing and distributing. The equivalent M-2 text (Municode) could not be read.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+     "retrieved": "2026-11-13",
+     "quote": "The M-1 District is intended to provide locations for light industrial uses and industrial parks which meet the needs for processing, manufacturing, fabricating, warehousing, distributing",
+     "context_before": "ibed in the south fulton zoning code as follows: m-1 light industrial district. ",
+     "context_after": ", research, flex officewarehouse uses, and office uses associated with industria",
+     "pdf_page": 6,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/c67f7bf26c75799059306249.pdf"
+    }
+   ],
+   "open_items": [
+    "Confirm with City of South Fulton planning that this parcel itself is zoned M-2 and has no conditions (the screener's zoning came from an ArcGIS Online layer that cannot be quoted, and the Municode use table is a known wall).",
+    "The county tax record classes the parcel as residential vacant land (land use code 100, class R5), not industrial: ask whether this is only a tax classification or reflects a different zoning or an old residential case.",
+    "Ask what buffers and performance standards apply to M-2 opposite the single-family lots across Welcome All Road and beside the church and the city-owned parcel to the north (see plans)."
+   ]
+  },
+  "plans": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "No rezoning case on this parcel in the city's Filed Zoning Cases list (read 2026-11-13; it runs back to 2017-18 cases). The nearest is Z26-002 at 4700 Welcome All Road, across the road and about 100 m south-east by my measurement, heard by the Planning Commission 2/18/2026 with a Mayor and Council date of 04/15/2026.",
+     "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "Z26-002 4700 Welcome All Road Staff Report 2/18/2026 04/15/2026",
+     "context_before": "004/u26-003/cv26-001/cdp 26-001 4740 & 4996 derrick road staff report 2/18/2026 ",
+     "context_after": " z25-036/cdp25-015 5090, 5050 & 0 southwood road staff report 12/17/2025 z25-035",
+     "words_shared_with_url": [],
+     "page_file": "pages/abbee3e1515f295c7a98c51c.html"
+    },
+    {
+     "id": "plans-2",
+     "text": "That case is a residential rezoning beside the M-2 park: AG-1 to CUP for 35 single-family homes on 15 acres.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+     "retrieved": "2026-11-13",
+     "quote": "requests a rezoning from AG-1 (Agricultural District) to CUP (Community Unit Plan District) to develop 35 single-family units on 15 acres at 4700 Welcome All Road",
+     "context_before": "aging director meeting date: april 15, 2026 mike lee c/o we partner group, llc. ",
+     "context_after": " (parcel id: 09f360001530024). city council district: 3. staff recommendation: a",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/6a9332aef776107deaa2eed2.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "Staff and the Planning Commission both recommended approval with a condition (R-5 single-family rules). The council outcome of 04/15/2026 was not read.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+     "retrieved": "2026-11-13",
+     "quote": "CONDITION: Applicant will have to follow R-5 Single-Family Dwelling District Regulations.",
+     "context_before": "efined amenities. staff recommends approval conditional based on these factors. ",
+     "context_after": " prepared by: karen tominey, senior planner reviewed by: reginald mcclendon, dir",
+     "pdf_page": 5,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/6a9332aef776107deaa2eed2.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "The land across the road from the M-2 park is planned for suburban housing: the 4700 Welcome All Road site's future land use is Suburban I. This parcel's own future land use (the screener says Industrial Mix-Use Zone) was not found on any quotable page.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+     "retrieved": "2026-11-13",
+     "quote": "The subject property has a future land use designation of Suburban I as designated in the 2021 South Fulton Comprehensive Plan",
+     "context_before": "orgia and city council district 3. 2021 comprehensive plan land use designation ",
+     "context_after": ", which does support the proposed zoning classification and use. adjacent zoning",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/6a9332aef776107deaa2eed2.pdf"
+    },
+    {
+     "id": "plans-5",
+     "text": "A 2026 Comprehensive Plan is now in force (cited in a 2026 staff report for another site); the 2021 plan cited in the Z26-002 report may be superseded. Staff in that report also say industrial zones need buffering from residential uses.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+     "retrieved": "2026-11-13",
+     "quote": "Industrial zones are generally incompatible with residential or commercial uses without appropriate buffering.",
+     "context_before": "g industrial land demand while minimizing impacts on residential neighborhoods. ",
+     "context_after": " they require excellent transportation access, such as proximity to interstates,",
+     "pdf_page": 6,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/c67f7bf26c75799059306249.pdf"
+    },
+    {
+     "id": "plans-6",
+     "text": "Nearby institutional use: the county parcel layer (map box query around the site, not by name) shows a city-owned exempt parcel at 4255 Will Lee Rd with $2.9M of improvements, about 44 m north of this parcel by my measurement. The Z26-002 report mentions a Welcome All Park & Multipurpose Facility; that it is this parcel is not confirmed.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4255 WILL LEE RD\",\"AddrNumber\":\"4255\",\"AddrPreDir\":null,\"AddrStreet\":\"WILL LEE\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CITY OF SOUTH FULTON \",\"OwnerAddr1\":\"5440 FULTON INDUSTRIAL BLVD\"",
+     "context_before": "4}},{\"attributes\":{\"objectid\":39255,\"parcelid\":\"09f350101520025\",\"taxyear\":2027,",
+     "context_after": ",\"owneraddr2\":\"atlanta ga 30336\",\"taxdist\":\"55\",\"totassess\":0,\"landassess\":26208",
+     "words_shared_with_url": [],
+     "page_file": "pages/0726cbe01adf4619ea32f305.html"
+    }
+   ],
+   "open_items": [
+    "Read this parcel's designation on the adopted 2026 South Fulton future land use map (the screener's FLUM 2045 layer is on ArcGIS Online and cannot be quoted).",
+    "Find the council decision on Z26-002 (04/15/2026): an approved 35-home subdivision near the site would add residential neighbours to the east.",
+    "Check for any pre-2017 Fulton County zoning case (with conditions) on this parcel: the city list does not cover cases from before the city existed."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer, nearby: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 2,000 ft of the brief's map point (-84.529299, 33.629351), returns 62 segments in the Camp Creek basin. The closest, an active 8-inch PVC gravity line, county service area, lies about 230 ft from the parcel line by my measurement from the returned geometry (in the subdivision east of Welcome All Road). Invert elevations versus the site's grades were not compared.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FacilityID\":\"SPSMCC2635320\",\"UpID\":\"SMCC2635320\",\"DownID\":\"SMCC2635310\",\"DiElevation\":-999.99,\"DiDepth\":-999.99,\"DiAngle\":999.99,\"UpSInvert\":944.66,\"DnSInvert\":933.26,\"Location\":null,\"WarrantyDate\":null,\"LegacyID\":null,\"Condition\":\"GOOD\",\"ConditionDate\":null,\"InstallDate\":null,\"Crossing\":\"NONE\",\"Basin\":\"CAMP CREEK\",\"SubBasin\":\"CC25\",\"UpSize\":\"8\",\"UpMaterial\":\"PVC\"",
+     "context_before": "984,\"join_count\":1,\"target_fid\":48769,\"join_fid\":null,\"woolpertid\":\"91sp000038\",",
+     "context_after": ",\"upcircle\":\"y\",\"upheight\":\"0\",\"upwidth\":\"0\",\"upcomment\":\"none\",\"upsurveydate\":1",
+     "words_shared_with_url": [],
+     "page_file": "pages/3053776cbb45c2512309cd51.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the same point, answers Fulton County, sewer, service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\"",
+     "context_before": "\":{\"objectid\":1,\"orig_fid\":1,\"shape_star\":73.23144531,\"shape_stle\":769.14763871,",
+     "context_after": ",\"shape.starea()\":10173715022.83869,\"shape.stlength()\":1481074.5223924106}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/6ec400dde5a92fcf74307601.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 600 ft of the same point, returns an empty feature list. That is expected if the county does not run water here (next claim).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "\"name\":\"surveydate\",\"type\":\"esrifieldtypedate\",\"alias\":\"surveydate\",\"length\":8},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/e6b9560ec8e320b869501e99.html"
+    },
+    {
+     "id": "utilities-4",
+     "text": "Water provider: the Development Authority of Fulton County says county water serves north Fulton and four north Fulton cities, not South Fulton; the City of Atlanta Department of Watershed Management is the other regional system and the likely water provider here (not confirmed; no water main map was read).",
+     "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+     "retrieved": "2026-11-13",
+     "quote": "The Fulton County Department of Public Works provides water, sewer, and storm water services to a population of 277,000 in north Fulton County and the cities of Alpharetta, Johns Creek, Milton, and Roswell.",
+     "context_before": " to ensure any business has what it needs for maximum operations. water & sewer ",
+     "context_after": " the county has nine elevated storage tanks, three ground storage tanks, two hig",
+     "words_shared_with_url": [],
+     "page_file": "pages/5858d37902c1eecd3d4ac3d1.html"
+    }
+   ],
+   "open_items": [
+    "Ask the City of Atlanta Department of Watershed Management (or whoever the provider is) for the nearest water main and fire-flow at Welcome All Road.",
+    "Ask Fulton County Public Works about sewer capacity in the Camp Creek basin and whether the parcel can reach the line about 230 ft east by gravity.",
+    "The built industrial parcels next door (4677 and 4601 Welcome All Rd) presumably have service: a person can ask how they connect."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "No public sign of a sale or developer: the parcel is not on the city's Filed Zoning Cases list (read 2026-11-13). The only '0 Welcome All Road' entry is Z24-020/CV24-006, which is a different parcel (next claim).",
+     "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "Z24-020 & CV24-006 0 Welcome All Road Staff Report 9/18/2024",
+     "context_before": "12/18/2024 z24-021 & cv24-007 7185 old national highway staff report 11/20/2024 ",
+     "context_after": " z24-019 & cv24-005 0 & 5070 derrick road staff report 9/18/2024 z24-018 3665 un",
+     "words_shared_with_url": [],
+     "page_file": "pages/abbee3e1515f295c7a98c51c.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The 2025 modification of that case (M25-002) gives its parcel as 09F380101570514, a 4.1 ac townhouse site, not this parcel (09F350101520306).",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13741/M25-002-0-Welcome-All-Road",
+     "retrieved": "2026-11-13",
+     "quote": "0 Welcome All Road, Parcel ID: 09F380101570514. Council District 3.",
+     "context_before": " minimum heated floor to 1,300 square footages in tr (townhouse residential) at ",
+     "context_after": " staff recommendation: approval (page break) application information applicant information: ci",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [
+      "welcome",
+      "road"
+     ],
+     "page_file": "pages/def9e231570393e11311a444.pdf"
+    },
+    {
+     "id": "market-3",
+     "text": "The county parcel record (queried by parcel id) shows land value only and zero improvement value, class R5, use code 100: vacant land, no built or operating use.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520306%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TaxDist\":\"55\",\"TotAssess\":152160,\"LandAssess\":152160,\"ImprAssess\":0,\"TotAppr\":380400,\"LandAppr\":380400,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R5\"",
+     "context_before": " rporation\",\"owneraddr1\":\"54 w allendale ave\",\"owneraddr2\":\"allendale nj 07401\",",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":11.16,\"nbrhood\":\"9601\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/b44e1a41cbf6c86c18df7935.html"
+    }
+   ],
+   "open_items": [
+    "Listing sites were not checked (the rules bar the main commercial listing sites by any route): whether the parcel is on the market is for a person to check by hand.",
+    "A web search pointed to a GDOT project page about realigning Welcome All Road near its Camp Creek bridge, and to an Aerotropolis CIDs project page for Welcome All Rd; neither was read. A person should check whether either touches this frontage."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Reading of county records, not a Secretary of State record: the parcel layer (map box query, not by name) shows the built industrial parcel adjoining this one on the south, 4677 Welcome All Rd (6.01 ac, $4.65M improvements, class I4), held by an LLC mailing from the same New Jersey street address as this parcel's owner. By my measurement from the parcel shapes the two share about 146 m of line.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4677 WELCOME ALL RD\",\"AddrNumber\":\"4677\",\"AddrPreDir\":null,\"AddrStreet\":\"WELCOME ALL\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"4677 WELCOME ALL ASSOCIATES LLC \",\"OwnerAddr1\":\"54 W ALLENDALE AVE\",\"OwnerAddr2\":\"ALLENDALE NJ 07401\"",
+     "context_before": "1}},{\"attributes\":{\"objectid\":38129,\"parcelid\":\"09f350001520646\",\"taxyear\":2027,",
+     "context_after": ",\"taxdist\":\"55\",\"totassess\":2102680,\"landassess\":243320,\"imprassess\":1859360,\"to",
+     "words_shared_with_url": [],
+     "page_file": "pages/0726cbe01adf4619ea32f305.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "The same box query shows the Chester Industrial Park parcels at 4601 Welcome All Rd (the M-2 park named in the Z26-002 staff report) held by an entity at the same New Jersey address. So this parcel looks like the undeveloped remainder of a family-held industrial park whose owners built and hold buildings next door: an industrial landlord or investor, not a passive holder.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4601 WELCOME ALL RD\",\"AddrNumber\":\"4601\",\"AddrPreDir\":null,\"AddrStreet\":\"WELCOME ALL\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CHESTER INDUSTRIAL PARK ASSOC \",\"OwnerAddr1\":\"54 W ALLENDALE AVE\",\"OwnerAddr2\":\"ALLENDALE NJ 07401\"",
+     "context_before": "2}},{\"attributes\":{\"objectid\":37566,\"parcelid\":\"09f350001311004\",\"taxyear\":2027,",
+     "context_after": ",\"taxdist\":\"55\",\"totassess\":135360,\"landassess\":102880,\"imprassess\":32480,\"totap",
+     "words_shared_with_url": [],
+     "page_file": "pages/0726cbe01adf4619ea32f305.html"
+    },
+    {
+     "id": "owner-3",
+     "text": "The lead's own county record (queried by parcel id) gives the owner as a New Jersey corporation mailing from Allendale NJ.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520306%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"V. PAULIUS & ASSOCIATES, A NEW JERSEY CO RPORATION\",\"OwnerAddr1\":\"54 W ALLENDALE AVE\",\"OwnerAddr2\":\"ALLENDALE NJ 07401\"",
+     "context_before": "come all\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"taxdist\":\"55\",\"totassess\":152160,\"landassess\":152160,\"imprassess\":0,\"totappr\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/b44e1a41cbf6c86c18df7935.html"
+    }
+   ],
+   "open_items": [
+    "The Georgia Secretary of State search is a known wall; a person should pull the entity records (status, officers, registered agent) for the owner and for the related entities at the same address.",
+    "The other parcel adjoining on the south, 4601 Welcome All Rd # REAR (6.54 ac, built industrial), is held by a different, Atlanta-based LLC: the park has been partly sold off before, which suggests the owners do sell."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The first pass missed a historic church cemetery on this parcel's north line. In the county parcel map, one part of the Welcome All Road Cemetery parcel (4582 Welcome All Rd SW) shares about 61 m of the lead's north boundary, by my measurement from the county shapes. The cemetery's own association reports that a ground-penetrating-radar survey found over 30 unmarked burials. Georgia law forbids disturbing a known cemetery or burials to develop land without a local permit. The 2026 rewrite of that law (SB 146, as passed) allows a disturbance permit only for an 'abandoned' cemetery, and this one is actively maintained, fenced and mapped. Any graves that extend past the recorded line onto the north tip would therefore have to be avoided. This does not kill the lead, because the wide south end is where a building would fit. Still, a person must settle the cemetery's true edge and any local buffer before relying on the usable-acre and building-fit numbers. Second doubt: the owner is tied by mailing address to the industrial landlord whose built park adjoins on the south. The parcel may be held as that park's own expansion land or yard, not for sale. Nothing found shows it is listed or wanted by anyone else.",
+  "disputes": [
+   "market-3"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The county parcel record (queried by parcel id, not by name) shows parcel 09F350101520017 at 4582 Welcome All Rd SW as exempt cemetery land (class E4, land use 601) held by the Welcome All Road Cemetery Preservation Association. By my measurement from the county parcel shapes (a map-box query of layer 11 with geometry returned), one of its two polygon parts, about 0.3 acres, shares about 61 m of the lead parcel's north line. They share the corner vertex at about -84.52923, 33.63061.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520017%27&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"4582 WELCOME ALL RD SW\",\"AddrNumber\":\"4582\",\"AddrPreDir\":null,\"AddrStreet\":\"WELCOME ALL\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"WELCOME ALL ROAD CEMETERY PRESERVATION A \"",
+    "context_before": "s\":[{\"attributes\":{\"objectid\":38852,\"parcelid\":\"09f350101520017\",\"taxyear\":2027,",
+    "context_after": ",\"owneraddr1\":\"2781 britt dr\",\"owneraddr2\":\"douglasville ga 30135-2121\",\"taxdist",
+    "words_shared_with_url": [],
+    "page_file": "pages/5b4f75192bc040d94985434e.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The same record classes the cemetery parcel as exempt land, land use code 601, class E4, with no improvement value.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520017%27&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"TotAssess\":0,\"LandAssess\":21440,\"ImprAssess\":0,\"TotAppr\":53600,\"LandAppr\":53600,\"ImprAppr\":0,\"LUCode\":\"601\",\"ClassCode\":\"E4\"",
+    "context_before": "addr1\":\"2781 britt dr\",\"owneraddr2\":\"douglasville ga 30135-2121\",\"taxdist\":\"55\",",
+    "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":2.62,\"nbrhood\":\"9601\",\"subdiv\":null,\"sub",
+    "words_shared_with_url": [],
+    "page_file": "pages/5b4f75192bc040d94985434e.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The cemetery's preservation association says a GPS and ground-penetrating-radar mapping of the cemetery (2023) found over 30 unmarked burials. Unmarked graves exist here, and the recorded or fenced line may not be the edge of the burials.",
+    "source_url": "https://welcomeallcemetery.org/projects/",
+    "retrieved": "2026-11-13",
+    "quote": "We had the cemetery mapped with GPS and Ground Penetrating Radar. To prepare for the mapping, we had to have the cemetery meticulously cleaned of brush and debris.",
+    "context_before": "e center of the cemetery by todd pate tree service for $1500. - 2023 (complete) ",
+    "context_after": " this was completed by cameron's lawn service for $500. over 30 unmarked burials",
+    "words_shared_with_url": [],
+    "page_file": "pages/92be4d2f867f015b9cb4b668.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "Same page: the count of unmarked burials found by the radar mapping.",
+    "source_url": "https://welcomeallcemetery.org/projects/",
+    "retrieved": "2026-11-13",
+    "quote": "Over 30 unmarked burials were discovered. The cost for the mapping by Omega Mapping Systems was $3855.",
+    "context_before": "ned of brush and debris. this was completed by cameron's lawn service for $500. ",
+    "context_after": " we will incur an annual digital map subscription fee of $125 beginning next yea",
+    "words_shared_with_url": [],
+    "page_file": "pages/92be4d2f867f015b9cb4b668.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The association describes the site as a historic cemetery under active care: restoration, preservation, a survey and a perimeter fence. That is relevant to whether it could ever count as 'abandoned' under the 2026 law (below).",
+    "source_url": "https://welcomeallcemetery.org/",
+    "retrieved": "2026-11-13",
+    "quote": "Welcome All Road Cemetery Preservation Association Inc is a 501(c)(3) nonprofit volunteer group of individuals striving for the beautification, restoration, and preservation of historic Welcome All Road Cemetery in South Fulton, Georgia.",
+    "context_before": "rch for: home about us burial records projects sponsors contact us home welcome ",
+    "context_after": " please consider a tax-deductible contribution to help preserve, beautify, and r",
+    "words_shared_with_url": [],
+    "page_file": "pages/2bb414d459642b8ce49be447.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "Georgia DCA's cemetery FAQ (updated 01/01/2025) summarises O.C.G.A. 36-72: a known cemetery or burial may not be disturbed to develop or change the use of land without a permit from the local governing authority.",
+    "source_url": "https://dca.georgia.gov/document/resources/frequently-asked-questions-cemeteries-0/download",
+    "retrieved": "2026-11-13",
+    "quote": "Provides that no known cemetery or burial object shall be disturbed for purposes of developing or changing the use of that land unless a permit is first obtained from the local governing authority.",
+    "context_before": "en authority to assume care of an abandoned cemetery, as defined in this law. \u2022 ",
+    "context_after": " \u2022 sets out requirements for that permit, including 1) evidence of land ownershi",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/0fc3ac71bd4fb4ce98751eaa.pdf"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "The same FAQ says state law sets no buffer around a cemetery, but some Georgia cities and counties have local cemetery buffer ordinances. Whether South Fulton has one is not shown (its code is on Municode, a known wall).",
+    "source_url": "https://dca.georgia.gov/document/resources/frequently-asked-questions-cemeteries-0/download",
+    "retrieved": "2026-11-13",
+    "quote": "Some counties and cities in Georgia have now enacted local ordinances setting out buffers and other requirements a developer must follow when the project area includes a cemetery.",
+    "context_before": " is only required to not disturb the graves, in compliance with our state laws. ",
+    "context_after": " we recommend that you check with your local governing authorities, such as the ",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/0fc3ac71bd4fb4ce98751eaa.pdf"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "2026 Senate Bill 146, as passed and posted on the Governor's 2026 signed-legislation page, rewrites O.C.G.A. 36-72-4 so that a disturbance permit may be issued only for an 'abandoned cemetery'. The next sentence of the bill, not quoted here, reads 'unless such cemetery or burial ground constitutes an abandoned cemetery as defined in this chapter.' The effective date was not read.",
+    "source_url": "https://gov.georgia.gov/document/2026-signed-legislation/sb-146/download",
+    "retrieved": "2026-11-13",
+    "quote": "No disturbance permit shall be issued under this chapter in connection with any",
+    "context_before": "ct without first obtaining a 214 disturbance permit under this chapter. 215 (c) ",
+    "context_after": " 216 cemetery or burial ground or any human remains or burial objects therein un",
+    "pdf_page": 9,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/029d2621797b2bf88627aab9.pdf"
+   },
+   {
+    "id": "skeptic-9",
+    "text": "SB 146's definition of 'abandoned cemetery' starts with neglect and no one responsible for upkeep. A cemetery with an active preservation association does not obviously meet it, so graves found on the lead parcel could likely not be permitted for removal, only avoided (my reading).",
+    "source_url": "https://gov.georgia.gov/document/2026-signed-legislation/sb-146/download",
+    "retrieved": "2026-11-13",
+    "quote": "That shows signs of neglect including, without limitation, the unchecked growth",
+    "context_before": "(1) 'abandoned cemetery' means a cemetery which shows or burial ground: 118 (a) ",
+    "context_after": " 119 of vegetation, repeated and unchecked acts of vandalism, or the disintegrat",
+    "pdf_page": 6,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/029d2621797b2bf88627aab9.pdf"
+   }
+  ],
+  "open_items": [
+   "Commission a ground-penetrating-radar or archaeological check along the lead's north line beside the Welcome All Road Cemetery parcel, and get the cemetery's 2022 boundary survey (the association says Jackson Land Surveying did it). Find out whether any burials lie on 09F350101520306.",
+   "Ask City of South Fulton planning (and its Historic and Cultural Landmarks Commission) whether a cemetery buffer or setback applies to development next to 4582 Welcome All Rd SW, and confirm SB 146's effective date and final text.",
+   "Ownership of the lead and of the adjoining built park (4677 and 4601 Welcome All Rd) share one New Jersey mailing address. A person should find out, without contacting the owner through this process, whether the lead is held as the park's expansion land, trailer yard or stormwater area. Its zero improvement value does not rule out such a use (hence the dispute of market-3).",
+   "Seen, not verifiable: the county parcel shapes put single-family lots (4630 and 4650 Welcome All Rd, 4221 Kenwood Trl, and a residential-class lot at 0 Welcome All Rd) and a church (4590 Will Lee Rd) about 15 to 21 m from the lead's road frontage, i.e. across Welcome All Road, by my measurement. The adopted M-2 buffer rule toward residential use across a street could not be read (Municode). A 2020 draft zoning Article 4 on the city site mentions buffers adjacent to residential zoning but is a draft.",
+   "The Aerotropolis CIDs project page for Welcome All Rd (aacids.govocal.com/projects/welcome-all-rd) is JavaScript-only and showed no text. Web search results describe right-of-way purchases to realign Welcome All Road at Camp Creek Parkway, which by map position appears well north of this parcel, but that was not confirmed.",
+   "Seen, not verifiable: a third-party meeting summary in search results said the Planning Commission recommended R-5 for Z26-002 despite a staff recommendation of denial. That differs from plans-3's 'both recommended approval'. The council decision of 04/15/2026 is still unread."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council": {
+   "file": "pages/6a9332aef776107deaa2eed2.pdf",
+   "fetched_at": "2026-11-13T17:48:20Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+   "status": 200,
+   "bytes": 679724,
+   "sha256": "e2f21a620eeda971212840898f825b51dcf28e793f88eb4ee1dfa9d48e7bab0c"
+  },
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council": {
+   "file": "pages/c67f7bf26c75799059306249.pdf",
+   "fetched_at": "2026-11-13T17:48:30Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+   "status": 200,
+   "bytes": 896279,
+   "sha256": "71e8cd1cfc578a5b1fdb8fd91ec2fc0f9e252d340c12b14d1034ed0c29b58133"
+  },
+  "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases": {
+   "file": "pages/abbee3e1515f295c7a98c51c.html",
+   "fetched_at": "2026-11-13T17:48:40Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+   "status": 200,
+   "bytes": 490638,
+   "sha256": "7b65487235171574229b1f9306fb16483c47ded5fb07be2ad48b5e5bb8968d6a"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/0726cbe01adf4619ea32f305.html",
+   "fetched_at": "2026-11-13T17:48:42Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 49757,
+   "sha256": "7f24513d6b660faea2f5fed5594c1616657bced777146ac8605b7c777b5bc24b"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/3053776cbb45c2512309cd51.html",
+   "fetched_at": "2026-11-13T17:48:43Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 96473,
+   "sha256": "85f7144829f4d9e8a120faa1f2a42f7019d4c1580a732f3565a3c1df7ac21848"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6ec400dde5a92fcf74307601.html",
+   "fetched_at": "2026-11-13T17:48:44Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1213,
+   "sha256": "515af0b1e3eab932009564b816c35b707d1a81da7f271e9f1a5dcda11320f0d7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/e6b9560ec8e320b869501e99.html",
+   "fetched_at": "2026-11-13T17:48:45Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3941,
+   "sha256": "4fdedc8dd0a83d1c15e98d06287f6931a243d734c92e8c178684710c271eadc4"
+  },
+  "https://www.developfultoncounty.com/infrastructure.php": {
+   "file": "pages/5858d37902c1eecd3d4ac3d1.html",
+   "fetched_at": "2026-11-13T17:48:46Z",
+   "final_url": "https://www.developfultoncounty.com/infrastructure.php",
+   "status": 200,
+   "bytes": 26591,
+   "sha256": "a80f3fbb9847c431ee513e41ab31fe383d1398f166412c747463aea109da047f"
+  },
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13741/M25-002-0-Welcome-All-Road": {
+   "file": "pages/def9e231570393e11311a444.pdf",
+   "fetched_at": "2026-11-13T17:48:50Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13741/M25-002-0-Welcome-All-Road",
+   "status": 200,
+   "bytes": 1063620,
+   "sha256": "df114a52cd1018419b6e917306ad0ad039ce5e457d6afb263d681917c82d272f"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520306%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b44e1a41cbf6c86c18df7935.html",
+   "fetched_at": "2026-11-13T17:48:50Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520306%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4334,
+   "sha256": "dffee60c17f652711d47b766ef0416996157c7780f80e1768e98344e22e37e5a"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520017%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/5b4f75192bc040d94985434e.html",
+   "fetched_at": "2026-11-13T17:48:51Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520017%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4327,
+   "sha256": "29abccc0182c8333f7f10cac5e8e808f5de663d326c8f854ed571ab5c01a3c9b"
+  },
+  "https://welcomeallcemetery.org/projects/": {
+   "file": "pages/92be4d2f867f015b9cb4b668.html",
+   "fetched_at": "2026-11-13T17:48:53Z",
+   "final_url": "https://welcomeallcemetery.org/projects/",
+   "status": 200,
+   "bytes": 76200,
+   "sha256": "2fc4e2adf7fa6c6b048f64547833f44dba119ff781b154c744c7e65e78088272"
+  },
+  "https://welcomeallcemetery.org/": {
+   "file": "pages/2bb414d459642b8ce49be447.html",
+   "fetched_at": "2026-11-13T17:48:54Z",
+   "final_url": "https://welcomeallcemetery.org/",
+   "status": 200,
+   "bytes": 81247,
+   "sha256": "3d349b4d2bfe8a8a74dad12ac6c101e005cb6385a83d4ce42c10f1ac5e91a27b"
+  },
+  "https://dca.georgia.gov/document/resources/frequently-asked-questions-cemeteries-0/download": {
+   "file": "pages/0fc3ac71bd4fb4ce98751eaa.pdf",
+   "fetched_at": "2026-11-13T17:48:56Z",
+   "final_url": "https://dca.georgia.gov/document/resources/frequently-asked-questions-cemeteries-0/download",
+   "status": 200,
+   "bytes": 233761,
+   "sha256": "d2c34443fb63a55cc0f1d34b537d3eca6b33807ec9b676fbe749cf74dc3172e5"
+  },
+  "https://gov.georgia.gov/document/2026-signed-legislation/sb-146/download": {
+   "file": "pages/029d2621797b2bf88627aab9.pdf",
+   "fetched_at": "2026-11-13T17:48:57Z",
+   "final_url": "https://gov.georgia.gov/document/2026-signed-legislation/sb-146/download",
+   "status": 200,
+   "bytes": 159186,
+   "sha256": "00dce75318f03da0f8c0ecfe8073f15bce233a773941541757574fe94ad668a0"
+  }
+ },
+ "quotecheck": {
+  "kept": 29,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-13T17:48:58Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "aebc73424c5c93b7a28ec78eed9bc05cdb8b090767313f2b8e75c028f75f43b8",
+   "skeptic.json": "21588e7d7408420d8c38b2eac6adb0be9144415a76c7088358b8e796bf5caa03"
+  }
+ },
+ "dropped_claims": []
+}

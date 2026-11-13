@@ -1,0 +1,125 @@
+{
+ "schema": 1,
+ "parcel_id": "09F110000440513",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Fairburn's zoning text (Municode) could not be read under the rules (known wall), so whether warehouse/distribution is permitted by right in M-2, and with what conditions, is not confirmed from the district text. Ask Fairburn Planning and Zoning for a zoning verification letter (the city publishes a Zoning Verification Process form) naming the M-2 district and any conditions of a past rezoning or annexation.",
+    "The screener's M-2 label comes from Fairburn's ArcGIS Online layer, which the rules cannot fetch; confirm it on the city's Official Zoning Map PDF or with staff.",
+    "Fairburn is in the GA Highway 74 / US Highway 29 overlay system named in the 2025 plan's compatibility table; confirm whether any overlay applies to this parcel."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "text": "Fairburn's comprehensive plan lists warehousing and manufacturing as appropriate development types for its Industrial future development category, with M-2 among the appropriate zoning districts. (The parcel's own category on the 2025 Future Development Map was not read from the map; the screener's layer says Industrial.)",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Conservation; parks and recreation; public/ institutional uses (schools, places of worship, and civic facilities); large office; warehousing; manufacturing; utilities."
+    },
+    {
+     "text": "The plan's Industrial category is for heavy industrial and logistics uses and calls for connectivity to I-85 and freight corridors.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "This area is designated for traditional and heavy industrial uses that drive economic development through manufacturing, processing, and logistics operations. It supports regional employment and logistics infrastructure."
+    },
+    {
+     "text": "The plan places an existing industrial pocket south of I-85 around Oakley Industrial Boulevard; the county parcel query around this parcel returns neighbours on Oakley Industrial Blvd (see market claims), so the parcel sits in that existing industrial area.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Industrial and utility uses are concentrated between the two corridors along and south of Fairburn Industrial Boulevard and a pocket south of I-85 around Oakley Industrial Boulevard."
+    },
+    {
+     "text": "The plan quoted above is the one adopted in October 2025.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "The plan went through one more round of final review and was adopted by City Council in October 2025."
+    },
+    {
+     "text": "Fairburn's current list of pending zoning and development cases (fetched 2026-11-13) has four cases; none is on Graham Road or this parcel id.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "project name proposed use type of request location next step durham lakes (gas station) gas station concept plan 101 durham lake pkwy on hold, under review rivertown (gas station) gas station rezoning and variance 6900 rivertown rd on hold, under review drb campbell commons single family detached rezoning r-3 to r-ct campbellton fairburn road, fairburn ga 30213 (parcel#09f180200131441) mayor and city council 10/26/2026 nexmetro acquisitions, llc (c/o steven l. jones, mckagen jones) multi family residential, conservation, and institutional rezoning oi and ag to pd -planned development and variance 0 milam road, fairburn, ga, parcels: 09f020400070093 & 09f020400070143 mayor and city council 11/09/2026"
+    },
+    {
+     "text": "The city's other (2025) pending-cases page lists four cases; none is on Graham Road or this parcel id.",
+     "source_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "project name proposed use type of request location next step t5 data center data center concept plan gullatt rd. on hold - dri required durham lakes (gas station) gas station concept plan 101 durham lake pkwy. pz meeting - 09/02/2025 curry bend (commercial and residential) commercial and residential final plat 0 bohannon road & 6560 bohannon road pz meeting - 09/02/2025 chick-fil-a restaurant / construction complete final plat 7810 senoia rd. mayor and city council - 09/02/2025"
+    },
+    {
+     "text": "A March 2022 Fairburn administrator report lists a 'Graham Road Site' land disturbance permit issued 2 April 2021. The report does not say which parcel; the county record still shows no improvements on this one.",
+     "source_url": "https://www.fairburn.com/ArchiveCenter/ViewFile/Item/69",
+     "retrieved": "2026-11-13",
+     "quote": "Graham Road Site Land Disturbance Permit April 2nd, 2021"
+    }
+   ],
+   "open_items": [
+    "Confirm on the 2025 Future Development Map (plan PDF, 158 MB, maps not text) that this parcel is in the Industrial category and not Warehouse District or another category.",
+    "Ask Fairburn which parcel the April 2021 'Graham Road Site' land disturbance permit covered, and whether any concept plan or LDP has been filed on this parcel.",
+    "Fairburn's agenda center loads by JavaScript and was not read; past Planning Commission and Council agendas (2021-2026) for this parcel were not checked."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map was reachable: Fairburn's GIS is on ArcGIS Online (known wall). Ask Fairburn Utilities (water, sewer, electric are city departments) for the nearest water main and sewer line to Graham Road and for capacity. The assessor's 'All public' code in the brief is the only sign so far.",
+    "Neighbouring parcels carry built warehouses (county records, market claims), which suggests service is near, but no map shows it."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "text": "No public sign of a sale or pending application: Fairburn's current pending zoning and development case list does not include this parcel or Graham Road.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "project name proposed use type of request location next step durham lakes (gas station) gas station concept plan 101 durham lake pkwy on hold, under review rivertown (gas station) gas station rezoning and variance 6900 rivertown rd on hold, under review drb campbell commons single family detached rezoning r-3 to r-ct campbellton fairburn road, fairburn ga 30213 (parcel#09f180200131441) mayor and city council 10/26/2026 nexmetro acquisitions, llc (c/o steven l. jones, mckagen jones) multi family residential, conservation, and institutional rezoning oi and ag to pd -planned development and variance 0 milam road, fairburn, ga, parcels: 09f020400070093 & 09f020400070143 mayor and city council 11/09/2026"
+    },
+    {
+     "text": "The county parcel record for this parcel (queried by parcel id) shows land value only and zero improvement value: the assessor sees it as vacant industrial land, not an operating use.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F110000440513%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"GRAHAM OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":190960,\"LandAssess\":190960,\"ImprAssess\":0,\"TotAppr\":477400,\"LandAppr\":477400,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\""
+    },
+    {
+     "text": "The county parcel layer, queried by a map box around this parcel (not by owner), returns a built warehouse parcel at 4800 Coates Dr (12.59 ac, $12.1M improvements) owned by a different LLC with the same New York mailing address and suite as this parcel's owner. My measurement from the shapes puts it about 135 ft from this parcel. This parcel is likely held alongside an operating warehouse portfolio, so it may be expansion or excess land rather than a stand-alone sale.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5492,33.5500,-84.5431,33.5565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4800 COATES DR 2\",\"AddrNumber\":\"4800\",\"AddrPreDir\":null,\"AddrStreet\":\"COATES\",\"AddrSuffix\":\"DR\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":\"2\",\"Owner\":\"COATES E OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":5160000,\"LandAssess\":304360,\"ImprAssess\":4855640,\"TotAppr\":12900000,\"LandAppr\":760900,\"ImprAppr\":12139100,\"LUCode\":\"398\",\"ClassCode\":\"I5\""
+    }
+   ],
+   "open_items": [
+    "No for-sale listing was checked: CoStar, LoopNet and Crexi are off limits, and the web search surfaced their listings for other Graham Rd addresses, which were not opened or used.",
+    "The brief's 'same owner for 27 years' rests on a 1999 deed; an LLC with a Hudson Yards suite address suggests a later transfer the CAMA extract may not show. Pull the current deed before relying on the long-hold seller signal.",
+    "The same owner also holds a 4.3 ac parcel at 0 Oakley Rd (09F050000360792, county query by map box), about 100 ft away by my measurement; ask whether the two are offered together."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "text": "Reading of county records, not a Secretary of State record: the owning LLC mails to the same New York office suite as the LLC that owns the built 12.59 ac warehouse at 4800 Coates Dr nearby, which looks like an institutional investor's single-asset entities.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5492,33.5500,-84.5431,33.5565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4800 COATES DR 2\",\"AddrNumber\":\"4800\",\"AddrPreDir\":null,\"AddrStreet\":\"COATES\",\"AddrSuffix\":\"DR\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":\"2\",\"Owner\":\"COATES E OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":5160000,\"LandAssess\":304360,\"ImprAssess\":4855640,\"TotAppr\":12900000,\"LandAppr\":760900,\"ImprAppr\":12139100,\"LUCode\":\"398\",\"ClassCode\":\"I5\""
+    },
+    {
+     "text": "The county record for this parcel (queried by parcel id) gives the owner as an LLC mailing to a New York office suite.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F110000440513%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"GRAHAM OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":190960,\"LandAssess\":190960,\"ImprAssess\":0,\"TotAppr\":477400,\"LandAppr\":477400,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\""
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State records (status, formation date, registered agent, principal office) could not be read (known wall). A person should pull the entity record and the current deed.",
+    "Whether the owner is a developer, an investor or a fund vehicle, and whether the parcel is part of a larger portfolio, needs title and SoS research by a person."
+   ]
+  }
+ }
+}

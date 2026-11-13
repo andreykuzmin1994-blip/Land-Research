@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "parcel_id": "09F140000615103",
+  "skeptic": {
+    "verdict": "killed",
+    "objection": "This is not land: it is the site of an operating roughly 156,000 sq ft manufacturing building. Fulton County's parcel map draws the lead parcel as an outer boundary with an inner ring cut out of it, and that inner ring is, point for point, the polygon of the separate improvements-only record at the same address (no land, $22.4 million of improvements, class I1). The 13.9 ac therefore surround the building, and the open ground the screen saw is the plant's yard, parking and truck court, which is why no envelope fitted. A pharmaceutical manufacturer is registered at the address through 2027 (first-pass market-2), and the 2021 sale at $16.7 million is a building price, not a land price.",
+    "disputes": ["plans-1", "plans-2"],
+    "claims": [
+      {
+        "text": "Asked by parcel id (09F140000615103 and 09F140000615111, outSR=4326), Fulton County's parcel layer returns the lead parcel's polygon with two rings: an outer boundary and, after it, an inner ring (a hole). The quote runs from the last point of the outer ring into the first points of the inner ring. The inner ring's points are the same points as the improvements record's polygon (next claim), so the hole in the lead parcel is the building record.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "[-84.519940943419144,33.574427331212199]],[[-84.521760204507473,33.572805926389179],[-84.521767700906281,33.571862065899687],[-84.520536461854277,33.571840839256829],[-84.520518412887512,33.573005109771209]"
+      },
+      {
+        "text": "In the same answer, the improvements-only record at 6715 Oakley Industrial Blvd has one ring made of the same five corner points as the hole in the lead parcel (listed in a different order). Computed by the skeptic from these coordinates: the hole is about 156,000 sq ft, the outer boundary about 13.2 ac, and the land left around the building about 9.6 ac.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"rings\":[[[-84.520518412887512,33.573005109771209],[-84.520536461854277,33.571840839256829],[-84.521767700906281,33.571862065899687],[-84.521760204507473,33.572805926389179],[-84.521493175070844,33.573019019171028]"
+      },
+      {
+        "text": "The same answer gives that improvements record no land value and no acreage, $22,407,900 of improvements, land-use code 405 and class I1: a building appraised at about 27 times the lead parcel's land value ($832,100).",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=FeatureID+IN+%28%2709F140000615103%27%2C%2709F140000615111%27%29&outFields=*&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"TotAppr\":22407900,\"LandAppr\":0,\"ImprAppr\":22407900,\"LUCode\":\"405\",\"ClassCode\":\"I1\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":null"
+      }
+    ],
+    "open_items": [
+      "The brief's map point (-84.520819, 33.572517) falls inside the hole, that is, on the building record and not on the lead parcel's land (skeptic's own computation from the coordinates above). The first pass's utility queries (utilities-1, utilities-2) were asked at that point. That does not change the verdict, but the empty pipe answer in utilities-2 says nothing about service to an operating plant.",
+      "plans-1 and plans-2 describe what the District-Industrial character area is for, in general. Neither quote places this parcel in that area, so they do not carry the 'supports' verdict at parcel scale. The question is moot for a built site.",
+      "Seen, not verifiable: a search result title from atlmainstreet.com reads 'Dendreon commits to 10 more years in Union City'. The page was not opened (the first pass reports that its robots.txt disallows all agents). If it is right, the building is leased to its operator until about 2029.",
+      "Not reached: dendreon.com did not answer (protocol error, then an empty reply on robots.txt), so the operator's own page was not read.",
+      "Screener gap for the person: a land record with a hole in its polygon and an improvements-only record (no land, class I1) at the same address should count as built on. The same-owner parcel 09F260001250088 was screened out as built on, which fits an owner holding leased industrial buildings rather than land.",
+      "If the 9.6 ac around the building matter at all, they are the occupant's yard, parking and truck court. Any surplus would have to come from the owner or tenant carving it out, not from a land purchase."
+    ]
+  }
+}

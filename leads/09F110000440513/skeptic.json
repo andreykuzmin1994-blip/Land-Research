@@ -1,0 +1,76 @@
+{
+ "schema": 1,
+ "parcel_id": "09F110000440513",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The owner is not a 27-year holder. It is one of five new KKR affiliate LLCs that took over a Fairburn industrial portfolio in September 2025: the Development Authority of Fulton County minutes approve assigning the 7250 Graham Road bond project to an LLC with this parcel's owner name, to affiliates of KKR, from an industrial trust that Clarion Partners appeared for. The county parcel layer puts that built 254,000 sq ft warehouse right beside this parcel, and the same owner also holds a 4.3 ac vacant lot at 0 Oakley Rd next to it. So the parcel looks like excess or expansion land that an institutional investor bought about 14 months ago with the neighbouring building. The screener also found no fit for the smallest building envelope here, so its likely use is yard, trailer parking or expansion for that same owner. The 'same owner for 27 years' and long-hold seller signals in the brief rest on a stale 1999 deed. Nothing shows the land is unavailable, but a person should expect a recent buyer who may not sell, and confirm it first.",
+  "disputes": [
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "text": "In September 2025 the Development Authority of Fulton County approved assigning the 2003 bond projects, among them 7250 Graham Road, from LIT/Hodges Industrial Trust to five LLCs. One of them has the same name as this parcel's owner in the county record. (This is read from the authority's minutes. The authority was not searched by owner name: the page came from a search on the street address 7250 Graham Road.)",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Projects from LIT/Hodges Industrial Trust to Oakley A Owner LLC, Lakeview Owner LLC, Graham Owner LLC, Whitewater B Owner LLC, and Southpark Owner LLC, or affiliates thereof (Address: 5150 Oakley Industrial Blvd, 105 Lakeview Court, 7250 Graham Road, 1305 Whitewater Place and 7760 Spence Road, Fulton County, Georgia)."
+   },
+   {
+    "text": "The same minutes say the portfolio (about $70 million invested and a million square feet developed) was being assigned to affiliates of KKR. So this parcel's owner looks like a recent institutional buyer, about 14 months ago, not a 1999 holder.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Mr. Kennedy gave a brief history and overview of the project, stating that $70 million had been invested and a million square feet developed with associated job creation. The owner is now seeking to assign these transactions to affiliates of KKR."
+   },
+   {
+    "text": "The authority approved the assignments, including the one to the LLC with this parcel's owner name.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "the Authority approved the assignments to Oakley A Owner LLC, Lakeview Owner LLC, Graham Owner LLC, Whitewater B Owner LLC, and Southpark Owner LLC, or affiliates thereof."
+   },
+   {
+    "text": "The minutes are of the authority's meeting on 25 September 2025.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "REGULAR MEETING HELD ON THURSDAY, SEPTEMBER 25, 2025 AT 2:00 P.M."
+   },
+   {
+    "text": "I asked the county parcel layer for every parcel in a small box drawn just around this parcel's outline (lon -84.5476 to -84.5447, lat 33.5510 to 33.5550, by coordinates, not by owner). It returns 7250 Graham Rd, title held by the Development Authority (the usual bond-lease set-up), with $8.4M of improvements. That is the warehouse in the bond project assigned above, so the owner's operating building sits right beside this parcel.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5476,33.5510,-84.5447,33.5550&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"7250 GRAHAM RD\",\"AddrNumber\":\"7250\",\"AddrPreDir\":null,\"AddrStreet\":\"GRAHAM\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"DEVELOPMENT AUTHORITY OF FULTON COUNTY \",\"OwnerAddr1\":\"7250 GRAHAM RD\",\"OwnerAddr2\":\"FAIRBURN GA 30213\",\"TaxDist\":\"25D\",\"TotAssess\":2635700,\"LandAssess\":281540,\"ImprAssess\":2354160,\"TotAppr\":9413200,\"LandAppr\":1005500,\"ImprAppr\":8407700,\"LUCode\":\"888\",\"ClassCode\":\"C5\""
+   },
+   {
+    "text": "The same box query returns a second vacant parcel, 0 Oakley Rd (4.3 ac, no improvements), owned by an LLC with the same name and New York suite as this parcel's owner. The owner holds vacant land on both sides of its buildings, which looks like held expansion or excess land.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5476,33.5510,-84.5447,33.5550&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"0 OAKLEY RD\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"OAKLEY\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"GRAHAM OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":236000,\"LandAssess\":236000,\"ImprAssess\":0,\"TotAppr\":590000,\"LandAppr\":590000,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"C4\""
+   },
+   {
+    "text": "The 7250 Graham Road warehouse was built from March 2021 to March 2022. That matches the 'Graham Road Site' land disturbance permit of 2 April 2021 in the first pass's plans-7, so that permit most likely covered the neighbouring building and not this parcel (an inference, not shown on the permit).",
+    "source_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+    "retrieved": "2026-11-13",
+    "quote": "Construction began in March 2021 and was completed in March 2022."
+   },
+   {
+    "text": "Clarion's own page says the 7250 Graham Road building stands in Southpark, a master-planned industrial park. Any private covenants or owners' association rules for Southpark could limit what is built on this parcel, and none were read.",
+    "source_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+    "retrieved": "2026-11-13",
+    "quote": "the project was built on 18.4 acres of land within Southpark, a master-planned industrial development."
+   },
+   {
+    "text": "The neighbouring building is a 253,774 sq ft distribution warehouse developed by Clarion Partners with Seefried. Clarion's representative appeared at the 2025 assignment, which fits the seller being a Clarion-managed trust.",
+    "source_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+    "retrieved": "2026-11-13",
+    "quote": "In conjunction with Seefried Industrial Properties, Clarion Partners commenced the development of a 253,774 square feet warehouse distribution building in Fairburn, GA."
+   }
+  ],
+  "open_items": [
+   "plans-1 is disputed only in part. Its claim text says M-2 is among the Industrial category's appropriate zoning districts, but the quote lists only development types. The page text after the quote reads 'o&i, c-2, m-1,' and is cut off there, so M-2 is not shown in what was checked. Read the full line on plan page 144.",
+   "Pull the current deed and the DAFC fact sheet for the September 2025 assignment. Confirm that this 9.55 ac parcel (0 Graham Rd) went to the KKR affiliate in that 2025 portfolio purchase, and whether it is tied to the 7250 Graham Road bond project (expansion land, parking or stormwater for that building) or is free-standing excess land.",
+   "The brief's 'same owner for 27 years' (1999 deed) and 'owner mails from out of state' signals should not be read as long-hold seller motivation. The county yearly-sales layers for 2018 to 2022 returned no sale in a box around this parcel; the 2025 transfer may not be in those layers yet, or was not a qualified sale.",
+   "The brief's building-fit check found no placement for the smallest 400 x 445 ft envelope. Together with the same owner's warehouse next door, the parcel's realistic use may be yard, trailer parking or expansion for that building, and its most likely buyer may be the owner itself. A person should ask whether the owner would sell it on its own.",
+   "Check for Southpark private covenants or an owners' association (recorded declaration) that limit use, access or outdoor storage on this parcel.",
+   "Seen, not verifiable: one web search (on the street address) returned a LoopNet property record for this parcel id among its results. It was not opened or used, and LoopNet is off limits.",
+   "Not checked: qPublic (Schneider) disallows Anthropic crawlers in robots.txt, so the county sales history page was not fetched."
+  ]
+ }
+}

@@ -1,0 +1,509 @@
+{
+ "schema": 1,
+ "parcel_id": "14 006800060376",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "City of Atlanta's own zoning district layer, queried at a point inside this parcel (33.674261, -84.39638), returns district I-1, and the layer itself links I-1 to the Light Industrial District Regulations chapter of the city code. The district text (on Municode) could not be read under the rules, so whether warehouse/distribution is permitted by right is not confirmed from the text; the verdict is left unknown for that reason only.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ZONECLASS\":\"I-1\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH16LIINDIRE\"",
+     "context_before": "\"alias\":\"zoningcode\",\"length\":255}],\"features\":[{\"attributes\":{\"objectid\":10717,",
+     "context_after": ",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",\"spi\":\" \",\"subar",
+     "words_shared_with_url": [],
+     "page_file": "pages/9038d76c1a906cac0f8821ab.html"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The same zoning record has blank SPI, subarea, TSA and rezoning case-in fields and status Current: the city's map shows plain I-1, with no conditional (-C) suffix, special public interest district or case number attached.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"SPI\":\" \",\"SUBAREA\":\" \",\"TSA\":\" \",\"STATUS\":\"Current\",\"CASEIN\":\" \",\"CASEOUT\":\" \",\"SUNRISE\":-2208988800000",
+     "context_before": "zo_ch16liindire\",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",",
+     "context_after": ",\"sunset\":32503593600000,\"createdate\":null,\"createdby\":\" \",\"created_user\":\"gis\",",
+     "words_shared_with_url": [],
+     "page_file": "pages/9038d76c1a906cac0f8821ab.html"
+    },
+    {
+     "id": "zoning-3",
+     "text": "City zoning queried with a box around the parcel plus 100 ft returns, besides the I-1 district, an R-4 single-family residential district. My own measurement from the returned shapes (approximate, local projection) puts the R-4 district touching the parcel along roughly 400 ft of its north-east side. Atlanta's code typically requires transitional yards/screening where industrial abuts residential; that text was not read (Municode wall).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39718%2C33.67312%2C-84.39526%2C33.67540&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"OBJECTID\":12090,\"ZONECLASS\":\"R-4\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH6SIMIREDIRE\"",
+     "context_before": ".len\":1571.56862881488,\"zoningcode\":\"multi-family residential\"}},{\"attributes\":{",
+     "context_after": ",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",\"spi\":\" \",\"subar",
+     "words_shared_with_url": [],
+     "page_file": "pages/fa948d9dc89df4cd7154e78d.html"
+    },
+    {
+     "id": "zoning-4",
+     "text": "The same box query also returns a small RG-2 (residential general) district; by my measurement from the shapes it lies about 25 ft from the parcel's east side.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39718%2C33.67312%2C-84.39526%2C33.67540&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"OBJECTID\":10743,\"ZONECLASS\":\"RG-2\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH8REGEDIRE\"",
+     "context_before": "26098,\"shape.len\":9500.0138469481499,\"zoningcode\":\"industrial\"}},{\"attributes\":{",
+     "context_after": ",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",\"spi\":\" \",\"subar",
+     "words_shared_with_url": [],
+     "page_file": "pages/fa948d9dc89df4cd7154e78d.html"
+    },
+    {
+     "id": "zoning-5",
+     "text": "The city's zoning overlay layer, queried at the same point inside the parcel, returns no overlay district.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/cfdc140f7a8eb126df78c9c3.html"
+    }
+   ],
+   "open_items": [
+    "Atlanta's zoning text is on Municode (known wall), and the city's main site (atlantaga.gov) answers robots.txt with 403; an attempt to read a third-party copy of the code (atlanta.elaws.us) timed out at robots.txt. Ask Atlanta Office of Zoning and Development for a zoning verification letter confirming warehouse/distribution is a permitted use in I-1 on this parcel and listing any conditions.",
+    "The parcel abuts R-4 single-family zoning and single-family homes (see market claims): ask what transitional yard, buffer, screening, height and truck-access restrictions apply on the residential sides; these could take a large share of a 9.4 ac site and may explain why the screener found no building envelope.",
+    "Confirm frontage/truck access: the parcel's road frontage is on Mount Zion Rd SW, which the county parcel layer shows lined with single-family homes; trucks may have to pass homes to reach I-75."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "The city's Development Patterns / Future Land Use layer, queried at a point inside the parcel, returns land use code I, Industrial.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\",\"LASTUPDATE\":null",
+     "context_before": "d_1\":0.0,\"pin\":\"industrial\",\"conversion\":\"flu only\",\"ndp\":\"i\",\"fid_l8land\":2040,",
+     "context_after": ",\"lasteditor\":\" \",\"density\":\" \",\"far\":\" \",\"history\":\"industrial\",\"acres\":30.9408",
+     "words_shared_with_url": [],
+     "page_file": "pages/dec66f5a76e363e2f39d022f.html"
+    },
+    {
+     "id": "plans-2",
+     "text": "The city's rezoning case layer, queried within 1,500 ft of a point inside the parcel, returns four cases, all from R-4 residential (three R-4 to R-4A in 2024-2025, one R-4 to MR-2 in 2006); none is industrial and none covers this I-1 parcel, so no rezoning of this parcel is on the city's case layer.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"R-4A\",\"DOCKET_NO\":\"Z-24-052\",\"STATUS\":\"COMPLETE\"",
+     "context_before": "\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":92481,",
+     "context_after": ",\"final_upda\":1729468800000,\"status_subtype\":2,\"ordinance\":\"24-o-1421\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/20cada0862e9cbd53daaf6fc.html"
+    },
+    {
+     "id": "plans-3",
+     "text": "Second of the four nearby cases: a 2006 rezoning from R-4 to MR-2 (4.85 ac); residential, not on this parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"MR-2\",\"DOCKET_NO\":\"Z-06-068\",\"STATUS\":\"COMPLETE\"",
+     "context_before": "hape.len\":877.01766933423903,\"addl_legis\":null}},{\"attributes\":{\"objectid\":2761,",
+     "context_after": ",\"final_upda\":null,\"status_subtype\":2,\"ordinance\":\"06-o-1440\",\"ordhyperlink\":\"ht",
+     "words_shared_with_url": [],
+     "page_file": "pages/20cada0862e9cbd53daaf6fc.html"
+    },
+    {
+     "id": "plans-4",
+     "text": "The city's special use permit layer, queried within 1,500 ft, returns a 2025 'New Application', docket U-25-028, on a site of about 923,000 sq ft (about 21 ac). By my measurement from its shape it lies about 515 ft north of this parcel and does not touch it. A web search result (third-party summary, not verified) described U-25-28 as a park-for-hire facility at 200/230 Cleveland Ave SW.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"APPSTATUS\":\"New Application\",\"CREATED_DATE\":1754927419000,\"CREATED_USER\":\"SHENDERSON\",\"DATE_APP\":null,\"GRANTEE\":null,\"LAST_EDITED_DATE\":1754927814000,\"LAST_EDITED_USER\":\"SHENDERSON\",\"ORDINANCE\":null,\"SUP_DOCKET\":\"U-25-028\",\"SUP_TYPE\":null,\"GLOBALID\":\"{01066FF3-631A-4525-8BE6-73B0D2D72333}\",\"SHAPE.AREA\":923180.06530026102",
+     "context_before": "6715688629105}},{\"attributes\":{\"objectid\":42886,\"address\":null,\"appr_date\":null,",
+     "context_after": ",\"shape.len\":4269.0204510328404}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/05020e4f1f2173f706379782.html"
+    },
+    {
+     "id": "plans-5",
+     "text": "The city's building moratorium layer, queried at a point inside the parcel, returns no moratorium.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "gth\":8},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/b2df91ab8feb3596ae712b80.html"
+    }
+   ],
+   "open_items": [
+    "Seen, not verifiable: the Atlanta Zoning Committee agenda on atlantacityga.iqm2.com (search result) lists U-25-28 / 26-O-1054 for 200 Cleveland Ave SW; iqm2's robots.txt asks a 60 s crawl delay, so it was not fetched. Ask the city for the outcome of U-25-28 (a large truck/park-for-hire use about 500 ft north would be a logistics neighbour).",
+    "The future land use layer's link to the adopted Comprehensive Development Plan (and its adoption date) was not read; confirm the parcel's character area in the current Atlanta CDP.",
+    "Nearby rezonings are residential (R-4 to R-4A, 2024-2025), so the surrounding neighbourhood is being reinforced as residential; ask planning whether opposition to industrial/truck use on this edge is likely."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map could be read: the Watershed Management GIS server (egis.atlantaga.gov) lists no public services in its MapWF folder and the WasteWater1c service named in search results answers 'not found'. Ask the City of Atlanta Department of Watershed Management for the nearest water main and sewer line to 0 Mount Zion Rd SW and for capacity.",
+    "The assessor's code in the brief reads all public / unknown; the neighbouring single-family homes suggest water at least is in the street, but no map shows it."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "The county parcel record (queried by parcel id) shows land value only and zero improvement value: vacant land, not an operating or built use, assessed at $293,600.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20006800060376%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":117440,\"LandAssess\":117440,\"ImprAssess\":0,\"TotAppr\":293600,\"LandAppr\":293600,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"I4\"",
+     "context_before": "addr1\":\"3717 roswell rd ste 100\",\"owneraddr2\":\"atlanta ga 30342\",\"taxdist\":\"05\",",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":9.38,\"nbrhood\":\"c906\",\"subdiv\":null,\"sub",
+     "words_shared_with_url": [],
+     "page_file": "pages/3023686deab3c455d0fde64f.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The city's special use permit layer queried exactly at a point inside the parcel returns nothing: no special use permit application on this parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/3043de66003f9501e1ec070a.html"
+    },
+    {
+     "id": "market-3",
+     "text": "No rezoning on this parcel appears on the city's rezoning case layer within 1,500 ft (the four cases returned are residential R-4 cases, none on this I-1 parcel); there is no sign of an application by a developer.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4\",\"TO_ZONE\":\"R-4A\",\"DOCKET_NO\":\"Z-24-052\",\"STATUS\":\"COMPLETE\"",
+     "context_before": "\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":92481,",
+     "context_after": ",\"final_upda\":1729468800000,\"status_subtype\":2,\"ordinance\":\"24-o-1421\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/20cada0862e9cbd53daaf6fc.html"
+    },
+    {
+     "id": "market-4",
+     "text": "The county parcel layer queried by a map box around the parcel (not by owner) shows the same LLC also owns a 1.0 ac vacant industrial-coded parcel at 0 Waters Rd SW rear, so the industrial land on offer may be about 10.4 ac together.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"0 WATERS RD SW REAR\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"WATERS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":\"REAR\",\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD STE 100\",\"OwnerAddr2\":\"ATLANTA GA 30342\",\"TaxDist\":\"05\",\"TotAssess\":31360,\"LandAssess\":31360,\"ImprAssess\":0,\"TotAppr\":78400,\"LandAppr\":78400,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"I3\",\"ExCode\":null,\"LivUnits\":null,\"LandAcres\":1.0",
+     "context_before": "6}},{\"attributes\":{\"objectid\":90444,\"parcelid\":\"14 006800060368\",\"taxyear\":2027,",
+     "context_after": ",\"nbrhood\":\"c906\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":n",
+     "words_shared_with_url": [],
+     "page_file": "pages/2b38b7c78472308cfc256b92.html"
+    },
+    {
+     "id": "market-5",
+     "text": "The same box query shows single-family homes on Mount Zion Rd beside the parcel, e.g. 167 Mount Zion Rd, a 0.225 ac residential lot with a homestead exemption.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":\"HA01\",\"LivUnits\":1,\"LandAcres\":0.225",
+     "context_before": "\":14200,\"imprassess\":127000,\"totappr\":353000,\"landappr\":35500,\"imprappr\":317500,",
+     "context_after": ",\"nbrhood\":\"1445\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":n",
+     "words_shared_with_url": [],
+     "page_file": "pages/2b38b7c78472308cfc256b92.html"
+    }
+   ],
+   "open_items": [
+    "Three web searches (by site address and road names, not owner) found no listing, news, development authority release or DRI for this parcel; listing sites were not visited and CoStar/LoopNet/Crexi were not used. Absence of a sign is not 'not for sale'.",
+    "Ask the city whether any land disturbance or building permit has been filed on 0 Mount Zion Rd SW (permit records on the city's main site could not be read)."
+   ]
+  },
+  "owner": {
+   "verdict": "holding_entity",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "The county record for this parcel (queried by parcel id) gives the owner as an LLC mailing to an office suite on Roswell Rd in Atlanta (30342).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20006800060376%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD STE 100\",\"OwnerAddr2\":\"ATLANTA GA 30342\"",
+     "context_before": "unt zion\",\"addrsuffix\":\"rd\",\"addrposdir\":\"sw\",\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"taxdist\":\"05\",\"totassess\":117440,\"landassess\":117440,\"imprassess\":0,\"totappr\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/3023686deab3c455d0fde64f.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "Reading of county records, not a Secretary of State record: the same LLC owns 2931 Waters Rd SW, a house lot next to this parcel, alongside the 9.4 ac industrial parcel.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"2931 WATERS RD SW\",\"AddrNumber\":\"2931\",\"AddrPreDir\":null,\"AddrStreet\":\"WATERS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD STE 100\",\"OwnerAddr2\":\"ATLANTA GA 30342\",\"TaxDist\":\"05\",\"TotAssess\":63200,\"LandAssess\":38560,\"ImprAssess\":24640,\"TotAppr\":158000,\"LandAppr\":96400,\"ImprAppr\":61600,\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":null,\"LivUnits\":1",
+     "context_before": "6}},{\"attributes\":{\"objectid\":90263,\"parcelid\":\"14 006800010355\",\"taxyear\":2027,",
+     "context_after": ",\"landacres\":0.5308,\"nbrhood\":\"1445\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/2b38b7c78472308cfc256b92.html"
+    },
+    {
+     "id": "owner-3",
+     "text": "It also owns 2925 Waters Rd SW, another house lot, so the LLC holds a small assemblage (the industrial parcel, a 1.0 ac rear industrial lot, two house lots and a 0.27 ac lot) that looks like a long-held land-holding vehicle named for the site (the brief gives the last sale as 2000).",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"2925 WATERS RD SW\",\"AddrNumber\":\"2925\",\"AddrPreDir\":null,\"AddrStreet\":\"WATERS\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":\"SW\",\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"ZION SEVENTY FIVE PROPERTY LLC \",\"OwnerAddr1\":\"3717 ROSWELL RD NE\",\"OwnerAddr2\":\"ATLANTA GA 30342\",\"TaxDist\":\"05\",\"TotAssess\":63200,\"LandAssess\":36360,\"ImprAssess\":26840,\"TotAppr\":158000,\"LandAppr\":90900,\"ImprAppr\":67100,\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":null,\"LivUnits\":1",
+     "context_before": "4}},{\"attributes\":{\"objectid\":90351,\"parcelid\":\"14 006800010348\",\"taxyear\":2027,",
+     "context_after": ",\"landacres\":0.4649,\"nbrhood\":\"1445\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/2b38b7c78472308cfc256b92.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State business search is a known wall: entity status, formation date, principal office and registered agent were not read. Pull the record by hand.",
+    "Ask whether the two house lots the LLC owns are rented or vacant, and whether they could serve as access or buffer for the industrial parcel."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "Nothing found shows a building, a developer or a sale on this parcel, and the city's own maps still show plain I-1 and Industrial future land use, so the lead is not killed. But it is a narrow wedge of about 8.7 acres by the city's parcel shape (the county says 9.38), with no frontage on anything but two 24 ft, two-lane collectors. Its long east side faces Waters Rd SW, and across that road are occupied single-family homes in residential zoning. The west side is an 830 ft curved edge with no parcel beside it, which by my reading is the I-75 right-of-way (no access there). Truck access means curb cuts across from houses on a residential street, on a site where the screener already found no envelope for the smallest building prototype. Atlanta's code rewrite (Draft V2, being finalised as Draft V3 for Council) is still pending, and this parcel's proposed district could not be read. A person must settle access, the real buildable area and the draft-map district before this ranks as a usable industrial site.",
+  "disputes": [
+   "owner-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The city's street centreline layer, queried within 80 ft of the parcel's own polygon (taken from the city's tax parcel layer), returns only Waters Rd SW and Mount Zion Rd SW. The Waters Rd SW segment that runs along the parcel's east side (address range 2894-3009) is a two-lane, 24 ft wide collector with a 35 mph limit, so the site's frontage is a narrow two-lane road, not an arterial or industrial street.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/33/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&distance=80&units=esriSRUnit_Foot&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"FUNCCLASS\":\"Collector\",\"SYMBOLCLASS\":null,\"SPEEDLIMIT\":\"35\",\"SURFACE\":null,\"DIRTRAVEL\":\"Both\",\"CARDDIRTRVL\":null,\"WIDTH\":\"24\",\"LANES\":\"2\"",
+    "context_before": "\"cityleft\":\"atlanta\",\"cityright\":\"atlanta\",\"zipleft\":\"30354\",\"zipright\":\"30354\",",
+    "context_after": ",\"workzone\":null,\"subdiv\":null,\"insthwynum\":null,\"ushwynum\":null,\"sthwynum\":null",
+    "words_shared_with_url": [],
+    "page_file": "pages/86db369cbd77e76ce0bf1bac.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The same street query gives that segment's label and address range: Waters Rd SW, 2894-3009, the block where the homes across the road from the parcel sit (for example 2960 Waters Rd SW).",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/33/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&distance=80&units=esriSRUnit_Foot&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"LABEL\":\"Waters Rd SW\",\"FROMLEFT\":2894,\"TOLEFT\":3008,\"FROMRIGHT\":2895,\"TORIGHT\":3009",
+    "context_before": "separator\":null,\"name\":\"waters\",\"posttype\":\"road\",\"postdir\":null,\"postmod\":\"sw\",",
+    "context_after": ",\"cityleft\":\"atlanta\",\"cityright\":\"atlanta\",\"zipleft\":\"30354\",\"zipright\":\"30354\"",
+    "words_shared_with_url": [],
+    "page_file": "pages/86db369cbd77e76ce0bf1bac.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The city's tax parcel layer, queried at a point inside 2960 Waters Rd SW (by my measurement about 45 ft east of the parcel, across Waters Rd), shows a residential (R3) lot with one living unit: occupied housing directly across the parcel's main frontage.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"CLASSCD\":\"R3\",\"CLASSDSCRP\":null,\"LIVUNITS\":1,\"SITEADDRESS\":\"2960 WATERS RD SW\"",
+    "context_before": "d\":\"14 006800060343\",\"building\":\" \",\"unit\":\" \",\"cvttxcd\":\"05\",\"cvttxdscrp\":null,",
+    "context_after": ",\"sitecity\":\"atlanta\",\"sitestate\":\"ga\",\"sitezip\":\"30354\",\"prprtydscrp\":null,\"cnv",
+    "words_shared_with_url": [],
+    "page_file": "pages/b2652f3cdcfcb536852c807b.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "The city's zoning district layer, queried at the same point inside 2960 Waters Rd SW, returns RG-2 (residential general): the land across Waters Rd from the parcel's east side is zoned residential.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONECLASS\":\"RG-2\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH8REGEDIRE\"",
+    "context_before": "\"alias\":\"zoningcode\",\"length\":255}],\"features\":[{\"attributes\":{\"objectid\":10743,",
+    "context_after": ",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",\"spi\":\" \",\"subar",
+    "words_shared_with_url": [],
+    "page_file": "pages/eeb3ae1850d1c64988716e0f.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The city's tax parcel layer, queried at a point inside this parcel, gives the parcel's mapped shape as 378,080 sq ft (about 8.68 ac), against the county record's 9.38 ac. The usable area may be smaller than the brief's 9.4 ac headline. The record also places the parcel in NPU Z, Glenrose Heights neighbourhood.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"SHAPE.AREA\":378080.130751152,\"SHAPE.LEN\":2614.4541981126499,\"TAXYEAR\":2025",
+    "context_before": "9d-8fad-4d7a-b74d-9d1b7c0f60f7}\",\"ordlink\":null,\"ordstatus\":null,\"ordname\":null,",
+    "context_after": ",\"zoning1\":null,\"zoning2\":null,\"council\":\"12\",\"npu\":\"z\",\"neighborhood\":\"glenrose",
+    "words_shared_with_url": [],
+    "page_file": "pages/d2a8f7b23ea4cf271ff6f1e9.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The city's building footprint layer, queried with the parcel's own polygon, returns no footprint: no mapped building on the parcel (this supports the lead).",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+    "context_before": "gth\":8},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+    "context_after": "",
+    "words_shared_with_url": [],
+    "page_file": "pages/cc858b247255d18bd816fdff.html"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "Atlanta's zoning code rewrite (ATL Zoning 2.0) is pending: Draft V2 is the proposed ordinance and a final Draft V3 is being prepared for City Council. The parcel's I-1 zoning could be remapped. This parcel's proposed district on the draft map was not read (the map is on ArcGIS Online).",
+    "source_url": "https://atlzoning.com/review-and-comment/",
+    "retrieved": "2026-11-13",
+    "quote": "Now that commenting has closed, a final version (Draft V3) is being prepared for City Council consideration.",
+    "context_before": "ion process. it incorporates extensive community feedback and hands-on testing. ",
+    "context_after": " chapter 1: introduction chapter 2: form districts chapter 3: rules for zoning d",
+    "words_shared_with_url": [],
+    "page_file": "pages/b487ec0ed2f8afdc2b1eb141.html"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "Draft V2's industrial use districts are written to keep logistics and warehousing. This points in the parcel's favour if it is mapped to an I- district, but the draft also adds transition screens next to residential use (for example for storage yards).",
+    "source_url": "https://atlzoning.com/wp-content/uploads/2026/05/Ch.-4.-Use-Districts.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Industrial (I-) Use Districts are intended to accommodate a wide range of manufacturing, logistics, warehousing, and other industrial activities that support the",
+    "context_before": "icts use district standards sec. 4.3.6. industrial (i-) use districts a. intent ",
+    "context_after": " city's economic base. these districts are designed to prioritize industrial ope",
+    "pdf_page": 37,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/bbd63166b7e2d3c6e54f5d80.pdf"
+   }
+  ],
+  "open_items": [
+   "My own measurement from the city's parcel shapes (approximate, local projection): the east side (about 650 ft) faces Waters Rd SW with houses about 45 ft away across the road; the west side is a curved edge of about 830 ft with no parcel within about 150-300 ft, consistent with I-75 right-of-way and so no access; the south side (about 394 ft) is about 148 ft from the nearest parcel, so Mount Zion Rd SW may sit in a wide right-of-way or on an approach to the I-75 crossing there. Ask the city or GDOT whether a truck driveway is possible on Mount Zion Rd SW; if not, all truck traffic would enter from Waters Rd opposite homes.",
+   "The residential land that actually touches the parcel's north-east lot line (first pass zoning-3) is, by my overlay of the city's parcel shapes, the same LLC's own lots (2931 Waters Rd SW and 0 Waters Rd SW). Any I-1 transitional yard there falls on land the seller controls; the third-party homes are across Waters Rd. Ask planning how the I-1 transitional rules (Sec. 16-16.006, on Municode, not read) treat lots across a street, and whether the owner's house lots could be added or rezoned.",
+   "Ask Atlanta planning which district the ATL Zoning 2.0 draft map assigns this parcel (I1, I2 or an industrial flex IX- district), and whether general warehouse and distribution above 15,000 sq ft would be permitted there or need a special use permit. The Draft V2 use table seems to show one industrial column with S for that use, but its layout could not be read reliably.",
+   "Owner type is not established: owner-1 only gives the LLC name and an office suite mailing address, which cannot tell a passive holding entity from a developer or investor vehicle. The Secretary of State record (a known wall) is still needed.",
+   "The city's land use amendment layer within 1,500 ft shows only two old amendments (CDP-06-61 and CDP-09-31, both complete). Not quoted; no recent plan change found.",
+   "No page I read addressed instructions to an automated reader."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/9038d76c1a906cac0f8821ab.html",
+   "fetched_at": "2026-11-13T17:47:13Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3774,
+   "sha256": "e610f85944321dbbcc15b6e51122023947bcb118af659404c6bd07e819cbc1fe"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39718%2C33.67312%2C-84.39526%2C33.67540&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/fa948d9dc89df4cd7154e78d.html",
+   "fetched_at": "2026-11-13T17:47:14Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.39718%2C33.67312%2C-84.39526%2C33.67540&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 5237,
+   "sha256": "91858e0f83d7858fe05d436be5a3838f879d14f81d7bfc2d086e352b150ce224"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/cfdc140f7a8eb126df78c9c3.html",
+   "fetched_at": "2026-11-13T17:47:15Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1337,
+   "sha256": "16e717ddaa52870a0b50866d722028848735e785b3e7ef1f0667d9e8408c0409"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/dec66f5a76e363e2f39d022f.html",
+   "fetched_at": "2026-11-13T17:47:16Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3835,
+   "sha256": "099b8f4cfca643702a845ddb2dcaf77c7c39c1a2633684abf1106b0d4982aec3"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/20cada0862e9cbd53daaf6fc.html",
+   "fetched_at": "2026-11-13T17:47:17Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4337,
+   "sha256": "e9d98c830311d7de16092ac18697de642074b7b6685d72ee81dbd952927bf979"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/05020e4f1f2173f706379782.html",
+   "fetched_at": "2026-11-13T17:47:18Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 2661,
+   "sha256": "e91a494d351ab6501c31df2c3b5e0e174b7030af79cfbef0ab3b5a6dd6de2689"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b2df91ab8feb3596ae712b80.html",
+   "fetched_at": "2026-11-13T17:47:19Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1579,
+   "sha256": "4ed791fe9d9f56ee37efa14190bb7f307a0e4b131ed8158411cd8bb29d9e6ba6"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20006800060376%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/3023686deab3c455d0fde64f.html",
+   "fetched_at": "2026-11-13T17:47:20Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20006800060376%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4318,
+   "sha256": "811ab8f56e6665e1d241e2d6a0cbecd480bcdcb56408cabdc9e73ffc1057fbf2"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/3043de66003f9501e1ec070a.html",
+   "fetched_at": "2026-11-13T17:47:21Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 1900,
+   "sha256": "2a65d82399ddb828a65cd1fabf57db7acae7f6f182dd48f54efcbcbbb85385c3"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/2b38b7c78472308cfc256b92.html",
+   "fetched_at": "2026-11-13T17:47:21Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.3974,33.6729,-84.3950,33.6756&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 18082,
+   "sha256": "cdf3626488a87e4f2599cf62a3d52d1fc917e1198b78aef31409adb75ff64bbc"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/33/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&distance=80&units=esriSRUnit_Foot&f=json": {
+   "file": "pages/86db369cbd77e76ce0bf1bac.html",
+   "fetched_at": "2026-11-13T17:47:24Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/33/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&distance=80&units=esriSRUnit_Foot&f=json",
+   "status": 200,
+   "bytes": 14266,
+   "sha256": "adc3fba51ff5f4a053d1b43fdcc43147fa534cb1b96d8803c48149f0179e9704"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b2652f3cdcfcb536852c807b.html",
+   "fetched_at": "2026-11-13T17:47:25Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 7190,
+   "sha256": "b7bb3fe5a293f5d4f76329e84c9922ef23c57a23999465d709d372dde34ea394"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/eeb3ae1850d1c64988716e0f.html",
+   "fetched_at": "2026-11-13T17:47:26Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3786,
+   "sha256": "4142376da9c1169b00512e4e14058f5d686500367383f7cf8d7e2f2318401295"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/d2a8f7b23ea4cf271ff6f1e9.html",
+   "fetched_at": "2026-11-13T17:47:27Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 9111,
+   "sha256": "f81f8b0645dfdfe89ca960ac4cfa32fb790cb8661b882ac6b2c66d0c9be82185"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/cc858b247255d18bd816fdff.html",
+   "fetched_at": "2026-11-13T17:47:28Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3107,
+   "sha256": "7b3f5afdc66b9cba695552529b1630854364e445fcd7a18d250163d715e03752"
+  },
+  "https://atlzoning.com/review-and-comment/": {
+   "file": "pages/b487ec0ed2f8afdc2b1eb141.html",
+   "fetched_at": "2026-11-13T17:47:29Z",
+   "final_url": "https://atlzoning.com/review-and-comment/",
+   "status": 200,
+   "bytes": 55134,
+   "sha256": "f318962bbb89ea328cb7710390f5e764524aebfdb090552787735667592d568b"
+  },
+  "https://atlzoning.com/wp-content/uploads/2026/05/Ch.-4.-Use-Districts.pdf": {
+   "file": "pages/bbd63166b7e2d3c6e54f5d80.pdf",
+   "fetched_at": "2026-11-13T17:47:30Z",
+   "final_url": "https://atlzoning.com/wp-content/uploads/2026/05/Ch.-4.-Use-Districts.pdf",
+   "status": 200,
+   "bytes": 497654,
+   "sha256": "c0290209f4ee5d83ec1bb16a16673c228dde0decae270cf175e852e3e5359edc"
+  }
+ },
+ "quotecheck": {
+  "kept": 26,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-13T17:47:31Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "b965709e1a7bfad19bb3f9fe0a3a7f1bf72dfc7059fb74562da4b5eaf2f1f08d",
+   "skeptic.json": "7162b3d0b43f66d5ed485226d07360897b1a881be11ab6d13b18a1ff0f5e090c"
+  }
+ },
+ "dropped_claims": []
+}

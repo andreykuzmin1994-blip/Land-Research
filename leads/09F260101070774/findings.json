@@ -1,0 +1,192 @@
+{
+ "schema": 1,
+ "parcel_id": "09F260101070774",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "text": "The parcel's M-2 zoning is confirmed by the developer's own DRI filing (GRTA methodology packet in ARC's DRI 4257 file): existing zoning M-2 (Heavy Industrial/Manufacturing), and the data center project was filed as not a rezoning. This confirms the district, not what M-2 permits for warehouse or distribution use.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20LTGM.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "The Existing zoning is M-2 (Heavy Industrial/Manufacturing). The zoning map is shown in Figure 1. Figure 1: Existing Zoning Map Proposed (If a rezoning): The proposed zoning is M2 (Not a rezoning)."
+    },
+    {
+     "text": "The DRI site plan in ARC's final report carries this exact parcel id with zoning M-2.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "ZONING:M-2 LAND LOT: 0107 55 DISTRICT: PARCEL ID: 09F260101070774"
+    },
+    {
+     "text": "For a data center (the owner's planned use), South Fulton's council-sponsored draft text amendment (ORD2026-XXX, repealing Ordinance 2024-034) allows data centers only in M-1 and M-2 and only by special use permit. This is a draft read on the city's site; whether and in what form it was adopted was not confirmed (plans section). It says nothing about warehouse use.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15891/Text-Amendment",
+     "retrieved": "2026-11-13",
+     "quote": "A. Data centers shall be permitted only within industrial zoning districts, limited to M-1 (Light Industrial) and M-2 (Heavy Industrial). A special use permit shall be required for all data centers"
+    }
+   ],
+   "open_items": [
+    "South Fulton's zoning text is on Municode (known wall): the M-2 use table could not be quoted, so whether warehouse / distribution / light industrial is permitted by right in M-2 is not shown here. The screener's by_right reading was not re-checked from the district text.",
+    "Ask City of South Fulton planning whether any conditions of zoning attach to this parcel, and whether the site plan's note 'JURISDICTION: FULTON COUNTY' is a drafting leftover (the DRI was submitted by the City of South Fulton)."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "text": "The applicant's DRI methodology packet states that the city's future land use map puts the site in the Industrial Zone character area and that industrial use is consistent with it. This is the applicant's summary of the plan, not the plan's own map; the brief gives the FLU as Industrial Mix-Use Zone.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20LTGM.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Future Land Use Map Zoning (Character Area): The future land use map defines the site as Industrial Zone."
+    },
+    {
+     "text": "Moratorium on data-center applications, last five years: on December 9, 2025 the city adopted a six-month moratorium on accepting any applications for new data centers (RES2025-094); RES2026-043, adopted May 12, 2026, extended it to September 9, 2026. It covered data centers, not warehouse or other industrial uses.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_05122026-1832",
+     "retrieved": "2026-11-13",
+     "quote": "WHEREAS, on December 9, 2025, the City of South Fulton instituted a six-month MORATORIUM ON THE ACCEPTANCE OF ANY APPLICATIONS RELATED TO THE NEW DEVELOPMENT OR ESTABLSHIMENT OF ANY DATA CENTER OR OTHER LARGGE SCALE DATA STORAGE which was designated as RES2025-094;"
+    },
+    {
+     "text": "The same resolution extends the moratorium to September 9, 2026 (its text gives the original date as 12/09/2026, apparently a typo for 2025).",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_05122026-1832",
+     "retrieved": "2026-11-13",
+     "quote": "Section 1. That the Data Center Moratorium which was passed by the Mayor and Council of the City of South Fulton on 12/09/2026, which is designated as RES2025-094, and including all provisions of Resolution RES2025-094, be extended until September 9, 2026."
+    },
+    {
+     "text": "New data-center rules pending or adopted: the draft replacement ordinance would bar any data center within 2,640 ft of property zoned or used for residential or mixed-use purposes. The lead parcel adjoins single-family subdivisions (next claim), so if this setback was adopted and applies to this project, the owner's planned data center here could not meet it. Adoption, final wording and any vesting of the 2024-25 project were not confirmed.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15891/Text-Amendment",
+     "retrieved": "2026-11-13",
+     "quote": "B. Minimum Setback: No data center shall be located within 2640 feet of any property zoned or used for mixed-use or residential purposes, measured from property line to property line."
+    },
+    {
+     "text": "Homes within the setback: the county parcel layer, asked for parcels within 1,500 ft of the brief's map point (-84.530935, 33.604924), returns dozens of residential (class R3, land use 101) lots on Winston Cir, Waverly Park and Ventura Ln. All of them are well inside 2,640 ft of the parcel.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.530935%2C33.604924&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"AddrStreet\":\"WINSTON\",\"AddrSuffix\":\"CIR\",\"AddrPosDir\":null"
+    },
+    {
+     "text": "Planning Commission, July 15, 2026 (case TA26-003): recommended approval of the data center ordinance with revisions, first restricting data centers to M-2. Council action was scheduled for July 28 and August 11, 2026.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15930/PC-mins-7-15-26",
+     "retrieved": "2026-11-13",
+     "quote": "The Commission recommended approval of the ordinance with the following revisions or considerations: 1. Restrict data centers to M-2 districts rather than M-1 and M-2."
+    },
+    {
+     "text": "Regional view: ARC's final DRI finding (February 12, 2025) says the data center project is not aligned with the regional plan's Developing Suburbs policies. That is advisory and concerns the data center, not industrial use in general.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "The project is not aligned with the applicable Developing Suburbs policy recommendations which state “There is a need in these areas for additional preservation of critical environmental locations and resources, as well as agricultural and forest uses.”"
+    }
+   ],
+   "open_items": [
+    "Read the city's adopted comprehensive plan / future land use map at parcel scale; the plan's own text was not read here (the FLU claim is the applicant's summary).",
+    "Confirm with the city whether ORD2026-024 / TA26-003 was adopted, its final residential setback and minimum lot size, and whether the 2024-25 project (DRI 4257, closed February 12, 2025) is vested under the earlier rules or must now get a special use permit."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "text": "Sewer, nearby: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 1,000 ft of the brief's map point (-84.530935, 33.604924), returns five active county gravity sewer segments (four 8-inch, one 6-inch), mostly Camp Creek basin. From the same layer's geometry (investigator's computation against the county parcel polygon) the nearest segment lies about 49 ft from the parcel line, and three lie within about 85 ft.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.530935%2C33.604924&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FlowMeter\":\"MC52\",\"Enabled\":1,\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FULTON COUNTY\",\"LengthInFeet\":378.55370923"
+    },
+    {
+     "text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the same point, answers Fulton County, sewer, service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.530935%2C33.604924&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""
+    },
+    {
+     "text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 1,000 ft of the same point, returns an empty feature list. That fits the next claim: the City of Atlanta, not the county, supplies water here, so its mains would not be on this county layer.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.530935%2C33.604924&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"
+    },
+    {
+     "text": "Water provider and demand: ARC's final DRI report names the City of Atlanta Department of Watershed Management as the water supplier for this project and records the application's 0.03 MGD water demand and 0.03 MGD sewage flow. No Atlanta water main map was read.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "ARC recognizes that energy demands will be very high for this project and that related water needs for cooling purposes may create a large peak demand from the City of Atlanta Department of Watershed Management (Atlanta Watershed Management). The application proposes 0.03 MGD of water supply demand and 0.03 MGD of estimated sewage flow generated by the project."
+    }
+   ],
+   "open_items": [
+    "Capacity is for the utilities to say: ask Atlanta Watershed Management about the nearest water main on Stacks Rd and its capacity, and Fulton County Public Works about sewer capacity in the Camp Creek basin.",
+    "Water was not seen on any published map; the verdict not_shown reflects water only. Sewer is nearby."
+   ]
+  },
+  "market": {
+   "verdict": "signs_developer_pursuing",
+   "claims": [
+    {
+     "text": "ALREADY IN A DEVELOPER'S HANDS: the City of South Fulton submitted this site to ARC as a Development of Regional Impact (DRI 4257) for a 696,981 sq ft data center with a substation on about 24 acres at Stacks Rd and Mallory Rd beside the CSX line. ARC closed its review on February 12, 2025.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "A DRI review of a proposal to construct a data center with 696,981 SF of space, a sub-station, emergency generator area, and related support facilities on an 24-acre currently partially wooded site at the southwest quadrant of the intersection of Stacks Rd and Mallory Rd, just north of the CSX Railroad in the City of South Fulton."
+    },
+    {
+     "text": "The DRI site plan names this exact parcel (and gives 23.64 ac in total: the lead's 20.979 ac plus the 2.683 ac development-authority inholding below).",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "ZONING:M-2 LAND LOT: 0107 55 DISTRICT: PARCEL ID: 09F260101070774"
+    },
+    {
+     "text": "Review dates: submitted by the City of South Fulton, opened January 28, 2025, closed February 12, 2025.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Submitting Local Government: City of South Fulton Date Opened: January 28, 2025 Date Closed: February 12, 2025"
+    },
+    {
+     "text": "Project path and timing: the DRI was triggered by a land disturbance permit (no rezoning), and the applicant planned full build-out in 2027.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20LTGM.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "DRI Trigger (Rezoning, land disturbance permit, committee review, annexation, etc): Land disturbance permit"
+    },
+    {
+     "text": "Build-out year stated by the applicant.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20LTGM.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "The development is planned for full build out in 2027. The analysis will consider full build out of the site."
+    },
+    {
+     "text": "DEVELOPMENT-AUTHORITY INVOLVEMENT: the county parcel layer (asked by map point, not by name) shows a 2.683 ac parcel on Stacks Rd held by the South Fulton Development Authority, with no improvements. From the county parcel geometry (investigator's computation) this parcel is a hole inside the lead parcel's outer ring: its whole 1,385 ft boundary is shared with the lead. Development-authority title inside a project site often goes with a bond-lease tax abatement, but no SFDA resolution or lease was read.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.530935%2C33.604924&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"SOUTH FULTON DEVELOPMENT AUTHORITY \",\"OwnerAddr1\":\"6385 OLD NATIONAL HWY STE 210\",\"OwnerAddr2\":\"ATLANTA GA 30349\",\"TaxDist\":\"55\",\"TotAssess\":90360,\"LandAssess\":90360,\"ImprAssess\":0,\"TotAppr\":225900,\"LandAppr\":225900,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":2.683"
+    },
+    {
+     "text": "Not built on the tax roll yet: the lead parcel's own county record (tax year 2027) shows land value only, $0 of improvements.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F260101070774%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":485560,\"LandAssess\":485560,\"ImprAssess\":0,\"TotAppr\":1213900,\"LandAppr\":1213900,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I5\""
+    }
+   ],
+   "open_items": [
+    "This parcel is the land for a data-center developer's planned project (bought 2024-01-29 for $23.5M per the brief, about $1.1M an acre, far above the $57,863/acre assessor land value). It is not an open warehouse site unless that project has stalled. The question for a person: is the project going ahead (permits issued, construction started), or did the moratorium or the new data center rules (2,640 ft residential setback in the draft) stop it?",
+    "Check City of South Fulton land disturbance / building permits and Georgia EPD stormwater NOI records for 4380 Stacks Rd; none was read here.",
+    "Search results (not verified, not a claim) mention a Development Authority of Fulton County tax break for a project by this developer; check DAFC and South Fulton Development Authority agendas for a bond or lease on this site and its terms. The SFDA-held inholding is the only verified sign.",
+    "Henderson's Arena (event venue) directories use the address 4380 Stacks Rd; the adjoining 5.37 ac parcel on Stacks Rd is held by an event-center company. Confirm site access does not depend on that parcel."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "text": "The county record gives the owner as a numbered project LLC of a data-center company (GA11 matches the GA-11 building on the DRI site plan), mailing from Washington, DC.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F260101070774%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"VANTAGE DATA CENTERS GA11 LLC \",\"OwnerAddr1\":\"2099 PENNSYLVANIA AVE NW BLDG/STE 100\",\"OwnerAddr2\":\"WASHINGTON DC 20006\""
+    },
+    {
+     "text": "The DRI methodology packet names the developer as the company's management entity, care of a Delaware registered-agent address: a developer's project vehicle, not a local operating business or a long-term holder.",
+     "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5476/2024%20Vantage%20Data%20Center%20-%20Stacks%20Rd%20DRI%204257%20-%20LTGM.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Vantage Data Centers Management Company, LLC c/o The Corporation Trust Company 1209 Orange Street, Wilmington, New Castle County, Delaware 19801"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State record (status, formation date, registered agent) not read: known wall (403).",
+    "Whether the owner would sell depends on whether its data center project here is still alive (market section). Do not approach before a person checks permits and the new ordinance."
+   ]
+  }
+ }
+}

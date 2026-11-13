@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "parcel_id": "09F350101520306",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "Nearest quotable statement of the zoning here: the city's April 2026 staff report on case Z26-002 (4700 Welcome All Road, on the east side of the road, about 100 m south-east of this parcel by my measurement from the county parcel shapes) lists the land to its west as M-2 Heavy Industrial, Chester Industrial Park. It does not name this parcel; that this parcel is part of that M-2 park is my reading (it adjoins two built park parcels on its south side and its owner mails from the same address as the park's owner; see owner).",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+          "retrieved": "2026-11-13",
+          "quote": "West: M-2 (Heavy Industrial District)/ Chester Industrial Park"
+        },
+        {
+          "text": "The same report says the 4700 Welcome All Road site borders industrial-zoned property to the west and single-family homes on its other sides: industrial and residential zoning meet along this stretch of Welcome All Road.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+          "retrieved": "2026-11-13",
+          "quote": "This property borders single-family developments as well as industrial use and zoned properties to the west."
+        },
+        {
+          "text": "A 2026 city staff report (Z26-001, Bridge Logistics, a different site) says M-2 heavy industrial uses may need extra performance standards. It does not quote the M-2 use table, so whether warehouse/distribution is permitted by right in M-2 is not shown by any page I could read.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+          "retrieved": "2026-11-13",
+          "quote": "Heavy industrial uses (M-2) may require additional performance standards for air, noise, and traffic mitigation."
+        },
+        {
+          "text": "For comparison, the same report quotes the adopted South Fulton Zoning Code's M-1 intent, which names industrial parks, warehousing and distributing. The equivalent M-2 text (Municode) could not be read.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+          "retrieved": "2026-11-13",
+          "quote": "The M-1 District is intended to provide locations for light industrial uses and industrial parks which meet the needs for processing, manufacturing, fabricating, warehousing, distributing"
+        }
+      ],
+      "open_items": [
+        "Confirm with City of South Fulton planning that this parcel itself is zoned M-2 and has no conditions (the screener's zoning came from an ArcGIS Online layer that cannot be quoted, and the Municode use table is a known wall).",
+        "The county tax record classes the parcel as residential vacant land (land use code 100, class R5), not industrial: ask whether this is only a tax classification or reflects a different zoning or an old residential case.",
+        "Ask what buffers and performance standards apply to M-2 opposite the single-family lots across Welcome All Road and beside the church and the city-owned parcel to the north (see plans)."
+      ]
+    },
+    "plans": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "No rezoning case on this parcel in the city's Filed Zoning Cases list (read 2026-11-13; it runs back to 2017-18 cases). The nearest is Z26-002 at 4700 Welcome All Road, across the road and about 100 m south-east by my measurement, heard by the Planning Commission 2/18/2026 with a Mayor and Council date of 04/15/2026.",
+          "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+          "retrieved": "2026-11-13",
+          "quote": "Z26-002 4700 Welcome All Road Staff Report 2/18/2026 04/15/2026"
+        },
+        {
+          "text": "That case is a residential rezoning beside the M-2 park: AG-1 to CUP for 35 single-family homes on 15 acres.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+          "retrieved": "2026-11-13",
+          "quote": "requests a rezoning from AG-1 (Agricultural District) to CUP (Community Unit Plan District) to develop 35 single-family units on 15 acres at 4700 Welcome All Road"
+        },
+        {
+          "text": "Staff and the Planning Commission both recommended approval with a condition (R-5 single-family rules). The council outcome of 04/15/2026 was not read.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+          "retrieved": "2026-11-13",
+          "quote": "CONDITION: Applicant will have to follow R-5 Single-Family Dwelling District Regulations."
+        },
+        {
+          "text": "The land across the road from the M-2 park is planned for suburban housing: the 4700 Welcome All Road site's future land use is Suburban I. This parcel's own future land use (the screener says Industrial Mix-Use Zone) was not found on any quotable page.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15436/Z26-002-4700-Welcome-All-Council",
+          "retrieved": "2026-11-13",
+          "quote": "The subject property has a future land use designation of Suburban I as designated in the 2021 South Fulton Comprehensive Plan"
+        },
+        {
+          "text": "A 2026 Comprehensive Plan is now in force (cited in a 2026 staff report for another site); the 2021 plan cited in the Z26-002 report may be superseded. Staff in that report also say industrial zones need buffering from residential uses.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15975/Z26-001_CDP26-003-Bridge-Logistics-Council",
+          "retrieved": "2026-11-13",
+          "quote": "Industrial zones are generally incompatible with residential or commercial uses without appropriate buffering."
+        },
+        {
+          "text": "Nearby institutional use: the county parcel layer (map box query around the site, not by name) shows a city-owned exempt parcel at 4255 Will Lee Rd with $2.9M of improvements, about 44 m north of this parcel by my measurement. The Z26-002 report mentions a Welcome All Park & Multipurpose Facility; that it is this parcel is not confirmed.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Address\":\"4255 WILL LEE RD\",\"AddrNumber\":\"4255\",\"AddrPreDir\":null,\"AddrStreet\":\"WILL LEE\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CITY OF SOUTH FULTON \",\"OwnerAddr1\":\"5440 FULTON INDUSTRIAL BLVD\""
+        }
+      ],
+      "open_items": [
+        "Read this parcel's designation on the adopted 2026 South Fulton future land use map (the screener's FLUM 2045 layer is on ArcGIS Online and cannot be quoted).",
+        "Find the council decision on Z26-002 (04/15/2026): an approved 35-home subdivision near the site would add residential neighbours to the east.",
+        "Check for any pre-2017 Fulton County zoning case (with conditions) on this parcel: the city list does not cover cases from before the city existed."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {
+          "text": "Sewer, nearby: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 2,000 ft of the brief's map point (-84.529299, 33.629351), returns 62 segments in the Camp Creek basin. The closest, an active 8-inch PVC gravity line, county service area, lies about 230 ft from the parcel line by my measurement from the returned geometry (in the subdivision east of Welcome All Road). Invert elevations versus the site's grades were not compared.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"FacilityID\":\"SPSMCC2635320\",\"UpID\":\"SMCC2635320\",\"DownID\":\"SMCC2635310\",\"DiElevation\":-999.99,\"DiDepth\":-999.99,\"DiAngle\":999.99,\"UpSInvert\":944.66,\"DnSInvert\":933.26,\"Location\":null,\"WarrantyDate\":null,\"LegacyID\":null,\"Condition\":\"GOOD\",\"ConditionDate\":null,\"InstallDate\":null,\"Crossing\":\"NONE\",\"Basin\":\"CAMP CREEK\",\"SubBasin\":\"CC25\",\"UpSize\":\"8\",\"UpMaterial\":\"PVC\""
+        },
+        {
+          "text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the same point, answers Fulton County, sewer, service available.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""
+        },
+        {
+          "text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 600 ft of the same point, returns an empty feature list. That is expected if the county does not run water here (next claim).",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.529299%2C33.629351&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=600&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"
+        },
+        {
+          "text": "Water provider: the Development Authority of Fulton County says county water serves north Fulton and four north Fulton cities, not South Fulton; the City of Atlanta Department of Watershed Management is the other regional system and the likely water provider here (not confirmed; no water main map was read).",
+          "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+          "retrieved": "2026-11-13",
+          "quote": "The Fulton County Department of Public Works provides water, sewer, and storm water services to a population of 277,000 in north Fulton County and the cities of Alpharetta, Johns Creek, Milton, and Roswell."
+        }
+      ],
+      "open_items": [
+        "Ask the City of Atlanta Department of Watershed Management (or whoever the provider is) for the nearest water main and fire-flow at Welcome All Road.",
+        "Ask Fulton County Public Works about sewer capacity in the Camp Creek basin and whether the parcel can reach the line about 230 ft east by gravity.",
+        "The built industrial parcels next door (4677 and 4601 Welcome All Rd) presumably have service: a person can ask how they connect."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {
+          "text": "No public sign of a sale or developer: the parcel is not on the city's Filed Zoning Cases list (read 2026-11-13). The only '0 Welcome All Road' entry is Z24-020/CV24-006, which is a different parcel (next claim).",
+          "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+          "retrieved": "2026-11-13",
+          "quote": "Z24-020 & CV24-006 0 Welcome All Road Staff Report 9/18/2024"
+        },
+        {
+          "text": "The 2025 modification of that case (M25-002) gives its parcel as 09F380101570514, a 4.1 ac townhouse site, not this parcel (09F350101520306).",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/13741/M25-002-0-Welcome-All-Road",
+          "retrieved": "2026-11-13",
+          "quote": "0 Welcome All Road, Parcel ID: 09F380101570514. Council District 3."
+        },
+        {
+          "text": "The county parcel record (queried by parcel id) shows land value only and zero improvement value, class R5, use code 100: vacant land, no built or operating use.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520306%27&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"TaxDist\":\"55\",\"TotAssess\":152160,\"LandAssess\":152160,\"ImprAssess\":0,\"TotAppr\":380400,\"LandAppr\":380400,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"R5\""
+        }
+      ],
+      "open_items": [
+        "Listing sites were not checked (the rules bar the main commercial listing sites by any route): whether the parcel is on the market is for a person to check by hand.",
+        "A web search pointed to a GDOT project page about realigning Welcome All Road near its Camp Creek bridge, and to an Aerotropolis CIDs project page for Welcome All Rd; neither was read. A person should check whether either touches this frontage."
+      ]
+    },
+    "owner": {
+      "verdict": "developer_or_investor",
+      "claims": [
+        {
+          "text": "Reading of county records, not a Secretary of State record: the parcel layer (map box query, not by name) shows the built industrial parcel adjoining this one on the south, 4677 Welcome All Rd (6.01 ac, $4.65M improvements, class I4), held by an LLC mailing from the same New Jersey street address as this parcel's owner. By my measurement from the parcel shapes the two share about 146 m of line.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Address\":\"4677 WELCOME ALL RD\",\"AddrNumber\":\"4677\",\"AddrPreDir\":null,\"AddrStreet\":\"WELCOME ALL\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"4677 WELCOME ALL ASSOCIATES LLC \",\"OwnerAddr1\":\"54 W ALLENDALE AVE\",\"OwnerAddr2\":\"ALLENDALE NJ 07401\""
+        },
+        {
+          "text": "The same box query shows the Chester Industrial Park parcels at 4601 Welcome All Rd (the M-2 park named in the Z26-002 staff report) held by an entity at the same New Jersey address. So this parcel looks like the undeveloped remainder of a family-held industrial park whose owners built and hold buildings next door: an industrial landlord or investor, not a passive holder.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5330,33.6265,-84.5255,33.6325&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Address\":\"4601 WELCOME ALL RD\",\"AddrNumber\":\"4601\",\"AddrPreDir\":null,\"AddrStreet\":\"WELCOME ALL\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"CHESTER INDUSTRIAL PARK ASSOC \",\"OwnerAddr1\":\"54 W ALLENDALE AVE\",\"OwnerAddr2\":\"ALLENDALE NJ 07401\""
+        },
+        {
+          "text": "The lead's own county record (queried by parcel id) gives the owner as a New Jersey corporation mailing from Allendale NJ.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F350101520306%27&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Owner\":\"V. PAULIUS & ASSOCIATES, A NEW JERSEY CO RPORATION\",\"OwnerAddr1\":\"54 W ALLENDALE AVE\",\"OwnerAddr2\":\"ALLENDALE NJ 07401\""
+        }
+      ],
+      "open_items": [
+        "The Georgia Secretary of State search is a known wall; a person should pull the entity records (status, officers, registered agent) for the owner and for the related entities at the same address.",
+        "The other parcel adjoining on the south, 4601 Welcome All Rd # REAR (6.54 ac, built industrial), is held by a different, Atlanta-based LLC: the park has been partly sold off before, which suggests the owners do sell."
+      ]
+    }
+  }
+}

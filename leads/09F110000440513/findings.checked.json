@@ -1,0 +1,407 @@
+{
+ "schema": 1,
+ "parcel_id": "09F110000440513",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Fairburn's zoning text (Municode) could not be read under the rules (known wall), so whether warehouse/distribution is permitted by right in M-2, and with what conditions, is not confirmed from the district text. Ask Fairburn Planning and Zoning for a zoning verification letter (the city publishes a Zoning Verification Process form) naming the M-2 district and any conditions of a past rezoning or annexation.",
+    "The screener's M-2 label comes from Fairburn's ArcGIS Online layer, which the rules cannot fetch; confirm it on the city's Official Zoning Map PDF or with staff.",
+    "Fairburn is in the GA Highway 74 / US Highway 29 overlay system named in the 2025 plan's compatibility table; confirm whether any overlay applies to this parcel."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "Fairburn's comprehensive plan lists warehousing and manufacturing as appropriate development types for its Industrial future development category, with M-2 among the appropriate zoning districts. (The parcel's own category on the 2025 Future Development Map was not read from the map; the screener's layer says Industrial.)",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Conservation; parks and recreation; public/ institutional uses (schools, places of worship, and civic facilities); large office; warehousing; manufacturing; utilities.",
+     "context_before": "s. typical character intensity industrial details appropriate development types ",
+     "context_after": " density/intensity 1 to 2 stories appropriate zoning district(s) o&i, c-2, m-1, ",
+     "pdf_page": 144,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The plan's Industrial category is for heavy industrial and logistics uses and calls for connectivity to I-85 and freight corridors.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "This area is designated for traditional and heavy industrial uses that drive economic development through manufacturing, processing, and logistics operations. It supports regional employment and logistics infrastructure.",
+     "context_before": "irburn comprehensive plan 141 (page break) future development strategy industrial description ",
+     "context_after": " implementation strategies & policy considerations \u2022 encourage aesthetic improve",
+     "pdf_page": 144,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The plan places an existing industrial pocket south of I-85 around Oakley Industrial Boulevard; the county parcel query around this parcel returns neighbours on Oakley Industrial Blvd (see market claims), so the parcel sits in that existing industrial area.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Industrial and utility uses are concentrated between the two corridors along and south of Fairburn Industrial Boulevard and a pocket south of I-85 around Oakley Industrial Boulevard.",
+     "context_before": "e major corridors between the highway and interstate, and the low-density uses. ",
+     "context_after": " vacant land can be found throughout the city within all the areas of other exis",
+     "pdf_page": 36,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "The plan quoted above is the one adopted in October 2025.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "The plan went through one more round of final review and was adopted by City Council in October 2025.",
+     "context_before": "fine the vision and recommendations. \u2022 community engagement finalize and adopt. ",
+     "context_after": " city of fairburn comprehensive plan 17 (page break) plan purpose what is a comprehensive plan",
+     "pdf_page": 19,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-5",
+     "text": "Fairburn's current list of pending zoning and development cases (fetched 2026-11-13) has four cases; none is on Graham Road or this parcel id.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "project name proposed use type of request location next step durham lakes (gas station) gas station concept plan 101 durham lake pkwy on hold, under review rivertown (gas station) gas station rezoning and variance 6900 rivertown rd on hold, under review drb campbell commons single family detached rezoning r-3 to r-ct campbellton fairburn road, fairburn ga 30213 (parcel#09f180200131441) mayor and city council 10/26/2026 nexmetro acquisitions, llc (c/o steven l. jones, mckagen jones) multi family residential, conservation, and institutional rezoning oi and ag to pd -planned development and variance 0 milam road, fairburn, ga, parcels: 09f020400070093 & 09f020400070143 mayor and city council 11/09/2026",
+     "context_before": "f the files, please contact the planning and zoning staff at [email protected]. ",
+     "context_after": " make a payment report an issue fairburn today public comments agenda & minutes ",
+     "words_shared_with_url": [],
+     "page_file": "pages/63c2340b4ce15a08451d89f9.html"
+    },
+    {
+     "id": "plans-6",
+     "text": "The city's other (2025) pending-cases page lists four cases; none is on Graham Road or this parcel id.",
+     "source_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "project name proposed use type of request location next step t5 data center data center concept plan gullatt rd. on hold - dri required durham lakes (gas station) gas station concept plan 101 durham lake pkwy. pz meeting - 09/02/2025 curry bend (commercial and residential) commercial and residential final plat 0 bohannon road & 6560 bohannon road pz meeting - 09/02/2025 chick-fil-a restaurant / construction complete final plat 7810 senoia rd. mayor and city council - 09/02/2025",
+     "context_before": "e cases, along with links to accompanying applications and information on each. ",
+     "context_after": " make a payment report an issue fairburn today public comments agenda & minutes ",
+     "words_shared_with_url": [],
+     "page_file": "pages/07157d4229d0e9e15fd26812.html"
+    },
+    {
+     "id": "plans-7",
+     "text": "A March 2022 Fairburn administrator report lists a 'Graham Road Site' land disturbance permit issued 2 April 2021. The report does not say which parcel; the county record still shows no improvements on this one.",
+     "source_url": "https://www.fairburn.com/ArchiveCenter/ViewFile/Item/69",
+     "retrieved": "2026-11-13",
+     "quote": "Graham Road Site Land Disturbance Permit April 2nd, 2021",
+     "context_before": "20th, 2021 fairburn iron horse storage land disturbance permit april 20th, 2021 ",
+     "context_after": " fern dale subdivision land disturbance permit march 31st, 2021 legend creek sub",
+     "pdf_page": 5,
+     "pdf_order": "layout",
+     "words_shared_with_url": [],
+     "page_file": "pages/dd18f6a29bfb7a015ffa4377.pdf"
+    }
+   ],
+   "open_items": [
+    "Confirm on the 2025 Future Development Map (plan PDF, 158 MB, maps not text) that this parcel is in the Industrial category and not Warehouse District or another category.",
+    "Ask Fairburn which parcel the April 2021 'Graham Road Site' land disturbance permit covered, and whether any concept plan or LDP has been filed on this parcel.",
+    "Fairburn's agenda center loads by JavaScript and was not read; past Planning Commission and Council agendas (2021-2026) for this parcel were not checked."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map was reachable: Fairburn's GIS is on ArcGIS Online (known wall). Ask Fairburn Utilities (water, sewer, electric are city departments) for the nearest water main and sewer line to Graham Road and for capacity. The assessor's 'All public' code in the brief is the only sign so far.",
+    "Neighbouring parcels carry built warehouses (county records, market claims), which suggests service is near, but no map shows it."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "No public sign of a sale or pending application: Fairburn's current pending zoning and development case list does not include this parcel or Graham Road.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "project name proposed use type of request location next step durham lakes (gas station) gas station concept plan 101 durham lake pkwy on hold, under review rivertown (gas station) gas station rezoning and variance 6900 rivertown rd on hold, under review drb campbell commons single family detached rezoning r-3 to r-ct campbellton fairburn road, fairburn ga 30213 (parcel#09f180200131441) mayor and city council 10/26/2026 nexmetro acquisitions, llc (c/o steven l. jones, mckagen jones) multi family residential, conservation, and institutional rezoning oi and ag to pd -planned development and variance 0 milam road, fairburn, ga, parcels: 09f020400070093 & 09f020400070143 mayor and city council 11/09/2026",
+     "context_before": "f the files, please contact the planning and zoning staff at [email protected]. ",
+     "context_after": " make a payment report an issue fairburn today public comments agenda & minutes ",
+     "words_shared_with_url": [],
+     "page_file": "pages/63c2340b4ce15a08451d89f9.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The county parcel record for this parcel (queried by parcel id) shows land value only and zero improvement value: the assessor sees it as vacant industrial land, not an operating use.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F110000440513%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"GRAHAM OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":190960,\"LandAssess\":190960,\"ImprAssess\":0,\"TotAppr\":477400,\"LandAppr\":477400,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\"",
+     "context_before": ":\"graham\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":9.55,\"nbrhood\":\"c810\",\"subdiv\":null,\"sub",
+     "words_shared_with_url": [],
+     "page_file": "pages/5c7b03b1fd5acc7b03a7ab08.html"
+    },
+    {
+     "id": "market-3",
+     "text": "The county parcel layer, queried by a map box around this parcel (not by owner), returns a built warehouse parcel at 4800 Coates Dr (12.59 ac, $12.1M improvements) owned by a different LLC with the same New York mailing address and suite as this parcel's owner. My measurement from the shapes puts it about 135 ft from this parcel. This parcel is likely held alongside an operating warehouse portfolio, so it may be expansion or excess land rather than a stand-alone sale.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5492,33.5500,-84.5431,33.5565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4800 COATES DR 2\",\"AddrNumber\":\"4800\",\"AddrPreDir\":null,\"AddrStreet\":\"COATES\",\"AddrSuffix\":\"DR\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":\"2\",\"Owner\":\"COATES E OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":5160000,\"LandAssess\":304360,\"ImprAssess\":4855640,\"TotAppr\":12900000,\"LandAppr\":760900,\"ImprAppr\":12139100,\"LUCode\":\"398\",\"ClassCode\":\"I5\"",
+     "context_before": "74}},{\"attributes\":{\"objectid\":8735,\"parcelid\":\"09f120000430562\",\"taxyear\":2027,",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":12.59,\"nbrhood\":\"c810\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/b0da18df772b4dfb0beda3e4.html"
+    }
+   ],
+   "open_items": [
+    "No for-sale listing was checked: CoStar, LoopNet and Crexi are off limits, and the web search surfaced their listings for other Graham Rd addresses, which were not opened or used.",
+    "The brief's 'same owner for 27 years' rests on a 1999 deed; an LLC with a Hudson Yards suite address suggests a later transfer the CAMA extract may not show. Pull the current deed before relying on the long-hold seller signal.",
+    "The same owner also holds a 4.3 ac parcel at 0 Oakley Rd (09F050000360792, county query by map box), about 100 ft away by my measurement; ask whether the two are offered together."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Reading of county records, not a Secretary of State record: the owning LLC mails to the same New York office suite as the LLC that owns the built 12.59 ac warehouse at 4800 Coates Dr nearby, which looks like an institutional investor's single-asset entities.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5492,33.5500,-84.5431,33.5565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"4800 COATES DR 2\",\"AddrNumber\":\"4800\",\"AddrPreDir\":null,\"AddrStreet\":\"COATES\",\"AddrSuffix\":\"DR\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":\"2\",\"Owner\":\"COATES E OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":5160000,\"LandAssess\":304360,\"ImprAssess\":4855640,\"TotAppr\":12900000,\"LandAppr\":760900,\"ImprAppr\":12139100,\"LUCode\":\"398\",\"ClassCode\":\"I5\"",
+     "context_before": "74}},{\"attributes\":{\"objectid\":8735,\"parcelid\":\"09f120000430562\",\"taxyear\":2027,",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":12.59,\"nbrhood\":\"c810\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/b0da18df772b4dfb0beda3e4.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "The county record for this parcel (queried by parcel id) gives the owner as an LLC mailing to a New York office suite.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F110000440513%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"GRAHAM OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":190960,\"LandAssess\":190960,\"ImprAssess\":0,\"TotAppr\":477400,\"LandAppr\":477400,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\"",
+     "context_before": ":\"graham\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":9.55,\"nbrhood\":\"c810\",\"subdiv\":null,\"sub",
+     "words_shared_with_url": [],
+     "page_file": "pages/5c7b03b1fd5acc7b03a7ab08.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State records (status, formation date, registered agent, principal office) could not be read (known wall). A person should pull the entity record and the current deed.",
+    "Whether the owner is a developer, an investor or a fund vehicle, and whether the parcel is part of a larger portfolio, needs title and SoS research by a person."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "The owner is not a 27-year holder. It is one of five new KKR affiliate LLCs that took over a Fairburn industrial portfolio in September 2025: the Development Authority of Fulton County minutes approve assigning the 7250 Graham Road bond project to an LLC with this parcel's owner name, to affiliates of KKR, from an industrial trust that Clarion Partners appeared for. The county parcel layer puts that built 254,000 sq ft warehouse right beside this parcel, and the same owner also holds a 4.3 ac vacant lot at 0 Oakley Rd next to it. So the parcel looks like excess or expansion land that an institutional investor bought about 14 months ago with the neighbouring building. The screener also found no fit for the smallest building envelope here, so its likely use is yard, trailer parking or expansion for that same owner. The 'same owner for 27 years' and long-hold seller signals in the brief rest on a stale 1999 deed. Nothing shows the land is unavailable, but a person should expect a recent buyer who may not sell, and confirm it first.",
+  "disputes": [
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "In September 2025 the Development Authority of Fulton County approved assigning the 2003 bond projects, among them 7250 Graham Road, from LIT/Hodges Industrial Trust to five LLCs. One of them has the same name as this parcel's owner in the county record. (This is read from the authority's minutes. The authority was not searched by owner name: the page came from a search on the street address 7250 Graham Road.)",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Projects from LIT/Hodges Industrial Trust to Oakley A Owner LLC, Lakeview Owner LLC, Graham Owner LLC, Whitewater B Owner LLC, and Southpark Owner LLC, or affiliates thereof (Address: 5150 Oakley Industrial Blvd, 105 Lakeview Court, 7250 Graham Road, 1305 Whitewater Place and 7760 Spence Road, Fulton County, Georgia).",
+    "context_before": "f the m.d. hodges enterprises, inc. series 2003d, 2003e, 2003f, 2003g and 2003h ",
+    "context_after": " mr. robert kennedy of troutman pepper locke llp, mr. payson macwilliam of clari",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/a06a9d26bfa3fdb93171eace.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The same minutes say the portfolio (about $70 million invested and a million square feet developed) was being assigned to affiliates of KKR. So this parcel's owner looks like a recent institutional buyer, about 14 months ago, not a 1999 holder.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Mr. Kennedy gave a brief history and overview of the project, stating that $70 million had been invested and a million square feet developed with associated job creation. The owner is now seeking to assign these transactions to affiliates of KKR.",
+    "context_before": "the fact sheet included as part of this item posted on the authority's website. ",
+    "context_after": " upon a motion made by dr. looney, which was seconded by secretary kurlander-nag",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/a06a9d26bfa3fdb93171eace.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The authority approved the assignments, including the one to the LLC with this parcel's owner name.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "the Authority approved the assignments to Oakley A Owner LLC, Lakeview Owner LLC, Graham Owner LLC, Whitewater B Owner LLC, and Southpark Owner LLC, or affiliates thereof.",
+    "context_before": "n a motion made by dr. looney, which was seconded by secretary kurlander-nagel, ",
+    "context_after": " final bond resolution for delowe village, l.p. (\"delowe village\") (address: 238",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/a06a9d26bfa3fdb93171eace.pdf"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "The minutes are of the authority's meeting on 25 September 2025.",
+    "source_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "REGULAR MEETING HELD ON THURSDAY, SEPTEMBER 25, 2025 AT 2:00 P.M.",
+    "context_before": "development authority of fulton county ",
+    "context_after": " suite 2052 (peachtree level) conference room fulton county government center bu",
+    "pdf_page": 1,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/a06a9d26bfa3fdb93171eace.pdf"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "I asked the county parcel layer for every parcel in a small box drawn just around this parcel's outline (lon -84.5476 to -84.5447, lat 33.5510 to 33.5550, by coordinates, not by owner). It returns 7250 Graham Rd, title held by the Development Authority (the usual bond-lease set-up), with $8.4M of improvements. That is the warehouse in the bond project assigned above, so the owner's operating building sits right beside this parcel.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5476,33.5510,-84.5447,33.5550&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"7250 GRAHAM RD\",\"AddrNumber\":\"7250\",\"AddrPreDir\":null,\"AddrStreet\":\"GRAHAM\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"DEVELOPMENT AUTHORITY OF FULTON COUNTY \",\"OwnerAddr1\":\"7250 GRAHAM RD\",\"OwnerAddr2\":\"FAIRBURN GA 30213\",\"TaxDist\":\"25D\",\"TotAssess\":2635700,\"LandAssess\":281540,\"ImprAssess\":2354160,\"TotAppr\":9413200,\"LandAppr\":1005500,\"ImprAppr\":8407700,\"LUCode\":\"888\",\"ClassCode\":\"C5\"",
+    "context_before": "05}},{\"attributes\":{\"objectid\":9097,\"parcelid\":\"09f110000440455\",\"taxyear\":2027,",
+    "context_after": ",\"excode\":null,\"livunits\":null,\"landacres\":17.12,\"nbrhood\":\"c810\",\"subdiv\":null,",
+    "words_shared_with_url": [],
+    "page_file": "pages/0e054ad93c4d793f78c4624f.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The same box query returns a second vacant parcel, 0 Oakley Rd (4.3 ac, no improvements), owned by an LLC with the same name and New York suite as this parcel's owner. The owner holds vacant land on both sides of its buildings, which looks like held expansion or excess land.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5476,33.5510,-84.5447,33.5550&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"0 OAKLEY RD\",\"AddrNumber\":\"0\",\"AddrPreDir\":null,\"AddrStreet\":\"OAKLEY\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"GRAHAM OWNER LLC \",\"OwnerAddr1\":\"30 HUDSON YARDS SUITE 7500\",\"OwnerAddr2\":\"NEW YORK NY 10001\",\"TaxDist\":\"25D\",\"TotAssess\":236000,\"LandAssess\":236000,\"ImprAssess\":0,\"TotAppr\":590000,\"LandAppr\":590000,\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"C4\"",
+    "context_before": "es\":[{\"attributes\":{\"objectid\":8147,\"parcelid\":\"09f050000360792\",\"taxyear\":2027,",
+    "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":4.3,\"nbrhood\":\"c810\",\"subdiv\":null,\"subd",
+    "words_shared_with_url": [],
+    "page_file": "pages/0e054ad93c4d793f78c4624f.html"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "The 7250 Graham Road warehouse was built from March 2021 to March 2022. That matches the 'Graham Road Site' land disturbance permit of 2 April 2021 in the first pass's plans-7, so that permit most likely covered the neighbouring building and not this parcel (an inference, not shown on the permit).",
+    "source_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+    "retrieved": "2026-11-13",
+    "quote": "Construction began in March 2021 and was completed in March 2022.",
+    "context_before": " cross-dock configuration, 36' clear height, esfr sprinklers, and led lighting. ",
+    "context_after": " prior to construction completion, the project was 100% pre-leased to the americ",
+    "words_shared_with_url": [],
+    "page_file": "pages/74de0c6f429a49e6ac56ee39.html"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "Clarion's own page says the 7250 Graham Road building stands in Southpark, a master-planned industrial park. Any private covenants or owners' association rules for Southpark could limit what is built on this parcel, and none were read.",
+    "source_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+    "retrieved": "2026-11-13",
+    "quote": "the project was built on 18.4 acres of land within Southpark, a master-planned industrial development.",
+    "context_before": "status as an increasingly important hub for many large institutional occupiers, ",
+    "context_after": " the new building features state-of-the-art class a attributes, including cross-",
+    "words_shared_with_url": [],
+    "page_file": "pages/74de0c6f429a49e6ac56ee39.html"
+   },
+   {
+    "id": "skeptic-9",
+    "text": "The neighbouring building is a 253,774 sq ft distribution warehouse developed by Clarion Partners with Seefried. Clarion's representative appeared at the 2025 assignment, which fits the seller being a Clarion-managed trust.",
+    "source_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+    "retrieved": "2026-11-13",
+    "quote": "In conjunction with Seefried Industrial Properties, Clarion Partners commenced the development of a 253,774 square feet warehouse distribution building in Fairburn, GA.",
+    "context_before": "7250 graham page image image caption page content city/state: fairburn, georgia ",
+    "context_after": " due to atlanta's status as an increasingly important hub for many large institu",
+    "words_shared_with_url": [],
+    "page_file": "pages/74de0c6f429a49e6ac56ee39.html"
+   }
+  ],
+  "open_items": [
+   "plans-1 is disputed only in part. Its claim text says M-2 is among the Industrial category's appropriate zoning districts, but the quote lists only development types. The page text after the quote reads 'o&i, c-2, m-1,' and is cut off there, so M-2 is not shown in what was checked. Read the full line on plan page 144.",
+   "Pull the current deed and the DAFC fact sheet for the September 2025 assignment. Confirm that this 9.55 ac parcel (0 Graham Rd) went to the KKR affiliate in that 2025 portfolio purchase, and whether it is tied to the 7250 Graham Road bond project (expansion land, parking or stormwater for that building) or is free-standing excess land.",
+   "The brief's 'same owner for 27 years' (1999 deed) and 'owner mails from out of state' signals should not be read as long-hold seller motivation. The county yearly-sales layers for 2018 to 2022 returned no sale in a box around this parcel; the 2025 transfer may not be in those layers yet, or was not a qualified sale.",
+   "The brief's building-fit check found no placement for the smallest 400 x 445 ft envelope. Together with the same owner's warehouse next door, the parcel's realistic use may be yard, trailer parking or expansion for that building, and its most likely buyer may be the owner itself. A person should ask whether the owner would sell it on its own.",
+   "Check for Southpark private covenants or an owners' association (recorded declaration) that limit use, access or outdoor storage on this parcel.",
+   "Seen, not verifiable: one web search (on the street address) returned a LoopNet property record for this parcel id among its results. It was not opened or used, and LoopNet is off limits.",
+   "Not checked: qPublic (Schneider) disallows Anthropic crawlers in robots.txt, so the county sales history page was not fetched."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan": {
+   "file": "pages/0d2514dcf7b12fbafbbf3624.pdf",
+   "fetched_at": "2026-11-13T17:46:05Z",
+   "final_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+   "status": 200,
+   "bytes": 158602610,
+   "sha256": "11f1a0b5cf4972d0dc6a341515c0a3add030347a0b2a57b1ea9d4230f39bc83f"
+  },
+  "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases": {
+   "file": "pages/63c2340b4ce15a08451d89f9.html",
+   "fetched_at": "2026-11-13T17:46:07Z",
+   "final_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+   "status": 200,
+   "bytes": 105559,
+   "sha256": "60bccf4770aca567ee35387aab9f97f7f966cb319812cb63106621e7b3378cc9"
+  },
+  "https://www.fairburn.com/257/Pending-Zoning-Development-Cases": {
+   "file": "pages/07157d4229d0e9e15fd26812.html",
+   "fetched_at": "2026-11-13T17:46:17Z",
+   "final_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+   "status": 200,
+   "bytes": 96407,
+   "sha256": "e3d04a6d31e3d1bc3757f581d5fc9647dcf23f224afe5b981101a14c9dac480f"
+  },
+  "https://www.fairburn.com/ArchiveCenter/ViewFile/Item/69": {
+   "file": "pages/dd18f6a29bfb7a015ffa4377.pdf",
+   "fetched_at": "2026-11-13T17:46:27Z",
+   "final_url": "https://www.fairburn.com/ArchiveCenter/ViewFile/Item/69",
+   "status": 200,
+   "bytes": 1477991,
+   "sha256": "5b900bc89166327b85fa51de911f3a5bdfc8400f93b7c890f86ac1fb4cd51db5"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F110000440513%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/5c7b03b1fd5acc7b03a7ab08.html",
+   "fetched_at": "2026-11-13T17:46:29Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F110000440513%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4296,
+   "sha256": "70ea6be1166feaf9acdec3e49e1db171a3fc6d1815174b80f58e9728c8424dfe"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5492,33.5500,-84.5431,33.5565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b0da18df772b4dfb0beda3e4.html",
+   "fetched_at": "2026-11-13T17:46:29Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5492,33.5500,-84.5431,33.5565&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 13937,
+   "sha256": "9b1dea8a80ca9cf553d771f3713095051ac9cd2ff01c55b4241f989037b51113"
+  },
+  "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf": {
+   "file": "pages/a06a9d26bfa3fdb93171eace.pdf",
+   "fetched_at": "2026-11-13T17:46:31Z",
+   "final_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_368_1501592515.pdf",
+   "status": 200,
+   "bytes": 145744,
+   "sha256": "01f558bada6d8cfc06f343e76ee9b8afa9f327d5bca5f711b0332311ab90734a"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5476,33.5510,-84.5447,33.5550&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/0e054ad93c4d793f78c4624f.html",
+   "fetched_at": "2026-11-13T17:46:31Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5476,33.5510,-84.5447,33.5550&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 8753,
+   "sha256": "0a996af769d9169ac057e21f4942d7a01ccb1a9cc43be0d228bb53433b01a383"
+  },
+  "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia": {
+   "file": "pages/74de0c6f429a49e6ac56ee39.html",
+   "fetched_at": "2026-11-13T17:46:33Z",
+   "final_url": "https://www.clarionpartners.com/our-approach/case-studies/industrial-development-graham-road-fairburn-georgia",
+   "status": 200,
+   "bytes": 64922,
+   "sha256": "294e153e9396d6fc85a54420c536eb8bf8cc2ae40eb5e6453e72ece9ff3ee8d9"
+  }
+ },
+ "quotecheck": {
+  "kept": 21,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-13T17:46:33Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "05e7fb6409a9df77d88d09dfff2ab1cb511d90f3e2b4592163c8214f65741498",
+   "skeptic.json": "59816298be26336db78fe73d0f9903b7ff48221c5dace2dbae091ee0f7b24e21"
+  }
+ },
+ "dropped_claims": []
+}

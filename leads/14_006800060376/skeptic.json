@@ -1,0 +1,69 @@
+{
+ "schema": 1,
+ "parcel_id": "14 006800060376",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "Nothing found shows a building, a developer or a sale on this parcel, and the city's own maps still show plain I-1 and Industrial future land use, so the lead is not killed. But it is a narrow wedge of about 8.7 acres by the city's parcel shape (the county says 9.38), with no frontage on anything but two 24 ft, two-lane collectors. Its long east side faces Waters Rd SW, and across that road are occupied single-family homes in residential zoning. The west side is an 830 ft curved edge with no parcel beside it, which by my reading is the I-75 right-of-way (no access there). Truck access means curb cuts across from houses on a residential street, on a site where the screener already found no envelope for the smallest building prototype. Atlanta's code rewrite (Draft V2, being finalised as Draft V3 for Council) is still pending, and this parcel's proposed district could not be read. A person must settle access, the real buildable area and the draft-map district before this ranks as a usable industrial site.",
+  "disputes": [
+   "owner-1"
+  ],
+  "claims": [
+   {
+    "text": "The city's street centreline layer, queried within 80 ft of the parcel's own polygon (taken from the city's tax parcel layer), returns only Waters Rd SW and Mount Zion Rd SW. The Waters Rd SW segment that runs along the parcel's east side (address range 2894-3009) is a two-lane, 24 ft wide collector with a 35 mph limit, so the site's frontage is a narrow two-lane road, not an arterial or industrial street.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/33/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&distance=80&units=esriSRUnit_Foot&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"FUNCCLASS\":\"Collector\",\"SYMBOLCLASS\":null,\"SPEEDLIMIT\":\"35\",\"SURFACE\":null,\"DIRTRAVEL\":\"Both\",\"CARDDIRTRVL\":null,\"WIDTH\":\"24\",\"LANES\":\"2\""
+   },
+   {
+    "text": "The same street query gives that segment's label and address range: Waters Rd SW, 2894-3009, the block where the homes across the road from the parcel sit (for example 2960 Waters Rd SW).",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/33/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=true&outSR=4326&distance=80&units=esriSRUnit_Foot&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"LABEL\":\"Waters Rd SW\",\"FROMLEFT\":2894,\"TOLEFT\":3008,\"FROMRIGHT\":2895,\"TORIGHT\":3009"
+   },
+   {
+    "text": "The city's tax parcel layer, queried at a point inside 2960 Waters Rd SW (by my measurement about 45 ft east of the parcel, across Waters Rd), shows a residential (R3) lot with one living unit: occupied housing directly across the parcel's main frontage.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"CLASSCD\":\"R3\",\"CLASSDSCRP\":null,\"LIVUNITS\":1,\"SITEADDRESS\":\"2960 WATERS RD SW\""
+   },
+   {
+    "text": "The city's zoning district layer, queried at the same point inside 2960 Waters Rd SW, returns RG-2 (residential general): the land across Waters Rd from the parcel's east side is zoned residential.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.395309%2C33.673615&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONECLASS\":\"RG-2\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH8REGEDIRE\""
+   },
+   {
+    "text": "The city's tax parcel layer, queried at a point inside this parcel, gives the parcel's mapped shape as 378,080 sq ft (about 8.68 ac), against the county record's 9.38 ac. The usable area may be smaller than the brief's 9.4 ac headline. The record also places the parcel in NPU Z, Glenrose Heights neighbourhood.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/25/query?geometry=-84.39638%2C33.674261&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"SHAPE.AREA\":378080.130751152,\"SHAPE.LEN\":2614.4541981126499,\"TAXYEAR\":2025"
+   },
+   {
+    "text": "The city's building footprint layer, queried with the parcel's own polygon, returns no footprint: no mapped building on the parcel (this supports the lead).",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.39526%2C33.674849%5D%2C%5B-84.395489%2C33.674229%5D%2C%5B-84.3955%2C33.674198%5D%2C%5B-84.395887%2C33.673117%5D%2C%5B-84.397184%2C33.673132%5D%2C%5B-84.397178%2C33.673199%5D%2C%5B-84.397173%2C33.673266%5D%2C%5B-84.397169%2C33.673332%5D%2C%5B-84.397164%2C33.673399%5D%2C%5B-84.39716%2C33.673465%5D%2C%5B-84.397156%2C33.673532%5D%2C%5B-84.397152%2C33.673599%5D%2C%5B-84.397149%2C33.673666%5D%2C%5B-84.397146%2C33.673732%5D%2C%5B-84.397144%2C33.673799%5D%2C%5B-84.397141%2C33.673866%5D%2C%5B-84.397139%2C33.673932%5D%2C%5B-84.397137%2C33.673999%5D%2C%5B-84.397136%2C33.674066%5D%2C%5B-84.397134%2C33.674133%5D%2C%5B-84.397133%2C33.674199%5D%2C%5B-84.397133%2C33.674266%5D%2C%5B-84.397132%2C33.674333%5D%2C%5B-84.397132%2C33.6744%5D%2C%5B-84.397132%2C33.674466%5D%2C%5B-84.397133%2C33.674533%5D%2C%5B-84.397134%2C33.6746%5D%2C%5B-84.397135%2C33.674667%5D%2C%5B-84.397136%2C33.674733%5D%2C%5B-84.397138%2C33.6748%5D%2C%5B-84.39714%2C33.674867%5D%2C%5B-84.397142%2C33.674934%5D%2C%5B-84.397144%2C33.675%5D%2C%5B-84.397147%2C33.675067%5D%2C%5B-84.39715%2C33.675134%5D%2C%5B-84.397154%2C33.6752%5D%2C%5B-84.397157%2C33.675267%5D%2C%5B-84.397161%2C33.675334%5D%2C%5B-84.397165%2C33.6754%5D%2C%5B-84.395944%2C33.675386%5D%2C%5B-84.395941%2C33.675142%5D%2C%5B-84.395798%2C33.675044%5D%2C%5B-84.395807%2C33.674903%5D%2C%5B-84.39526%2C33.674849%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+   },
+   {
+    "text": "Atlanta's zoning code rewrite (ATL Zoning 2.0) is pending: Draft V2 is the proposed ordinance and a final Draft V3 is being prepared for City Council. The parcel's I-1 zoning could be remapped. This parcel's proposed district on the draft map was not read (the map is on ArcGIS Online).",
+    "source_url": "https://atlzoning.com/review-and-comment/",
+    "retrieved": "2026-11-13",
+    "quote": "Now that commenting has closed, a final version (Draft V3) is being prepared for City Council consideration."
+   },
+   {
+    "text": "Draft V2's industrial use districts are written to keep logistics and warehousing. This points in the parcel's favour if it is mapped to an I- district, but the draft also adds transition screens next to residential use (for example for storage yards).",
+    "source_url": "https://atlzoning.com/wp-content/uploads/2026/05/Ch.-4.-Use-Districts.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Industrial (I-) Use Districts are intended to accommodate a wide range of manufacturing, logistics, warehousing, and other industrial activities that support the"
+   }
+  ],
+  "open_items": [
+   "My own measurement from the city's parcel shapes (approximate, local projection): the east side (about 650 ft) faces Waters Rd SW with houses about 45 ft away across the road; the west side is a curved edge of about 830 ft with no parcel within about 150-300 ft, consistent with I-75 right-of-way and so no access; the south side (about 394 ft) is about 148 ft from the nearest parcel, so Mount Zion Rd SW may sit in a wide right-of-way or on an approach to the I-75 crossing there. Ask the city or GDOT whether a truck driveway is possible on Mount Zion Rd SW; if not, all truck traffic would enter from Waters Rd opposite homes.",
+   "The residential land that actually touches the parcel's north-east lot line (first pass zoning-3) is, by my overlay of the city's parcel shapes, the same LLC's own lots (2931 Waters Rd SW and 0 Waters Rd SW). Any I-1 transitional yard there falls on land the seller controls; the third-party homes are across Waters Rd. Ask planning how the I-1 transitional rules (Sec. 16-16.006, on Municode, not read) treat lots across a street, and whether the owner's house lots could be added or rezoned.",
+   "Ask Atlanta planning which district the ATL Zoning 2.0 draft map assigns this parcel (I1, I2 or an industrial flex IX- district), and whether general warehouse and distribution above 15,000 sq ft would be permitted there or need a special use permit. The Draft V2 use table seems to show one industrial column with S for that use, but its layout could not be read reliably.",
+   "Owner type is not established: owner-1 only gives the LLC name and an office suite mailing address, which cannot tell a passive holding entity from a developer or investor vehicle. The Secretary of State record (a known wall) is still needed.",
+   "The city's land use amendment layer within 1,500 ft shows only two old amendments (CDP-06-61 and CDP-09-31, both complete). Not quoted; no recent plan change found.",
+   "No page I read addressed instructions to an automated reader."
+  ]
+ }
+}

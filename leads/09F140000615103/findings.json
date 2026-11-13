@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "parcel_id": "09F140000615103",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [],
+      "open_items": [
+        "Union City's own site (unioncityga.gov) answered 403 to earlier investigators even for robots.txt, its zoning layer is on ArcGIS Online and its code is on Municode (known walls), so neither the M-1 designation nor the M-1 use table could be quoted. Not re-tried here.",
+        "The parcel is already built on (market section): ask Union City planning what use and conditions the existing roughly 156,000 sq ft building was approved under, and whether any conditions of zoning or a site plan approval bind the land around it."
+      ]
+    },
+    "plans": {
+      "verdict": "supports",
+      "claims": [
+        {"text": "Union City's 2020 comprehensive plan update (as submitted for ARC review, January 2021) applies its District-Industrial character area close to I-85, US-29, South Fulton Parkway and rail lines. This parcel is in an industrial park about 0.8 mi from I-85 exit 64 (brief), but the plan's map was not read at parcel scale.",
+         "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Application: D-I in close proximity to I-85, US-29, South Fulton Parkway and rail lines for the purpose of convenient transportation access."},
+        {"text": "The same plan's District-Industrial area is meant for large-scale distribution and industrial uses.",
+         "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Building development should be variable within D-I to promote the specific needs of industrial activities or businesses and accommodate large-scale distribution facilities, industrial activities, or office park developments."}
+      ],
+      "open_items": [
+        "Confirm on Union City's adopted Future Development Map which character area covers this parcel (the ARC copy was not read at parcel scale; the word Oakley does not appear in its text).",
+        "Rezoning history of the last five years not checked: Union City agendas and minutes are on its own site, which answered 403 to earlier investigators. Ask the city for any rezoning, variance or site plan case on 09F140000615103 and the improvements record 09F140000615111.",
+        "Search snippets only, not read or verified: earlier search results mentioned a 2026 Union City moratorium on rezonings while the zoning ordinance is rewritten. Ask the city whether it is still in force."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {"text": "Sewer, service area: Fulton County's water/sewer service area layer (WR_Public_Map_Viewer layer 16), asked at the brief's map point for this parcel (-84.520819, 33.572517), answers Fulton County, sewer, service available.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""},
+        {"text": "Sewer, pipes not shown: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 800 ft of the same point, returns an empty feature list. The parcel is about 13.9 ac, so parts of it lie beyond 800 ft of that point; a private or city-owned line would not be on this county layer.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.520819%2C33.572517&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=800&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"},
+        {"text": "Water: no published water main map was read. The Development Authority of Fulton County lists Union City among the cities that run their own water service, so Union City (not Fulton County) is the likely water provider here.",
+         "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+         "retrieved": "2026-11-13",
+         "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park, Palmetto, Roswell and Union City."}
+      ],
+      "open_items": [
+        "The site already carries an operating manufacturing building (market section), so water and sewer are very likely connected; the verdict only says no map read here shows the lines. Ask Union City utilities and Fulton County Public Works for the service lines and capacity.",
+        "Capacity: only the utility can say."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {"text": "ALREADY BUILT: asked by the site address, Fulton County's parcel layer returns a second record at 6715 Oakley Industrial Blvd, 09F140000615111, held by an abbreviated form of the same owner name, with no land, $22,407,900 of improvements, class I1, and a shape of about 156,000 sq ft. In the same answer's geometry (outSR=4326 query) this shape sits as a hole cut out of the lead parcel's polygon (investigator's own computation): the lead's 13.9 ac include a roughly 156,000 sq ft building that the parcel map shows as a hole, which is why the screen found no open envelope and treated it as unbuilt.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"ImprAppr\":22407900,\"LUCode\":\"405\",\"ClassCode\":\"I1\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":null,\"NbrHood\":\"C810\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":null,\"SubdivBlck\":null,\"FeatureID\":\"09F140000615111\",\"Shape.STArea()\":156036.69247538838"},
+        {"text": "OPERATING USE: the Oregon Board of Pharmacy's list of registered drug distribution agents, manufacturers and wholesalers (as of 10/26/2026) carries a manufacturer registration for Dendreon Pharmaceuticals LLC at this site address, issued 2011 and expiring 09/30/2027. A pharmaceutical manufacturer operates here; the parcel is not vacant land.",
+         "source_url": "https://www.oregon.gov/pharmacy/Documents/List_of_DDA_Man_Wholesalers.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "M-0002251 DENDREON PHARMACEUTICALS LLC 6715 OAKLEY INDUSTRIAL BLVD UNION CITY GA 30291 08/12/2011 09/30/2027"},
+        {"text": "The lead parcel's own record (same answer) shows only $198,600 of improvements and land-use code 999 on 13.91 ac, with a mapped shape of about 416,000 sq ft (about 9.6 ac): the building's value sits on the separate improvements record above, so a screen that reads only this record sees near-vacant land.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"ImprAppr\":198600,\"LUCode\":\"999\",\"ClassCode\":\"I5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":13.91,\"NbrHood\":\"C810\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":null,\"SubdivBlck\":null,\"FeatureID\":\"09F140000615103\",\"Shape.STArea()\":416073.34617291571"}
+      ],
+      "open_items": [
+        "No sale, contract or developer sign was found, and none was expected: this is an improved, occupied industrial property, not a land lead. A person should treat it as screened out (already built on) rather than as a land opportunity.",
+        "Seen, not verifiable: search-result snippets (not opened: atlmainstreet.com robots.txt disallows all agents; businesswire.com and cresa.com refused the fetch) described a December 2019 Dendreon press release on a 10-year lease to keep its roughly 155,000 sq ft Union City manufacturing facility, through about 2029. If true, the building is leased to the operator until about 2029.",
+        "The other same-owner parcel in the brief (09F260001250088) was screened out as already built on; check whether the owner name is a portfolio of leased buildings.",
+        "Screener gap (for the person, not fixed here): the built-on screen reads only the land record's improvement value; Fulton carries some buildings on a separate improvements-only record (no land, class I1) at the same address. Same-address improvement records could be checked before ranking."
+      ]
+    },
+    "owner": {
+      "verdict": "developer_or_investor",
+      "claims": [
+        {"text": "The county parcel record (asked by site address) gives the land owner as a building-numbered LLC mailing from New York; the improvements record carries an abbreviated form of the same name. The registered manufacturer at the address is a different company (market section), so the owner reads as a landlord or investor vehicle holding one building, not the operator. This is a reading of the records; the Secretary of State record was not read.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=Address%3D%276715%20OAKLEY%20INDUSTRIAL%20BLVD%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Owner\":\"B9 MALBEC OAKLEY BUILDING 3 LLC \",\"OwnerAddr1\":\"345 PARK AVE\",\"OwnerAddr2\":\"NEW YORK NY 10154\",\"TaxDist\":\"50\""}
+      ],
+      "open_items": [
+        "Georgia Secretary of State record not read (known wall: 403 and a search form; the owner name may not be put into an outside service). Status, formation date, principal office and registered agent are unknown.",
+        "Pull the 2021-03-17 deed ($16,700,000 per the brief) to see whether it conveyed the land and building together and whether a lease is of record."
+      ]
+    }
+  }
+}
