@@ -41,9 +41,9 @@ Open items, most important first:
    survives as written: #29 is `killed`, the rest are `weakened`.** The
    checks found four gaps in the screen:
    - built sites pass the land-only screen (`screens.py`, human-owned);
-   - Atlanta's future land use comes from a superseded field. A reviewed
-     fix is held, because the root zoning importer's snippet must change
-     with it. To restore it: `git revert c00525a 0cea72b` (`reviews/35/19`);
+   - Atlanta's future land use came from a superseded field (fixed
+     2026-11-13: the screener reads NDP, and the root importer's proposed
+     sources match it, `reviews/35/19`);
    - a listed hazardous site next door does not count;
    - operating companies' own buffer land ranks as a lead.
 

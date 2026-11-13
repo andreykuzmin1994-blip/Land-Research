@@ -1,5 +1,5 @@
 {
-  "_comment": "Paste ONLY the 'zoning_sources' list below into sources.json, as a new key INSIDE county_parcel_data.fulton_ga (next to field_mapping), never directly under county_parcel_data (that would read as a new county connector). sources.json is human-only: the agent never edits it. Built from screener/fulton.py ZONING_SOURCES (2026-11-05) and matching it exactly on url, kind, fields and jurisdictions: the City of South Fulton layer serves south_fulton only, and Fulton layer 34 alone serves the Fulton Industrial District (fid, unincorporated county land under the county's ordinance). Order = precedence: for a parcel, the first role='zoning' source that covers its jurisdiction and matches it wins. role='flu' entries are future land use: zoning_import never writes them to parcels.zoning. Jurisdiction keys are the stable ids of zoning.py / zoning_rules.json.",
+  "_comment": "Paste ONLY the 'zoning_sources' list below into sources.json, as a new key INSIDE county_parcel_data.fulton_ga (next to field_mapping), never directly under county_parcel_data (that would read as a new county connector). sources.json is human-only: the agent never edits it. Built from screener/fulton.py ZONING_SOURCES (2026-11-05) and matching it exactly on url, kind, fields and jurisdictions: the City of South Fulton layer serves south_fulton only, and Fulton layer 34 alone serves the Fulton Industrial District (fid, unincorporated county land under the county's ordinance). Order = precedence: for a parcel, the first role='zoning' source that covers its jurisdiction and matches it wins. role='flu' entries are future land use: zoning_import never writes them to parcels.zoning. atlanta_flu reads NDP, the code field of the city's 2025 development-pattern layer (LANDUSEDES on the same records is the superseded plan); the screener names each code from the layer legend (screener/fulton.py flu_labels, reviews/35_screener_lead_layer/19), and a root reader of future land use would need the same table (2026-11-13). Jurisdiction keys are the stable ids of zoning.py / zoning_rules.json.",
   "key_path": "county_parcel_data.fulton_ga.zoning_sources",
   "uncovered_jurisdictions": [
     "college_park",
@@ -140,7 +140,7 @@
         "atlanta"
       ],
       "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8",
-      "flu_field": "LANDUSEDES"
+      "flu_field": "NDP"
     }
   ]
 }
