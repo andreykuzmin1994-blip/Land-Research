@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="834" viewBox="0 0 640 834" font-family="sans-serif">
+<title>Site plan #48 parcel 09F070100320231</title>
+<rect x="0" y="0" width="640" height="834" fill="#ffffff"/>
+<path class="parcel-fill" d="M529.0,64.3 L581.6,81.5 L619.0,83.1 L620.0,109.0 L559.0,111.8 L548.3,165.4 L615.9,167.2 L615.4,172.1 L598.7,193.7 L540.1,228.6 L522.5,240.1 L505.3,252.2 L488.6,265.0 L472.4,278.4 L458.4,291.5 L445.0,305.2 L450.9,310.8 L337.0,434.4 L261.8,495.8 L173.9,541.8 L133.1,558.5 L92.6,575.9 L91.9,573.5 L61.9,503.2 L31.9,463.2 L31.2,431.4 L20.0,412.9 L103.1,396.2 L88.2,359.5 L92.7,287.0 L122.7,241.2 L158.8,239.4 L198.6,200.2 L221.2,148.6 L286.4,68.6 L483.1,64.4 L506.1,64.1 Z" fill="#f4f1ea" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="largest-open" d="M581.6,81.5 L619.0,83.1 L620.0,109.0 L559.0,111.8 L548.3,165.4 L615.9,167.2 L615.4,172.1 L598.7,193.7 L540.1,228.6 L522.5,240.1 L505.3,252.2 L488.6,265.0 L472.4,278.4 L458.4,291.5 L445.0,305.2 L450.9,310.8 L337.0,434.4 L261.8,495.8 L173.9,541.8 L133.1,558.5 L92.6,575.9 L91.9,573.5 L87.8,564.0 L107.1,565.3 L150.3,548.4 L160.5,535.5 L154.2,513.1 L148.1,507.8 L142.6,507.9 L109.3,527.1 L95.7,531.2 L82.1,519.6 L77.2,497.1 L74.6,494.0 L66.7,489.3 L51.7,489.6 L46.5,482.6 L34.5,445.3 L31.3,438.0 L31.2,431.4 L21.2,414.9 L20.3,412.9 L103.1,396.2 L88.2,359.5 L92.7,287.0 L122.7,241.2 L158.8,239.4 L198.6,200.2 L221.2,148.6 L286.4,68.6 L483.1,64.4 L506.1,64.1 L529.0,64.3 Z" fill="#cfe8c4" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="constrained" d="M61.9,503.2 L50.9,488.5 L51.7,489.6 L66.7,489.3 L74.6,494.0 L77.2,497.1 L82.1,519.6 L95.7,531.2 L109.3,527.1 L142.6,507.9 L148.1,507.8 L154.2,513.1 L160.5,535.5 L150.3,548.4 L107.1,565.3 L87.8,564.0 L91.9,573.5 Z M34.5,466.7 L31.8,458.1 L31.9,463.2 L31.2,431.4 L31.3,438.0 L34.5,445.3 L46.5,482.6 Z M20.0,412.9 L103.1,396.2 L20.3,412.9 L21.2,414.9 Z" fill="#9cc3e0" fill-rule="evenodd" fill-opacity="0.8" stroke="none" stroke-width="0.0"/>
+<path class="envelope" d="M497.5,242.0 L343.2,78.3 L128.9,280.2 L283.2,444.0 Z" fill="#f2c9a0" fill-rule="evenodd" fill-opacity="0.8" stroke="#b5534a" stroke-width="2.0"/>
+<path class="pond" d="M84.1,507.8 L216.5,507.8 L216.5,441.6 L84.1,441.6 Z" fill="#7fc4bd" fill-rule="evenodd" fill-opacity="0.9" stroke="#1f6f68" stroke-width="2.0"/>
+<path class="parcel" d="M529.0,64.3 L581.6,81.5 L619.0,83.1 L620.0,109.0 L559.0,111.8 L548.3,165.4 L615.9,167.2 L615.4,172.1 L598.7,193.7 L540.1,228.6 L522.5,240.1 L505.3,252.2 L488.6,265.0 L472.4,278.4 L458.4,291.5 L445.0,305.2 L450.9,310.8 L337.0,434.4 L261.8,495.8 L173.9,541.8 L133.1,558.5 L92.6,575.9 L91.9,573.5 L61.9,503.2 L31.9,463.2 L31.2,431.4 L20.0,412.9 L103.1,396.2 L88.2,359.5 L92.7,287.0 L122.7,241.2 L158.8,239.4 L198.6,200.2 L221.2,148.6 L286.4,68.6 L483.1,64.4 L506.1,64.1 Z" fill="none" fill-rule="evenodd" fill-opacity="1.0" stroke="#222222" stroke-width="1.5"/>
+<path class="frontage" d="M529.0,64.3 L565.6,76.2 M613.5,82.9 L619.0,83.1 L620.0,109.0 L615.8,109.2 M615.9,167.2 L615.9,167.2 L615.9,167.4 M41.8,408.5 L74.3,402.0 M90.8,318.4 L92.7,287.0 L122.7,241.2 L145.2,240.0 M165.0,233.3 L194.7,204.1 M211.4,170.8 L221.2,148.6 L224.5,144.5 M256.7,105.0 L286.4,68.6 L483.1,64.4 L506.1,64.1 L529.0,64.3" fill="none" stroke="#d9480f" stroke-width="5.0" stroke-linecap="round"/>
+<text x="313.2" y="265.1" font-size="11" text-anchor="middle" font-weight="bold">cross-dock 353,600 SF</text>
+<rect x="594.0" y="22.0" width="28" height="48" fill="#ffffff" fill-opacity="0.8"/>
+<path class="north" d="M608.0,26.0 L616.0,52.0 L608.0,46.0 L600.0,52.0 Z" fill="#222222"/>
+<text x="608.0" y="66.0" font-size="12" text-anchor="middle" font-weight="bold">N</text>
+<path class="scale" d="M20.0,633.0 L20.0,638.0 L185.5,638.0 L185.5,633.0" fill="none" stroke="#222222" stroke-width="2.0"/>
+<text x="191.5" y="638.0" font-size="11" text-anchor="start" font-weight="normal">500 ft</text>
+<rect x="20" y="660.0" width="14" height="10" fill="#f4f1ea" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="670.0" font-size="12" text-anchor="start" font-weight="normal">Parcel (county map) 31.7 ac</text>
+<rect x="20" y="678.0" width="14" height="10" fill="#9cc3e0" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="688.0" font-size="12" text-anchor="start" font-weight="normal">Constrained 2%: floodplain, wetlands and water, easements, protected land</text>
+<rect x="20" y="696.0" width="14" height="10" fill="#cfe8c4" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="706.0" font-size="12" text-anchor="start" font-weight="normal">Largest open part 31.0 ac</text>
+<rect x="20" y="714.0" width="14" height="10" fill="#f2c9a0" stroke="#b5534a" stroke-width="1.0"/>
+<text x="40.0" y="724.0" font-size="12" text-anchor="start" font-weight="normal">Envelope: cross-dock 680 x 520 ft building, 353,600 SF (+ truck court + trailer</text>
+<text x="40.0" y="742.0" font-size="12" text-anchor="start" font-weight="normal">parking)</text>
+<rect x="20" y="750.0" width="14" height="10" fill="#7fc4bd" stroke="#1f6f68" stroke-width="1.0"/>
+<text x="40.0" y="760.0" font-size="12" text-anchor="start" font-weight="normal">Detention pond 400 x 200 ft beside the envelope: rough allowance, no hydrology</text>
+<rect x="20" y="768.0" width="14" height="10" fill="#d9480f" stroke="#d9480f" stroke-width="1.0"/>
+<text x="40.0" y="778.0" font-size="12" text-anchor="start" font-weight="normal">Road frontage about 1,744 ft (longest: local road, GDOT route 1121200514309); curb</text>
+<text x="40.0" y="796.0" font-size="12" text-anchor="start" font-weight="normal">cut not checked</text>
+<text x="20.0" y="814.0" font-size="11" text-anchor="start" font-weight="normal">North up. Steep ground not shown. A screening sketch, not a survey.</text>
+</svg>

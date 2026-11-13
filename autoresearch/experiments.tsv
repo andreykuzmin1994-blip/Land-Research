@@ -1,0 +1,17 @@
+time	commit	parent	fingerprint	graded	hits	sites	positives	k	win_share	status	description
+2026-11-13 16:14:52	5d40e25	5432596	4eb1c1de9059	11.7	2.4	35.0	107	216		baseline	screener: review fixes for the 2026-11-13 screen changes
+2026-11-13 16:15:18	c85e341	5d40e25	4eb1c1de9059	11.8	3.0	35.0	107	216	0.608	discard	exp: weight industrial context 25, seller 20
+2026-11-13 16:15:30	06b2711	5d40e25	4eb1c1de9059	11.5	2.4	35.0	107	216	0.344	discard	exp: saturating industrial-context curve (1-exp(-n/5))
+2026-11-13 16:15:40	7799237	5d40e25	4eb1c1de9059	11.7	3.0	35.0	107	216	0.550	discard	exp: land-class term (industrial/commercial digest class), seller 30->20
+2026-11-13 16:15:49	a18991b	5d40e25	4eb1c1de9059	10.6	2.0	35.0	107	216	0.136	discard	exp: combine access x industrial context into one term
+2026-11-13 16:15:57	7e4173b	5d40e25	4eb1c1de9059	12.7	4.0	35.0	107	216	0.702	discard	exp: smooth long-tail access curve (half credit near 4 mi)
+2026-11-13 16:16:05	c12de0d	5d40e25	4eb1c1de9059	10.7	3.4	35.0	107	216	0.072	discard	exp: usable-land credit grows to 30 acres (sqrt curve)
+2026-11-13 16:16:13	ed46feb	5d40e25	4eb1c1de9059	10.4	3.2	35.0	107	216	0.266	discard	exp: weight interstate access 45, seller 15
+2026-11-13 16:16:20	426479f	5d40e25	4eb1c1de9059	13.0	4.0	35.0	107	216	0.750	discard	exp: gentle linear access decay to zero at 12 mi
+2026-11-13 16:16:27	62ae296	5d40e25	4eb1c1de9059	10.4	3.0	35.0	107	216	0.156	discard	exp: industrial context saturates at 40 parcels instead of 15
+2026-11-13 16:16:36	792c5a2	5d40e25	4eb1c1de9059	11.8	2.0	35.0	107	216	0.542	discard	exp: smooth tenure credit (35 x years/25) instead of 10/20-year steps
+2026-11-13 16:16:50	dd0e18e	5d40e25	4eb1c1de9059	11.9	2.8	35.0	107	216	0.496	discard	exp: land-price term favouring lower assessed land value per acre, seller 30->20
+2026-11-13 16:16:58	a3082e6	5d40e25	4eb1c1de9059	13.5	5.6	35.0	107	216	0.734	discard	exp: access full within 2 mi, convex decay to zero at 12 mi
+2026-11-13 16:17:07	d4d5f7f	5d40e25	4eb1c1de9059	11.8	2.4	35.0	107	216	0.630	discard	exp: drop the individual/trust owner-type bonus from motivation
+2026-11-13 16:17:16	c55ad7a	5d40e25	4eb1c1de9059	12.2	2.6	35.0	107	216	0.696	discard	exp: rail weight 10 (seller 25) with smooth decay to zero at ~1 mile
+2026-11-13 16:17:24	2c2b4a5	5d40e25	4eb1c1de9059	13.4	4.4	35.0	107	216	0.716	discard	exp: access full within 2 mi, linear to zero at 15 mi

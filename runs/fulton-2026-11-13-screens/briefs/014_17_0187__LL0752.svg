@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="834" viewBox="0 0 640 834" font-family="sans-serif">
+<title>Site plan #14 parcel 17 0187  LL0752</title>
+<rect x="0" y="0" width="640" height="834" fill="#ffffff"/>
+<path class="parcel-fill" d="M609.3,163.2 L607.3,403.7 L460.9,403.5 L440.6,403.5 L434.8,403.5 L431.5,403.5 L377.4,445.7 L323.0,488.1 L316.5,487.4 L301.1,512.6 L286.2,571.2 L277.7,580.0 L256.5,617.0 L252.2,620.0 L237.2,619.4 L215.3,612.7 L231.7,432.0 L32.0,431.4 L32.0,402.1 L31.2,250.6 L30.7,148.2 L31.4,148.2 L60.5,146.6 L59.2,115.8 L218.1,113.9 L295.5,113.0 L291.4,25.7 L399.8,21.1 L414.6,20.0 L429.5,20.2 L444.2,21.7 L458.8,24.5 L473.1,28.5 L487.0,33.8 L500.4,40.2 L513.2,47.8 L525.3,56.4 L536.5,66.0 L546.9,76.6 L556.4,88.1 Z" fill="#f4f1ea" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="largest-open" d="M609.3,163.2 L607.3,403.7 L460.9,403.5 L440.6,403.5 L434.8,403.5 L431.5,403.5 L377.4,445.7 L323.0,488.1 L316.5,487.4 L301.1,512.6 L286.2,571.2 L277.7,580.0 L256.5,617.0 L252.2,620.0 L237.2,619.4 L215.3,612.7 L231.7,432.0 L32.0,431.4 L32.0,402.1 L31.2,250.6 L30.7,148.2 L31.4,148.2 L60.5,146.6 L59.2,115.8 L218.1,113.9 L295.5,113.0 L291.4,25.7 L399.8,21.1 L414.6,20.0 L429.5,20.2 L444.2,21.7 L458.8,24.5 L473.1,28.5 L487.0,33.8 L500.4,40.2 L513.2,47.8 L525.3,56.4 L536.5,66.0 L546.9,76.6 L556.4,88.1 Z" fill="#cfe8c4" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="envelope" d="M135.8,389.0 L507.6,389.0 L507.6,130.4 L135.8,130.4 Z" fill="#f2c9a0" fill-rule="evenodd" fill-opacity="0.8" stroke="#b5534a" stroke-width="2.0"/>
+<path class="parcel" d="M609.3,163.2 L607.3,403.7 L460.9,403.5 L440.6,403.5 L434.8,403.5 L431.5,403.5 L377.4,445.7 L323.0,488.1 L316.5,487.4 L301.1,512.6 L286.2,571.2 L277.7,580.0 L256.5,617.0 L252.2,620.0 L237.2,619.4 L215.3,612.7 L231.7,432.0 L32.0,431.4 L32.0,402.1 L31.2,250.6 L30.7,148.2 L31.4,148.2 L60.5,146.6 L59.2,115.8 L218.1,113.9 L295.5,113.0 L291.4,25.7 L399.8,21.1 L414.6,20.0 L429.5,20.2 L444.2,21.7 L458.8,24.5 L473.1,28.5 L487.0,33.8 L500.4,40.2 L513.2,47.8 L525.3,56.4 L536.5,66.0 L546.9,76.6 L556.4,88.1 Z" fill="none" fill-rule="evenodd" fill-opacity="1.0" stroke="#222222" stroke-width="1.5"/>
+<path class="frontage" d="M474.8,403.5 L460.9,403.5 L440.6,403.5 L434.8,403.5 L431.5,403.5 L416.6,415.2 M231.1,438.0 L231.7,432.0 L71.4,431.5 M31.9,381.1 L31.2,250.6 L30.7,148.2 L31.4,148.2 L60.5,146.6 L59.2,115.8 L75.3,115.6" fill="none" stroke="#d9480f" stroke-width="5.0" stroke-linecap="round"/>
+<text x="321.7" y="263.7" font-size="11" text-anchor="middle" font-weight="bold">front/rear-load 166,400 SF</text>
+<rect x="594.0" y="22.0" width="28" height="48" fill="#ffffff" fill-opacity="0.8"/>
+<path class="north" d="M608.0,26.0 L616.0,52.0 L608.0,46.0 L600.0,52.0 Z" fill="#222222"/>
+<text x="608.0" y="66.0" font-size="12" text-anchor="middle" font-weight="bold">N</text>
+<path class="scale" d="M20.0,633.0 L20.0,638.0 L136.2,638.0 L136.2,633.0" fill="none" stroke="#222222" stroke-width="2.0"/>
+<text x="142.2" y="638.0" font-size="11" text-anchor="start" font-weight="normal">200 ft</text>
+<rect x="20" y="660.0" width="14" height="10" fill="#f4f1ea" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="670.0" font-size="12" text-anchor="start" font-weight="normal">Parcel (county map) 14.5 ac</text>
+<rect x="20" y="678.0" width="14" height="10" fill="#9cc3e0" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="688.0" font-size="12" text-anchor="start" font-weight="normal">Constrained 0%: floodplain, wetlands and water, easements, protected land</text>
+<rect x="20" y="696.0" width="14" height="10" fill="#cfe8c4" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="706.0" font-size="12" text-anchor="start" font-weight="normal">Largest open part 14.5 ac</text>
+<rect x="20" y="714.0" width="14" height="10" fill="#f2c9a0" stroke="#b5534a" stroke-width="1.0"/>
+<text x="40.0" y="724.0" font-size="12" text-anchor="start" font-weight="normal">Envelope: front/rear-load 640 x 260 ft building, 166,400 SF (+ truck court + trailer</text>
+<text x="40.0" y="742.0" font-size="12" text-anchor="start" font-weight="normal">parking)</text>
+<rect x="20" y="750.0" width="14" height="10" fill="#7fc4bd" stroke="#1f6f68" stroke-width="1.0"/>
+<text x="40.0" y="760.0" font-size="12" text-anchor="start" font-weight="normal">Detention pond: no pond room found (a lower bound)</text>
+<rect x="20" y="768.0" width="14" height="10" fill="#d9480f" stroke="#d9480f" stroke-width="1.0"/>
+<text x="40.0" y="778.0" font-size="12" text-anchor="start" font-weight="normal">Road frontage about 926 ft (longest: local road, GDOT route 1121200011203); curb cut</text>
+<text x="40.0" y="796.0" font-size="12" text-anchor="start" font-weight="normal">not checked</text>
+<text x="20.0" y="814.0" font-size="11" text-anchor="start" font-weight="normal">North up. Steep ground not shown. A screening sketch, not a survey.</text>
+</svg>
