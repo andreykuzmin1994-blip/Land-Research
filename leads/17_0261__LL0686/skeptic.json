@@ -1,0 +1,78 @@
+{
+ "schema": 1,
+ "parcel_id": "17 0261  LL0686",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "This parcel is not spare land on the market. Its owner of record is the REIT entity that on 30 May 2007, the date of this parcel's last sale, bought 40 Petro travel centers and leased them to TravelCenters of America; it owns the operating Petro truck stop next door, two buildings stand on this parcel beside it, and the landlord's leases on all 178 travel centers were extended in 2023 for 10 years with 50 years of tenant renewal options, now guaranteed by BP. On top of that the parcel is zoned C-1-C, whose use list bars wholesaling and permits no warehouse, and it sits within 150 ft of single-family and multi-family districts. Not killed only because no document read shows this 42.6 ac parcel is inside the leased premises rather than excess land.",
+  "disputes": [
+   "market-6"
+  ],
+  "claims": [
+   {
+    "text": "Owner and use: a trade-press report of 30 May 2007 (the same date as this parcel's last recorded sale in the brief, $5.4 million) says that, as TravelCenters of America (TA) bought the Petro Stopping Centers business, HPT (Hospitality Properties Trust) bought the real estate of 40 Petro travel centers and leased them to TA under a long-term lease. The owner of record here is an HPT PSC entity that also owns the adjacent Petro truck stop (first pass owner-2, market-4). My reading: this parcel is very likely part of a REIT-owned, tenant-operated travel center held under a long lease, not spare land an owner would sell for an industrial building. Whether this particular parcel is inside the leased premises is not shown by this page.",
+    "source_url": "https://www.truckinginfo.com/news/travelcenters-of-america-acquires-petro-stopping-centers",
+    "retrieved": "2026-11-13",
+    "quote": "HPT acquired 40 Petro travel centers and leased them to TA under a long-term lease."
+   },
+   {
+    "text": "Same article: the 40 Petro travel centers were leased from Hospitality Properties Trust at the time of the acquisition.",
+    "source_url": "https://www.truckinginfo.com/news/travelcenters-of-america-acquires-petro-stopping-centers",
+    "retrieved": "2026-11-13",
+    "quote": "Simultaneously with this acquisition, 40 Petro travel centers were leased from Hospitality Properties Trust."
+   },
+   {
+    "text": "The lease is long and recently extended: the landlord REIT (Service Properties Trust, which I take to be the renamed HPT; that link is not shown on this page) announced that on BP's purchase of TA its leases for all 178 TA/Petro travel centers were extended 10 years from 2023, with 50 more years of renewal options, guaranteed by a BP subsidiary. If this parcel is in those premises, the land is tied up until about 2033 at the earliest and the tenant controls renewal.",
+    "source_url": "https://www.nasdaq.com/press-release/service-properties-trust-agrees-to-amended-lease-terms-upon-completion-of-bps",
+    "retrieved": "2026-11-13",
+    "quote": "We are also pleased to have successfully extended the terms of our leases for these 178 travel centers, which would otherwise begin to expire in 2029, for 10 years each, with an additional 50 years in total renewal options."
+   },
+   {
+    "text": "Same release: the tenant (BP) holds the extension options.",
+    "source_url": "https://www.nasdaq.com/press-release/service-properties-trust-agrees-to-amended-lease-terms-upon-completion-of-bps",
+    "retrieved": "2026-11-13",
+    "quote": "BP will have five, 10-year extension options for each of the five leases."
+   },
+   {
+    "text": "Zoning: the C-1 district's permitted-use list (third-party copy of Atlanta Code Sec. 16-11.003, history ending 2019) names no warehouse, distribution or industrial use, bars wholesaling outright, and caps storage at a 7,500 sq ft vault facility served by cars and vans. Warehouse / distribution therefore needs a rezoning (the zoning section, left unknown by the first pass, reads rezoning_needed on this text), before any conditions of the C-1-C case are even considered.",
+    "source_url": "http://atlanta.elaws.us/code/coor_ptiii_pt16_ch11_sec16-11.003",
+    "retrieved": "2026-11-13",
+    "quote": "No wholesaling or jobbing shall be conducted from within the district."
+   },
+   {
+    "text": "Same section: the only storage use permitted in C-1.",
+    "source_url": "http://atlanta.elaws.us/code/coor_ptiii_pt16_ch11_sec16-11.003",
+    "retrieved": "2026-11-13",
+    "quote": "Vault-storage facility not exceeding 7,500 square feet of floor area and having all pickup and delivery of items by passenger automobile or van."
+   },
+   {
+    "text": "Residential neighbours: Atlanta's zoning district layer, queried with this parcel's outline (the first pass's 50-corner simplification of the county parcel shape) and a 150 ft distance, returns single-family R-4A (and R-4, RG-3, RG-3-C) districts within 150 ft of the parcel, i.e. touching it or just across Watts Rd. A rezoning to industrial here would face residential transitional-yard and buffer rules and likely neighbourhood opposition to trucks; the C-1 text itself (above) is written around its relation to adjoining residential districts.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONING\":\"R-4A\",\"EDITTED\":\" \",\"REFERENCE\":\"R1525\",\"SHAPE.AREA\":3092276.89638871,\"SHAPE.LEN\":14874.9921260212,\"ZONINGCODE\":\"Single Family Residential\""
+   },
+   {
+    "text": "Same query: the RG-3-C (multi-family, conditional, case Z-18-032) district within 150 ft of the parcel.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONING\":\"RG-3-C\",\"EDITTED\":\" \",\"REFERENCE\":\"R939\",\"SHAPE.AREA\":167333.816616522,\"SHAPE.LEN\":2223.9974409845604,\"ZONINGCODE\":\"Multi-Family Residential\""
+   },
+   {
+    "text": "In fairness to the lead, the same query also returns an 88 ac I-1 (light industrial) district within 150 ft, so an industrial rezoning would extend an existing industrial district rather than create a new one.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONING\":\"I-1\",\"EDITTED\":\" \",\"REFERENCE\":\"R2328\",\"SHAPE.AREA\":3844199.1161441798,\"SHAPE.LEN\":10445.511124738001,\"ZONINGCODE\":\"Industrial\""
+   }
+  ],
+  "open_items": [
+   "Seen, not verifiable: search-result summaries (not opened; sec.gov answered my robots.txt request with HTTP 403 'Request Rate Threshold Exceeded', it demands a contact User-Agent) of TA's 2007 prospectus (sec.gov Archives edgar data 1378453, 424B1) and HPT's 2007 10-Q (edgar data 945394) describe the same 40-site Petro purchase and lease, with the original Petro lease running to June 30, 2024 plus two 15-year extensions. A person should check the landlord's latest 10-K property schedule for Atlanta, GA and whether parcel 17 0261 LL0686 (not only the 3181 Donald Lee Hollowell Pkwy truck stop parcel) is inside the leased premises.",
+   "Ask (via title, not by contacting anyone) whether a memorandum of lease to the travel center operator is recorded against this parcel, and whether the tax-roll mailing address is the tenant's office rather than the landlord's: tax bills sent to the tenant would point to a triple-net lease covering this land.",
+   "The two building footprints of about 13,400 and 14,800 sq ft inside this parcel (first pass market-1, market-2) next to the truck stop fit the reading that part of this parcel is in operating use by the travel center (truck service, wash or parking). A person should check aerial imagery for truck parking or paving on this parcel.",
+   "Dispute market-6: its claim text says the rezoning case layer queried at the parcel point returns no case, but the quote and address are only the special use permit layer (layer 24) with a 2,500 ft distance; the rezoning point query is not quoted. Its empty SUP answer is fine; the 'no rezoning case on this parcel' half rests on nothing kept (though plans-2 and my own land use amendment check point the same way).",
+   "Market verdict no_sign_found is literally right (no listing or developer filing), but the evidence the first pass and I found points to land held by a REIT under a long lease to an operator next door: not available, rather than available with no sign.",
+   "Owner verdict holding_entity: the evidence reads more like an investor (REIT) landlord subsidiary than a passive holding entity. Either way a sale is a corporate portfolio decision tied to the BP lease.",
+   "The C-1 text came from atlanta.elaws.us, a third-party copy whose history ends in 2019; it timed out on a second page for me and for the first pass, so quotecheck may fail to fetch it. Confirm the current C-1 text and the conditions of Z-80-100 / Z-13-055 with Atlanta's Office of Zoning and Development, and whether the citywide zoning rewrite changes C-1.",
+   "Atlanta land use amendment layer (layer 18) queried with the parcel outline returns only CDP-18-019 (LDR to MDR, Z-18-032, the residential neighbour); within 2,500 ft it also lists CDP-07-40 (I to SFR, filed 2007, never approved) and CDP-10-05 (I to HDC, approved 2011) whose shapes I did not place. Ask planning whether either touches this parcel; not used as a claim.",
+   "Not fetched: cspdailynews.com robots.txt disallows ClaudeBot, so I did not read its article on the BP lease; businesswire.com reset the connection on robots.txt, so its copy of the release was not read."
+  ]
+ }
+}

@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "parcel_id": "09F090200490304",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "This is a residential infill site with a highway edge, not an industrial one. By my measure from the county parcel shapes, the parcel shares about 2,650 ft of lot line with the owner of a 310-unit apartment complex: about 311 ft with the built apartments and about 2,355 ft with that owner's vacant 21.31 ac tract, which looks like a future phase. New Ferndale single-family homes (2024 plat) and houses on Victoria Dr sit 40 to 95 ft off its other lines, probably across Virlyn B. Smith Rd. The adopted 2025 plan says no new industrial use next to residential areas. It wants the Virlyn B. Smith corridor to become walkable and mixed-use, with No Through Trucks signs. The parcel is zoned PD, so a warehouse needs a rezoning that the plan's own policy argues against. Fairburn's 2014 development memos also show a religious assembly hall at Highway 29 and VB Smith: its conceptual site plan was approved in January 2014, its site plans were in review in June 2014, and the land was bought in May 2014. That is very likely this parcel. The owner bought the land for its own facility, and whether it still plans to build or would sell is unknown. No document shows the land is unavailable, so this is weakened, not killed.",
+    "disputes": ["zoning-3", "zoning-1"],
+    "claims": [
+      {
+        "text": "Fairburn's January 2014 community development memo lists a Northwest Georgia assembly hall project at Highway 29 (Roosevelt Hwy) and VB Smith (Virlyn B. Smith Rd), with its conceptual site plan approved. The lead fronts Roosevelt Hwy (SR 14, per the brief), and the county parcel shapes put it beside Virlyn B. Smith Rd properties. The brief records the purchase on 2014-05-16. My reading: this is very likely the owner's planned facility on this parcel, so the owner bought the land to use it, not to resell it. The memo gives no parcel id, so the location match is my inference.",
+        "source_url": "https://www.fairburn.com/DocumentCenter/View/2407/Community-Development-Report-Memo---January-27-2014-PDF",
+        "retrieved": "2026-11-13",
+        "quote": "NW GA Assembly Hall (Highway 29 at VB Smith) – Conceptual Site Plan approved."
+      },
+      {
+        "text": "By June 2014, a month after the purchase, the same assembly hall project had moved on to site development plan review. Nothing has been built in the 12 years since (the county record shows $0 of improvements). Whether the project was dropped or only deferred is unknown, and the answer decides whether this owner would sell at all.",
+        "source_url": "https://www.fairburn.com/DocumentCenter/View/2413/Community-Development-Report-Memo---June-6-2014-PDF",
+        "retrieved": "2026-11-13",
+        "quote": "NW GA Assembly Hall (Highway 29 at VB Smith) – Site Development Plans are in review."
+      },
+      {
+        "text": "This adds to the first pass's plans-2. In the same county box answer the first pass used, the apartment owner (Evergreen Park Owner GA LLC, 7305 Village Center Blvd Rear) also holds a vacant 21.31 ac tract, land use 299. By my measure from the parcel shapes (a separate query by coordinates), that tract shares about 2,355 ft of lot line with the lead, the lead's longest common boundary. That is likely the land for a further residential phase next door.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5525,-84.5920,33.5615&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"LUCode\":\"299\",\"ClassCode\":\"C5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":21.31"
+      },
+      {
+        "text": "Single-family homes on a second side: in the same box answer, 22 Victoria Dr is a one-unit house (class R3). By my measure, the Victoria Dr lots sit about 40 to 95 ft from the lead's line, and the Christ Gospel church at 300 Virlyn B. Smith Rd about 39 ft. Together with the Ferndale homes in plans-3, the lead has housing on its north, east and south sides.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5525,-84.5920,33.5615&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":null,\"LivUnits\":1,\"LandAcres\":0.2234"
+      },
+      {
+        "text": "The adopted 2025 plan calls for traffic calming on Virlyn B. Smith Road, the road the lead's east side probably faces, with No Through Trucks signage. That rules out truck access from that side and points the corridor away from freight.",
+        "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+        "retrieved": "2026-11-13",
+        "quote": "Virlyn B. Smith Road. Mini-roundabouts, raised crosswalks, and “No Through Trucks” signage near pedestrian zones and trail access."
+      },
+      {
+        "text": "The same plan treats the Virlyn B. Smith corridor as an area moving towards walkable, mixed-use development (the bullet sits under the heading on adding multimodality to the Virlyn B. Smith and SR 74/Senoia Road corridors). That is the opposite direction from a 400,000 SF cross-dock warehouse.",
+        "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+        "retrieved": "2026-11-13",
+        "quote": "Support the area’s transition to walkable, mixed-use development with safer, more connected infrastructure."
+      }
+    ],
+    "open_items": [
+      "Ask Fairburn planning whether the NW GA Assembly Hall (Highway 29 at VB Smith, 2014) is this parcel, whether its site development permit was ever issued or has lapsed, and what the PD zoning on the parcel allows (assembly hall only, or a broader master plan).",
+      "Whether the owner still intends to build or holds the land as surplus can only come from the owner. Not contacted, per the rules. A religious body that bought land for its own facility may simply not sell.",
+      "My frontage reading (the east side on Virlyn B. Smith Rd, the homes across it) comes from parcel-shape distances, not a road layer. Confirm on the ground and with the GDOT centrelines which side truck access would use. The brief's 2,022 ft on SR 14 (Roosevelt Hwy) is the only plausible truck frontage.",
+      "Counterweight for the person: the 2025 plan's Light Industrial category is described as low-impact industrial and office that complements nearby residential areas. If the adopted map puts this parcel in Light Industrial (not checked: the map is an image), a flex or light industrial use may be arguable. A large distribution building is still unlikely.",
+      "zoning-3: the kept quote shows only the M-1 and M-2 legend entries. It does not show PD, so it does not by itself show what the claim says about PD. zoning-1: the kept quote speaks of PUD (Planned Unit Development), while the brief and the plan's compatibility table use PD. The plan does list PD as an appropriate district for its residential categories and not for Light Industrial or Industrial, which supports the rezoning_needed verdict on other grounds.",
+      "owner-1 is classed as operator. The quote shows only the owner's name and mailing address. The owner reads as an end user that bought land for its own (religious) facility, not an operating business next door. The person should read operator in that sense."
+    ]
+  }
+}

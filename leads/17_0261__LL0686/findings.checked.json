@@ -1,0 +1,495 @@
+{
+ "schema": 1,
+ "parcel_id": "17 0261  LL0686",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "City of Atlanta's zoning district layer, queried at a point inside this parcel (33.791043, -84.487241), returns C-1-C, and the layer links it to Chapter 11 of the zoning code (Community Business District Regulations): a commercial district with conditions, not an industrial district.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ZONECLASS\":\"C-1-C\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH11COBUDIRE",
+     "context_before": "\"alias\":\"zoningcode\",\"length\":255}],\"features\":[{\"attributes\":{\"objectid\":11303,",
+     "context_after": "\\r\\n\",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",\"spi\":\" \",\"",
+     "words_shared_with_url": [],
+     "page_file": "pages/6220b4ab7fad82d3c1defedd.html"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The same zoning record classes the district as Commercial; the C-1-C polygon it belongs to is about 80.6 acres, so it covers this 42.6 ac parcel together with the owner's adjacent built parcel and more.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ZONING\":\"C-1-C\",\"EDITTED\":\" \",\"REFERENCE\":\"R503\",\"SHAPE.AREA\":3510565.3383682398,\"SHAPE.LEN\":9822.727791722431,\"ZONINGCODE\":\"Commercial\"",
+     "context_before": "5200000,\"globalid\":\"{94faed64-ecf4-40b7-94d7-d7cc9ef00e21}\",\"acres\":80.59181315,",
+     "context_after": "}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/6220b4ab7fad82d3c1defedd.html"
+    },
+    {
+     "id": "zoning-3",
+     "text": "The zoning record names rezoning case Z-13-055 as the case that last set this C-1-C district (CASEIN), with no SPI or subarea. The case layer (see plans) shows Z-13-055 as C-1-C to C-1-C, i.e. a change to the existing conditions or site plan, not a new district.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"SPI\":\" \",\"SUBAREA\":\" \",\"TSA\":\" \",\"STATUS\":\"Current\",\"CASEIN\":\"Z-13-055\",\"CASEOUT\":\" \"",
+     "context_before": "h11cobudire\\r\\n\",\"baseelev\":0.0,\"height\":0.0,\"lastupdate\":null,\"lasteditor\":\" \",",
+     "context_after": ",\"sunrise\":1386201600000,\"sunset\":32503593600000,\"createdate\":1402444800000,\"cre",
+     "words_shared_with_url": [],
+     "page_file": "pages/6220b4ab7fad82d3c1defedd.html"
+    },
+    {
+     "id": "zoning-4",
+     "text": "The city's zoning overlay layer, queried at the same point, places the parcel in an overlay named NW Atlanta Affordable WH (my reading: an affordable workforce housing overlay); its rules were not read.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ZONECLASS\":\"NW Atlanta Affordable WH\",\"ZONEDESC\":\"NW Atlanta AWH\"",
+     "context_before": "eldtypedouble\",\"alias\":\"shape.len\"}],\"features\":[{\"attributes\":{\"objectid\":9281,",
+     "context_after": ",\"label\":\"nw atalnta awh\",\"spi\":\" \",\"created_user\":\"shenderson\",\"created_date\":1",
+     "words_shared_with_url": [],
+     "page_file": "pages/790283662cf846c0b04a06cf.html"
+    }
+   ],
+   "open_items": [
+    "The conditions of C-1-C could not be read. Atlanta's code is on Municode (known wall), atlantaga.gov answers robots.txt with 403, and the third-party code copy atlanta.elaws.us timed out on the section page (16-11.003). Ask Atlanta Office of Zoning and Development (OZD) for the text of every condition and site plan attached to this C-1-C district and whether they bind this parcel.",
+    "Seen, not verifiable (search-result summary only, page on atlantaga.gov not opened): a Zoning Review Board agenda of April 10, 2014 (atlantaga.gov Home ShowDocument id 13563) is said to list Z-13-55/Z-80-100, a site plan amendment for the C-1-C property at 3181 Donald Lee Hollowell Pkwy NW (formerly 3153 Bankhead Hwy). If right, the original conditional zoning is case Z-80-100 (1980). Ask OZD for both case files.",
+    "Seen, not verifiable: the city case layer links Z-13-055 to ordinance 14-O-1014 at aimewebapp.blob.core.windows.net finalactions 14o1014.pdf, but that PDF, when I read it, is an unrelated ordinance about wildlife habitat exemptions from weed rules (the host answers robots.txt with HTTP 400, so quotecheck will not fetch it). The link appears wrong; ask the city clerk for the real 14-O-1014 and its conditions.",
+    "Whether warehouse / distribution is allowed at all in C-1 was not read from any code text. My reading only: C-1 is a community business district, so a warehouse would most likely need a rezoning to I-1 or I-2 (the future land use map supports that, see plans). Ask OZD for a zoning verification letter.",
+    "Ask OZD what the NW Atlanta Affordable WH overlay requires and whether it applies to non-residential development."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "The city's Development Patterns / Future Land Use layer, queried at a point inside the parcel, returns land use code I, Industrial.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\"",
+     "context_before": "d_1\":0.0,\"pin\":\"industrial\",\"conversion\":\"flu only\",\"ndp\":\"i\",\"fid_l8land\":2470,",
+     "context_after": ",\"lastupdate\":null,\"lasteditor\":\" \",\"density\":\" \",\"far\":\" \",\"history\":\"industria",
+     "words_shared_with_url": [],
+     "page_file": "pages/b35b7f9467825dae04e0eb58.html"
+    },
+    {
+     "id": "plans-2",
+     "text": "The city's rezoning case layer within 2,500 ft of the parcel point lists Z-13-055, C-1-C to C-1-C, status CONDITION, ordinance 14-O-1014. By my own measurement from the case and parcel shapes, this 7.7 ac case lies on the owner's adjacent built parcel (17 026000030295), not on this one.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"C-1-C\",\"TO_ZONE\":\"C-1-C\",\"DOCKET_NO\":\"Z-13-055\",\"STATUS\":\"CONDITION\"",
+     "context_before": "hape.len\":4550.7906224941107,\"addl_legis\":null}},{\"attributes\":{\"objectid\":3330,",
+     "context_after": ",\"final_upda\":1480377600000,\"status_subtype\":2,\"ordinance\":\"14-o-1014\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/f13769e382dbed5bcd32e8bc.html"
+    },
+    {
+     "id": "plans-3",
+     "text": "Same layer: Z-18-032, R-4A (single-family) to RG-3-C (multi-family, conditional), complete in 2018, 3.7 ac. By my measurement from the shapes it touches this parcel's north side: a residential neighbour that may bring buffer and transitional-yard rules.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"R-4A\",\"TO_ZONE\":\"RG-3-C\",\"DOCKET_NO\":\"Z-18-032\",\"STATUS\":\"COMPLETE\"",
+     "context_before": ":\"addinall legislatin\",\"length\":50}],\"features\":[{\"attributes\":{\"objectid\":3608,",
+     "context_after": ",\"final_upda\":1532390400000,\"status_subtype\":2,\"ordinance\":\"18-o-1287\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/f13769e382dbed5bcd32e8bc.html"
+    },
+    {
+     "id": "plans-4",
+     "text": "Same layer: Z-18-036, MRC-2 to I-1 (light industrial), complete (last update 2019), 19.1 ac, about 1,250 ft west of the parcel by my measurement: an industrial rezoning nearby.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"MRC-2\",\"TO_ZONE\":\"I-1\",\"DOCKET_NO\":\"Z-18-036\",\"STATUS\":\"COMPLETE\"",
+     "context_before": "hape.len\":4665.3309162206197,\"addl_legis\":null}},{\"attributes\":{\"objectid\":3741,",
+     "context_after": ",\"final_upda\":1553644800000,\"status_subtype\":2,\"ordinance\":\"18-o-1291\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/f13769e382dbed5bcd32e8bc.html"
+    },
+    {
+     "id": "plans-5",
+     "text": "Same layer: Z-25-049, I-1-C to I-1, status FILED (2025), 1.6 ac, about 1,200 ft north-west by my measurement; not on this parcel.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"I-1-C\",\"TO_ZONE\":\"I-1\",\"DOCKET_NO\":\"Z-25-049\",\"STATUS\":\"FILED\"",
+     "context_before": "shape.len\":1087.6940274432,\"addl_legis\":null}},{\"attributes\":{\"objectid\":104961,",
+     "context_after": ",\"final_upda\":1761609600000,\"status_subtype\":0,\"ordinance\":\"25-o-1420\",\"ordhyper",
+     "words_shared_with_url": [],
+     "page_file": "pages/f13769e382dbed5bcd32e8bc.html"
+    },
+    {
+     "id": "plans-6",
+     "text": "The city's building moratorium layer, queried at the parcel point, returns no moratorium.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "gth\":8},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/20d7808ae991a21d81766c82.html"
+    }
+   ],
+   "open_items": [
+    "The same case layer also shows larger residential and mixed-use rezonings within 2,500 ft (Z-22-081, RG-3 to PD-MU, 68.6 ac, about 1,760 ft away by my measurement; R-4A to MR-MU cases in 2024-25): ask planning whether neighbourhood opposition to truck traffic is likely.",
+    "Confirm the parcel's character area and policy text in the current adopted Atlanta Comprehensive Development Plan (only the GIS layer was read)."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map was read: Atlanta Department of Watershed Management publishes no queryable public layer found in earlier leads, and atlantaga.gov is a robots wall. The adjacent parcel holds an operating truck stop with a city address, so service very likely exists in Donald Lee Hollowell Pkwy, but no map shows it at this parcel. Ask Watershed Management for the nearest water main and sewer, and capacity."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "The city's building footprint layer, queried with this parcel's outline from the county parcel map (simplified by me to 50 corners, within about 0.5 m of the original; footprints the outline contains), returns two buildings of about 13,363 and 14,830 sq ft wholly inside the parcel (near its south-east corner, next to the truck stop by my reading of the coordinates). The land is not empty, although the assessor carries no improvements on it (next claim): the buildings are probably assessed with, and used by, the adjacent operating site.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelContains&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"AREASQFT\":13362.67473684,\"COMMENTS\":null",
+     "context_before": "stories\":null,\"yearbuilt\":null,\"liveunits\":null,\"baseelev\":null,\"roofelev\":null,",
+     "context_after": ",\"createdate\":null,\"geo_oid\":null,\"struct_id\":null,\"ruleid\":null,\"luc\":null,\"luc",
+     "words_shared_with_url": [],
+     "page_file": "pages/c447cc6916e179fa6c7dddcd.html"
+    },
+    {
+     "id": "market-2",
+     "text": "The second building footprint inside the parcel outline.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelContains&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"AREASQFT\":14830.15095417,\"COMMENTS\":null",
+     "context_before": "stories\":null,\"yearbuilt\":null,\"liveunits\":null,\"baseelev\":null,\"roofelev\":null,",
+     "context_after": ",\"createdate\":null,\"geo_oid\":null,\"struct_id\":null,\"ruleid\":null,\"luc\":null,\"luc",
+     "words_shared_with_url": [],
+     "page_file": "pages/c447cc6916e179fa6c7dddcd.html"
+    },
+    {
+     "id": "market-3",
+     "text": "The county parcel record (queried by parcel id) shows this parcel with zero improvement value, land use code 400, class I5, 42.62 ac.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2717%200261%20%20LL0686%27%2C%2717%20026000030295%27)&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":388440,\"LandAssess\":388440,\"ImprAssess\":0,\"TotAppr\":971100,\"LandAppr\":971100,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I5\"",
+     "context_before": "1 center ridge rd ste 200\",\"owneraddr2\":\"westlake oh 44145-5634\",\"taxdist\":\"05\",",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":42.62,\"nbrhood\":\"c402\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/be6f82b3bf5b3c92f615866c.html"
+    },
+    {
+     "id": "market-4",
+     "text": "EPA's Facility Registry, searched by the house number 3181 in Atlanta, lists Petro Stopping Center (gas offer) at 3181 Donald Lee Hollowell Pkwy NW, the address the county gives the owner's adjacent built parcel (owner section): the neighbour is an operating truck stop.",
+     "source_url": "https://data.epa.gov/efservice/FRS_FACILITY_SITE/CITY_NAME/ATLANTA/LOCATION_ADDRESS/CONTAINING/3181/JSON",
+     "retrieved": "2026-11-13",
+     "quote": "\"primary_name\": \"PETRO STOPPING CENTER GAS OFFER\", \"std_state_code\": \"GA\", \"county_name\": \"FULTON COUNTY\"",
+     "context_before": "and_code\": null, \"site_type_name\": \"stationary\", \"registry_id\": \"110070023098\", ",
+     "context_after": ", \"small_bus_ind\": \"n\", \"std_street_name\": \"donald lee hollowell pkwy nw\", \"inte",
+     "words_shared_with_url": [],
+     "page_file": "pages/88f8300f4e889b12210cf789.html"
+    },
+    {
+     "id": "market-5",
+     "text": "The same registry also lists Petro Stopping Center #22 at 3181 Bankhead Hwy (the road's former name).",
+     "source_url": "https://data.epa.gov/efservice/FRS_FACILITY_SITE/CITY_NAME/ATLANTA/LOCATION_ADDRESS/CONTAINING/3181/JSON",
+     "retrieved": "2026-11-13",
+     "quote": "\"primary_name\": \"PETRO STOPPING CENTER #22\", \"std_state_code\": \"GA\", \"county_name\": \"FULTON\"",
+     "context_before": "land_code\": \"n\", \"site_type_name\": \"stationary\", \"registry_id\": \"110013524221\", ",
+     "context_after": ", \"small_bus_ind\": null, \"std_street_name\": \"bankhead hwy nw\", \"interest_status_",
+     "words_shared_with_url": [],
+     "page_file": "pages/88f8300f4e889b12210cf789.html"
+    },
+    {
+     "id": "market-6",
+     "text": "The city's special use permit layer, queried within 2,500 ft of the parcel point, returns no special use permit; and the rezoning case layer queried exactly at the parcel point returns no case (this parcel is not on any rezoning case): no sign of a developer applying.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}",
+     "context_before": "th\":38},{\"name\":\"shape.area\",\"type\":\"esrifieldtypedouble\",\"alias\":\"shape.area\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/c0b10dc32bc709f458a73c5c.html"
+    }
+   ],
+   "open_items": [
+    "Biggest finding: this parcel looks like part of an operating truck stop, not spare land for sale. The same owner holds the adjacent 16 ac truck stop (Petro, 3181 Donald Lee Hollowell Pkwy NW, at I-285 exit 12), and two buildings of about 28,000 sq ft together stand inside this parcel next to it. Ask what the buildings are (truck service, truck wash, parts shop) and whether truck parking spills onto this land; the usable acreage for a new building may be far less than the screen assumed.",
+    "Seen, not verifiable: web search results (operator, brand and review sites, not opened) list 3181 Donald Lee Hollowell Pkwy NW as Petro Atlanta, a 24-hour travel center at I-285 exit 12, with a DOT physicals clinic and a truck chrome shop at the same address.",
+    "Three web searches (by case number, road name and the neighbour's site address, never the owner) found no listing, news, development-authority release or DRI for this parcel. CoStar, LoopNet and Crexi were not used. Absence of a sign is not 'not for sale'.",
+    "Ask whether the land is under a lease to the truck stop operator; a lease would govern any sale."
+   ]
+  },
+  "owner": {
+   "verdict": "holding_entity",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "The county record for this parcel (queried by parcel id) gives the owner as an LLC mailing to a suite in Westlake, Ohio.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2717%200261%20%20LL0686%27%2C%2717%20026000030295%27)&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"HPT PSC PROPERTIES LLC \",\"OwnerAddr1\":\"24601 CENTER RIDGE RD STE 200\",\"OwnerAddr2\":\"WESTLAKE OH 44145-5634\"",
+     "context_before": "\":\"watts\",\"addrsuffix\":\"rd\",\"addrposdir\":\"nw\",\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"taxdist\":\"05\",\"totassess\":388440,\"landassess\":388440,\"imprassess\":0,\"totappr\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/be6f82b3bf5b3c92f615866c.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "The same query shows the same owner on the adjacent 16.05 ac parcel at 3181 Donald Lee Hollowell Pkwy NW, built ($1,980,900 improvements), land use code 335, class C5 (commercial): the truck stop that EPA's registry names as a Petro Stopping Center (market section). The facility trades under another name than the owner of record, so the LLC reads as a property-holding entity for an operating travel center.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2717%200261%20%20LL0686%27%2C%2717%20026000030295%27)&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"3181 DONALD LEE HOLLOWELL PKWY NW\",\"AddrNumber\":\"3181\"",
+     "context_before": "s\":[{\"attributes\":{\"objectid\":74179,\"parcelid\":\"17 026000030295\",\"taxyear\":2027,",
+     "context_after": ",\"addrpredir\":null,\"addrstreet\":\"donald lee hollowell\",\"addrsuffix\":\"pkwy\",\"addr",
+     "words_shared_with_url": [],
+     "page_file": "pages/be6f82b3bf5b3c92f615866c.html"
+    },
+    {
+     "id": "owner-3",
+     "text": "The neighbour's assessed values from the same record.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2717%200261%20%20LL0686%27%2C%2717%20026000030295%27)&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":1778160,\"LandAssess\":985800,\"ImprAssess\":792360,\"TotAppr\":4445400,\"LandAppr\":2464500,\"ImprAppr\":1980900,\"LUCode\":\"335\",\"ClassCode\":\"C5\"",
+     "context_before": "\"24601 center ridge rd ste 200\",\"owneraddr2\":\"westlake oh 44145\",\"taxdist\":\"05\",",
+     "context_after": ",\"excode\":null,\"livunits\":0,\"landacres\":16.05,\"nbrhood\":\"c402\",\"subdiv\":null,\"su",
+     "words_shared_with_url": [],
+     "page_file": "pages/be6f82b3bf5b3c92f615866c.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State business search is a known wall: entity status, formation date, principal office and registered agent were not read. Pull the record by hand.",
+    "My reading, not verified: the owner looks like a landlord or holding entity of the travel center rather than its day-to-day operator. Sale of this land would likely be a corporate decision tied to the truck stop and any lease to its operator. Last recorded sale 2007-05-30 for $5,421,145 (per brief)."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "This parcel is not spare land on the market. Its owner of record is the REIT entity that on 30 May 2007, the date of this parcel's last sale, bought 40 Petro travel centers and leased them to TravelCenters of America; it owns the operating Petro truck stop next door, two buildings stand on this parcel beside it, and the landlord's leases on all 178 travel centers were extended in 2023 for 10 years with 50 years of tenant renewal options, now guaranteed by BP. On top of that the parcel is zoned C-1-C, whose use list bars wholesaling and permits no warehouse, and it sits within 150 ft of single-family and multi-family districts. Not killed only because no document read shows this 42.6 ac parcel is inside the leased premises rather than excess land.",
+  "disputes": [
+   "market-6"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "Owner and use: a trade-press report of 30 May 2007 (the same date as this parcel's last recorded sale in the brief, $5.4 million) says that, as TravelCenters of America (TA) bought the Petro Stopping Centers business, HPT (Hospitality Properties Trust) bought the real estate of 40 Petro travel centers and leased them to TA under a long-term lease. The owner of record here is an HPT PSC entity that also owns the adjacent Petro truck stop (first pass owner-2, market-4). My reading: this parcel is very likely part of a REIT-owned, tenant-operated travel center held under a long lease, not spare land an owner would sell for an industrial building. Whether this particular parcel is inside the leased premises is not shown by this page.",
+    "source_url": "https://www.truckinginfo.com/news/travelcenters-of-america-acquires-petro-stopping-centers",
+    "retrieved": "2026-11-13",
+    "quote": "HPT acquired 40 Petro travel centers and leased them to TA under a long-term lease.",
+    "context_before": "rrently operates and franchises. simultaneously with ta's acquisition of petro, ",
+    "context_after": " in addition to its purchase price of approximately $630 million, hpt has agreed",
+    "words_shared_with_url": [],
+    "page_file": "pages/499b700d8c03fce2037ad12e.html"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "Same article: the 40 Petro travel centers were leased from Hospitality Properties Trust at the time of the acquisition.",
+    "source_url": "https://www.truckinginfo.com/news/travelcenters-of-america-acquires-petro-stopping-centers",
+    "retrieved": "2026-11-13",
+    "quote": "Simultaneously with this acquisition, 40 Petro travel centers were leased from Hospitality Properties Trust.",
+    "context_before": "nesday that it has acquired the operating businesses of petro stopping centers. ",
+    "context_after": " prior to this acquisition, petro was a privately owned company headquartered in",
+    "words_shared_with_url": [],
+    "page_file": "pages/499b700d8c03fce2037ad12e.html"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The lease is long and recently extended: the landlord REIT (Service Properties Trust, which I take to be the renamed HPT; that link is not shown on this page) announced that on BP's purchase of TA its leases for all 178 TA/Petro travel centers were extended 10 years from 2023, with 50 more years of renewal options, guaranteed by a BP subsidiary. If this parcel is in those premises, the land is tied up until about 2033 at the earliest and the tenant controls renewal.",
+    "source_url": "https://www.nasdaq.com/press-release/service-properties-trust-agrees-to-amended-lease-terms-upon-completion-of-bps",
+    "retrieved": "2026-11-13",
+    "quote": "We are also pleased to have successfully extended the terms of our leases for these 178 travel centers, which would otherwise begin to expire in 2029, for 10 years each, with an additional 50 years in total renewal options.",
+    "context_before": "eases will be guaranteed by an a3/a- rated wholly owned subsidiary of bp p.l.c. ",
+    "context_after": "\" about service properties trust service properties trust (nasdaq: svc) is a rea",
+    "words_shared_with_url": [],
+    "page_file": "pages/c4abe192ed9376a8e0349804.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "Same release: the tenant (BP) holds the extension options.",
+    "source_url": "https://www.nasdaq.com/press-release/service-properties-trust-agrees-to-amended-lease-terms-upon-completion-of-bps",
+    "retrieved": "2026-11-13",
+    "quote": "BP will have five, 10-year extension options for each of the five leases.",
+    "context_before": "nts received by svc for the 178 travel centers under the ta leases during 2022. ",
+    "context_after": " bp's wholly owned subsidiary, bp corporation north america inc., will guarantee",
+    "words_shared_with_url": [],
+    "page_file": "pages/c4abe192ed9376a8e0349804.html"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "Residential neighbours: Atlanta's zoning district layer, queried with this parcel's outline (the first pass's 50-corner simplification of the county parcel shape) and a 150 ft distance, returns single-family R-4A (and R-4, RG-3, RG-3-C) districts within 150 ft of the parcel, i.e. touching it or just across Watts Rd. A rezoning to industrial here would face residential transitional-yard and buffer rules and likely neighbourhood opposition to trucks; the C-1 text itself (above) is written around its relation to adjoining residential districts.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONING\":\"R-4A\",\"EDITTED\":\" \",\"REFERENCE\":\"R1525\",\"SHAPE.AREA\":3092276.89638871,\"SHAPE.LEN\":14874.9921260212,\"ZONINGCODE\":\"Single Family Residential\"",
+    "context_before": "5200000,\"globalid\":\"{a1c7ad21-b444-4a0d-846a-cf39d49e474f}\",\"acres\":71.10069892,",
+    "context_after": "}},{\"attributes\":{\"objectid\":38773,\"zoneclass\":\"rg-3\",\"zonedesc\":\"https://librar",
+    "words_shared_with_url": [],
+    "page_file": "pages/d6dcce0a88c275b95d745483.html"
+   },
+   {
+    "id": "skeptic-8",
+    "text": "Same query: the RG-3-C (multi-family, conditional, case Z-18-032) district within 150 ft of the parcel.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONING\":\"RG-3-C\",\"EDITTED\":\" \",\"REFERENCE\":\"R939\",\"SHAPE.AREA\":167333.816616522,\"SHAPE.LEN\":2223.9974409845604,\"ZONINGCODE\":\"Multi-Family Residential\"",
+    "context_before": "35200000,\"globalid\":\"{aee11214-b551-4759-a831-fc2bdfbd53fc}\",\"acres\":3.84147121,",
+    "context_after": "}},{\"attributes\":{\"objectid\":10847,\"zoneclass\":\"r-4a\",\"zonedesc\":\"https://librar",
+    "words_shared_with_url": [],
+    "page_file": "pages/d6dcce0a88c275b95d745483.html"
+   },
+   {
+    "id": "skeptic-9",
+    "text": "In fairness to the lead, the same query also returns an 88 ac I-1 (light industrial) district within 150 ft, so an industrial rezoning would extend an existing industrial district rather than create a new one.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONING\":\"I-1\",\"EDITTED\":\" \",\"REFERENCE\":\"R2328\",\"SHAPE.AREA\":3844199.1161441798,\"SHAPE.LEN\":10445.511124738001,\"ZONINGCODE\":\"Industrial\"",
+    "context_before": "5200000,\"globalid\":\"{e3aa1f3e-5365-4550-bb5d-f10e6e4c70cf}\",\"acres\":88.25102142,",
+    "context_after": "}},{\"attributes\":{\"objectid\":12409,\"zoneclass\":\"rg-3-c\",\"zonedesc\":\"https://libr",
+    "words_shared_with_url": [],
+    "page_file": "pages/d6dcce0a88c275b95d745483.html"
+   }
+  ],
+  "open_items": [
+   "Seen, not verifiable: search-result summaries (not opened; sec.gov answered my robots.txt request with HTTP 403 'Request Rate Threshold Exceeded', it demands a contact User-Agent) of TA's 2007 prospectus (sec.gov Archives edgar data 1378453, 424B1) and HPT's 2007 10-Q (edgar data 945394) describe the same 40-site Petro purchase and lease, with the original Petro lease running to June 30, 2024 plus two 15-year extensions. A person should check the landlord's latest 10-K property schedule for Atlanta, GA and whether parcel 17 0261 LL0686 (not only the 3181 Donald Lee Hollowell Pkwy truck stop parcel) is inside the leased premises.",
+   "Ask (via title, not by contacting anyone) whether a memorandum of lease to the travel center operator is recorded against this parcel, and whether the tax-roll mailing address is the tenant's office rather than the landlord's: tax bills sent to the tenant would point to a triple-net lease covering this land.",
+   "The two building footprints of about 13,400 and 14,800 sq ft inside this parcel (first pass market-1, market-2) next to the truck stop fit the reading that part of this parcel is in operating use by the travel center (truck service, wash or parking). A person should check aerial imagery for truck parking or paving on this parcel.",
+   "Dispute market-6: its claim text says the rezoning case layer queried at the parcel point returns no case, but the quote and address are only the special use permit layer (layer 24) with a 2,500 ft distance; the rezoning point query is not quoted. Its empty SUP answer is fine; the 'no rezoning case on this parcel' half rests on nothing kept (though plans-2 and my own land use amendment check point the same way).",
+   "Market verdict no_sign_found is literally right (no listing or developer filing), but the evidence the first pass and I found points to land held by a REIT under a long lease to an operator next door: not available, rather than available with no sign.",
+   "Owner verdict holding_entity: the evidence reads more like an investor (REIT) landlord subsidiary than a passive holding entity. Either way a sale is a corporate portfolio decision tied to the BP lease.",
+   "The C-1 text came from atlanta.elaws.us, a third-party copy whose history ends in 2019; it timed out on a second page for me and for the first pass, so quotecheck may fail to fetch it. Confirm the current C-1 text and the conditions of Z-80-100 / Z-13-055 with Atlanta's Office of Zoning and Development, and whether the citywide zoning rewrite changes C-1.",
+   "Atlanta land use amendment layer (layer 18) queried with the parcel outline returns only CDP-18-019 (LDR to MDR, Z-18-032, the residential neighbour); within 2,500 ft it also lists CDP-07-40 (I to SFR, filed 2007, never approved) and CDP-10-05 (I to HDC, approved 2011) whose shapes I did not place. Ask planning whether either touches this parcel; not used as a claim.",
+   "Not fetched: cspdailynews.com robots.txt disallows ClaudeBot, so I did not read its article on the BP lease; businesswire.com reset the connection on robots.txt, so its copy of the release was not read."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/6220b4ab7fad82d3c1defedd.html",
+   "fetched_at": "2026-11-13T22:00:17Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3798,
+   "sha256": "42e09523973e2352ad92747ca9ca37ba07b10a87cbd07c0094616b59f8074cac"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/790283662cf846c0b04a06cf.html",
+   "fetched_at": "2026-11-13T22:00:18Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1706,
+   "sha256": "e9331afcb5d4f4563892597f4b56d300f36f223e4cffc9c61586f54db4f44d71"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/b35b7f9467825dae04e0eb58.html",
+   "fetched_at": "2026-11-13T22:00:19Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3835,
+   "sha256": "f50a05c01a93bc30a12b98c9a9ddc5fa2969b97128826f5579ebab43c7640129"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/f13769e382dbed5bcd32e8bc.html",
+   "fetched_at": "2026-11-13T22:00:20Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 10748,
+   "sha256": "4c0fa461d7707930f48c05ede519e968a1b2e013c3285af5b2283f9c408fa6d6"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/20d7808ae991a21d81766c82.html",
+   "fetched_at": "2026-11-13T22:00:21Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1579,
+   "sha256": "4ed791fe9d9f56ee37efa14190bb7f307a0e4b131ed8158411cd8bb29d9e6ba6"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelContains&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/c447cc6916e179fa6c7dddcd.html",
+   "fetched_at": "2026-11-13T22:00:22Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelContains&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4358,
+   "sha256": "681ed612ba9107cbacfa428acf8c85be1f77d827090628a1c3fecd2032c51b6a"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2717%200261%20%20LL0686%27%2C%2717%20026000030295%27)&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/be6f82b3bf5b3c92f615866c.html",
+   "fetched_at": "2026-11-13T22:00:24Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2717%200261%20%20LL0686%27%2C%2717%20026000030295%27)&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 10239,
+   "sha256": "ba0a6ff1201f9a738f83ea46ae9a50b40b2f0226482964121283ab5e6a338076"
+  },
+  "https://data.epa.gov/efservice/FRS_FACILITY_SITE/CITY_NAME/ATLANTA/LOCATION_ADDRESS/CONTAINING/3181/JSON": {
+   "file": "pages/88f8300f4e889b12210cf789.html",
+   "fetched_at": "2026-11-13T22:00:26Z",
+   "final_url": "https://data.epa.gov/efservice/FRS_FACILITY_SITE/CITY_NAME/ATLANTA/LOCATION_ADDRESS/CONTAINING/3181/JSON",
+   "status": 200,
+   "bytes": 8094,
+   "sha256": "6c0950be22c1a6ef13b77b83c2fd845e9f36084e117481226ec8670690cc0445"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/c0b10dc32bc709f458a73c5c.html",
+   "fetched_at": "2026-11-13T22:00:26Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.487241%2C33.791043&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1812,
+   "sha256": "181ed0ad18b7d634f32b01b95a543571d1afba2d671d90c8154a38315efad8d1"
+  },
+  "https://www.truckinginfo.com/news/travelcenters-of-america-acquires-petro-stopping-centers": {
+   "file": "pages/499b700d8c03fce2037ad12e.html",
+   "fetched_at": "2026-11-13T22:00:28Z",
+   "final_url": "https://www.truckinginfo.com/news/travelcenters-of-america-acquires-petro-stopping-centers",
+   "status": 200,
+   "bytes": 238750,
+   "sha256": "6e49a8b1f726a3eb329e086cd115d842156cc9183027869848e43ebaa5464f60"
+  },
+  "https://www.nasdaq.com/press-release/service-properties-trust-agrees-to-amended-lease-terms-upon-completion-of-bps": {
+   "file": "pages/c4abe192ed9376a8e0349804.html",
+   "fetched_at": "2026-11-13T22:01:01Z",
+   "final_url": "https://www.nasdaq.com/press-release/service-properties-trust-agrees-to-amended-lease-terms-upon-completion-of-bps",
+   "status": 200,
+   "bytes": 159776,
+   "sha256": "202d44d7e0108f5bdf5838f0002b8530040612ccb5af7e1369c76e1543481bbc"
+  },
+  "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/d6dcce0a88c275b95d745483.html",
+   "fetched_at": "2026-11-13T22:02:02Z",
+   "final_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.48575%2C33.79358%5D%2C%5B-84.48532%2C33.79342%5D%2C%5B-84.48477%2C33.79391%5D%2C%5B-84.4847%2C33.79375%5D%2C%5B-84.48427%2C33.79337%5D%2C%5B-84.48437%2C33.79331%5D%2C%5B-84.48455%2C33.79318%5D%2C%5B-84.48469%2C33.793%5D%2C%5B-84.48475%2C33.7929%5D%2C%5B-84.48484%2C33.7927%5D%2C%5B-84.48488%2C33.7926%5D%2C%5B-84.48493%2C33.79239%5D%2C%5B-84.48494%2C33.79229%5D%2C%5B-84.48494%2C33.79223%5D%2C%5B-84.48493%2C33.79217%5D%2C%5B-84.48489%2C33.79206%5D%2C%5B-84.48479%2C33.79192%5D%2C%5B-84.48468%2C33.79181%5D%2C%5B-84.48453%2C33.79164%5D%2C%5B-84.48451%2C33.79161%5D%2C%5B-84.48448%2C33.79154%5D%2C%5B-84.48448%2C33.79151%5D%2C%5B-84.48449%2C33.79141%5D%2C%5B-84.48451%2C33.7913%5D%2C%5B-84.48453%2C33.79125%5D%2C%5B-84.48463%2C33.79109%5D%2C%5B-84.4847%2C33.79103%5D%2C%5B-84.48484%2C33.79091%5D%2C%5B-84.48512%2C33.7907%5D%2C%5B-84.48555%2C33.79032%5D%2C%5B-84.48568%2C33.79023%5D%2C%5B-84.48594%2C33.7901%5D%2C%5B-84.48607%2C33.79002%5D%2C%5B-84.48614%2C33.78997%5D%2C%5B-84.48627%2C33.78985%5D%2C%5B-84.48639%2C33.78972%5D%2C%5B-84.4865%2C33.78957%5D%2C%5B-84.48679%2C33.78905%5D%2C%5B-84.4869%2C33.78886%5D%2C%5B-84.48728%2C33.78831%5D%2C%5B-84.49039%2C33.7883%5D%2C%5B-84.49038%2C33.78936%5D%2C%5B-84.48972%2C33.79013%5D%2C%5B-84.48903%2C33.79079%5D%2C%5B-84.48911%2C33.79084%5D%2C%5B-84.48835%2C33.79174%5D%2C%5B-84.4873%2C33.7942%5D%2C%5B-84.48582%2C33.79417%5D%2C%5B-84.48585%2C33.79362%5D%2C%5B-84.48575%2C33.79358%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=150&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 8202,
+   "sha256": "2b73909575e5d5d3f7638dcf7e19edf4208b0e99e45d03c307d386814d6c4732"
+  }
+ },
+ "quotecheck": {
+  "kept": 26,
+  "dropped": 2,
+  "downgraded": [],
+  "checked_at": "2026-11-13T22:02:02Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "3f9ee644ffb9ae47130ea78224f9b8a5e1dd383397ebebd5bb72154920fbb25c",
+   "skeptic.json": "96c4448d3d8ba475453b25816f48b00517d1cadb5a3f98d4ca092033815d1741"
+  }
+ },
+ "dropped_claims": [
+  {
+   "id": "skeptic-5",
+   "section": "skeptic",
+   "reason": "page could not be fetched: robots.txt could not be read (timed out)",
+   "claim": {
+    "text": "Zoning: the C-1 district's permitted-use list (third-party copy of Atlanta Code Sec. 16-11.003, history ending 2019) names no warehouse, distribution or industrial use, bars wholesaling outright, and caps storage at a 7,500 sq ft vault facility served by cars and vans. Warehouse / distribution therefore needs a rezoning (the zoning section, left unknown by the first pass, reads rezoning_needed on this text), before any conditions of the C-1-C case are even considered.",
+    "source_url": "http://atlanta.elaws.us/code/coor_ptiii_pt16_ch11_sec16-11.003",
+    "retrieved": "2026-11-13",
+    "quote": "No wholesaling or jobbing shall be conducted from within the district."
+   }
+  },
+  {
+   "id": "skeptic-6",
+   "section": "skeptic",
+   "reason": "page could not be fetched: robots.txt could not be read (timed out)",
+   "claim": {
+    "text": "Same section: the only storage use permitted in C-1.",
+    "source_url": "http://atlanta.elaws.us/code/coor_ptiii_pt16_ch11_sec16-11.003",
+    "retrieved": "2026-11-13",
+    "quote": "Vault-storage facility not exceeding 7,500 square feet of floor area and having all pickup and delivery of items by passenger automobile or van."
+   }
+  }
+ ]
+}

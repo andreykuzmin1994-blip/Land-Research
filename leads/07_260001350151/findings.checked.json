@@ -455,7 +455,7 @@
  "pages": {
   "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17": {
    "file": "pages/38452f5d3cf86d5dafbdeb54.pdf",
-   "fetched_at": "2026-11-13T19:23:13Z",
+   "fetched_at": "2026-11-13T22:08:49Z",
    "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
    "status": 200,
    "bytes": 1888221,
@@ -463,7 +463,7 @@
   },
   "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road": {
    "file": "pages/38e38fbf487ec34cb03fee81.pdf",
-   "fetched_at": "2026-11-13T19:23:23Z",
+   "fetched_at": "2026-11-13T22:08:59Z",
    "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
    "status": 200,
    "bytes": 1345947,
@@ -471,7 +471,7 @@
   },
   "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11056/CDP-004-Bishop-Herndon-Road": {
    "file": "pages/1b7110a44fda077450743edc.pdf",
-   "fetched_at": "2026-11-13T19:23:33Z",
+   "fetched_at": "2026-11-13T22:09:09Z",
    "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11056/CDP-004-Bishop-Herndon-Road",
    "status": 200,
    "bytes": 195781,
@@ -479,7 +479,7 @@
   },
   "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11120/PC-minutes-9182024": {
    "file": "pages/5c07aced19aebc68604f7871.pdf",
-   "fetched_at": "2026-11-13T19:23:43Z",
+   "fetched_at": "2026-11-13T22:09:19Z",
    "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11120/PC-minutes-9182024",
    "status": 200,
    "bytes": 318839,
@@ -487,23 +487,23 @@
   },
   "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases": {
    "file": "pages/abbee3e1515f295c7a98c51c.html",
-   "fetched_at": "2026-11-13T19:23:53Z",
+   "fetched_at": "2026-11-13T22:09:29Z",
    "final_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
    "status": 200,
-   "bytes": 490638,
-   "sha256": "7b65487235171574229b1f9306fb16483c47ded5fb07be2ad48b5e5bb8968d6a"
+   "bytes": 494622,
+   "sha256": "90250b9397ff3ae00a408f50234b7108ef4958c11aec86cf49af4aa7c43b9673"
   },
   "https://www.cityofsouthfultonga.gov/AgendaCenter/Ordinances-4": {
    "file": "pages/5dbccb666b158071d1bcd3f7.html",
-   "fetched_at": "2026-11-13T19:24:03Z",
+   "fetched_at": "2026-11-13T22:09:39Z",
    "final_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/Ordinances-4",
    "status": 200,
    "bytes": 167879,
-   "sha256": "175e5ec6db1cde3a80100bea7d44b4829e464067295ef262f7a121e009910e57"
+   "sha256": "b31c943d719f24829c8904012085dfeb2bdbb2fc8424c565a11300678b1b27b5"
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json": {
    "file": "pages/c0ee63dea6f44b2f2d77523f.html",
-   "fetched_at": "2026-11-13T19:24:05Z",
+   "fetched_at": "2026-11-13T22:09:41Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
    "status": 200,
    "bytes": 7437,
@@ -511,7 +511,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/f161d68a62dac091448b67e0.html",
-   "fetched_at": "2026-11-13T19:24:06Z",
+   "fetched_at": "2026-11-13T22:09:42Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 1213,
@@ -519,7 +519,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/e66462e0b9eab2c1f4c7ca42.html",
-   "fetched_at": "2026-11-13T19:24:07Z",
+   "fetched_at": "2026-11-13T22:09:43Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 3941,
@@ -527,7 +527,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/c4ab474025952ac2daa98c6d.html",
-   "fetched_at": "2026-11-13T19:24:08Z",
+   "fetched_at": "2026-11-13T22:09:44Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 6459,
@@ -535,7 +535,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001350151%27&outFields=*&returnGeometry=true&outSR=4326&f=json": {
    "file": "pages/53a3e1fd1bb3e7d39198cb8d.html",
-   "fetched_at": "2026-11-13T19:24:09Z",
+   "fetched_at": "2026-11-13T22:09:45Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001350151%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
    "status": 200,
    "bytes": 4870,
@@ -543,7 +543,7 @@
   },
   "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1": {
    "file": "pages/77867d88075f52dca720884d.pdf",
-   "fetched_at": "2026-11-13T19:24:13Z",
+   "fetched_at": "2026-11-13T22:09:49Z",
    "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
    "status": 200,
    "bytes": 1943867,
@@ -554,7 +554,7 @@
   "kept": 31,
   "dropped": 0,
   "downgraded": [],
-  "checked_at": "2026-11-13T19:24:13Z",
+  "checked_at": "2026-11-13T22:09:49Z",
   "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
   "inputs": {
    "findings.json": "48b2726430a6f0e96c4c543c8c4760882aa07600a94549b78abe1267b38852f3",

@@ -1,0 +1,523 @@
+{
+ "schema": 1,
+ "parcel_id": "07 400001630455",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "rezoning_needed",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "Fairburn's comprehensive plan (adopted October 2025) shows its zoning districts with AG (Agricultural) separate from the two industrial districts, M-1 Light Industrial and M-2 Heavy Industrial. The brief gives this parcel's zoning as AG (screener's city layer, not re-read here), so a warehouse would need a rezoning to M-1 or M-2 unless AG's own use table allows it, which could not be read (Municode).",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "O&I - Office & Institutional M-1 - Light Industrial M-2 - Heavy Industrial",
+     "context_before": "-1 - neighborhood commercial c-2 - highway commercial dtmu - downtown mixed-use ",
+     "context_after": " n miles 0 0.5 1 2 p&o - parks & open space rr - railroad city of fairburn compr",
+     "pdf_page": 39,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The same zoning map legend lists AG first, as the Agricultural district.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Zoning Legend AG - Agricultural R-1 - Single-Family",
+     "context_before": "tentionally hindering their stated purposes. city of fairburn comprehensive plan (page break) ",
+     "context_after": " r-2 - single-family r-3 - single-family r-4 - single-family r-ct - residential ",
+     "pdf_page": 39,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    }
+   ],
+   "open_items": [
+    "AG district use table not read: Fairburn's zoning text is on Municode (known wall). Ask Fairburn planning whether AG allows any warehouse, distribution or outdoor storage use, and what a rezoning to M-1 would require.",
+    "Search results only (not read; the listing page now redirects away): a 2024-2025 brokerage listing for this address said current zoning Agricultural with future zoning residential. Ask the city whether any rezoning application has ever been filed on this parcel."
+   ]
+  },
+  "plans": {
+   "verdict": "against",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "The brief places this parcel in Fairburn's Rural Residential future land use category (screener's city layer, on an ArcGIS Online host that is a known wall; the plan's own map was not read at parcel scale). In the plan adopted in 2025, Rural Residential lists conservation, parks, schools, large-lot houses, small retail and agriculture as its development types and AG, R-1, C-1, PD and P&O as its appropriate districts: no industrial use and no M-1 or M-2 (PDF page 128).",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Rural Residential Details Appropriate Development Types Conservation; parks and recreation; public/ institutional uses (schools, places of worship, and civic facilities); large-lot single-family detached houses; conservation subdivisions; small retail; agriculture; accessory dwelling units (ADUs). Density/Intensity 0 to 1 dwelling units/acre Appropriate Zoning District(s) AG, R-1, C-1, PD, P&O",
+     "context_before": "\u2022 enhance zoning tools to support rural development typical character intensity ",
+     "context_after": " 126 city of fairburn comprehensive plan (page break) rural residential legend n miles 0 0.5 1",
+     "pdf_page": 128,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The Rural Residential area is meant for minimal development (PDF page 128); its policy list also says to limit infrastructure expansion.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "The area promotes minimal urban development and generous open space.",
+     "context_before": "ity living environment that blends seamlessly with the surrounding rural areas. ",
+     "context_after": " implementation strategies & policy considerations \u2022 promote conservation design",
+     "pdf_page": 128,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The plan was adopted by City Council in October 2025 (PDF page 19), so it is the current plan.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "The plan went through one more round of final review and was adopted by City Council in October 2025.",
+     "context_before": "fine the vision and recommendations. \u2022 community engagement finalize and adopt. ",
+     "context_after": " city of fairburn comprehensive plan 17 (page break) plan purpose what is a comprehensive plan",
+     "pdf_page": 19,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "Next door: Fulton County's parcel layer, asked for parcels within 60 ft of this parcel's own polygon, returns 6760 Johnson Rd (5 ac, exempt class E1) owned by the City of Fairburn. Within 60 ft can include a lot across a road; a shared lot line was not measured.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"6760 JOHNSON RD\",\"AddrNumber\":\"6760\",\"AddrPreDir\":null,\"AddrStreet\":\"JOHNSON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"THE CITY OF FAIRBURN \"",
+     "context_before": "}},{\"attributes\":{\"objectid\":134117,\"parcelid\":\"07 400001630026\",\"taxyear\":2027,",
+     "context_after": ",\"owneraddr1\":\"55 malone st\",\"owneraddr2\":\"fairburn ga 30213\",\"taxdist\":\"25a\",\"t",
+     "words_shared_with_url": [],
+     "page_file": "pages/c18733f306944dc749314496.html"
+    },
+    {
+     "id": "plans-5",
+     "text": "The 2025 plan's work program schedules a city neighborhood park at that address, 6760 Johnson Road (item NC.10, PDF page 232).",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Design and construct neighborhood park at 6760 Johnson Road.",
+     "context_before": "ecreation nc.9 fairburn youth center improvements. x x parks & recreation nc.10 ",
+     "context_after": " nc.11 duncan park improvements. 230 city of fairburn comprehensive plan x x x p",
+     "pdf_page": 232,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-6",
+     "text": "The plan describes the Johnson Road park as replacing a former county recreation center, with nature trails and a possible fire station (PDF page 188): a public park and civic use planned beside the parcel.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Designing and constructing a neighborhood park along Johnson Road. This new park would replace a former Fulton County recreation center and add nature trails and other amenities. The City has identified the potential to add a fire station at the site.",
+     "context_before": "s, but these projects are those the city is interested in implementing first. \u2022 ",
+     "context_after": " \u2022 campaigning for a splost program. funding all expansion and improvement effor",
+     "pdf_page": 188,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-7",
+     "text": "Other neighbours in the same 60 ft answer are houses: e.g. 8735 Gullatt Rd is residential class R4 with a homestead exemption (HF01) and one living unit; the answer also includes homesteaded houses at 8705 and 8845 Gullatt Rd and a homeowners association parcel on Seneca Rd.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R4\",\"ExCode\":\"HF01\",\"LivUnits\":1,",
+     "context_before": "\":59800,\"imprassess\":71440,\"totappr\":328100,\"landappr\":149500,\"imprappr\":178600,",
+     "context_after": "\"landacres\":5.0,\"nbrhood\":\"07007\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":nul",
+     "words_shared_with_url": [],
+     "page_file": "pages/c18733f306944dc749314496.html"
+    },
+    {
+     "id": "plans-8",
+     "text": "The plan's own industrial policy (PDF page 113) asks that new industry have truck-route access and not adjoin residential neighbourhoods; this parcel adjoins houses (previous claim).",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "New industrial development should only be allowed where there is direct access to an official truck route; where it is not adjacent to residential neighborhoods;",
+     "context_before": "r mechanism for keeping up with wear and tear on local roadways from the truck. ",
+     "context_after": " and where it does not \"open up\" previously rural land to a potential cascade of",
+     "pdf_page": 113,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-9",
+     "text": "Truck access: the 2021 interchange feasibility report for the South Fulton CID records that trucks are not allowed on Johnson Road (the parcel's longest frontage, per the brief). The sentence may refer to Johnson Road within Palmetto; the restriction at this frontage was not confirmed.",
+     "source_url": "https://southfultoncid.com/wp-content/uploads/2018/03/InterchangeFeasibilityReport_Final_070521.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Additionally, truck traffic is not currently allowed on Johnson Road, Sims Street, or in Palmetto\u2019s downtown area in an effort to maintain the small-town character.",
+     "context_before": "wntown area, and several residential developments are located along this route. ",
+     "context_after": " mr. mark shugart has expressed his preference for a proposed interchange to be ",
+     "pdf_page": 13,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/2c003af9304e82191cff1d98.pdf"
+    },
+    {
+     "id": "plans-10",
+     "text": "Counterweight, nearby: a new I-85 interchange at Gullatt Road (the parcel's other frontage road, per its Gullatt Rd neighbours) has a Justification Report accepted by FHWA on December 3, 2025. The CID page does not say where on Gullatt Road the ramps would sit or how far that is from this parcel.",
+     "source_url": "https://southfultoncid.com/projects/gullatt-road-at-i-85-interchange/",
+     "retrieved": "2026-11-13",
+     "quote": "The report was reviewed by the Federal Highway Administriation and accepted on December 3, 2025.",
+     "context_before": "5, gdot undertook a formal interchange justification report, using cid funding. ",
+     "context_after": " project description the federal highway administration has reviewed and accepte",
+     "words_shared_with_url": [],
+     "page_file": "pages/75278a5a765ecc04d7f1ba8e.html"
+    },
+    {
+     "id": "plans-11",
+     "text": "Counterweight, nearby: a 2025 regional review (ARC DRI 4465, closed October 10, 2025) covers a six-building, 2,184,000 sq ft data center campus on 119 mostly wooded acres off Gullatt Road, mostly in Fairburn and partly in Palmetto. Whether it adjoins or includes this parcel is not stated in the text read.",
+     "source_url": "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "A DRI review of a proposal to construct six data center buildings totaling 2,184,000 square feet of space along with associated infrastructure, access, parking, utilities, and stormwater management and a new power substation on a 119-acre mostly wooded site off of Gullatt Road primarily in the city of Fairburn with a smaller portion of the property in the City of Palmetto in Fulton County.",
+     "context_before": "burn date opened: september 25, 2025 date closed: october 10, 2025 description: ",
+     "context_after": " comments: key comments the project is not aligned with the applicable developin",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/d08b21e7b70ba4caa0ad1371.pdf"
+    },
+    {
+     "id": "plans-12",
+     "text": "Fairburn's earlier pending-cases page lists that data center (T5) as a concept plan on Gullatt Rd, on hold pending the DRI.",
+     "source_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "T5 Data Center Data Center Concept Plan Gullatt Rd. On Hold - DRI required",
+     "context_before": "formation on each. project name proposed use type of request location next step ",
+     "context_after": " durham lakes (gas station) gas station concept plan 101 durham lake pkwy. pz me",
+     "words_shared_with_url": [],
+     "page_file": "pages/07157d4229d0e9e15fd26812.html"
+    },
+    {
+     "id": "plans-13",
+     "text": "Rezoning check: Fairburn's current list of active and recent planning, zoning and variance cases (read 2026-11-13) shows four cases (gas stations at Durham Lake Pkwy and Rivertown Rd, DRB Campbell Commons on Campbellton Fairburn Road, NexMetro on Milam Road); none is on Johnson Rd, Gullatt Rd or this parcel.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each.",
+     "context_before": "oning pending zoning and development cases pending zoning and development cases ",
+     "context_after": " to request copies of the files, please contact the planning and zoning staff at",
+     "words_shared_with_url": [],
+     "page_file": "pages/63c2340b4ce15a08451d89f9.html"
+    }
+   ],
+   "open_items": [
+    "Confirm on the adopted Future Development Map (the plan's map is an image) that this parcel is Rural Residential and not Industrial or Light Industrial; the brief's category comes from the city's ArcGIS Online layer (known wall).",
+    "Ask Fairburn planning where the Gullatt Road interchange ramps would be, how far from this parcel, and whether the plan's future map or a later amendment changes the land use near the new interchange.",
+    "Ask where the T5 ATL IV (DRI 4465) site lies relative to this parcel (adjoining, across Gullatt Rd, or including it), and its current zoning status after the October 2025 ARC review.",
+    "Search results only (not read): an October 2025 WSB-TV report describes residents opposing a KMT Partners plan for about 200 acres of warehouses on agricultural land along I-85 in the Fairburn / South Fulton area; the site location was not stated. Ask whether it is near Johnson or Gullatt Road and how the council voted.",
+    "Rezoning history of the last five years was checked only against the two pending-cases pages and web searches; no moratorium or annexation affecting this parcel was found in search results (not verified). Ask the city for any rezoning, variance or annexation on or beside 07 400001630455 since 2021.",
+    "Is Johnson Road at this frontage an official truck route, and does the plan's 'No Through Truck Traffic' signage at Johnson Road (transportation table) reach this segment?"
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer, near the parcel: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 300 ft of this parcel's own polygon, returns 6 active 8-inch gravity sewer segments (Line Creek basin, county service area, city Fairburn). Which side of the parcel they run on was not measured.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=300&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Enabled\":1,\"PipeSize\":8,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FAIRBURN\"",
+     "context_before": "s\":null,\"maintenance\":\"unk\",\"createdby\":null,\"createdate\":null,\"flowmeter\":null,",
+     "context_after": ",\"lengthinfeet\":117.46144143,\"shape.stlength()\":117.46159875047768}},{\"attribute",
+     "words_shared_with_url": [],
+     "page_file": "pages/e4d1d1cd96a45197aaa19226.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the brief's map point (-84.609401, 33.518042), answers Fulton County, sewer, service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.609401%2C33.518042&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\"",
+     "context_before": "\":{\"objectid\":1,\"orig_fid\":1,\"shape_star\":73.23144531,\"shape_stle\":769.14763871,",
+     "context_after": ",\"shape.starea()\":10173715022.83869,\"shape.stlength()\":1481074.5223924106}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/86b28dd0ff18d5dbc3942d76.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 2,000 ft of the brief's map point, returns an empty feature list. That is expected where a city (Fairburn or Palmetto) runs water; no city water map was read.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.609401%2C33.518042&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "\"esrifieldtypedate\",\"alias\":\"surveydate\",\"length\":8},{\"name\":\"shape.stlength()\",",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/ccdf69760e94200c6fa9b093.html"
+    },
+    {
+     "id": "utilities-4",
+     "text": "Water provider: the Development Authority of Fulton County lists Fairburn (and Palmetto) among the cities that run their own water service.",
+     "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+     "retrieved": "2026-11-13",
+     "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park, Palmetto, Roswell and Union City.",
+     "context_before": "tect publicly owned treatment works and prevent the introduction of pollutants. ",
+     "context_after": " electricity & natural gas electricity and natural gas are supplied by divisions",
+     "words_shared_with_url": [],
+     "page_file": "pages/5858d37902c1eecd3d4ac3d1.html"
+    }
+   ],
+   "open_items": [
+    "Verdict is the weaker of the two: county gravity sewer (8-inch) runs within 300 ft of the parcel, but no published map read here shows a water main. Ask Fairburn utilities for the nearest water main and its size; 8-inch sewer and the plan's 'limit infrastructure expansion' policy for Rural Residential suggest capacity for a large warehouse is a real question (only the utility can say).",
+    "The plan's Rural Residential policy list includes 'Limit infrastructure expansion' (PDF page 128)."
+   ]
+  },
+  "market": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Search results only, not verifiable: web search summaries described an MLS listing (FMLS 7423469) for 6790 Johnson Road as 46.7 acres at the corner of Johnson and Gullatt Roads, marketed to builders and investors, asking $3,299,000 (down from $3,499,000, last change 2024-11-05), with tenants in the house on one month's notice. The brokerage page (dorseyalston.com listings path) now redirects to its featured-properties page, so the listing is no longer live there and nothing was quoted. Ask a broker or the MLS whether it expired, was withdrawn, or went under contract.",
+    "One search summary also carried an 'off market' figure from a site in the CoStar group (LandWatch); it was not used. A person should not rely on it.",
+    "The parcel lies in the area of two 2025 public projects (Gullatt Road I-85 interchange IJR accepted December 2025; T5 data center DRI 4465 off Gullatt Road). Neither document read names this parcel; whether a data-center or interchange buyer has approached the owner is unknown.",
+    "The 2021 CID feasibility report records an area developer (Saben LLC's owner) with a new development north-east of I-85 / Gullatt Road; Saben LLC holds a 2.4-ac parcel within 60 ft of this one (county parcel layer). Ask whether that developer's plans reach this parcel."
+   ]
+  },
+  "owner": {
+   "verdict": "holding_entity",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Fulton County's parcel record, asked by parcel id, gives an LLC owner with a farm name and a Pennsylvania mailing address; the brief shows the last recorded sale as a 2004 executor's deed. With no Secretary of State record read, 'holding entity' (a family or estate vehicle for inherited farmland) is an inference from the name, the out-of-state address and the deed type, not a recorded fact.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20400001630455%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"TARENE FARM LLC \",\"OwnerAddr1\":\"380 LANBURG LN\",\"OwnerAddr2\":\"AMBLER PA 19002\"",
+     "context_before": "\"johnson\",\"addrsuffix\":\"rd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"taxdist\":\"25a\",\"totassess\":102460,\"landassess\":26460,\"imprassess\":76000,\"totap",
+     "words_shared_with_url": [],
+     "page_file": "pages/3d2fe57ca724633c2847313e.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "The same record shows one living unit and $190,000 of improvements on the 46.7 acres (class V5, land use code 112): a house on the farm, which search summaries (not verified) describe as tenant-occupied.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20400001630455%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":190000,\"LUCode\":\"112\",\"ClassCode\":\"V5\",\"ExCode\":null,\"LivUnits\":1,\"LandAcres\":46.7",
+     "context_before": "2460,\"landassess\":26460,\"imprassess\":76000,\"totappr\":1785900,\"landappr\":1595900,",
+     "context_after": ",\"nbrhood\":\"07007\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/3d2fe57ca724633c2847313e.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State record (status, formation date, registered agent, principal office) not read: the site answers 403 (known wall). Ask a person to pull it, and to check whether the LLC is registered in Georgia or only in Pennsylvania.",
+    "The brief notes a conservation-use (CUVA) covenant; ask when it expires and the breach penalty, since it bears on the owner's willingness and timing to sell."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "Beyond the Rural Residential plan category the first pass found, the same adopted 2025 plan works against trucks at this exact corner: its 2026-2030 work program item T.47 (Gullatt Road, 2027-2028) is a mini-roundabout at Johnson Road with No Through Truck Traffic signage, and its policy text says the Gullatt Road calming is meant to discourage truck intrusion. Johnson and Gullatt are the parcel's two frontage roads, the plan's industrial policy asks for direct truck-route access, and the parcel adjoins homesteaded houses and a planned city park. The parcel also appears to drain to the Line Creek small water supply watershed (the county sewer pipes beside it are in the Line Creek basin), where the state Part 5 criteria carry a 25% impervious limit and stream buffers that Fairburn's code follows. Together these make an industrial rezoning against the plan unlikely and the building fit optimistic, but no document shows the land is unavailable, so a person must settle it with Fairburn planning.",
+  "disputes": [],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "Fairburn's adopted 2025 plan, Community Work Program item T.47 (PDF page 216), schedules signage and traffic calming along Gullatt Road, one of the parcel's two frontage roads, for 2027-2028.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "Install signage and traffic calming along Gullatt Road.",
+    "context_before": "install signage and traffic calming along rivertown road. x x public works t.47 ",
+    "context_after": " x x public works t.48 install signage and traffic calming along sw malone stree",
+    "pdf_page": 216,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The matching cost row on the next PDF page (217; the row is read across the page break, so check it against the printed table) describes that Gullatt Road project as a mini-roundabout at Johnson Road with No Through Truck Traffic signage: the corner of the parcel's two frontages. A small roundabout and truck signage at the site's corner work against WB-67 truck access.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "Mini-roundabout at Johnson Road; \u201cNo Through Truck Traffic\u201d signage; lighting upgrades",
+    "context_before": "s srts, gdot, community organizations $65,000 $105,000 general fund, ss4a, gtib ",
+    "context_after": " srts, gdot, community organizations $30,000 $70,000 general fund, tsplost, cdbg",
+    "pdf_page": 217,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The plan's transportation text (PDF page 161) says the Gullatt Road calming is meant to discourage truck intrusion, with No Through Trucks signs: the city's stated intent for this corridor is fewer trucks, not an industrial route.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "Gullatt Road. Mini-roundabouts to calm traffic and discourage truck intrusion, \u201cNo Through Trucks,\u201d and street lighting upgrades.",
+    "context_before": "d \"no through trucks\" to alleviate stress and bolster safety for pedestrians. \u2022 ",
+    "context_after": " \u2022 malone street to rivertown road. speed cushions, pedestrian signage at key cr",
+    "pdf_page": 161,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "The county sewer pipes within 300 ft of the parcel (the first pass's utilities-1 query) are all in the LINE CREEK sewer basin, sub-basin LC65: a sign the parcel drains toward Line Creek. A sewer basin is a proxy for the drainage area, not a mapped watershed boundary.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=300&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Crossing\":\"NONE\",\"Basin\":\"LINE CREEK\",\"SubBasin\":\"LC65\",\"UpSize\":\"8\"",
+    "context_before": "null,\"legacyid\":null,\"condition\":\"good\",\"conditiondate\":null,\"installdate\":null,",
+    "context_after": ",\"upmaterial\":\"pvc\",\"upcircle\":\"y\",\"upheight\":\"0\",\"upwidth\":\"0\",\"upcomment\":\"non",
+    "words_shared_with_url": [],
+    "page_file": "pages/e4d1d1cd96a45197aaa19226.html"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "ARC's 2025 review of the T5 data center off Gullatt Road places that nearby site in the Line Creek Water Supply Watershed, the supply for Newnan and Fayette County.",
+    "source_url": "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "The proposed project is in the Line Creek Water Supply Watershed which is a public water supply source for both the City of Newnan in Coweta County and for Fayette County.",
+    "context_before": "ncy for both the project and the potable water system. 2 (page break) water supply watersheds ",
+    "context_after": " it is classified as a small (less than 100 square mile) water supply watershed.",
+    "pdf_page": 3,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/d08b21e7b70ba4caa0ad1371.pdf"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "The same review states the state Part 5 criteria that apply in such a watershed: a 25% impervious limit across the watershed plus stream buffers and setbacks. A 520,000 SF cross-dock with truck court and trailer parking on 46.7 acres would be far above 25% impervious if Fairburn applies the limit per site.",
+    "source_url": "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "The Part 5 criteria include an impervious limit of 25% impervious surface in the entire watershed and a 100-foot vegetative buffer and 150-foot impervious setback along all perennial streams within 7 miles upstream of a public water supply intake.",
+    "context_before": "o the requirements of the part 5 criteria and are then approved by georgia epd. ",
+    "context_after": " more than 7 miles upstream, the minimum criteria halve the buffer and setback t",
+    "pdf_page": 3,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/d08b21e7b70ba4caa0ad1371.pdf"
+   }
+  ],
+  "open_items": [
+   "Ask Fairburn planning whether the T.47 mini-roundabout at Johnson Road is at the parcel's corner, its design vehicle, and whether No Through Truck Traffic signage would still let a warehouse's own trucks use Gullatt and Johnson Roads as a destination.",
+   "Ask Fairburn whether its water supply watershed ordinances (City Code 80-111(g) and 80-111.1, on Municode, a known wall) apply a 25% impervious limit per site in the Line Creek watershed, and whether this parcel is inside that watershed and within 7 miles upstream of an intake (wider 100 ft buffer and 150 ft setback).",
+   "Industrial use here would need both a rezoning and a future land use amendment from Rural Residential against the plan's own industrial policy (no adjacency to residential neighbourhoods, direct truck-route access) and beside a planned city park at 6760 Johnson Rd: ask planning staff whether they would support either.",
+   "Search results only, not read: a brokerage listing summary said future zoning residential; ask whether that reflects the city's map or the broker's view, and whether the listing ended in a contract.",
+   "Not read: a City of Palmetto special called council agenda surfaced in a search for Johnson Road and the data center answered 403 to a plain fetch; ask Palmetto whether any annexation or rezoning near Johnson and Gullatt Roads is pending.",
+   "The parcel carries a 1940 house with tenants (search summaries, not verified) and a CUVA covenant (brief): confirm the covenant's end date and penalty before any approach.",
+   "First-pass claims zoning-1 and zoning-2 quote only the zoning map legend; they show AG and M-1/M-2 are separate districts, not that this parcel is AG. The parcel's zoning rests on the screener's city layer."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan": {
+   "file": "pages/0d2514dcf7b12fbafbbf3624.pdf",
+   "fetched_at": "2026-11-13T22:10:51Z",
+   "final_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+   "status": 200,
+   "bytes": 158602610,
+   "sha256": "11f1a0b5cf4972d0dc6a341515c0a3add030347a0b2a57b1ea9d4230f39bc83f"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/c18733f306944dc749314496.html",
+   "fetched_at": "2026-11-13T22:10:53Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 15156,
+   "sha256": "bba12af780a2888a455d848d6307f8a8836d381d14aca668dee26d8778f2961b"
+  },
+  "https://southfultoncid.com/wp-content/uploads/2018/03/InterchangeFeasibilityReport_Final_070521.pdf": {
+   "file": "pages/2c003af9304e82191cff1d98.pdf",
+   "fetched_at": "2026-11-13T22:10:55Z",
+   "final_url": "https://southfultoncid.com/wp-content/uploads/2018/03/InterchangeFeasibilityReport_Final_070521.pdf",
+   "status": 200,
+   "bytes": 3617211,
+   "sha256": "d571734f2f5385ab7fb563c9c52a8c4e79791cc84a90c217dfb2b290b974e19b"
+  },
+  "https://southfultoncid.com/projects/gullatt-road-at-i-85-interchange/": {
+   "file": "pages/75278a5a765ecc04d7f1ba8e.html",
+   "fetched_at": "2026-11-13T22:10:56Z",
+   "final_url": "https://southfultoncid.com/projects/gullatt-road-at-i-85-interchange/",
+   "status": 200,
+   "bytes": 79033,
+   "sha256": "be391cc40e14747273642e83a2719f14a2e86921e9fb9dc206ef1b3b27f84da0"
+  },
+  "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf": {
+   "file": "pages/d08b21e7b70ba4caa0ad1371.pdf",
+   "fetched_at": "2026-11-13T22:10:58Z",
+   "final_url": "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf",
+   "status": 200,
+   "bytes": 6064716,
+   "sha256": "2c081ca309ad203ae1e1f0fab1df7a944c936fb0f7ed45fcf8cc61ea6213901f"
+  },
+  "https://www.fairburn.com/257/Pending-Zoning-Development-Cases": {
+   "file": "pages/07157d4229d0e9e15fd26812.html",
+   "fetched_at": "2026-11-13T22:10:59Z",
+   "final_url": "https://www.fairburn.com/257/Pending-Zoning-Development-Cases",
+   "status": 200,
+   "bytes": 96407,
+   "sha256": "7106a22ca357911606e97a4cba5e52131958e725ce53f6c2e2326b192255c825"
+  },
+  "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases": {
+   "file": "pages/63c2340b4ce15a08451d89f9.html",
+   "fetched_at": "2026-11-13T22:11:09Z",
+   "final_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+   "status": 200,
+   "bytes": 105559,
+   "sha256": "a25dbd8969d3e123d70eca3eec40d6742012ff5404395908046c472184187550"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=300&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/e4d1d1cd96a45197aaa19226.html",
+   "fetched_at": "2026-11-13T22:11:09Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=300&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 15299,
+   "sha256": "eeece43ce72bf3523edaaff359378e76158f3677d1bebe2e1c91fbdef315b730"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.609401%2C33.518042&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/86b28dd0ff18d5dbc3942d76.html",
+   "fetched_at": "2026-11-13T22:11:11Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.609401%2C33.518042&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1213,
+   "sha256": "515af0b1e3eab932009564b816c35b707d1a81da7f271e9f1a5dcda11320f0d7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.609401%2C33.518042&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/ccdf69760e94200c6fa9b093.html",
+   "fetched_at": "2026-11-13T22:11:11Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.609401%2C33.518042&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3941,
+   "sha256": "4fdedc8dd0a83d1c15e98d06287f6931a243d734c92e8c178684710c271eadc4"
+  },
+  "https://www.developfultoncounty.com/infrastructure.php": {
+   "file": "pages/5858d37902c1eecd3d4ac3d1.html",
+   "fetched_at": "2026-11-13T22:11:13Z",
+   "final_url": "https://www.developfultoncounty.com/infrastructure.php",
+   "status": 200,
+   "bytes": 26591,
+   "sha256": "a80f3fbb9847c431ee513e41ab31fe383d1398f166412c747463aea109da047f"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20400001630455%27&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/3d2fe57ca724633c2847313e.html",
+   "fetched_at": "2026-11-13T22:11:13Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20400001630455%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 5590,
+   "sha256": "b5de8910fb9ba92e28abfe527ca662640e435ac3426bf1ba838a720656834500"
+  }
+ },
+ "quotecheck": {
+  "kept": 27,
+  "dropped": 1,
+  "downgraded": [],
+  "checked_at": "2026-11-13T22:11:13Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "bc0cb9c5fcef09b5232c1074431a7f03f9e1b6d4e13c9e978806cac8016c237d",
+   "skeptic.json": "99d52f96811de14f8c0ad7afb874220b80089c253a1d60ae3648d81b8db8f620"
+  }
+ },
+ "dropped_claims": [
+  {
+   "id": "skeptic-5",
+   "section": "skeptic",
+   "reason": "the quote is not on the page",
+   "claim": {
+    "text": "Fairburn's plan (PDF page 84) says the Line Creek small water supply watersheds cover the southwestern corner of the city, about 38.5% of it; this parcel lies south-west of downtown.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "intersect in the southwestern corner of the city, totaling 4,210 acres and covering about 38.5% of the city. Development within water supply watersheds is possible, but it requires careful planning to minimize negative impacts on water quality and quantity."
+   }
+  }
+ ]
+}

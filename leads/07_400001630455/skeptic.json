@@ -1,0 +1,62 @@
+{
+ "schema": 1,
+ "parcel_id": "07 400001630455",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "Beyond the Rural Residential plan category the first pass found, the same adopted 2025 plan works against trucks at this exact corner: its 2026-2030 work program item T.47 (Gullatt Road, 2027-2028) is a mini-roundabout at Johnson Road with No Through Truck Traffic signage, and its policy text says the Gullatt Road calming is meant to discourage truck intrusion. Johnson and Gullatt are the parcel's two frontage roads, the plan's industrial policy asks for direct truck-route access, and the parcel adjoins homesteaded houses and a planned city park. The parcel also appears to drain to the Line Creek small water supply watershed (the county sewer pipes beside it are in the Line Creek basin), where the state Part 5 criteria carry a 25% impervious limit and stream buffers that Fairburn's code follows. Together these make an industrial rezoning against the plan unlikely and the building fit optimistic, but no document shows the land is unavailable, so a person must settle it with Fairburn planning.",
+  "disputes": [],
+  "claims": [
+   {
+    "text": "Fairburn's adopted 2025 plan, Community Work Program item T.47 (PDF page 216), schedules signage and traffic calming along Gullatt Road, one of the parcel's two frontage roads, for 2027-2028.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "Install signage and traffic calming along Gullatt Road."
+   },
+   {
+    "text": "The matching cost row on the next PDF page (217; the row is read across the page break, so check it against the printed table) describes that Gullatt Road project as a mini-roundabout at Johnson Road with No Through Truck Traffic signage: the corner of the parcel's two frontages. A small roundabout and truck signage at the site's corner work against WB-67 truck access.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "Mini-roundabout at Johnson Road; “No Through Truck Traffic” signage; lighting upgrades"
+   },
+   {
+    "text": "The plan's transportation text (PDF page 161) says the Gullatt Road calming is meant to discourage truck intrusion, with No Through Trucks signs: the city's stated intent for this corridor is fewer trucks, not an industrial route.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "Gullatt Road. Mini-roundabouts to calm traffic and discourage truck intrusion, “No Through Trucks,” and street lighting upgrades."
+   },
+   {
+    "text": "The county sewer pipes within 300 ft of the parcel (the first pass's utilities-1 query) are all in the LINE CREEK sewer basin, sub-basin LC65: a sign the parcel drains toward Line Creek. A sewer basin is a proxy for the drainage area, not a mapped watershed boundary.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.608571%2C33.516467%5D%2C%5B-84.610059%2C33.515649%5D%2C%5B-84.611515%2C33.515664%5D%2C%5B-84.611496%2C33.515965%5D%2C%5B-84.611484%2C33.516267%5D%2C%5B-84.611478%2C33.516568%5D%2C%5B-84.611479%2C33.51687%5D%2C%5B-84.611502%2C33.518179%5D%2C%5B-84.61151%2C33.518386%5D%2C%5B-84.611524%2C33.518592%5D%2C%5B-84.611545%2C33.518798%5D%2C%5B-84.611572%2C33.519003%5D%2C%5B-84.611606%2C33.519208%5D%2C%5B-84.611646%2C33.519412%5D%2C%5B-84.611693%2C33.519617%5D%2C%5B-84.611746%2C33.519821%5D%2C%5B-84.611806%2C33.520023%5D%2C%5B-84.611911%2C33.520357%5D%2C%5B-84.611647%2C33.52036%5D%2C%5B-84.609408%2C33.520394%5D%2C%5B-84.609389%2C33.519505%5D%2C%5B-84.606649%2C33.519452%5D%2C%5B-84.606649%2C33.518922%5D%2C%5B-84.606649%2C33.5189%5D%2C%5B-84.606647%2C33.518111%5D%2C%5B-84.60665%2C33.518108%5D%2C%5B-84.606651%2C33.516663%5D%2C%5B-84.606692%2C33.516659%5D%2C%5B-84.608571%2C33.516467%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=300&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Crossing\":\"NONE\",\"Basin\":\"LINE CREEK\",\"SubBasin\":\"LC65\",\"UpSize\":\"8\""
+   },
+   {
+    "text": "Fairburn's plan (PDF page 84) says the Line Creek small water supply watersheds cover the southwestern corner of the city, about 38.5% of it; this parcel lies south-west of downtown.",
+    "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+    "retrieved": "2026-11-13",
+    "quote": "intersect in the southwestern corner of the city, totaling 4,210 acres and covering about 38.5% of the city. Development within water supply watersheds is possible, but it requires careful planning to minimize negative impacts on water quality and quantity."
+   },
+   {
+    "text": "ARC's 2025 review of the T5 data center off Gullatt Road places that nearby site in the Line Creek Water Supply Watershed, the supply for Newnan and Fayette County.",
+    "source_url": "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "The proposed project is in the Line Creek Water Supply Watershed which is a public water supply source for both the City of Newnan in Coweta County and for Fayette County."
+   },
+   {
+    "text": "The same review states the state Part 5 criteria that apply in such a watershed: a 25% impervious limit across the watershed plus stream buffers and setbacks. A 520,000 SF cross-dock with truck court and trailer parking on 46.7 acres would be far above 25% impervious if Fairburn applies the limit per site.",
+    "source_url": "https://documents.atlantaregional.com/Land%20Use/Reviews/ID6544/2025%20T5%20ATL%20IV%204465%20-%20Final%20Report.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "The Part 5 criteria include an impervious limit of 25% impervious surface in the entire watershed and a 100-foot vegetative buffer and 150-foot impervious setback along all perennial streams within 7 miles upstream of a public water supply intake."
+   }
+  ],
+  "open_items": [
+   "Ask Fairburn planning whether the T.47 mini-roundabout at Johnson Road is at the parcel's corner, its design vehicle, and whether No Through Truck Traffic signage would still let a warehouse's own trucks use Gullatt and Johnson Roads as a destination.",
+   "Ask Fairburn whether its water supply watershed ordinances (City Code 80-111(g) and 80-111.1, on Municode, a known wall) apply a 25% impervious limit per site in the Line Creek watershed, and whether this parcel is inside that watershed and within 7 miles upstream of an intake (wider 100 ft buffer and 150 ft setback).",
+   "Industrial use here would need both a rezoning and a future land use amendment from Rural Residential against the plan's own industrial policy (no adjacency to residential neighbourhoods, direct truck-route access) and beside a planned city park at 6760 Johnson Rd: ask planning staff whether they would support either.",
+   "Search results only, not read: a brokerage listing summary said future zoning residential; ask whether that reflects the city's map or the broker's view, and whether the listing ended in a contract.",
+   "Not read: a City of Palmetto special called council agenda surfaced in a search for Johnson Road and the data center answered 403 to a plain fetch; ask Palmetto whether any annexation or rezoning near Johnson and Gullatt Roads is pending.",
+   "The parcel carries a 1940 house with tenants (search summaries, not verified) and a CUVA covenant (brief): confirm the covenant's end date and penalty before any approach.",
+   "First-pass claims zoning-1 and zoning-2 quote only the zoning map legend; they show AG and M-1/M-2 are separate districts, not that this parcel is AG. The parcel's zoning rests on the screener's city layer."
+  ]
+ }
+}

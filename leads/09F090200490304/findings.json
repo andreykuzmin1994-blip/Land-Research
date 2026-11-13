@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "parcel_id": "09F090200490304",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "rezoning_needed",
+      "claims": [
+        {"text": "The brief gives this parcel Fairburn PD zoning (from the screener's city layer, an ArcGIS Online host that is a known wall; not re-read here). Fairburn's comprehensive plan, adopted October 2025, counts planned-development zoning among the city's residential zoning, not its industrial zoning. A warehouse here would most likely need a rezoning to M-1/M-2 or an amended PD. What this PD's own approval permits was not read.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "Of the areas zoned residential, the majority are zoned PUD (Planned Unit Development), R-1 (Single-Family Residential, one acre), or R-2 (Single-Family Residential, Low to Medium Density, one-half acre)."},
+        {"text": "The plan's Industrial future-development category lists warehousing and manufacturing, with O&I, C-2, M-1, M-2 and P&O as its appropriate zoning districts. PD is not among them.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "large office; warehousing; manufacturing; utilities. Density/Intensity 1 to 2 stories Appropriate Zoning District(s) O&I, C-2, M-1, M-2, P&O"},
+        {"text": "The plan's zoning-map legend shows Fairburn's two industrial districts, M-1 Light Industrial and M-2 Heavy Industrial, as separate from PD (Planned Development).",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "M-1 - Light Industrial M-2 - Heavy Industrial"}
+      ],
+      "open_items": [
+        "Fairburn's zoning text, PD section included, is on Municode (known wall). Ask Fairburn planning for the ordinance that zoned this parcel PD: when it passed, for what project (the owner's name suggests a planned religious facility such as an assembly hall), the approved site plan and conditions, and whether that approval has lapsed.",
+        "Ask whether this PD is part of a larger PD that also covers the neighbouring 7305 Village Center Blvd apartments and the vacant John Rivers Rd tracts. If so, an industrial use would mean amending a shared master plan, not rezoning one parcel.",
+        "The screener's future land use code TCMU is not a category in the 2025 plan's Future Development Strategy (the categories run from Greenspace to Industrial). Confirm which 2025 category the adopted map gives this parcel. The map is an image and was not read at parcel scale."
+      ]
+    },
+    "plans": {
+      "verdict": "against",
+      "claims": [
+        {"text": "The adopted 2025 plan's industrial siting policy: new industrial development only where it is not adjacent to residential neighbourhoods. This parcel adjoins housing (next two claims).",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "New industrial development should only be allowed where there is direct access to an official truck route; where it is not adjacent to residential neighborhoods;"},
+        {"text": "NEXT DOOR IS A 310-UNIT HOUSING PARCEL. I asked the county parcel layer for a map box around the parcel (by coordinates, not by name). It returns 7305 Village Center Blvd, 13.4 ac, 310 living units, $40.9M of improvements, land use 2B1. From the parcel shapes I measured a shared lot line with the lead. Its owner also holds a vacant 21.31 ac parcel at the same address that also adjoins the lead.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5525,-84.5920,33.5615&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"ImprAppr\":40911100,\"LUCode\":\"2B1\",\"ClassCode\":\"C5\",\"ExCode\":null,\"LivUnits\":310,\"LandAcres\":13.4"},
+        {"text": "A new subdivision lies to the north. In the same box answer, 75 Jacoby Dr is a homesteaded house (R3, one living unit) in Ferndale Ph 1, with a 2024 subdivision plat number. By my measure, the Jacoby Dr lots sit about 60 ft from the lead's north-east line, so a street or strip may lie between.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5525,-84.5920,33.5615&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":\"HF01\",\"LivUnits\":1,\"LandAcres\":0.737,\"NbrHood\":\"96193A\",\"Subdiv\":\"FERNDALE PH 1\",\"SubdivNum\":\"2024-1074\""},
+        {"text": "The plan's other policy points the same way: no further industrial use beside residential areas without significant buffering and transport infrastructure.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "Do not approve additional industrial uses adjacent to residential areas without significant buffering and transportation infrastructure in place."},
+        {"text": "The plan treats John Rivers Road, one of the parcel's frontage roads, as a neighbourhood walking and biking corridor, with tree-lined buffers. It says nothing of freight.",
+         "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+         "retrieved": "2026-11-13",
+         "quote": "in under-served areas, these corridors would connect neighborhoods to parks, schools, and downtown. Buffers would improve safety and encourage walking and biking, especially for families and children."},
+        {"text": "Rezoning check: Fairburn's list of active and recent planning, zoning and variance cases (read 2026-11-13) has four cases: gas stations at 101 Durham Lake Pkwy and 6900 Rivertown Rd, DRB Campbell Commons on Campbellton Fairburn Road, and NexMetro on Milam Road. None is on John Rivers Rd, Roosevelt Hwy or this parcel id.",
+         "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+         "retrieved": "2026-11-13",
+         "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each."},
+        {"text": "Counterweight, nearby but more than five years old: in 2018 the City of South Fulton approved a modification for a 4.15-ac M-1 (light industrial) site at the west corner of Roosevelt Hwy and John Rivers Rd. By my measure it is about 2,500 ft south-west of this parcel, so industrial zoning lines the highway there.",
+         "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/691/M17-003-WEBSITE",
+         "retrieved": "2026-11-13",
+         "quote": "Applicant Mawal, Inc. seeks a modification from conditions identified in Zoning Case Z73-065 for property located at the west intersection of Roosevelt Hwy & Johns River Rd."},
+        {"text": "Context, location not established: an August 2024 regional review (ARC, DRI 4213, Fairburn Technology Center) covers a data center on a 60-acre site on Bohannon Road in Fairburn. Industrial parcels on Bohannon Rd lie a few hundred feet south of this parcel, but the report's text does not say where on Bohannon Road the site is. This is not evidence that it adjoins or includes this parcel (this lead is 46.9 ac and has no mapped wetlands; the DRI site plan shows wetland impacts).",
+         "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID5441/2024%20Fairburn%20Technology%20Center%20DRI%20TBD%20-%20Preliminary%20Report%20and%20Comments%20Request.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "A DRI review of a proposal to construct a data center project with 1,190,000 million Sf of space in three two-story buildings and supporting facilities on a 60-acre site on Bohannon Road"}
+      ],
+      "open_items": [
+        "Confirm the parcel's category on the 2025 Future Development Map (an image, not read at parcel scale). The screener's TCMU code comes from the city's ArcGIS Online layer (known wall) and is not a 2025 plan category.",
+        "The parcel also faces Roosevelt Hwy (US-29) and lies about 66 ft from the CSX line, with industrial parcels on Bohannon Rd to the south (brief and county box answer). Ask Fairburn planning whether it would treat the Roosevelt Hwy side as an industrial edge or the apartments and Ferndale homes as the controlling neighbours.",
+        "Ask where the Fairburn Technology Center data center (DRI 4213, Bohannon Road, 2024) lies relative to this parcel, and its status.",
+        "Rezoning history over the last five years was checked only against Fairburn's current pending-cases page, Fairburn council minutes for January to May 2014 (no item on this parcel found) and web searches. Ask the city for every rezoning, PD amendment, variance or annexation on or beside 09F090200490304."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {"text": "Water provider: the Development Authority of Fulton County lists Fairburn among the municipalities that run their own water service, so the City of Fairburn, not Fulton County, is the likely water (and possibly sewer) provider. No city water or sewer map was read. The brief's assessor field says well and septic.",
+         "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+         "retrieved": "2026-11-13",
+         "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park,"},
+        {"text": "Sewer and water, county service area: I asked Fulton County's water/sewer service area layer (WR_Public_Map_Viewer layer 16) at the brief's map point (-84.596244, 33.556898). It returns an empty feature list: the point is outside the county's mapped water/sewer service areas. That fits a city-served area; it says nothing about city mains.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.596244%2C33.556898&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "{\"name\":\"SHAPE.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.STLength()\"}],\"features\":[]}"},
+        {"text": "Sewer, county pipes not shown: I asked Fulton County's Waste Water Pipe layer (layer 4) for pipes within 1,500 ft of the same point. It returns an empty feature list. The county layer does not show any city sewer.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.596244%2C33.556898&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"},
+        {"text": "Water, county pipes not shown: I asked Fulton County's Water Pipe layer (layer 11) for pipes within 1,500 ft of the same point. It returns an empty feature list, as expected if Fairburn runs water here.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.596244%2C33.556898&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"}
+      ],
+      "open_items": [
+        "Ask the City of Fairburn utilities department for the nearest water and sewer mains and their capacity. The neighbouring 310-unit apartment parcel and the industrial parcels on Bohannon Rd suggest city service nearby, but no map was read. Capacity is a question only the utility can answer."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {"text": "No public sign of a sale, contract or developer: the parcel is not on Fairburn's list of active and recent zoning and development cases (read 2026-11-13; the four cases listed are at Durham Lake Pkwy, Rivertown Rd, Campbellton Fairburn Rd and Milam Rd).",
+         "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+         "retrieved": "2026-11-13",
+         "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each."},
+        {"text": "No built or operating use: the county parcel layer (map box query, by coordinates) shows the lead, 0 John Rivers Rd, 46.89 ac, with land value only and $0 of improvements, commercial vacant class C5, and no exemption code. My reading: nothing is built, and no religious facility operates here (one would normally be tax-exempt) 12 years after the 2014 purchase (brief).",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5525,-84.5920,33.5615&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"ImprAppr\":0,\"LUCode\":\"300\",\"ClassCode\":\"C5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":46.89"}
+      ],
+      "open_items": [
+        "Whether the owner still plans a facility here or has declared the land surplus (an abandoned project often means a willing seller) can only come from the owner or a broker. Not contacted, per the rules.",
+        "Brokerage listing sites were not searched (CoStar, LoopNet and Crexi are excluded by rule). A person may check other public channels for a listing."
+      ]
+    },
+    "owner": {
+      "verdict": "operator",
+      "claims": [
+        {"text": "Reading of the county record only, not a Secretary of State record (known wall): the owner is a non-profit-style corporation whose name reads as the regional construction committee of a religious organization, mailing from New York State. That makes it an end user that bought land for its own facilities (here, held vacant since 2014 per the brief), not a developer, investor or family holding.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.6010,33.5525,-84.5920,33.5615&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"Owner\":\"REGIONAL BUILDING COMMITTEE OF JEHOVAH'S WITNESSES INC\",\"OwnerAddr1\":\"1005 RED MILLS RD\",\"OwnerAddr2\":\"WALLKILL NY 12589\""}
+      ],
+      "open_items": [
+        "Georgia Secretary of State record not read (known wall: 403). A person should confirm the entity's status, state of formation, registered agent and whether it is registered to do business in Georgia.",
+        "Before any approach, find out who decides on land sales for this owner. Religious-organization building bodies often hold land for a future facility and may sell surplus tracts through a central office."
+      ]
+    }
+  }
+}

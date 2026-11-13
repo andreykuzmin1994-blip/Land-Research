@@ -1,0 +1,46 @@
+{
+ "schema": 1,
+ "parcel_id": "07 260001221014",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "This is not a stand-alone 23 acres from a motivated seller. The same Miami Beach limited partnership holds four of the five parcels of the 2024 outdoor-storage rezoning case (7460, 7490 and 7500 Herndon Rd and 7565 Bishop Rd, about 73.4 acres). Its deed on this parcel (2024-12-19, per the brief) came after that case and after the city began moving the land to the Industrial character area, so it looks like an industrial land assembler that will price and sell the land as one block, or develop it itself. M-2 zoning on this parcel is not shown by any document: the 2024 request to rezone R-2/AG-1 land here to M-2 was recommended for denial by staff and the Planning Commission, no council approval was found, and the county still assesses the parcel as residential with a house on it. It also touches an owner-occupied home (7480 Herndon Rd) and lies about 1,200 ft from the Fulton County Board of Education's 103-acre campus at 7415 Herndon Rd, so expect buffers and opposition. The first pass's 'conditional' zoning verdict and 'supports' plans verdict rest on a Planning Commission vote and an M-2 intent statement, not on an adopted decision, and the 2021 plan that CDP-004 amended has since been replaced by the 2026 plan.",
+  "disputes": [
+   "zoning-7",
+   "plans-4"
+  ],
+  "claims": [
+   {
+    "text": "Fulton County's Tax Parcel layer (PropertyMapViewer layer 11), asked for every parcel within 15 ft of this parcel's own boundary polygon (taken from the same layer), returns 7460 Herndon Rd (10.03 acres, one living unit) under the same limited partnership that owns 7500 Herndon Rd. The same answer also lists 7490 Herndon Rd (1.19 ac) and 7565 Bishop Rd (39.18 ac) under that owner: four of the five 2024 case parcels, about 73.4 acres together, are in one holder's hands.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=%7B%22rings%22%3A%5B%5B%5B-84.63127992887843%2C33.55178903190558%5D%2C%5B-84.63127990047899%2C33.55178895717308%5D%2C%5B-84.6310587118351%2C33.551215773082305%5D%2C%5B-84.63044818244195%2C33.551444002552365%5D%2C%5B-84.63014763412069%2C33.55076546917168%5D%2C%5B-84.62999405868317%2C33.550772856135325%5D%2C%5B-84.62994730051297%2C33.548400270756595%5D%2C%5B-84.62994455393695%2C33.5483981431592%5D%2C%5B-84.62790768180538%2C33.54839388161863%5D%2C%5B-84.62786995920357%2C33.54670561147348%5D%2C%5B-84.62814395884621%2C33.54670588628369%5D%2C%5B-84.63117977727417%2C33.54670878280087%5D%2C%5B-84.63118054812055%2C33.54675342911772%5D%2C%5B-84.63124238661189%2C33.5498692688977%5D%2C%5B-84.63139887924085%2C33.550093702026714%5D%2C%5B-84.63217453728683%2C33.55120350920255%5D%2C%5B-84.63239204585996%2C33.55151536256211%5D%2C%5B-84.63188734997678%2C33.55170375175422%5D%2C%5B-84.63132540184662%2C33.551906867144766%5D%2C%5B-84.63127992887843%2C33.55178903190558%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=15&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"7460 HERNDON RD\",\"AddrNumber\":\"7460\",\"AddrPreDir\":null,\"AddrStreet\":\"HERNDON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"BR FAIRBURN LP \""
+   },
+   {
+    "text": "The same 15 ft adjacency query returns 7480 Herndon Rd, a 2.25-acre residential parcel with one living unit and homestead exemption code HF01: an owner-occupied home touches this parcel. Residential buffers and compatibility conditions will apply to any industrial plan.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=%7B%22rings%22%3A%5B%5B%5B-84.63127992887843%2C33.55178903190558%5D%2C%5B-84.63127990047899%2C33.55178895717308%5D%2C%5B-84.6310587118351%2C33.551215773082305%5D%2C%5B-84.63044818244195%2C33.551444002552365%5D%2C%5B-84.63014763412069%2C33.55076546917168%5D%2C%5B-84.62999405868317%2C33.550772856135325%5D%2C%5B-84.62994730051297%2C33.548400270756595%5D%2C%5B-84.62994455393695%2C33.5483981431592%5D%2C%5B-84.62790768180538%2C33.54839388161863%5D%2C%5B-84.62786995920357%2C33.54670561147348%5D%2C%5B-84.62814395884621%2C33.54670588628369%5D%2C%5B-84.63117977727417%2C33.54670878280087%5D%2C%5B-84.63118054812055%2C33.54675342911772%5D%2C%5B-84.63124238661189%2C33.5498692688977%5D%2C%5B-84.63139887924085%2C33.550093702026714%5D%2C%5B-84.63217453728683%2C33.55120350920255%5D%2C%5B-84.63239204585996%2C33.55151536256211%5D%2C%5B-84.63188734997678%2C33.55170375175422%5D%2C%5B-84.63132540184662%2C33.551906867144766%5D%2C%5B-84.63127992887843%2C33.55178903190558%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=15&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"LUCode\":\"101\",\"ClassCode\":\"R4\",\"ExCode\":\"HF01\",\"LivUnits\":1,\"LandAcres\":2.25"
+   },
+   {
+    "text": "The county parcel layer, asked by parcel id 07 260001360937, gives 7415 Herndon Rd, 103.25 acres, owned by the Fulton County Board of Education (exempt class E1). Measured from the vertices of the two parcel polygons in the same layer, it lies about 1,200 ft from this parcel (my measure, approximate). A high school campus this close is a likely source of opposition and of truck-route limits on Herndon Road.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001360937%27&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Address\":\"7415 HERNDON RD\",\"AddrNumber\":\"7415\",\"AddrPreDir\":null,\"AddrStreet\":\"HERNDON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"FULTON COUNTY BOARD OF EDUCATION \""
+   },
+   {
+    "text": "A 2026 South Fulton staff memo (case Z26-013, on Bishop Road) says the 2026 Comprehensive Plan is newly adopted. CDP-004, the first pass's plans evidence, was an amendment to the 2021 plan; which 2026 character area covers 7500 Herndon Road was not read, so the 'supports' verdict is not shown for the plan in force.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
+    "retrieved": "2026-11-13",
+    "quote": "The zoning proposal is not in conformity with the 2021 Comprehensive Plan; however, it is in compliance with the newly adopted 2026 plan."
+   }
+  ],
+  "open_items": [
+   "Ask South Fulton planning for the Mayor and Council action on Z24-002 and U24-001 (2024) and on CDP-004, and the official zoning of 7500 Herndon Road today. If Z24-002 was denied or withdrawn, the R-2/AG-1 part of the case land is not M-2 and the screener's by_right reading fails. Which of the five case parcels was already M-2 before 2024 is not said in the memo text.",
+   "Ask which character area the April 2026 Comprehensive Plan future land use map gives 7500 Herndon Road (the map was not read).",
+   "Ask whether the limited partnership holding 73.4 acres of the case land is linked to 9606 Capital (whose separate entity holds 7635 Bishop Rd, with an Atlanta mailing address) or to the 2024 applicant, and whether it plans its own industrial project. The Secretary of State record is a known wall.",
+   "Seen, not verifiable: the city's release on Bishop Industrial Park (cityofsouthfultonga.gov CivicAlerts.aspx?AID=864) redirected to a mobile news path that answered 404. Search snippets say the city supported 9606 Capital's Bishop Road redevelopment 'through rezoning'; that may mean a rezoning was approved for some of the case land. A person should get the ordinance.",
+   "Search snippets only: Creekside High School is the school at 7405/7415 Herndon Road. Check whether truck access from this parcel to I-85 would pass it.",
+   "The house on the parcel (one living unit, about $193,800 of improvements) and houses on 7460 and 7490 Herndon Rd in the same holding would need demolition; whether they are leased is unknown."
+  ]
+ }
+}

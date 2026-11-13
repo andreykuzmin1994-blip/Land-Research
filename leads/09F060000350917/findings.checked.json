@@ -285,7 +285,7 @@
  "pages": {
   "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan": {
    "file": "pages/0d2514dcf7b12fbafbbf3624.pdf",
-   "fetched_at": "2026-11-13T17:46:54Z",
+   "fetched_at": "2026-11-13T22:11:25Z",
    "final_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
    "status": 200,
    "bytes": 158602610,
@@ -293,15 +293,15 @@
   },
   "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases": {
    "file": "pages/63c2340b4ce15a08451d89f9.html",
-   "fetched_at": "2026-11-13T17:47:02Z",
+   "fetched_at": "2026-11-13T22:11:34Z",
    "final_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
    "status": 200,
    "bytes": 105559,
-   "sha256": "41bcd3bfa2575da0c2ef0cbbc3adc818d21bcd579950e5b9a34931594cc7fbaa"
+   "sha256": "0231b385c34c9ce591a66711fea39c644f2e328c516ad2bf11662543d889c893"
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/61455d609d2b7d636f7b601c.html",
-   "fetched_at": "2026-11-13T17:47:04Z",
+   "fetched_at": "2026-11-13T22:11:35Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 18088,
@@ -309,7 +309,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/e3ef459c6f849ae8b5a0c492.html",
-   "fetched_at": "2026-11-13T17:47:05Z",
+   "fetched_at": "2026-11-13T22:11:36Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 1213,
@@ -317,7 +317,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/4c58bacde4e495f5d0f89121.html",
-   "fetched_at": "2026-11-13T17:47:06Z",
+   "fetched_at": "2026-11-13T22:11:37Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 3941,
@@ -325,7 +325,7 @@
   },
   "https://www.developfultoncounty.com/infrastructure.php": {
    "file": "pages/5858d37902c1eecd3d4ac3d1.html",
-   "fetched_at": "2026-11-13T17:47:08Z",
+   "fetched_at": "2026-11-13T22:11:39Z",
    "final_url": "https://www.developfultoncounty.com/infrastructure.php",
    "status": 200,
    "bytes": 26591,
@@ -333,7 +333,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
    "file": "pages/d819c5348067c2afa68f3433.html",
-   "fetched_at": "2026-11-13T17:47:08Z",
+   "fetched_at": "2026-11-13T22:11:39Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
    "status": 200,
    "bytes": 14721,
@@ -341,7 +341,7 @@
   },
   "https://www.developfultoncounty.com/uploads/meetings-and-minutes_41_963367144.pdf": {
    "file": "pages/e9b1a7a007adde6989ff1846.pdf",
-   "fetched_at": "2026-11-13T17:47:09Z",
+   "fetched_at": "2026-11-13T22:11:40Z",
    "final_url": "https://www.developfultoncounty.com/uploads/meetings-and-minutes_41_963367144.pdf",
    "status": 200,
    "bytes": 132602,
@@ -349,7 +349,7 @@
   },
   "https://epd.georgia.gov/document/document/pa0225-4/download": {
    "file": "pages/a86c3fae1af96e0661c0ed74.pdf",
-   "fetched_at": "2026-11-13T17:47:10Z",
+   "fetched_at": "2026-11-13T22:11:41Z",
    "final_url": "https://epd.georgia.gov/document/document/pa0225-4/download",
    "status": 200,
    "bytes": 83697,
@@ -357,7 +357,7 @@
   },
   "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json": {
    "file": "pages/1100996d76560c0f7c983129.html",
-   "fetched_at": "2026-11-13T17:47:11Z",
+   "fetched_at": "2026-11-13T22:11:42Z",
    "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=1%3D1&geometry=-84.551315%2C33.549753&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
    "status": 200,
    "bytes": 45864,
@@ -368,7 +368,7 @@
   "kept": 18,
   "dropped": 0,
   "downgraded": [],
-  "checked_at": "2026-11-13T17:47:11Z",
+  "checked_at": "2026-11-13T22:11:42Z",
   "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
   "inputs": {
    "findings.json": "a9a38ca6ef79c5d7cf908ed61babe8738b1e36fd5eb328a67ef239525d895158",

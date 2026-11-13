@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0034  LL1135",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "The rezoning path that grade B rests on has already been tried on this parcel and has failed. A logistics developer applied to rezone it to M-1 for a 280,000 sq ft building. Staff recommended denial: the adopted 2026 Comprehensive Plan's Community Live Work designation does not support industrial use, the abutting land is residential, there is a church and apartments on either side, and the site would bring truck traffic. At the September 16, 2026 Planning Commission, staff reported that the applicant intends to withdraw. So the first pass's market verdict (developer pursuing) is out of date. What is left is a parcel where the city's own planners have said industrial use breaks the new plan. Any industrial buyer would face the same plan amendment and rezoning that this developer just walked away from.",
+    "disputes": ["market-1"],
+    "claims": [
+      {"text": "At the September 16, 2026 Planning Commission, staff reported that the applicant for Z26-016/CDP26-006 (this parcel) intends to withdraw. Because the case had been advertised, the withdrawal needs City Council action, and the Commission deferred the case so the Council could take it up. The developer pursuit in market-1 is ending, not ongoing.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/16348/PC-091626-Minutes",
+       "retrieved": "2026-11-13",
+       "quote": "Staff advised that the applicant had indicated an intent to withdraw the application. Because the case had already been advertised, City Council action was required for the withdrawal. Staff requested that the Planning Commission defer the case to its next meeting so that the withdrawal could be considered by City Council."},
+      {"text": "The same minutes record the deferral of Z26-016/CDP26-006 to the October 21, 2026 Planning Commission meeting, 5-0.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/16348/PC-091626-Minutes",
+       "retrieved": "2026-11-13",
+       "quote": "Commissioner Leverette made a motion to defer case Z26-016/CDP26-006 to October 21, 2026 Planning Commission meeting. Commissioner Dunn seconded the motion. Motion carried 5-0."},
+      {"text": "The October 21, 2026 Planning Commission approved the September 16 minutes with two corrections, neither about this case. In my reading of these minutes, the Old Business they record is Z26-021 and Z26-025, and Z26-016 is not heard. That fits a withdrawal handled by the Council. The November 18, 2026 PC agenda does not list Z26-016 either.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/16368/PC-Mins-10-21-2026",
+       "retrieved": "2026-11-13",
+       "quote": "Commissioner Leverette moved to Approve the September 16, 2026, minutes with the two stated corrections. Motion carried 7-0."},
+      {"text": "The staff report finds industrial use unsuitable because the abutting properties are zoned and used as residential. This is a site condition and will face any industrial buyer, not just this applicant.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+       "retrieved": "2026-11-13",
+       "quote": "The proposed zoning will not permit a use that is suitable for development of adjacent and nearby properties because abutting properties are zoned and utilized as residential."},
+      {"text": "The staff report quotes the adopted 2026 Comprehensive Plan's finding against industrial next to legacy residential, the policy behind the denial recommendation.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+       "retrieved": "2026-11-13",
+       "quote": "Industrial next to legacy residential has created incompatible development adjacencies leading to transportation and quality of life concerns"},
+      {"text": "Staff also find that the parcel has a reasonable economic use under its current AG-1 zoning. That is one of the standards that weighs against a rezoning.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+       "retrieved": "2026-11-13",
+       "quote": "The property does have reasonable economic use as currently zoned."}
+    ],
+    "open_items": [
+      "Confirm with South Fulton planning whether City Council has accepted the withdrawal of Z26-016/CDP26-006 and on what date. Council minutes were not found in the Agenda Center, which lists only ordinances and resolutions for Oct-Nov 2026.",
+      "Ask whether TDC Logistics Company, LLC still holds a contract or option on the parcel after withdrawing. If it lapsed, the owner may be open to another buyer. That helps availability but not entitlement.",
+      "Ask whether the 2026 Comprehensive Plan allows any route to Industrial Zone at this location: a Community Live Work use that tolerates flex or light industrial, or a future-land-use amendment cycle. Staff's reading is that it does not.",
+      "market-1's quote is accurate for July 2026, but the claim ('A developer is pursuing this parcel') no longer matches the September 16, 2026 record. The market verdict signs_developer_pursuing should be read as 'a developer pursued and is withdrawing'.",
+      "utilities-1: the quote shows one sewer segment's attributes. It does not show that the segment lies inside the parcel; that rests on the first pass's own overlay. If 8-inch gravity sewer crosses the site, its easement may limit the building pad. Ask Fulton County Public Works.",
+      "A search result title named an MLS listing on a broker's site for 'Washington Road, South Fulton GA 30349'. It was not opened: it is not a public-agency source, and it is unknown whether it is this parcel. A person could check whether the parcel is listed."
+    ]
+  }
+}

@@ -1,8 +1,8 @@
 # Lead check: parcel 07 260001350151, run fulton-2026-11-13-screens
 
-**In one line (the launching session's reading, not checked):** Part of a 78.3-acre assemblage mostly held by the same partnership, with a 2024 outdoor-storage rezoning that staff recommended denying and the Planning Commission deferred (outcome not found); city memos describe the assemblage as currently a landfill. Ask South Fulton for the case outcome before anything else.
+**In one line (the launching session's reading, not checked):** Part of a 78.3-acre assemblage mostly held by the same partnership, under a 2024 outdoor-storage rezoning that staff and the Planning Commission recommended denying (no council decision found; see lead 07 260001221014). City memos describe the assemblage as currently a landfill. Ask South Fulton for the case outcome before anything else.
 
-Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. Words in double quotation marks were on the linked page when it was fetched (2026-11-13T19:24:13Z). Everything else is an agent's own reading, not checked.
+Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. Words in double quotation marks were on the linked page when it was fetched (2026-11-13T22:09:49Z). Everything else is an agent's own reading, not checked.
 
 ## What the documents say
 

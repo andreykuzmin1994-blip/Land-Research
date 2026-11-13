@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "parcel_id": "13 0034  LL1135",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "rezoning_needed",
+      "claims": [
+        {
+          "text": "The city's July 2026 staff report on case Z26-016/CDP26-006 says this parcel is zoned AG-1 today, and that the applicant asked to rezone it to M-1 Light Industrial (with a plan amendment) to build a 280,000 sq ft light industrial building. Industrial use here needs that rezoning.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "The applicant is requesting to rezone from the AG-1 (Agricultural District) to M-1 (Light Industrial District) and is requesting a Comprehensive Development Plan amendment from Community Live Work to Industrial Zone for the purpose of constructing a 280,000 square foot light industrial building."
+        },
+        {
+          "text": "The same report quotes the South Fulton Zoning Code's intent for M-1, the district requested: it names warehousing and distributing. The AG-1 and M-1 use tables themselves (Municode) were not read.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "The M-1 District is intended to provide locations for light industrial uses and industrial parks which meet the needs for processing, manufacturing, fabricating, warehousing, distributing, research, flex office-warehouse uses, and office uses associated with industrial uses."
+        },
+        {
+          "text": "Land to the west is already M-1 (and part lies in the City of East Point), per the same report's adjacent-zoning list.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "West: M-1 (Light Industrial District); AG-1 (Agricultural); City of East Point"
+        }
+      ],
+      "open_items": [
+        "The AG-1 and M-1 use tables are on Municode (known wall) and were not quoted. Ask South Fulton planning whether any warehouse or distribution use is possible in AG-1 (it almost certainly is not) and what conditions staff would attach to an M-1 approval here.",
+        "The staff report lists prior zoning cases as N/A; the city's case list only goes back to 2017. Ask whether any pre-2017 Fulton County zoning conditions bind the parcel."
+      ]
+    },
+    "plans": {
+      "verdict": "against",
+      "claims": [
+        {
+          "text": "The adopted 2026 South Fulton Comprehensive Plan puts this parcel in the Community Live Work character area, which staff say does not support industrial zoning; the applicant had to ask for a plan amendment to Industrial Zone.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "The subject property has a future land use designation of Community Live Work as designated in the 2026 South Fulton Comprehensive Plan, which does not support the proposed zoning."
+        },
+        {
+          "text": "Staff recommended denial of both the plan amendment and the rezoning.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "Staff can't recommend approval of an amendment to the future land use for this site, and subsequently cannot recommend approval for the zoning designation."
+        },
+        {
+          "text": "Staff cite a 2026 Comprehensive Plan strategy that keeps industrial along existing industrial corridors and away from homes and schools, and say this site would break it.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "Locate and limit industrial development along existing industrial zones near major transportation corridors (Fulton Industrial Boulevard, I-85) and away from sensitive land uses (residential areas, schools)."
+        },
+        {
+          "text": "Neighbours named in the staff report: an apartment complex, a place of worship, a retail centre across Washington Road, apartments zoned A to the north and the Silverwood Estates single-family subdivision (R-3) to the south.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "The proposed site sits between an apartment complex and a place of worship, and is across the street from a retail center."
+        },
+        {
+          "text": "The same report's adjacent-zoning list gives the south side as R-3 single-family (Silverwood Estates) and AG-1.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "South: R-3 (Single-Family Dwelling District); Silverwood Estates Subdivision, AG-1"
+        },
+        {
+          "text": "At the July 15, 2026 Planning Commission no hearing was held: the applicant had asked for a deferral and was absent, and the Commission deferred the case 4-1 to September 16, 2026.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15930/PC-mins-7-15-26",
+          "retrieved": "2026-11-13",
+          "quote": "Outcome: Deferral approved 4–1. The cases were continued to September 16, 2026."
+        },
+        {
+          "text": "The city's Filed Zoning Cases list (read 2026-11-13) still shows only the July 15, 2026 Planning Commission date for this case, with the Mayor and Council column empty: no final decision is posted there.",
+          "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+          "retrieved": "2026-11-13",
+          "quote": "Z26-016/CDP26-006 0 Washington Rd Staff Report 07/15/2026"
+        },
+        {
+          "text": "The city's Agenda Center list of 2026 ordinances (read 2026-11-13) runs to the October 27, 2026 council meeting (this entry, for another case, is the latest) and holds no ordinance for Z26-016: no adopted rezoning of this parcel was found there.",
+          "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter",
+          "retrieved": "2026-11-13",
+          "quote": "ORD2026-038_ Z26-019-U26-009 3985 Roosevelt Hwy"
+        },
+        {
+          "text": "Moratorium: the only one found is a data-center moratorium (not warehouses), extended by the council to September 9, 2026; it has lapsed by its own terms.",
+          "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/ViewFile/Agenda/_05122026-1832",
+          "retrieved": "2026-11-13",
+          "quote": "including all provisions of Resolution RES2025-094, be extended until September 9, 2026."
+        },
+        {
+          "text": "The replacement data-center ordinance (TA26-003) forwarded by the Planning Commission in July 2026 allows data centers only by special use permit, and the Commission asked to limit them to M-2; a data-center use here would face that route on top of the rezoning.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15930/PC-mins-7-15-26",
+          "retrieved": "2026-11-13",
+          "quote": "Data centers allowed only through special-use permits."
+        }
+      ],
+      "open_items": [
+        "Find the outcome of the September 16, 2026 Planning Commission hearing and of any Mayor and Council hearing on Z26-016/CDP26-006 (minutes not found online; a search result title on a third-party summary site, citizenportal.ai, mentions Sept. 16 votes but was not opened). Was it denied, deferred again or withdrawn?",
+        "No ARC Development of Regional Impact review was looked up for this site; 280,000 sq ft may be under the DRI threshold. Ask whether a DRI was filed.",
+        "Read the 2026 Comprehensive Plan's Community Live Work text directly (only the staff report's summary was read)."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {
+          "text": "Sewer, at the site: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 1,500 ft of the brief's map point (-84.494943, 33.62824, inside the parcel), returns 61 segments in the Camp Creek basin. By my overlay with the county parcel shape, 15 active 8-inch gravity segments (about 2,700 ft) lie at least partly inside the parcel; this one, SPSMCC2800940, lies wholly inside.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.494943%2C33.62824&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"FacilityID\":\"SPSMCC2800940\",\"UpID\":\"SMCC2800940\",\"DownID\":\"SMCC2800930\",\"DiElevation\":-999.99,\"DiDepth\":-999.99,\"DiAngle\":999.99,\"UpSInvert\":971.75,\"DnSInvert\":969.16,\"Location\":null,\"WarrantyDate\":null,\"LegacyID\":null,\"Condition\":\"GOOD\",\"ConditionDate\":null,\"InstallDate\":null,\"Crossing\":\"NONE\",\"Basin\":\"CAMP CREEK\",\"SubBasin\":\"CC30\",\"UpSize\":\"8\",\"UpMaterial\":\"VC\""
+        },
+        {
+          "text": "Sewer, service area: the county's service area layer (layer 16), asked at the same point, answers Fulton County, sewer, service available.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.494943%2C33.62824&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""
+        },
+        {
+          "text": "Water, not shown: the county's Water Pipe layer (layer 11), asked for pipes within 1,500 ft of the same point, returns an empty feature list. Fulton County does not run water in south Fulton, so this says only that no county water map covers the site; the water provider's map (probably City of Atlanta Watershed Management, or East Point) was not read.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.494943%2C33.62824&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"
+        }
+      ],
+      "open_items": [
+        "Ask the water provider for Washington Road (likely City of Atlanta Department of Watershed Management, possibly East Point) for the nearest main, size and fire flow.",
+        "Ask Fulton County Public Works about sewer capacity in the Camp Creek basin (sub-basins CC27-CC30) and whether the 8-inch lines crossing the site sit in easements that would constrain the building pad.",
+        "Staff's standard-of-review answer says the proposal could burden existing streets, utilities or schools; ask what utility concern, if any, staff had."
+      ]
+    },
+    "market": {
+      "verdict": "signs_developer_pursuing",
+      "claims": [
+        {
+          "text": "A developer is pursuing this parcel: the July 15, 2026 Planning Commission minutes record the rezoning application as made by TDC Logistics Company, LLC, a company, not the individual owner of record, for a 280,000 sq ft industrial building on 38.94 acres at 0 Washington Road.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15930/PC-mins-7-15-26",
+          "retrieved": "2026-11-13",
+          "quote": "An application by TDC Logistics Company, LLC requesting a rezoning from AG-1 (Agricultural District) to M-1 (Light Industrial Zoning District) and a Future Land Use Amendment from Community Live-Work to Industrial Zone to develop an industrial building of 280,000 square feet on 38.94 acres at 0 Washington Road"
+        },
+        {
+          "text": "The staff report confirms the case is on this exact parcel (13 0034 LL1135, 38.94 acres, west side of Washington Road).",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "The property consists of one parcel currently known as 0 Washington Road (parcel number 13 0034 LL1135) to contain a proposed development site totaling 38.94 acres, located on the west side of Washington Road"
+        },
+        {
+          "text": "The application is filed through an attorney/agent, and the applicant held its own community meeting on June 29, 2026, where its presenter fielded traffic and air-quality questions.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "Status of Applicant: Attorney/Agent"
+        },
+        {
+          "text": "The applicant's presenter at that meeting argued Washington Road suits truck traffic.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15876/Z26-016-CDP26-006-0-Washington-Road-rm",
+          "retrieved": "2026-11-13",
+          "quote": "replied that Washington Road is an existing 4-lane road, intentionally built for handling commercial and residential traffic."
+        },
+        {
+          "text": "The applicant itself asked for the July hearing to be put off to September 16, 2026 and did not attend: its commitment after the staff denial recommendation is not shown.",
+          "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15930/PC-mins-7-15-26",
+          "retrieved": "2026-11-13",
+          "quote": "The applicant requested that the case be deferred to the September 16, 2026, Planning Commission meeting and was not present at the July meeting."
+        },
+        {
+          "text": "The county parcel record (queried by parcel id) still shows vacant land with no improvement value and the individual owner, so no recorded sale to the applicant shows on the tax roll yet; the application by a company suggests a contract or option, which is my inference.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200034%20%20LL1135%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"TotAssess\":224840,\"LandAssess\":224840,\"ImprAssess\":0,\"TotAppr\":562100,\"LandAppr\":562100,\"ImprAppr\":0,\"LUCode\":\"100\",\"ClassCode\":\"A5\""
+        }
+      ],
+      "open_items": [
+        "Ask whether TDC Logistics Company, LLC holds a purchase contract or option on the parcel and when it expires; a search summary linked TDC to a national developer's development arm, which was not verified.",
+        "If the rezoning was denied or withdrawn after September 16, 2026, the contract may have lapsed and the owner may be open to another buyer; if it is still pending, the parcel is tied up.",
+        "Listing sites were not checked (the rules bar the main commercial listing sites by any route)."
+      ]
+    },
+    "owner": {
+      "verdict": "individual_or_family",
+      "claims": [
+        {
+          "text": "The county parcel record, queried by parcel id, names an individual owner with an Atlanta mailing address (the brief gives the last recorded sale as 1996).",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2713%200034%20%20LL1135%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Owner\":\"LONG ANTHONY \",\"OwnerAddr1\":\"1520 S GORDON ST\""
+        }
+      ],
+      "open_items": [
+        "Pull the current deed and any recorded option or memorandum of contract with the Fulton County Clerk of Superior Court; the tax class A5 (agricultural) also raises whether a conservation-use covenant applies, with a rollback penalty on a change of use."
+      ]
+    }
+  }
+}

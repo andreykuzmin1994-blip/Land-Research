@@ -1,8 +1,8 @@
 # Lead check: parcel 09F060000350917, run fulton-2026-11-13-screens
 
-**In one line (the launching session's reading, not checked):** The owner appears to run a plant close by (the agents' reading, not a kept quote), and the skeptic saw what looks like a trailer yard on county aerials (seen, not verifiable). Drive it or open the aerials and confirm who uses the land before any outreach.
+**In one line (the launching session's reading, not checked):** The owner runs a dry pet food plant at 5001 Fayetteville Rd, about 490 ft away by the agents' measurement, and the skeptic saw what looks like a trailer yard on county aerials (seen, not verifiable). Drive it or open the aerials and confirm who uses the land before any outreach.
 
-Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. Words in double quotation marks were on the linked page when it was fetched (2026-11-13T17:47:11Z). Everything else is an agent's own reading, not checked.
+Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. Words in double quotation marks were on the linked page when it was fetched (2026-11-13T22:11:42Z). Everything else is an agent's own reading, not checked.
 
 ## What the documents say
 
