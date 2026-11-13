@@ -95,34 +95,6 @@ class ZoningTests(unittest.TestCase):
         self.assertEqual(zoning.flu_category("Conserve/ Preserve"), "conservation")
         self.assertEqual(zoning.flu_category("Rural/ Agricultural Neighborhood"), "rural")
 
-    def test_atlanta_future_land_use_is_the_2025_development_pattern(self):
-        # Leads #156 and #195 (2026-11-12): LANDUSEDES said "Industrial" where
-        # the plan passed in July 2025 (field NDP) says Low Density Residential.
-        from screener import fulton
-        src = next(s for s in fulton.ZONING_SOURCES if s["name"] == "Atlanta future land use")
-        self.assertEqual(src["flu_field"], "NDP")
-        p = {"zoning": None, "flu": None}
-        checks._apply_zoning(p, src, {"NDP": "LDR", "LANDUSEDES": "Industrial",
-                                      "DP_NAME": "High Density Mixed Use"})
-        self.assertEqual((p["flu"], p["flu_source"]), ("Low Density Residential",
-                                                       "Atlanta future land use"))
-        self.assertEqual(zoning.flu_category(p["flu"]), zoning.RESIDENTIAL)
-        self.assertEqual(zoning.entitlement(zoning.zoning_category("R-4"),
-                                            zoning.flu_category(p["flu"]), 3)[0], "hard")
-        # Every code in the layer's legend has a name the categories read.
-        cats = {code: zoning.flu_category(name) for code, name in src["flu_labels"].items()}
-        self.assertEqual({c for c, k in cats.items() if k == zoning.INDUSTRIAL}, {"I", "I-Flex", "IF"})
-        self.assertEqual(cats["OS"], "conservation")
-        for code in ("LDR", "MDR", "HDR", "LLSF", "MLSF", "R-Flex"):
-            self.assertEqual(cats[code], zoning.RESIDENTIAL, code)
-        # An unknown code is kept as it is; a source with no table is unchanged.
-        p = {"zoning": None, "flu": None}
-        checks._apply_zoning(p, src, {"NDP": "NEW-CODE"})
-        self.assertEqual(p["flu"], "NEW-CODE")
-        p = {"zoning": None, "flu": None}
-        checks._apply_zoning(p, {"name": "x", "flu_field": "F"}, {"F": "LDR"})
-        self.assertEqual(p["flu"], "LDR")
-
     def test_entitlement(self):
         self.assertEqual(zoning.entitlement("industrial", "unknown", 0)[0], "by_right")
         self.assertEqual(zoning.entitlement("rezonable", "industrial", 0)[0], "likely")

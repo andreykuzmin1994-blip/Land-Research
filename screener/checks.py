@@ -566,8 +566,6 @@ def _apply_zoning(p: dict[str, Any], src: dict[str, Any], attrs: dict[str, Any])
         p["zoning"] = z
         p["zoning_desc"] = val(src.get("desc_field"))
         p["zoning_source"] = src["name"]
-    if flu and src.get("flu_labels"):
-        flu = src["flu_labels"].get(flu, flu)       # a layer that stores codes (Atlanta's NDP)
     if flu and not p["flu"]:
         p["flu"] = flu
         p["flu_source"] = src["name"]
