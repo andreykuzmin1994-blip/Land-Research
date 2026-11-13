@@ -228,6 +228,22 @@ class MiscTests(unittest.TestCase):
         self.assertFalse(same_owner("LEE JOHN", "LEE JAMES"))
         self.assertTrue(same_owner("HARVISCHAK DENNIS", "DENNIS HARVISCHAK REVOCABLE TRUST THE"))
         self.assertFalse(same_owner("PALMETTO BECKNELL INDUSTRI", "BOWEN ROAD ASSOCIATES LLC"))
+        # The deed file's 30-character cut can leave a stray letter or half a
+        # tail (reviews/36 11): the name is also tried without its last word.
+        self.assertTrue(same_owner("WESTSIDE PINES LANDS COMPANY I", "WESTSIDE PINES LANDS CO INC"))
+        self.assertTrue(same_owner("RIVERBEND ACRE, LLC A DELAWARE", "RIVERBEND ACRE, LLC"))
+        self.assertTrue(same_owner("RIVERBEND ACRES 2, LLC A DELAW", "RIVERBEND ACRES 2 LLC"))
+        # Only the deed seller, and only when it fills all 30 characters, is
+        # cut back (reviews/36 13): never the tax-roll name, never a name of
+        # 29 whose 30th character was a space.
+        self.assertFalse(same_owner("RIVERBEND ACRES 2 LLC", "RIVERBEND ACRES 2, LLC A DELAW"))
+        self.assertFalse(same_owner("MAPLE CROSSING", "MAPLE CROSSING RIVERSIDE TOWNHOMES LLC"))
+        self.assertFalse(same_owner("SMITH JOHN WILLIAM ALEXANDER JR", "SMITH JOHN WILLIAM ALEXANDER SR"))
+        self.assertFalse(same_owner("NORTHGATE PINES LAND PARTNERS", "NORTHGATE PINES LAND LTD"))
+        self.assertEqual(len("NORTHGATE PINES LAND PARTNERS"), 29)
+        self.assertFalse(same_owner("WESTSIDE PINES COMPANY I", "WESTSIDE PINES CO INC X"))
+        self.assertFalse(same_owner("WESTSIDE PINES LANDS COMPANY I", "NORTHGATE PINES LANDS CO INC"))
+        self.assertFalse(same_owner("SOUTH FULTON LAND PARTNERS LL", "SOUTH FULTON LAND CO"))
 
     def test_dates_and_jurisdictions(self):
         self.assertIsNone(_parse_date("0002-01-01 00:00:00"))

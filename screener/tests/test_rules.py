@@ -416,12 +416,14 @@ class FakeRepo:
         self.history: list[tuple[str, list[str]]] = []
         self.dirty: list[str] = []
         self.broken = False
+        self.gone: set[str] = set()          # commits reset away, still known to git
 
     def commit(self, name, *files):
         self.history.append((name, list(files) or ["screener/rank.py"]))
 
     def reset(self, name):
         names = [c for c, _ in self.history]
+        self.gone.update(names[names.index(name) + 1:])
         self.history = self.history[:names.index(name) + 1]
 
     def git(self, *args):
@@ -448,9 +450,12 @@ class FakeRepo:
             if only and not under:                       # a single file asked about
                 return "\n".join(f for f in files if f in only)
             return "\n".join(f for f in files if not under or f.startswith("screener/"))
-        if args[0] == "log" and "--format=%h" in args:
+        if args[:3] == ("rev-parse", "--verify", "--quiet"):    # a logged short hash, made full
+            short = args[3].removesuffix("^{commit}")
+            return short.ljust(40, "0") if short in names or short in self.gone else ""
+        if args[0] == "log" and "--format=%H" in args:           # full hashes
             first, last = args[-1].split("..")
-            return "\n".join(names[names.index(first) + 1:names.index(last) + 1])
+            return "\n".join(n.ljust(40, "0") for n in names[names.index(first) + 1:names.index(last) + 1])
         if args[0] == "log":
             return "exp: test"
         return ""
@@ -651,7 +656,7 @@ class DecideTests(unittest.TestCase):
         self.assertRegex(ev._rows()[-1]["win_share"], r"^\d\.\d{3}$")
         # The reset takes back the experiment and nothing else.
         hints = [ln for ln in text.splitlines() if ln.startswith("Revert the experiment")]
-        self.assertEqual(hints, ["Revert the experiment: git reset --hard bbb"] * 2)
+        self.assertEqual(hints, ["Revert the experiment: git reset --keep bbb"] * 2)
         # ccc was a discard left in place, so undoing ddd means going back past it.
         self.assertIn("this also takes back 1 earlier discarded experiment(s)", text)
         self.assertNotIn("Do not reset", text)
@@ -670,9 +675,61 @@ class DecideTests(unittest.TestCase):
                     self.repo.history.append(human)
                 self.repo.commit("ccc")
                 self.assertEqual(self.run_decide(3, order=self.bad), 0)
-                last = sys.stdout.getvalue().rstrip().splitlines()[-1]
+                text = sys.stdout.getvalue()
+                last = text.rstrip().splitlines()[-1]
                 self.assertTrue(last.startswith("Do not reset. Stop and ask a human"), last)
-                self.assertNotIn("git reset --hard", last)
+                # No reset command anywhere after the decision (reviews/36 10, finding 2).
+                after = text[text.rindex("DECISION:"):]
+                self.assertNotIn("git reset", after)
+
+    def test_the_reset_hint_uses_keep_and_matches_a_logged_short_hash(self):
+        # reviews/36 10, findings 4 and 5: --keep refuses to drop uncommitted
+        # work; git may print longer short hashes later than it logged them.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertIn("Revert the experiment: git reset --keep aaa", text)
+        self.assertNotIn("--hard", text)
+
+    def test_a_hex_ref_name_in_the_log_stands_for_nothing(self):
+        # reviews/36 15, note 4: a branch named "2026" resolves to a human's commit.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        self.log.write_text(self.log.read_text().replace("\tbbb\t", "\t2026\t"))
+        real = self.repo.git
+        self.repo.git = lambda *a: ("bbb".ljust(40, "0") if a[:3] == ("rev-parse", "--verify", "--quiet")
+                                    and a[3].startswith("2026") else real(*a))
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        self.assertTrue(sys.stdout.getvalue().rstrip().splitlines()[-1].startswith("Do not reset"))
+
+    def test_a_logged_hash_git_cannot_make_full_stands_for_nothing(self):
+        # reviews/36 12, finding 1: an ambiguous or hand-cut row must not
+        # cover a human's commit that happens to share its first letters.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        self.repo.history.append(("bbbe", ["screener/README.md"]))  # a human's, same first letters
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertTrue(text.rstrip().splitlines()[-1].startswith("Do not reset"))
+        self.assertNotIn("git reset", text[text.rindex("DECISION:"):])
+
+    def test_a_logged_row_that_is_no_hash_stands_for_nothing(self):
+        # reviews/36 13, note 2: rev-parse would resolve "HEAD~1" or a branch.
+        self.baseline_then_experiment()                           # aaa baseline, bbb
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)    # bbb: discard, left
+        rows = self.log.read_text().replace("\tbbb\t", "\tHEAD~1\t")
+        self.log.write_text(rows)
+        real = self.repo.git
+        self.repo.git = lambda *a: ("bbb".ljust(40, "0") if a[:3] == ("rev-parse", "--verify", "--quiet")
+                                    and a[3].startswith("HEAD~1") else real(*a))
+        self.repo.commit("ccc")
+        self.assertEqual(self.run_decide(3, order=self.bad), 0)
+        text = sys.stdout.getvalue()
+        self.assertTrue(text.rstrip().splitlines()[-1].startswith("Do not reset"))
 
     def test_the_reset_hint_keeps_a_humans_commit_made_since_the_best_run(self):
         self.baseline_then_experiment()
@@ -681,7 +738,7 @@ class DecideTests(unittest.TestCase):
         self.assertEqual(self.run_decide(3, order=self.bad), 0)
         text = sys.stdout.getvalue()
         self.assertIn("DECISION: DISCARD", text)
-        self.assertTrue(text.rstrip().endswith("Revert the experiment: git reset --hard bbb"))
+        self.assertTrue(text.rstrip().endswith("Revert the experiment: git reset --keep bbb"))
         self.assertNotIn("also removes", text)
 
     def test_documents_and_tests_may_change_since_the_best_run(self):

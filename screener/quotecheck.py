@@ -147,6 +147,9 @@ PDFTOTEXT_TIMEOUT_S = 300
 CONTEXT_CHARS = 80
 ECHO_WORDS = 3                   # this many quote words in a row in the address: an echo
 ECHO_TOKEN_CHARS = 12            # or one word this long (with 8+ letters)
+ECHO_SLUG_CHARS = 40             # or this much of the quote's words, whatever separates them
+# Path words that mark a page built from the request (a search or results page).
+REQUEST_PATH_WORDS = frozenset({"search", "query", "find", "results", "lookup"})
 UNKNOWN = "unknown"
 # Never fetched: their terms prohibit automated use (README, "What it can't
 # tell you"; CLAUDE.md "NEVER scrape CoStar"). A name anywhere in the
@@ -203,6 +206,7 @@ class Fetched:
     ctype: str
     final_url: str
     status: int
+    hops: list[str] = field(default_factory=list)   # every address asked, the first included
 
 
 @dataclass
@@ -354,43 +358,103 @@ def _query_words(url: str) -> tuple[list[str], list[str]]:
     return _tokens(_decoded(parts.query + " " + parts.fragment)), _tokens(_decoded(values))
 
 
+_REQUEST = "(?:" + "|".join(sorted(REQUEST_PATH_WORDS)) + ")"
+REQUEST_SEGMENT = re.compile(_REQUEST + r"(?:[-_](?:" + _REQUEST[3:-1] + r"|page|for))*"
+                             r"(?:\.[a-z0-9]{1,6})*")
+DOCUMENT_SUFFIXES = (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".rtf", ".odt")
+
+
+def _path_words(url: str, document_names: bool = True) -> tuple[list[str], list[str]]:
+    """The words of the address's path; and the words in it that look typed.
+    Typed: the segments after a segment that names a request
+    ("/search/<words>", "/search-results.php/<words>": REQUEST_SEGMENT), and
+    a segment with an encoded space of any kind unless it is the file name of a document
+    ("Article%2012%20Light%20Industrial.pdf"). A request word inside a
+    slug ("hearing-results") or as the last segment (ArcGIS ".../query")
+    types nothing."""
+    try:
+        path = urllib.parse.urlsplit(url).path
+    except ValueError:
+        return [], []
+    segments = [seg for seg in path.split("/") if seg]
+    typed: list[str] = []
+    after_request = False
+    for n, seg in enumerate(segments):
+        words = _tokens(_decoded(seg))
+        # Any encoded space: +, %20, %09, %C2%A0, %E3%80%80, %2B (reviews/35 13, F4).
+        # _decoded turns a raw "+" into a space and leaves a decoded one.
+        spaced = " " in _decoded(seg) or "+" in _decoded(seg)
+        document = (document_names and n == len(segments) - 1
+                    and _decoded(seg).endswith(DOCUMENT_SUFFIXES))
+        if after_request or (spaced and not document):
+            typed += words
+        # A request segment is request words joined by - or _ (with "page" or
+        # "for"), then any file extension: search, search.php, search.json,
+        # search-results, search-page, search;jsessionid=1 (also encoded).
+        # Not a slug that begins with one ("find-your-zoning": reviews/35 13
+        # F3, 14 F3).
+        if REQUEST_SEGMENT.fullmatch(_decoded(seg).split(";", 1)[0].strip(" /")):
+            after_request = True
+    return _tokens(_decoded(path)), typed
+
+
+def _shared_runs(words: list[str], seq: list[str]) -> list[int]:
+    """Where in `words` a run of ECHO_WORDS of them, two of four letters or
+    more, also stands in `seq` in the same order."""
+    runs = {tuple(seq[i:i + ECHO_WORDS]) for i in range(len(seq) - ECHO_WORDS + 1)}
+    return [i for i in range(len(words) - ECHO_WORDS + 1)
+            if tuple(words[i:i + ECHO_WORDS]) in runs
+            and sum(1 for w in words[i:i + ECHO_WORDS] if sum(ch.isalpha() for ch in w) >= 4) >= 2]
+
+
 def words_shared_with_url(quote: str, url: str) -> list[str]:
     """The quote's words of four or more letters that are also in the query
-    part of its address (after the "?"), in the quote's order. Saved with a
-    kept claim for the skeptic."""
-    in_query = set(_query_words(url)[0])
+    part of its address (after the "?"), or in a run of ECHO_WORDS words it
+    shares with the path, in the quote's order. Saved with a kept claim for
+    the skeptic, and flagged in lead.md."""
+    words = _tokens(normalise(quote))
+    shared = set(_query_words(url)[0])
+    path, _ = _path_words(url)
+    for i in _shared_runs(words, path):
+        shared.update(words[i:i + ECHO_WORDS])
     seen: list[str] = []
-    for word in _tokens(normalise(quote)):
-        if sum(ch.isalpha() for ch in word) >= 4 and word in in_query and word not in seen:
+    for word in words:
+        if sum(ch.isalpha() for ch in word) >= 4 and word in shared and word not in seen:
             seen.append(word)
     return seen
 
 
-def quote_is_from_url(quote: str, url: str) -> bool:
+def quote_is_from_url(quote: str, url: str, document_names: bool = True) -> bool:
     """Is the quote made of its own address? True when the address holds
-    MIN_QUOTE_CHARS in a row of the quote anywhere; or when its query part
-    holds ECHO_WORDS of the quote's words in a row (two of them of four
-    letters or more) or one of its words of ECHO_TOKEN_CHARS or more with
-    eight letters or more. A page that shows its request back would show
-    them. The path is held only to the first rule: a document's file name
-    often shares words with the document ("Comprehensive-Plan.pdf")."""
+    MIN_QUOTE_CHARS in a row of the quote anywhere, or ECHO_SLUG_CHARS of
+    the quote's words whatever separates them ("_", "-", "+", "."); or when
+    its query part holds ECHO_WORDS of the quote's words in a row (two of
+    them of four letters or more) or one of its words of ECHO_TOKEN_CHARS or
+    more with eight letters or more. A page that shows its request back
+    would show them. The path is held to the same run of words only where it
+    looks typed (_path_words: an encoded space, or what follows a "search"
+    or "results" segment): a
+    document's file name often shares words with the document
+    ("2045-Comprehensive-Plan-Update.pdf"), so there a shared run is flagged,
+    not dropped (words_shared_with_url)."""
     nq = normalise(quote)
     if any(nq[i:i + MIN_QUOTE_CHARS] in form
            for form in (_decoded(url), normalise(urllib.parse.unquote(url)))
            for i in range(max(1, len(nq) - MIN_QUOTE_CHARS + 1))):
         return True
     words = _tokens(nq)
+    joined, in_url = " ".join(words), " ".join(_tokens(_decoded(url)))
+    if len(joined) >= ECHO_SLUG_CHARS and any(
+            joined[i:i + ECHO_SLUG_CHARS] in in_url
+            for i in range(len(joined) - ECHO_SLUG_CHARS + 1)):
+        return True
     in_query, values = _query_words(url)
     if any(len(w) >= ECHO_TOKEN_CHARS and sum(ch.isalpha() for ch in w) >= 8 and w in in_query
            for w in words):
         return True
-    runs = {tuple(seq[i:i + ECHO_WORDS]) for seq in (in_query, values)
-            for i in range(len(seq) - ECHO_WORDS + 1)}
-    for i in range(len(words) - ECHO_WORDS + 1):
-        run = tuple(words[i:i + ECHO_WORDS])
-        if run in runs and sum(1 for w in run if sum(ch.isalpha() for ch in w) >= 4) >= 2:
-            return True
-    return False
+    if _shared_runs(words, in_query) or _shared_runs(words, values):
+        return True
+    return bool(_shared_runs(words, _path_words(url, document_names)[1]))
 
 
 class Robots:
@@ -545,6 +609,7 @@ class Fetcher:
         site. Every hop passes url_problem, address_problem, robots.txt
         (unless this is the robots.txt itself) and the host's pace."""
         site = site_of(url)
+        asked: list[str] = []
         for hop in range(MAX_REDIRECTS + 1):
             why = url_problem(url)
             if not why and site_of(url) != site:
@@ -553,6 +618,7 @@ class Fetcher:
             if why:
                 raise FetchError(why if hop == 0 else f"it redirects to an address not fetched: {why}")
             self.wait(url)
+            asked.append(url[:2000])
             status, headers, body = self.open_once(url, cap)
             if status in (301, 302, 303, 307, 308):
                 target = headers.get("location", "")
@@ -563,7 +629,7 @@ class Fetcher:
                 except ValueError:
                     raise FetchError(f"HTTP {status} to an unreadable address") from None
                 continue
-            return Fetched(body, headers.get("content-type", "").lower(), url[:2000], status)
+            return Fetched(body, headers.get("content-type", "").lower(), url[:2000], status, asked)
         raise FetchError(f"more than {MAX_REDIRECTS} redirects")
 
     def wait(self, url: str) -> None:
@@ -674,6 +740,8 @@ def load_page(url: str, pages: Path, fetcher: Fetcher) -> Page:
         "final_url": clean(got.final_url, 2000), "status": got.status, "bytes": len(got.body),
         "sha256": hashlib.sha256(got.body).hexdigest(),
     }
+    if len(got.hops) > 1:      # the echo rules are run on every address asked
+        record["redirected_from"] = [clean(h, 2000) for h in got.hops[:-1]]
     if is_pdf:
         units = _pdf_units(path)
         if isinstance(units, str):
@@ -709,6 +777,7 @@ def find_quote(quote: str, page: Page) -> dict[str, Any] | None:
     around it (and the PDF page and text order), or None when it is not
     there."""
     nq = normalise(quote)
+    texts = {(number, order): text for number, order, text in page.units}
     for number, order, text in page.units:
         at = text.find(nq)
         while at != -1:
@@ -717,8 +786,15 @@ def find_quote(quote: str, page: Page) -> dict[str, Any] | None:
             back = _cut(nq[-1], text[end] if end < len(text) else " ",
                         text[end + 1] if end + 1 < len(text) else " ")
             if not front and not back:
-                found: dict[str, Any] = {"context_before": text[max(0, at - CONTEXT_CHARS):at],
-                                         "context_after": text[end:end + CONTEXT_CHARS]}
+                before = text[max(0, at - CONTEXT_CHARS):at]
+                if number and len(before) < CONTEXT_CHARS and (number - 1, order) in texts:
+                    # The end of the PDF page before: a "not" there still shows.
+                    tail = texts[(number - 1, order)][-(CONTEXT_CHARS - len(before)):]
+                    before = f"{tail} (page break) {before}"
+                after = text[end:end + CONTEXT_CHARS]
+                if number and len(after) < CONTEXT_CHARS and (number + 1, order) in texts:
+                    after = f"{after} (page break) {texts[(number + 1, order)][:CONTEXT_CHARS - len(after)]}"
+                found: dict[str, Any] = {"context_before": before, "context_after": after}
                 if number:
                     found["pdf_page"], found["pdf_order"] = number, order
                 return found
@@ -834,6 +910,12 @@ def validate(findings: Any, skeptic_doc: Any = None) -> list[tuple[str, dict[str
     return out
 
 
+def _addresses(page: Page) -> list[str]:
+    """Every address the fetch asked after the cited one, the final one last."""
+    hops = page.record.get("redirected_from", [])[1:]
+    return hops + ([page.record["final_url"]] if page.record.get("final_url") else [])
+
+
 def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None) -> Result:
     """Check every claim; return the checked copy and what was dropped."""
     sections = validate(findings, skeptic_doc)
@@ -866,6 +948,14 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
                     page = cache[url]
                     if page.problem:
                         why = f"page {page.problem}"
+                    elif any(quote_is_from_url(claim["quote"], hop) for hop in _addresses(page)):
+                        why = "the quote repeats words from an address the request was redirected to"
+                    elif not page.record.get("file", "").endswith(".pdf") and any(
+                            quote_is_from_url(claim["quote"], a, document_names=False)
+                            for a in [claim["source_url"], *_addresses(page)]):
+                        # A ".pdf" name that did not answer with a PDF is no
+                        # document's file name (reviews/35 12, F2).
+                        why = "the quote repeats words from its own source_url"
                     else:
                         found = find_quote(claim["quote"], page)
                         if found is None:
@@ -874,9 +964,12 @@ def check(findings: Any, pages: Path, fetcher: Fetcher, skeptic_doc: Any = None)
                 result.dropped.append({"id": claim_id, "section": name, "reason": why,
                                        "claim": claim if isinstance(claim, dict) else repr(claim)})
             else:
+                shared: list[str] = []
+                for address in [claim["source_url"], *_addresses(cache[url])]:
+                    shared += [w for w in words_shared_with_url(claim["quote"], address)
+                               if w not in shared]
                 kept.append({"id": claim_id, **claim, **found,
-                             "words_shared_with_url": words_shared_with_url(
-                                 claim["quote"], claim["source_url"]),
+                             "words_shared_with_url": shared,
                              "page_file": cache[url].record["file"]})
         target["claims"] = kept
         result.kept += len(kept)
@@ -903,33 +996,108 @@ _QUOTE_MARKS = {ord(ch): "'" for ch in (
     '"`\u00ab\u00bb\u02ba\u02dd\u02ee\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u2032\u2033'
     '\u2034\u2035\u2036\u2037\u2039\u203a\u275b\u275c\u275d\u275e\u276e\u276f\u2e42\u301d\u301e'
     '\u301f\uff02\uff07')}
-_PLAIN_KEPT = " .,;:!?()'-/%$+="
-_ADDRESS = re.compile(r"(?i)\b(?:https?|ftp)\s*:\s*/\s*/\s*\S*|\bwww\s*\.\s*\S+"
-                      r"|\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b(?:/\S*)?")      # and bare host names
+_PLAIN_KEPT = " .,;:!?()'-/%$+=\u00a7"
+# Schemes removed with whatever follows their colon. Not tel:, about:, blob:
+# or ws:, which read as prose ("Tel:404-555-0100", "WS:12 mph"); a blob:
+# address carries an https: one, which goes (reviews/35 18).
+SCHEMES = ("https", "http", "ftps", "ftp", "sftp", "javascript", "vbscript", "mailto", "sms",
+           "smb", "webcal", "view-source", "magnet", "search-ms", "ssh", "telnet", "ldap",
+           "gopher", "nntp", "intent", "itms-services")
+_LABEL = r"[^\W_](?:[^\W_]|-)*"
+_HOST = _LABEL + r"(?:\." + _LABEL + r")+"                   # dotted, any script
+# A host name ends in a label of letters (or punycode): "4.2.1.3", "1.1" and
+# "S.E.1" are numbers, not hosts.
+_NAMED_HOST = r"(?:" + _LABEL + r"\.)+(?:[^\W\d_]{2,}|xn--[a-z0-9-]+)"
+_ADDRESS = re.compile(
+    r"(?i)\S*:/\s*/\S*"                                  # any scheme, whatever stands before it
+    r"|\S*[/\\]\s*[/\\]\s*" + _HOST + r"\S*"            # //host or \\host, spaced schemes too
+    r"|(?<![^\s(])//(?=[^\W_])\S*"                          # //intranet/x, //3405803785?x
+    r"|\S*www\s*\.\s*\S+"
+    # a numeric host with a port, query or fragment, or a path that is no
+    # second dotted number; the hex form
+    r"|\b\d{1,3}(?:\.\d{1,3}){3}(?:[:?#]|/(?!\d+(?:\.\d+)+\b))\S*"
+    # a dotted host with a hex part: 0xcb.0.113.9/x, 0xcb.29961/x
+    r"|\b(?=[0-9a-fx.]*0x)(?:0x[0-9a-f]+|\d+)(?:\.(?:0x[0-9a-f]+|\d+)){1,3}\S*"
+    # IPv6: a "::" form standing alone, or all eight groups
+    r"|(?<![\w:])(?=[0-9a-f:]*::)[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}(?![\w:])"
+    r"|\b(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}\b"
+    # a scheme a browser or the system opens, with anything but a space
+    # straight after its colon (SCHEMES; "https:3405803785/x", "smb:host/x");
+    # file: only with a slash, data: only with a media type, so "Case
+    # file:A-12" and "Source data:2026" stay (reviews/35 17, 18)
+    r"|\b(?:" + "|".join(SCHEMES) + r"):\S+|\bms-[a-z-]+:\S+|\bfile:/\S*"
+    r"|\bdata:(?:[a-z]+/[a-z0-9.+-]+[;,]|,)\S*"
+    # a named host after http, https or ftp and a colon or slash, with spaces
+    # the reduction left ("https: evil.example"); not "HTTP 1.1", "FTP:
+    # Sec.4.2" or "the www St.Louis office"
+    r"|\b(?:https?|ftps?)\b\s*[:/][\s:/]*" + _NAMED_HOST + r"\S*")
+# Any other dotted word ("clerk.zone", "M-2.No", "St.Louis/Kansas") is split
+# at a dot before a letter instead of removed: every word stays, and nothing
+# can be linked or pasted as an address, though "clerk. zone" can still be
+# read as one (reviews/35 15, 16). A dot before a digit stays: "4.2.1.3".
+_DOTTED = re.compile(r"(?<=[^\W_])\.(?=[^\W\d_])")
+# Latin letters that are no ASCII letter plus marks, and look like no
+# quotation mark: kept, so names and streets read right.
+_LATIN_KEPT = frozenset("\u0141\u0142\u00df\u1e9e\u00d8\u00f8\u00c6\u00e6\u0110\u0111\u00d0\u00f0"
+                        "\u00de\u00fe\u0152\u0153\u0126\u0127\u0131\u014a\u014b")
+_FRACTIONS = re.compile("(?<=\\d)(?=[\u00bc-\u00be\u2150-\u215f\u2189])")
 
 
-def _plain(text: Any, limit: int = 600) -> str:
+def _kept_char(ch: str) -> bool:
+    """ASCII letters and digits, Latin letters with marks, plain punctuation.
+    Other scripts go: their letters include look-alike quotation marks
+    (U+02BB, U+1425, U+05F2) and right-to-left text."""
+    if ch.isascii() or ch in _PLAIN_KEPT:
+        return ch.isalnum() or ch in _PLAIN_KEPT
+    if ch in _LATIN_KEPT:
+        return True
+    # A Latin letter that is an ASCII letter plus marks ("e" + accent). The
+    # Saltillo and click letters are Latin too, and look like quotation marks.
+    base = unicodedata.normalize("NFKD", ch)[0]
+    return ch.isalpha() and base.isascii() and base.isalpha()
+
+
+def _plain(text: Any, limit: int = 600, keep_end: bool = False) -> str:
     """An agent's (or a page's) words made safe to sit in lead.md: one line
     of letters, digits and plain punctuation. No quotation marks but the
-    apostrophe, no markup, no entities, no web or mail addresses. Characters
-    are reduced first and addresses removed after, so nothing removed can
-    leave an address behind. In lead.md only this code writes quotation
+    apostrophe, no markup, no entities, and nothing that can be linked or
+    pasted as an address: an address under one of SCHEMES (or ms-*, file:/,
+    data:<type>), //host, www., a numeric host with a port or path, a hex
+    or IPv6 host is removed; a named host after http, https or ftp and a
+    colon or slash is removed; any other dotted word is split at a dot
+    before a letter ("clerk. zone"), which a person can still read. A dotted
+    number ("203.0.113.9", "4.2.1.3") stays: it cannot be told from a
+    section number. Characters are reduced first and
+    addresses removed after, so nothing removed can leave an address behind. In lead.md only this code writes quotation
     marks and links."""
-    t = html.unescape(html.unescape(clean(text, limit * 4)))      # &quot; and &amp;quot;
+    raw = str(text)
+    if keep_end:
+        raw = raw[-limit * 4:]
+    t = html.unescape(html.unescape(clean(raw, limit * 4)))       # &quot; and &amp;quot;
+    t = t.replace("\\", "/")                     # https:\\host\\x reads as an address
+    t = _FRACTIONS.sub(" ", t)                    # 1\u00bd reads 1 1/2, not 11/2
     t = unicodedata.normalize("NFKC", clean(t, limit * 4)).translate(_QUOTE_MARKS)
+    t = t.replace("\u2044", "/")
     t = t.replace("@", " at ").replace("&", " and ")
-    t = "".join(ch if ch.isalnum() or ch in _PLAIN_KEPT else " " for ch in t)
+    t = "".join(ch if _kept_char(ch) else " " for ch in t)
     for _ in range(5):
         again = _ADDRESS.sub("(address removed)", t)
         if again == t:
             break
         t = again
+    t = _DOTTED.sub(". ", t)
     t = re.sub(r"'{2,}", "'", re.sub(r"\s+", " ", t)).strip()
-    return t[:limit] + (" (cut)" if len(t) > limit else "")
+    if len(t) <= limit:
+        return t
+    if keep_end:          # the words just before a quote: keep the last ones, whole
+        return t[-limit:].split(" ", 1)[-1] if " " in t[-limit:] else t[-limit:]
+    return t[:limit] + " (cut)"
 
 
 def _link(url: str) -> str:
     """A kept claim's address as an autolink; nothing in it can close the link."""
+    # The fragment is never sent, so it is the agent's text, not the page's.
+    url = urllib.parse.urldefrag(url)[0]
     return "<" + urllib.parse.quote(url, safe=":/?#@!$&'*+,;=%~-._") + ">"
 
 
@@ -947,7 +1115,7 @@ def _claim_lines(claim: dict[str, Any]) -> list[str]:
     """One kept claim: the agent's words, then the quote, its address and
     the page's words on each side of it."""
     where = f", PDF page {claim['pdf_page']}" if claim.get("pdf_page") else ""
-    before = _plain(claim.get("context_before", "")[-LEAD_CONTEXT_CHARS:], LEAD_CONTEXT_CHARS)
+    before = _plain(claim.get("context_before", ""), LEAD_CONTEXT_CHARS, keep_end=True)
     after = _plain(claim.get("context_after", "")[:LEAD_CONTEXT_CHARS], LEAD_CONTEXT_CHARS)
     lines = [f"- {_plain(claim['text'], LEAD_TEXT_CHARS)} ({_plain(claim['id'], 40)})",
              f"  - On the page: \"{_code(claim['quote'])}\" ({_link(claim['source_url'])}{where})",
@@ -1060,6 +1228,18 @@ def _read_json(path: Path) -> tuple[Any, str]:
     return doc, hashlib.sha256(raw).hexdigest()
 
 
+def _remove_results(folder: Path) -> str:
+    """Remove the checked file and lead.md, trying both; '' or what failed."""
+    failed = []
+    for old in (folder / CHECKED_NAME, folder / LEAD_NAME):
+        try:
+            if old.is_symlink() or old.exists():
+                old.unlink()
+        except OSError as exc:
+            failed.append(f"{old.name} ({type(exc).__name__})")
+    return " and ".join(failed)
+
+
 def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1071,21 +1251,28 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     ap.add_argument("--headline", metavar="TEXT", default="",
                     help="the launching session's one line for the top of lead.md (its own "
                          "reading; printed as such, as plain text)")
-    args = ap.parse_args(argv)
+    try:
+        args = ap.parse_args(argv)
+    except SystemExit:
+        # A mistyped option must not leave an old result behind either.
+        for word in (sys.argv[1:] if argv is None else argv):
+            if Path(word).name == FINDINGS_NAME:
+                _remove_results(Path(word).parent)
+        raise
     path: Path = args.findings
     folder = path.parent
     out, lead = folder / CHECKED_NAME, folder / LEAD_NAME
     try:
-        if path.name != FINDINGS_NAME:
+        if path.name != FINDINGS_NAME:     # another file: this folder's results are not its
             raise Invalid(f"the file to check is named {FINDINGS_NAME}")
-        for old in (out, lead):            # a failed run must not leave an old result
-            try:
-                if old.is_symlink() or old.exists():
-                    old.unlink()
-            except OSError as exc:
-                raise Invalid(f"the old {old.name} could not be removed "
-                              f"({type(exc).__name__})") from exc
+        failed = _remove_results(folder)   # a failed run must not leave an old result
+        if failed:
+            raise Invalid(f"the old {failed} could not be removed")
         findings, findings_hash = _read_json(path)
+        if (isinstance(findings, dict) and isinstance(findings.get("parcel_id"), str)
+                and folder.resolve().name != findings["parcel_id"].replace(" ", "_")):
+            raise Invalid(f"parcel_id does not match the folder name {clean(folder.resolve().name, 60)!r} "
+                          "(the folder is the parcel id with each space written as _)")
         skeptic_path = folder / SKEPTIC_NAME
         skeptic_doc, skeptic_hash = None, ""
         if args.with_skeptic:

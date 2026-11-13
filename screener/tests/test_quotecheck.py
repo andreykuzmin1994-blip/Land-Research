@@ -96,7 +96,8 @@ class Base(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.dir = Path(tmp.name)
+        self.dir = Path(tmp.name) / "14F0001_0001"      # a lead folder is named for its parcel
+        self.dir.mkdir()
         self.pages = self.dir / qc.PAGES_DIR
         self.fetcher = FakeFetcher({URL: PAGE})
 
@@ -294,6 +295,117 @@ class MatchTests(Base):
             claim(source_url=plan, quote="provides water and sewer service to the corridor"),
             claim(source_url=plan, quote="2045-comprehensive-plan-update/water-and-sewer")))
         self.assertEqual((r.kept, r.dropped[0]["reason"]), (2, why))
+
+    def test_a_path_that_carries_the_request_is_an_echo_too(self):
+        # reviews/35 10, F1: a search page that takes its words in the path.
+        why = "the quote repeats words from its own source_url"
+        cases = ((HOST + "/search/M-1+warehouses+allowed/", "Search Results for: M-1 warehouses allowed"),
+                 (HOST + "/results/m-1-warehouses-allowed", "Results: m-1 warehouses allowed"),
+                 (HOST + "/wiki/Special:Search/Warehouses_are_permitted_by_right_in_the_M-1_district",
+                  "Warehouses are permitted by right in the M-1 district"),
+                 (HOST + "/news/warehouses-are-permitted-by-right-in-the-m-1-district",
+                  "Warehouses are permitted by right in the M-1 district"))
+        for url, quote in cases:
+            with self.subTest(url):
+                self.fetcher.pages[url] = f"<h1>{quote}</h1>".encode()
+                self.assertEqual(self.reason(findings(claim(source_url=url, quote=quote))), why)
+        self.assertEqual(self.fetcher.calls, [])
+        # A short run shared with a plain path is kept, and flagged.
+        tag = HOST + "/tag/warehouses-allowed-here"
+        self.fetcher.pages[tag] = b"<p>Tagged: warehouses allowed here, by the planning office.</p>"
+        r = self.check(findings(claim(source_url=tag, quote="Tagged: warehouses allowed here, by")))
+        self.assertEqual(r.kept, 1)
+        self.assertEqual(r.checked["sections"]["zoning"]["claims"][0]["words_shared_with_url"],
+                         ["warehouses", "allowed", "here"])
+        self.assertIn("also in the request (warehouses, allowed, here)", qc.render_lead(r.checked))
+
+    def test_a_document_file_name_or_a_request_word_in_a_slug_types_nothing(self):
+        # reviews/35 11, S1: these honest quotes were dropped by the fourth round.
+        cases = ((HOST + "/Documents/Article%2012%20Light%20Industrial.pdf",
+                  "Article 12, Light Industrial: warehouses are permitted by right"),
+                 (HOST + "/Zoning+Map+Amendments+2026.pdf",
+                  "Zoning map amendments, 2026: parcel 14F0001 0001 rezoned to M-1"),
+                 (HOST + "/planning/hearing-results/2026-03-board-of-commissioners-zoning-hearing",
+                  "The board of commissioners approved RZ-26-004 at the zoning hearing"),
+                 (HOST + "/2026/results-of-rezoning-vote-on-campbellton-road",
+                  "The results of rezoning vote were four to one"),
+                 (HOST + "/2026/county-seeks-to-find-new-industrial-park-site",
+                  "The county seeks to find a site by June"),
+                 (HOST + "/arcgis/rest/services/Fulton_County_Zoning_Districts/MapServer/2/query?where=1%3D1&f=json",
+                  '"DISTRICT":"Fulton County Zoning District M-1"'))
+        for url, quote in cases:
+            with self.subTest(url):
+                self.assertEqual(qc.claim_problem(claim(source_url=url, quote=quote)), "")
+        # reviews/35 13, F3: a slug that begins with a request word types nothing.
+        for url, quote in ((HOST + "/find-your-zoning/zoning-districts/m-1-light-industrial",
+                            "M-1 Light Industrial District: warehouses are permitted by right."),
+                           (HOST + "/results-of-rezoning-vote/attachments/rz-26-004-staff-report",
+                            "The RZ-26-004 staff report recommends approval"),
+                           (HOST + "/Planning/Search-Zoning-Cases/RZ-26-004-Campbellton-Road",
+                            "Case RZ-26-004 Campbellton Road was approved in March")):
+            with self.subTest(url):
+                self.assertEqual(qc.claim_problem(claim(source_url=url, quote=quote)), "")
+        # Each request word, as a whole segment, types what follows it; an
+        # encoded space alone types a segment that is not a document's name.
+        for word in sorted(qc.REQUEST_PATH_WORDS):
+            with self.subTest(word):
+                self.assertTrue(qc.quote_is_from_url("here: m-1 warehouses allowed",
+                                                     f"{HOST}/{word}/m-1-warehouses-allowed"))
+        for typed in ("/s/m-1%09warehouses%09allowed", "/s/m-1%C2%A0warehouses%C2%A0allowed",
+                      "/s/m-1%E3%80%80warehouses%E3%80%80allowed", "/s/m-1%2Bwarehouses%2Ballowed",
+                      "/s/m-1%252Bwarehouses%252Ballowed",
+                      "/tags/m-1+warehouses+allowed", "/tags/m-1%20warehouses%20allowed",
+                      "/tags/m-1%20warehouses%20allowed.aspx", "/s/m-1+warehouses+allowed.pdf/x",
+                      "/Search/m-1-warehouses-allowed", "/city/search/m-1-warehouses-allowed",
+                      "/search.php/m-1-warehouses-allowed", "/search-results/m-1-warehouses-allowed",
+                      "/search;jsessionid=1/m-1-warehouses-allowed",
+                      "/search%2F/m-1-warehouses-allowed", "/search.json/m-1-warehouses-allowed",
+                      "/search.nsf/m-1-warehouses-allowed", "/search.aspx/m-1-warehouses-allowed",
+                      "/search.jsp/m-1-warehouses-allowed", "/search.do/m-1-warehouses-allowed",
+                      "/search.html/m-1-warehouses-allowed", "/search-for/m-1-warehouses-allowed",
+                      "/search-page/m-1-warehouses-allowed", "/results-page/m-1-warehouses-allowed",
+                      "/search%3Bjsessionid=1/m-1-warehouses-allowed"):
+            with self.subTest(typed):
+                self.assertTrue(qc.quote_is_from_url("here: m-1 warehouses allowed", HOST + typed))
+        # The 40-character rule is tried at every offset of the quote.
+        self.assertTrue(qc.quote_is_from_url(
+            "Notice. Warehouses are permitted by right in the M-1 district",
+            HOST + "/news/warehouses-are-permitted-by-right-in-the-m-1-district"))
+
+    def test_a_document_name_counts_only_when_the_reply_is_a_pdf(self):
+        # reviews/35 12, F2: "warehouses+allowed+here.pdf" served as a web page.
+        url = HOST + "/s/warehouses+allowed+here.pdf"
+        quote = "No hits: warehouses allowed here"
+        self.assertEqual(qc.claim_problem(claim(source_url=url, quote=quote)), "")
+        self.fetcher.pages[url] = b"<p>No hits: warehouses allowed here</p>"
+        self.assertEqual(self.reason(findings(claim(source_url=url, quote=quote))),
+                         "the quote repeats words from its own source_url")
+
+    def test_every_address_of_a_redirect_is_held_to_the_echo_rules(self):
+        # reviews/35 10, F1: a short link that lands on a query page.
+        short = HOST + "/go/7f3a"
+        landing = HOST + "/search?q=warehouses+are+permitted+by+right"
+        self.fetcher.pages[short] = (302, landing)
+        self.fetcher.pages[landing] = b"<p>You searched for warehouses are permitted by right</p>"
+        self.assertEqual(self.reason(findings(claim(
+            source_url=short, quote="You searched for warehouses are permitted by right"))),
+            "the quote repeats words from an address the request was redirected to")
+        # Words shared with the address landed on are flagged.
+        hop = HOST + "/go/8b"
+        land = HOST + "/gis/query?outFields=warehouse&f=json"
+        self.fetcher.pages[hop] = (302, land)
+        self.fetcher.pages[land] = b"<p>The warehouse layer lists 1 building on the parcel.</p>"
+        r = self.check(findings(claim(source_url=hop, quote="warehouse layer lists 1 building on the parcel")))
+        kept = r.checked["sections"]["zoning"]["claims"][0]
+        self.assertEqual(kept["words_shared_with_url"], ["warehouse"])
+        self.assertEqual(r.checked["pages"][hop]["redirected_from"], [hop])
+        # A typed address in the middle of a chain counts too.
+        a, b, c = HOST + "/go/1", HOST + "/search?q=warehouses+are+permitted+by+right", HOST + "/doc/9"
+        self.fetcher.pages.update({a: (302, b), b: (302, c),
+                                   c: b"<p>You searched for warehouses are permitted by right</p>"})
+        self.assertEqual(self.reason(findings(claim(
+            source_url=a, quote="You searched for warehouses are permitted by right"))),
+            "the quote repeats words from an address the request was redirected to")
 
     def test_one_kept_claim_keeps_the_verdict(self):
         r = self.check(findings(claim(), claim(quote="this sentence is nowhere on that page at all")))
@@ -609,6 +721,17 @@ class PdfTests(Base):
         self.assertEqual(self.modes, [[], ["-layout"]])
         self.assertTrue(r.checked["pages"][URL]["file"].endswith(".pdf"))
 
+    def test_a_pdf_whose_file_name_holds_the_quote_is_kept(self):
+        # reviews/35 13, mutation gap: the document exemption end to end.
+        url = HOST + "/Documents/Article%2012%20Light%20Industrial.pdf"
+        self.fetcher.pages[url] = b"%PDF-1.7 binary"
+        self.reading = "Article 12, Light Industrial: warehouses are permitted by right."
+        self.layout = self.reading
+        r = self.check(findings(claim(source_url=url,
+                                      quote="Article 12, Light Industrial: warehouses are permitted")))
+        self.assertEqual(r.kept, 1)
+        self.assertTrue(r.checked["sections"]["zoning"]["claims"][0]["words_shared_with_url"])
+
     def test_a_quote_found_only_across_columns_is_marked(self):
         r = self.check(findings(claim(quote="uses are Right column says terminals")))
         kept = r.checked["sections"]["zoning"]["claims"][0]
@@ -832,7 +955,7 @@ class LeadFileTests(Base):
         self.assertIn("It disputes these first-pass claims: zoning-1.", self.lead)
         self.assertIn("and 2 more kept claims", self.lead)
         self.assertIn("**In one line (the launching session's reading, not checked):** County "
-                      "confirms at https: (address removed) listing", self.lead)
+                      "confirms at (address removed) listing", self.lead)
 
     def test_a_downgraded_verdict_and_an_unbacked_skeptic_say_so(self):
         r = self.check(findings(claim(quote="words that never appear on that page at all")),
@@ -849,7 +972,207 @@ class LeadFileTests(Base):
     def test_the_pages_words_on_each_side_of_a_quote_are_always_shown(self):
         r = self.check(findings(claim(quote="permitted in the M-1 district at any size")))
         self.assertIn("Around it the page reads: ...as a principal use. rendering plants are not "
-                      "(the quote) . see the county code ((address removed)", qc.render_lead(r.checked))
+                      "(the quote) . see the county code (address removed)", qc.render_lead(r.checked))
+
+    def test_a_not_just_before_the_quote_survives_the_reduction(self):
+        # reviews/35 10, F2: "&" becomes " and ", which used to push it out.
+        page = HOST + "/plain.txt"
+        self.fetcher.open_once = lambda u, cap, real=self.fetcher.open_once: (
+            (200, {"content-type": "text/plain"},
+             b"Lots & blocks & tracts zoned M-1 & M-2 are not permitted in the M-1 district by right.")
+            if u == page else real(u, cap))
+        r = self.check(findings(claim(source_url=page, quote="permitted in the M-1 district by right")))
+        line = [l for l in qc.render_lead(r.checked).splitlines() if "Around it" in l][0]
+        self.assertIn("are not (the quote)", line)
+        self.assertLessEqual(len(qc._plain("x & " * 40, 45, keep_end=True)), 45)
+
+    def test_no_web_address_survives_in_agent_or_page_words(self):
+        # reviews/35 10, F3 and F4.
+        for text in ("County file 1https://203.0.113.9/listing", "\u00e9https://203.0.113.9/x",
+                     "1https://b\u00fccher.example/x", "1https://intranet/x", "see 203.0.113.9/listing", "go to awww.example.com now", "x.https:/ /y.example/z"):
+            with self.subTest(text):
+                out = qc._plain(text)
+                self.assertIn("(address removed)", out)
+                self.assertNotRegex(out, r"(?i)https?|://|www|\.example|203\.0")
+        for text in ("\u02bb\u02bbwarehouses are permitted by right\u02bc\u02bc", "\u1425cleared\u1425",
+                     "\u05f2zoned\u05f2"):
+            with self.subTest(text):
+                out = qc._plain(text)
+                self.assertTrue(all(ch.isascii() for ch in out), out)
+        # Latin letters with marks, section numbers and plain words stay.
+        self.assertEqual(qc._plain("Caf\u00e9 r\u00e9sum\u00e9, section 4.2.1.3 of the code."),
+                         "Caf\u00e9 r\u00e9sum\u00e9, section 4.2.1.3 of the code.")
+
+    def test_letters_that_look_like_quotation_marks_go_and_ordinary_text_stays(self):
+        # reviews/35 11, S2 and notes.
+        for text in ("\ua78c\ua78cWarehouses are permitted\ua78c\ua78c", "\ua78bx\ua78b",
+                     "\u01c0\u01c1\u01c2\u01c3cleared"):
+            with self.subTest(text):
+                self.assertTrue(all(ch.isascii() for ch in qc._plain(text)))
+        self.assertEqual(qc._plain("a {b} ^c"), "a b c")
+        for text in ("Sec. 4.2.1.3/4.2.1.4 of the code",
+                     "See Sec. 27-4.3/27-4.4 and Table 4.1/4.2.", "FAR 0.5/1.0", "$3.50/sf",
+                     "18.2/acre", "1.5/2.0 stories", "PIN 14F.0001.0001/A", "Rev. 2.1/2026",
+                     "Exh. A.1/A.2", "Fig. 3.a/3.b", "the S.E.1/4 of the N.E.1/4", "at 10:30:15",
+                     "permitted.Outdoor storage is not",
+                     "Note: // see below", "\u00a7 27-4 applies"):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), text.replace("permitted.Outdoor", "permitted. Outdoor")
+                                 .replace("3.a/3.b", "3. a/3. b").replace("S.E.1/4", "S. E.1/4")
+                                 .replace("N.E.1/4", "N. E.1/4"))
+        self.assertEqual(qc._plain("Fig. 3.a/3.b, the S.E.1/4"), "Fig. 3. a/3. b, the S. E.1/4")
+        self.assertEqual(qc._plain("1\u00bd acres, 2\u00be and \u00bd"), "1 1/2 acres, 2 3/4 and 1/2")
+        name = "\u0141\u00f3d\u017a Stra\u00dfe S\u00f8ren \u00c6r\u00f8 \u0110or\u0111evi\u0107"
+        self.assertEqual(qc._plain(name), name)
+
+    def test_addresses_with_spaces_any_top_level_name_or_a_port_are_removed(self):
+        # reviews/35 12, F1, and the mutation survivors it lists.
+        for text in ("HTTPS : / / x.city/p", "https ://evil.city/x", "https: //evil.city/x",
+                     "http\u015b://evil.city/x", "\u00e9://evil.city/x", "see //evil.city/x",
+                     "//203.0.113.9/1", "evil.city/x", "evil.shop/x", "evil.pro/x", "evil.zzz/x",
+                     "evil.land/parcel", "evil.museum", "evil.com", "evil.ly", "203.0.113.9/123",
+                     "203.0.113.9:8080/1", "https\u2236//evil.city/x", "https\u00b7//evil.city/x",
+                     "https\u02d0//evil.city/x", "_://evil.city/x", "\u2044\u2044evil.city",
+                     "x2://y.example", "verify.shop/ok", "county-attorney.legal",
+                     "records at clerk.zone", "clerk.zone:8443", "clerk.zone?id=7", "evil.zone#x",
+                     "evil.zone:/x", "[2001:db8::7]:443", "xn--bcher-kva.zone", "EVIL.CITY",
+                     "203.0.113.9:8080", "evil.church"):
+            with self.subTest(text):
+                self.assert_no_address(qc._plain("see " + text + " now"))
+
+    def assert_no_address(self, out):
+        """Nothing in `out` reads or links as an address: no dotted word with
+        a letter after the dot, no scheme, no //, no www, no numeric or IPv6
+        host. A bare host is split at its dots; the rest is removed."""
+        self.assertNotRegex(out, r"[^\W_]\.[^\W\d_]", out)
+        self.assertNotRegex(out, r"(?i)://|//|www|203\.0|db8|ffff|fe80|8329|0xcb", out)
+
+    def test_hosts_under_any_top_level_name_go_whatever_their_case(self):
+        # reviews/35 14 F1 and F4, 15 F1 and F2: whatever its case and its
+        # top-level name, a host is removed (with a path, port or query) or
+        # split at its dots (bare).
+        for text in ("County-Attorney.Legal", "CLERK.ZONE", "Records.Farm", "b\u00fccher.zone",
+                     "EVIL.LY", "Evil.Ly", "Clerk.Us", "COUNTY.GA", "Evil.Zone./x", "Evil.Zone%2Fx",
+                     "Evil.Zone :8443", "https:\\\\Evil.Zone\\x", "203.0.113.9?id=7", "Evil.Zone/x",
+                     "Evil.Zone?id=7", "Evil.Zone#x", "Evil.Zone:8443", "Evil.Zone:/x",
+                     "Evil.Example", "2001:db8::7", "::ffff:cb00:7109", "fe80::1",
+                     "2001:0db8:0000:0000:0000:ff00:0042:8329", "confirmed...clerk.com today",
+                     ".evil.city", "1..Clerk.Zone", "clerk.com--the county site",
+                     "Clerk.Zone-confirmed", "clerk.com- see", "Zoning.Gov- today",
+                     "evil.verm\u00f6gensberater", "0xcb.0x0.0x71.0x9/listing"):
+            with self.subTest(text):
+                self.assert_no_address(qc._plain("see " + text + " now"))
+        # reviews/35 14, F2 and notes: page context is case-folded, and these
+        # dotted words are no hosts.
+        for text in ("permitted.outdoor", "st.louis", "art.iv", "ft.worth", "u.s.hwy 29",
+                     "4.2.permitted", "m-1.warehouses", "are.not", "is not.permitted",
+                     "district.except where not.allowed by overlay", "1:2:3:4:5 ratio",
+                     "12:00:00:00:00", "fee::due", "at 10:30"):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), {
+                    "permitted.outdoor": "permitted. outdoor", "st.louis": "st. louis",
+                    "art.iv": "art. iv", "ft.worth": "ft. worth", "u.s.hwy 29": "u. s. hwy 29",
+                    "4.2.permitted": "4.2. permitted", "m-1.warehouses": "m-1. warehouses",
+                    "are.not": "are. not", "is not.permitted": "is not. permitted",
+                    "district.except where not.allowed by overlay":
+                        "district. except where not. allowed by overlay"}.get(text, text))
+        # reviews/35 15 F2 and 16 F2, F3: no word is lost, a "No" before a
+        # quote included; a dot beside a non-ASCII letter is split too.
+        for text, out in (("Lot.No/Block 4", "Lot. No/Block 4"),
+                          ("St.Louis/Kansas City", "St. Louis/Kansas City"),
+                          ("Max.Ht:45 and Ft.Worth?", "Max. Ht:45 and Ft. Worth?"),
+                          ("caf\u00e9.zone and \u0141\u00f3d\u017a.Legal",
+                           "caf\u00e9. zone and \u0141\u00f3d\u017a. Legal"),
+                          ("bad.\u00e9vil", "bad. \u00e9vil"),("limited in M-2.No warehouses", "limited in M-2. No warehouses"),
+                          ("permitted.By right", "permitted. By right"),
+                          ("P.O.Box 1234", "P. O. Box 1234"), ("Farm.Co-op", "Farm. Co-op"),
+                          ("for.Sale or for.Rent", "for. Sale or for. Rent")):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), out)
+
+    def test_a_dotted_word_after_a_scheme_word_is_removed(self):
+        # reviews/35 16 F1 and 17 F1: a scheme with a colon or slash takes its
+        # host, and so does a scheme with a colon and no space, whatever host.
+        for text in ("County confirms at https:||evil.example|listing",
+                     "https:\u29f8\u29f8evil.zone\u29f8x", "https:\\\\Evil.Zone\\x",
+                     "ftp: files.county.gov", "open \\\\evil.zone\\x",
+                     "at https:3405803785/opinion", "data:text/html;base64,PHNjcmlwdD5h==",
+                     "See https:intranet/x", "http:localhost:8080/admin", "https:0xcb007109/x",
+                     "https:2130706433", "ftp:3405803785/x", "file:/etc/passwd",
+                     "javascript:alert(1)", "mailto:clerk.zone",
+                     # reviews/35 18, F1 and F3
+                     "see \\\\intranet\\opinion", "or //3405803785?x", "//localhost/x",
+                     "sms:+14045551234", "ms-msdt:/id", "search-ms:query=x", "smb:intranet/share",
+                     "webcal:intranet/cal", "view-source:intranet", "magnet:?xt=urn:x",
+                     "0xcb.0.113.9/x", "0xcb.29961/x", "vbscript:x", "sftp:x/y", "ftps:x/y",
+                     "http:x/y", "ftp:x/y", "ssh:host", "telnet:host", "ldap:host", "data:,x"):
+            with self.subTest(text):
+                out = qc._plain(text)
+                self.assertIn("(address removed)", out)
+                self.assertNotRegex(out, r"(?i)evil|attorney|county\. gov|files|3405|intranet|"
+                                         r"localhost|0xcb|2130|passwd|alert|base64|clerk|"
+                                         r"\+1404|msdt|query|share|cal\b|urn|x/y|host")
+        # A scheme word with only spaces before a host: split, not pasteable.
+        for text, out in (("https\u2236\u2215\u2215county-attorney.com\u2215opinion",
+                           "https county-attorney. com opinion"),
+                          ("see HTTP evil.zone", "see HTTP evil. zone"),
+                          ("www evil.com", "www evil. com")):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), out)
+
+    def test_prose_that_names_a_scheme_keeps_every_word(self):
+        # reviews/35 17, F2.
+        for text, out in (("The portal uses HTTP 1.1 only", "The portal uses HTTP 1.1 only"),
+                          ("served over HTTP/1.1", "served over HTTP/1.1"),
+                          ("HTTP 404.Not found", "HTTP 404. Not found"),
+                          ("Upload plans by FTP: Sec.4.2 applies", "Upload plans by FTP: Sec.4.2 applies"),
+                          ("county ftp site.Parcels are listed", "county ftp site. Parcels are listed"),
+                          ("the www St.Louis office", "the www St. Louis office"),
+                          ("tel: 404 555 0100", "tel: 404 555 0100"),
+                          ("data: the county", "data: the county"),
+                          ("http and https", "http and https"),
+                          # reviews/35 18, F2
+                          ("Tel:404-555-0100 for the clerk", "Tel:404-555-0100 for the clerk"),
+                          ("Source data:2026 assessor roll", "Source data:2026 assessor roll"),
+                          ("Zoning data:M-1 and M-2", "Zoning data:M-1 and M-2"),
+                          ("Case file:A-12 is closed", "Case file:A-12 is closed"),
+                          ("Questions about:the zoning", "Questions about:the zoning"),
+                          ("WS:12 mph", "WS:12 mph"), ("Note: // see below", "Note: // see below"),
+                          ("see the WWW: Ord.No. 26-04 page", "see the WWW: Ord. No. 26-04 page"),
+                          ("Permit 20260412/3 was issued", "Permit 20260412/3 was issued"),
+                          ("Book 20261234/Page 5", "Book 20261234/Page 5"),
+                          ("Recorded 20261112:14:05", "Recorded 20261112:14:05"),
+                          ("localhost:8080/x and 3405803785/x", "localhost:8080/x and 3405803785/x")):
+            with self.subTest(text):
+                self.assertEqual(qc._plain(text), out)
+
+    def test_a_link_shows_the_address_without_its_fragment(self):
+        self.assertEqual(qc._link(URL + "?a=1#CLEARED-zoning-by-right"), f"<{URL}?a=1>")
+
+    def test_a_pdf_quote_at_the_top_of_a_page_shows_the_end_of_the_page_before(self):
+        page = qc.Page(units=[(1, "reading", "warehouses on this land are not"),
+                              (2, "reading", "permitted in the m-1 district by right. end")])
+        found = qc.find_quote("permitted in the M-1 district by right", page)
+        self.assertEqual(found["context_before"], "warehouses on this land are not (page break) ")
+        self.assertEqual(found["context_after"], ". end")
+        # Only the same text order, only the end of the page before, only
+        # when the page itself has too little in front of the quote.
+        long = "x" * 200 + " not"
+        nxt = "except on lots under five acres. " + "z" * 200
+        page = qc.Page(units=[(1, "layout", "the layout text ends in not"), (1, "reading", long),
+                              (2, "reading", "permitted in the m-1 district by right."),
+                              (3, "layout", "layout text of the next page"), (3, "reading", nxt)])
+        found = qc.find_quote("permitted in the M-1 district by right", page)
+        self.assertEqual(found["context_before"], long[-qc.CONTEXT_CHARS:] + " (page break) ")
+        self.assertEqual(found["context_after"], ". (page break) " + nxt[:qc.CONTEXT_CHARS - 1])
+        page = qc.Page(units=[(1, "reading", "permitted in the m-1 district by right. " + "w" * 100),
+                              (2, "reading", "the next page")])
+        found = qc.find_quote("permitted in the M-1 district by right", page)
+        self.assertNotIn("page break", found["context_after"])
+        page = qc.Page(units=[(1, "reading", "the page before"),
+                              (2, "reading", "y" * 100 + " permitted in the m-1 district by right.")])
+        found = qc.find_quote("permitted in the M-1 district by right", page)
+        self.assertNotIn("page break", found["context_before"])
 
     def test_words_shared_with_the_request_are_flagged(self):
         url = HOST + "/gis/query?outFields=warehouse&f=json"
@@ -922,6 +1245,41 @@ class CliTests(Base):
         self.assertEqual(sorted(checked["quotecheck"]["inputs"]), ["findings.json", "skeptic.json"])
         self.assertEqual(checked["quotecheck"]["inputs"]["findings.json"], digest)
         self.assertIn("the skeptic's opinion only", (self.dir / qc.LEAD_NAME).read_text())
+
+    def test_a_refused_run_leaves_no_lead_md(self):
+        # reviews/35 10, F6: both old results are removed before any refusal.
+        (self.dir / qc.CHECKED_NAME).mkdir()
+        (self.dir / qc.CHECKED_NAME / "x").write_text("x")
+        (self.dir / qc.LEAD_NAME).write_text("# CLEARED by an agent")
+        code, out = self.run_cli(json.dumps(findings(claim())))
+        self.assertEqual(code, 2)
+        self.assertIn("could not be removed", out)
+        self.assertFalse((self.dir / qc.LEAD_NAME).exists())
+        (self.dir / qc.LEAD_NAME).write_text("# CLEARED by an agent")
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            qc.main([str(self.dir / qc.FINDINGS_NAME), "--with-skeptik"], fetcher=self.fetcher)
+        self.assertFalse((self.dir / qc.LEAD_NAME).exists())
+
+    def test_the_parcel_id_must_match_its_folder(self):
+        for wrong in ("14F0001 - CLEARED zoning", "14f0001 0001"):
+            with self.subTest(wrong):
+                code, out = self.run_cli(json.dumps(findings(claim(), parcel_id=wrong)))
+                self.assertEqual(code, 2)
+                self.assertIn("parcel_id does not match the folder name", out)
+                self.assertFalse((self.dir / qc.LEAD_NAME).exists())
+        # Run from inside the folder (reviews/35 11, note).
+        (self.dir / qc.FINDINGS_NAME).write_text(json.dumps(findings(claim())))
+        here = os.getcwd()
+        os.chdir(self.dir)
+        self.addCleanup(os.chdir, here)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(qc.main([qc.FINDINGS_NAME], fetcher=self.fetcher), 0)
+
+    def test_a_dangling_lead_link_is_removed_too(self):
+        os.symlink(self.dir / "nowhere", self.dir / qc.LEAD_NAME)
+        code, _ = self.run_cli(json.dumps(findings(claim(), parcel_id="other")))
+        self.assertEqual(code, 2)
+        self.assertFalse((self.dir / qc.LEAD_NAME).is_symlink())
 
     def test_outputs_are_never_written_through_a_link(self):
         victim = self.dir / "victim.txt"

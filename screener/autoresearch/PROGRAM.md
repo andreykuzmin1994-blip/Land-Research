@@ -5,14 +5,6 @@ improves **one file**, `screener/rank.py`, and keeps a change only if the
 ranking gets better at finding land that owners actually sold to
 industrial developers.
 
-> **Do not run the loop yet (2026-11-11).** The evaluation below has been
-> reviewed and its findings fixed in code, but the answer key in `data/`
-> has not yet been rebuilt under the rules written here, so the pool
-> sizes, site counts and baseline below still describe the old key.
-> `--decide` refuses until a human clears that (`REVIEW_PENDING` in
-> `evaluate.py`). If you are an agent asked to run experiments: stop and
-> tell the human.
-
 ## The score
 
 `python -m screener.autoresearch.evaluate` asks one question five times,
@@ -34,22 +26,22 @@ someone who built an industrial building on it by 2025?
   who bought the parcel at a real price since 1 January 2015: a site
   counts under the owner who held it before then, in the years that owner
   still had it.
-- **Sites, not records.** The same site is in several years (164 positive
-  records, 49 distinct sites). Each positive record is weighted so that
+- **Sites, not records.** The same site is in several years (147 positive
+  records, 45 distinct sites). Each positive record is weighted so that
   every distinct site adds up to 1.
 - **Left out:** parcels that got industrial buildings without such a sale
   (owner-users, corporate successors, replatted ids, sales after the
   building, buyers since 2015) are dropped from the pool entirely, so they
   count neither way. So is any parcel sold in the first quarter of the
   as-of year when the digest already shows the buyer.
-- **Splits:** dev (38 sites) is what the loop sees. Test (11 sites) is
+- **Splits:** dev (35 sites) is what the loop sees. Test (10 sites) is
   sealed: a human checks it every ~20 kept experiments. The split is by
   ~5 km map cell, the same cells in every year, so test sites are in
   places the loop never saw.
 - **Ranked within each year.** A parcel is compared only with the other
   parcels of its own year; results are added up over the years.
 - **Two numbers.**
-  - `hits`: sites in the top 2% of their year's pool (K, about 44
+  - `hits`: sites in the top 2% of their year's pool (K, about 43
     parcels a year on dev).
   - `graded`: each site earns credit by where it ranks: full credit in
     the top 2%, half at about the top 6%, nothing below the top 20% of
@@ -59,10 +51,10 @@ someone who built an industrial building on it by 2025?
 - **Fixed size:** K is fixed at 2% of the pool, so inflating scores can't
   help. Only ranking real sites higher does. The hard screens are frozen
   into the evaluation set.
-- **Baseline (key rebuilt 2026-11-10):** graded 12.2 of 38 dev sites, 1.9
-  hits. Random ranking averages graded 3.4 (5th–95th percentile 2.1–4.8)
-  and 0.9 hits. Scores from earlier keys (a single 2016 year, whole hits)
-  are not comparable.
+- **Baseline (key rebuilt 2026-11-12):** graded 11.7 of 35 dev sites, 2.4
+  hits. Random ranking averages graded 3.1 (5th–95th percentile 1.7–4.6)
+  and 0.8 hits. Scores from earlier keys (the 2026-11-10 key, a single
+  2016 year, whole hits) are not comparable.
 
 Built by `build_eval.py` (humans only, between runs). It writes the frozen
 files in `data/`. Blank in the evaluation set, because their values today
@@ -158,9 +150,10 @@ starts from); the loop never does.
 #   edit screener/rank.py (one idea)
 git commit -am "exp: <what you changed>"
 python -m screener.autoresearch.evaluate --decide
-#   DISCARD -> run the exact `git reset --hard <commit>` it prints (it
+#   DISCARD -> run the exact `git reset --keep <commit>` it prints (it
 #              takes back discarded experiments and nothing else). If it
-#              prints "Do not reset" instead, stop and ask a human.
+#              prints "Do not reset" instead, stop and ask a human. If git
+#              refuses the reset, stop and ask a human: never use --hard.
 #   KEEP    -> carry on from here
 #   REFUSED -> see below
 ```
@@ -182,7 +175,7 @@ When `--decide` prints REFUSED, it logs nothing:
   `best_ranking.json` was lost, a human checks out the best kept commit
   and re-records it with `--decide --new-baseline`.
 
-A change is kept only if `graded` is at least 2.0 above the best kept
+A change is kept only if `graded` is at least 2.5 above the best kept
 run, `hits` is not lower, **and** it beats the best kept run in at least
 99% of clustered bootstrap resamples (whole map cells are resampled, every
 year of a cell together, because sites cluster and repeat across years).
@@ -206,9 +199,10 @@ the live ranking, because the live tool scores with the same `rank.py`.
 
 ## Known limits (state them in reports)
 
-- A few dozen dev sites in about ten map cells. The bar (+2.0 graded and
+- 35 dev sites in 11 map cells. The bar (+2.5 graded and
   99% of resamples) is set so that a change that is not an improvement is
-  kept about 2% of the time or less; it also means small real
+  kept about 2% of the time (2.4% in the worst setting measured,
+  `reviews/36_screener_eval_cohorts_metric/14`); it also means small real
   improvements are often discarded. Expect a handful of keeps, not
   dozens.
 - The five years are five views of mostly the same sites. They steady the

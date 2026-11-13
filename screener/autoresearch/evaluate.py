@@ -37,8 +37,9 @@ resamples. Each resample draws whole ~5 km map cells, every year of a cell
 together, because positives come in clusters and a site repeats across
 years; both rankings are scored on the same draw. The thresholds are
 checked with --null-test, so that a change that is not an improvement is
-kept about 2% of the time or less; the measured rates, and the key they
-were measured on, are in reviews/36_screener_eval_cohorts_metric (07).
+kept about 2% of the time (2.4% in the worst setting measured); the
+measured rates, and the key they were measured on, are in
+reviews/36_screener_eval_cohorts_metric (14).
 
 What the loop is shown. Scores are printed and logged to one decimal, and
 a decision prints the rounded scores only: no win share, and the gain as
@@ -152,9 +153,9 @@ K_SHARE = 0.02
 # 20% is paid for, so lifting sites through the unread middle earns nothing.
 CREDIT_SPAN = 10.0
 BOOTSTRAP = 500
-# Checked with --null-test (reviews/36, 05 to 07): see there before
+# Checked with --null-test (reviews/36, 05 to 07 and 14): see there before
 # changing, and re-run --null-test after any change to these or to the key.
-MIN_GAIN = 2.0
+MIN_GAIN = 2.5                               # 2.0 kept noise 2.9% of the time on the 2026-11-12 key (reviews/36 14)
 WIN_SHARE_TO_KEEP = 0.99
 SHOWN_DECIMALS = 1                           # what the loop is shown; comparisons are exact
 NULL_NOISE = (4.0, 8.0, 16.0)                # --null-test: score-point noise levels tried
@@ -169,11 +170,8 @@ UNSTABLE = ("rank.learned_score gave some records a different score the second t
 # Why --decide refuses for now ("" = it does not). Set while a change to this
 # evaluation awaits its review; a human clears it in the change that records
 # the review's outcome. Scoring without --decide still works.
-REVIEW_PENDING = ("the evaluation's review findings are fixed in code (reviews/36, 05 to 07), "
-                  "but the answer key in data/ has not been rebuilt under the new builder "
-                  "rules, and the keep thresholds have not been checked on the rebuilt key. No "
-                  "experiment may be kept or discarded yet. Stop and tell a human "
-                  "(screener/AGENTS_DESIGN.md, \"Next session\")")
+# Cleared 2026-11-12: key rebuilt and thresholds measured on it (reviews/36, 14 and 15).
+REVIEW_PENDING = ""
 # Record fields the ranking never sees. The ranking is handed an allow-list
 # (the key's meta "features" and "banned"), so a new record field is hidden
 # unless it is added there; this tuple only documents the known ones.
@@ -720,6 +718,28 @@ def second_pass(source: bytes):
     return recheck
 
 
+def _stdlib_has(name: str) -> bool:
+    """Is there a module of this name on this Python outside the repository?"""
+    if name in sys.builtin_module_names or importlib.machinery.FrozenImporter.find_spec(name):
+        return True
+    elsewhere = [p for p in sys.path if p and _outside_repo(p)]
+    try:
+        spec = importlib.machinery.PathFinder.find_spec(name, elsewhere)
+    except (ImportError, ValueError):
+        return False
+    # A namespace folder elsewhere (no loader) is no module of its own:
+    # the repository's folder would still be merged in (reviews/36 12, 2).
+    return spec is not None and spec.loader is not None
+
+
+def _outside_repo(path: str) -> bool:
+    try:
+        resolved = Path(path).resolve()
+    except OSError:
+        return False
+    return resolved != ROOT and ROOT not in resolved.parents
+
+
 def foreign_modules() -> list[str]:
     """What could run inside the evaluator from the repository but outside
     screener/, where the git checks do not look: a file or folder at the
@@ -729,23 +749,38 @@ def foreign_modules() -> list[str]:
     outside screener/ and is not an installed package."""
     inside = ROOT / "screener"
     installed = {Path(p).resolve() for p in (sys.prefix, sys.base_prefix, sys.exec_prefix)}
+    suffixes = importlib.machinery.all_suffixes()
     out = []
     try:
         for entry in ROOT.iterdir():
             if entry.is_dir():
-                # A folder is importable in a standard module's place only as
-                # a package (venv/ or site/ without an __init__ is not).
-                shadows = (entry.name in sys.stdlib_module_names
-                           and any(entry.glob("__init__.*")))
+                # A package folder takes a standard module's place. A folder
+                # without an __init__ does only when this Python has no such
+                # module of its own (msvcrt/ or _winapi/ on Linux): an
+                # existing module wins over a namespace folder (venv/, site/).
+                package = any((entry / f"__init__{suffix}").is_file() for suffix in suffixes)
+                shadows = entry.name in sys.stdlib_module_names and (
+                    package or not _stdlib_has(entry.name))
             else:
                 # csv.py, csv.pyc, csv.cpython-313-x86_64-linux-gnu.so, ...
                 shadows = any(entry.name.endswith(suffix)
                               and entry.name[:-len(suffix)] in sys.stdlib_module_names
-                              for suffix in importlib.machinery.all_suffixes())
+                              for suffix in suffixes)
             if shadows:
                 out.append(f"{entry.name} (shadows a standard module)")
     except OSError:
         pass
+    # A folder inside the repository on sys.path, other than the root itself
+    # (PYTHONPATH=reviews): what is in it is imported before the standard
+    # library and no git check looks there (reviews/36 13, note 3).
+    for entry in sys.path:
+        try:
+            where = Path(entry or ".").resolve()
+        except OSError:
+            continue
+        if (where != ROOT and ROOT in where.parents and "site-packages" not in where.parts
+                and not set(where.parents) & installed and where not in installed):
+            out.append(f"{where.relative_to(ROOT)} (a repository folder on sys.path)")
     for name, module in list(sys.modules.items()):
         file = getattr(module, "__file__", None)
         if not isinstance(file, str):
@@ -1004,18 +1039,30 @@ def decide(records: list[dict], positives, dev: dict, new_baseline: bool) -> int
         # kept rank.py unless an earlier discard was left in place; a human's
         # commit to a document or a test may sit between the two.
         if not _git("diff", "--name-only", best["commit"], parent, "--", EXPERIMENT_FILE):
-            print(f"Revert the experiment: git reset --hard {parent}")
+            print(f"Revert the experiment: git reset --keep {parent}")
         else:
             # An earlier discard was left in place. Going back to the best
             # kept run removes every commit since: say so only when each one
             # is a discard this log recorded. Otherwise a human sorts it out.
+            # Full hashes, matched by the logged short form: git lengthens
+            # its short hashes as a repository grows.
             between = [line.split()[0] for line in
-                       _git("log", "--format=%h", f"{best['commit']}..{parent}").splitlines()
+                       _git("log", "--format=%H", f"{best['commit']}..{parent}").splitlines()
                        if line.strip()]
-            discards = {r["commit"] for r in _decisions()
-                        if r["status"] == "discard" and r["fingerprint"] == fp}
+            # Hex only: rev-parse would also resolve "HEAD~1" or a branch name.
+            logged = {r["commit"] for r in _decisions()
+                      if r["status"] == "discard" and r["fingerprint"] == fp
+                      and re.fullmatch(r"[0-9a-f]+", r["commit"] or "")}
+            # Each logged short hash made full by git: an ambiguous or unknown
+            # one gives nothing, so it cannot stand for a human's commit
+            # (reviews/36 12, finding 1).
+            # A ref name that happens to be hex ("2026") resolves to another
+            # commit: keep only a hash that begins with what was logged.
+            discards = {full for c in logged
+                        for full in [_git("rev-parse", "--verify", "--quiet", f"{c}^{{commit}}")]
+                        if full.startswith(c)}
             if between and all(c in discards for c in between):
-                print(f"Revert the experiment: git reset --hard {best['commit']}")
+                print(f"Revert the experiment: git reset --keep {best['commit']}")
                 print(f"(this also takes back {len(between)} earlier discarded experiment(s) "
                       "that were left in place)")
             else:
@@ -1053,8 +1100,9 @@ def main(argv: list[str] | None = None) -> int:
     strays = foreign_modules()
     if strays:
         return _refuse("modules were loaded from inside the repository but outside screener/ ("
-                       + ", ".join(strays[:5]) + "): run from a clean checkout; a file there "
-                       "that shadows a standard module would run inside the evaluator.")
+                       + ", ".join(strays[:5]) + "): run from the repository root, with no "
+                       "PYTHONPATH set, in a clean checkout; a file there that shadows a "
+                       "standard module would run inside the evaluator.")
     try:
         records, positives, meta = load()
     except EvalSetError as exc:
@@ -1118,6 +1166,8 @@ def main(argv: list[str] | None = None) -> int:
         # Nothing is shown before decide()'s guards pass: a refused run is not a look.
         return decide(records, positives, dev, args.new_baseline)
     if args.null_test:
+        if args.test:
+            print("--test is ignored with --null-test: the null test uses the dev split only")
         if args.null_test < 20:
             print("--null-test needs at least 20 trials")
             return 2

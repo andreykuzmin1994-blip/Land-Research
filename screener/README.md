@@ -616,16 +616,17 @@ command (poppler-utils).
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
 against an answer key it can't game: Fulton land that its owner sold,
 before any building, to someone who had a $1M+ industrial building on it
-by 2025, asked from each January of 2015 to 2019. That's 49 distinct
-sites (164 site-years), spatially split 38 dev / 11 test. See
+by 2025, asked from each January of 2015 to 2019. That's 45 distinct
+sites (147 site-years), spatially split 35 dev / 10 test. See
 `screener/autoresearch/PROGRAM.md`.
 
-Key rebuilt 2026-11-10 (`reviews/36_screener_eval_cohorts_metric`): five
-as-of years instead of 2016 alone, a sale must precede the building, and
-a change is judged on a graded score (where each site ranks) instead of
-whole top-2% hits. The hand-built ranking scores graded 12.2 of 38 dev
-sites (1.9 in the top 2%); random ranking averages 3.4. Earlier scores are
-not comparable.
+Key rebuilt 2026-11-12 (`reviews/36_screener_eval_cohorts_metric`, 05 to
+13): five as-of years instead of 2016 alone, a sale must precede the
+building, a parcel bought at a real price since 2015 counts only under
+the owner before, and a change is judged on a graded score (where each
+site ranks) instead of whole top-2% hits. The hand-built ranking scores
+graded 11.7 of 35 dev sites (2.4 in the top 2%); random ranking averages
+3.1. Earlier scores are not comparable.
 
 ```bash
 python -m screener.autoresearch.build_eval          # rebuild the frozen key (humans only, ~5 min; needs data/test_blocks.json)
@@ -696,8 +697,9 @@ never the bootstrap win share (that goes to the log only): finer numbers
 would let one experiment ask whether a band of parcels holds a known site.
 Every scoring that runs `rank.py` and shows a number is logged as a
 `look`, `test` or `null` row with a hash of `rank.py`. After a DISCARD
-the evaluator prints the `git reset --hard` that takes back discarded
-experiments and nothing else; when a reset would remove any other commit
+the evaluator prints the `git reset --keep` that takes back discarded
+experiments and nothing else (`--keep`, not `--hard`: it stops rather than
+delete uncommitted work anywhere in the checkout); when a reset would remove any other commit
 it prints "Do not reset" and no command.
 
 The `rank.py` that is checked is the one that runs: its bytes are compiled
@@ -767,6 +769,20 @@ Known gaps:
   the human read of each kept diff stand against lookups.
 - Changing shared objects through their methods (such as registering a
   class with an ABC) isn't detected.
+- The check for root-level files that shadow a standard module is best
+  effort. It runs inside the evaluator's own process, after its imports:
+  a shadow that does load (an untracked root `csv.py` or `csv.pyc`,
+  against rule 1) can switch the check off before it looks
+  (`reviews/36_screener_eval_cohorts_metric/10_fourth_round_check.md`,
+  finding 3). Run from a clean checkout.
+- The reset hint trusts `experiments.tsv`: a hand-added discard row that
+  names a human's commit gets that commit reset away.
+- The check for repository folders on `sys.path` also runs after the
+  evaluator's own imports, so a planted module that removes its own entry
+  is not seen, and a folder named `site-packages`, or one under the
+  running virtual environment, is exempt
+  (`reviews/36_screener_eval_cohorts_metric/15`). Both need someone who
+  sets `PYTHONPATH` or plants files; the loop's command does neither.
 - The live `python -m screener.run` doesn't run the check.
 - Python 3.14 adds public evaluation hooks (`annotationlib`,
   `ForwardRef.evaluate`, template strings) that these rules haven't been
@@ -777,6 +793,10 @@ Known gaps:
 ```bash
 python -m unittest discover -s screener/tests -t .
 ```
+
+Run it from the repository root with `-t .`: without it `screener/tests`
+lands on `sys.path`, and the evaluator's tests (rightly) see a repository
+folder there.
 
 ## Adding a county
 

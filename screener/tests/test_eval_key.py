@@ -187,7 +187,7 @@ class KeepRuleTests(unittest.TestCase):
     def test_thresholds_are_the_reviewed_ones(self):
         # Changing these needs the null test re-run and recorded (reviews/36).
         self.assertEqual((ev.MIN_GAIN, ev.WIN_SHARE_TO_KEEP, ev.CREDIT_SPAN, ev.K_SHARE,
-                          ev.BOOTSTRAP), (2.0, 0.99, 10.0, 0.02, 500))
+                          ev.BOOTSTRAP), (2.5, 0.99, 10.0, 0.02, 500))
         self.assertGreaterEqual(ev.NULL_TRIALS, 1000)
 
     def test_null_test_is_deterministic_and_counts_false_keeps(self):
@@ -297,7 +297,7 @@ class DecideMechanicsTests(unittest.TestCase):
         self.assertEqual((saved["commit"], sorted(saved["order"])), ("bbb", ["2015", "2016"]))
         text = self.out.getvalue()
         self.assertIn("DECISION: KEEP", text)
-        self.assertIn("needs +2 graded, hits not lower, and a win in 99% of resamples", text)
+        self.assertIn("needs +2.5 graded, hits not lower, and a win in 99% of resamples", text)
         self.assertNotIn("wins", text)
 
     def test_a_log_from_the_old_evaluator_is_refused(self):
@@ -483,6 +483,23 @@ class MainTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.run_main("--null-test", "20")
         self.assertEqual([r["status"] for r in self.rows()], ["null"])
+
+    def test_a_null_test_never_scores_the_test_split(self):
+        # reviews/36 09 N6 and 10 finding 2: --null-test with --test stays on dev.
+        asked = []
+        real = ev.evaluate
+
+        def only_dev(records, positives, split, **kw):
+            asked.append(split)
+            if split != "dev":
+                raise AssertionError("the sealed split was scored")
+            return real(records, positives, split, **kw)
+        with mock.patch.object(ev, "evaluate", only_dev), \
+                mock.patch.object(ev.concurrent.futures, "ProcessPoolExecutor",
+                                  side_effect=RuntimeError("stopped here")):
+            with self.assertRaises(RuntimeError):
+                self.run_main("--null-test", "20", "--test")
+        self.assertEqual(asked, ["dev"])
 
     def test_main_uses_the_fresh_process_pass_and_says_when_it_cannot_run(self):
         asked = []
@@ -704,14 +721,44 @@ class CheckedBytesTests(unittest.TestCase):
             for name in ("csv.py", "json.pyc", "prepare.py", ".gitignore", "CSV.txt",
                          "math" + __import__("importlib.machinery").machinery.EXTENSION_SUFFIXES[0]):
                 Path(tmp, name).write_text("")
-            for folder in ("random", "venv", "site", "types", "screener", "tests"):
+            # A folder without an __init__ is a namespace package: it loses to
+            # a module this Python has (venv/), and wins where there is none
+            # (msvcrt/ or _winapi/ on Linux: reviews/36 10, finding 1).
+            missing = ["msvcrt", "_winapi"] if sys.platform != "win32" else []
+            for folder in ("random", "venv", "site", "types", "screener", "tests", *missing):
                 Path(tmp, folder).mkdir()
             Path(tmp, "random", "__init__.py").write_text("")
-            with mock.patch.object(ev, "ROOT", Path(tmp)):
+            Path(tmp, "types", "__init__.pyi").write_text("")     # not importable: no shadow
+            Path(tmp, "site", "__init__.txt").write_text("")
+            Path(tmp, "venv", "__init__.py").mkdir()                # a folder of that name: no package
+            # With the root on sys.path too (PYTHONPATH=.), its own folders do
+            # not count as the standard module (reviews/36 12, finding 3).
+            with mock.patch.object(ev, "ROOT", Path(tmp)), \
+                    mock.patch.object(sys, "path", [tmp, "", *sys.path]):
                 found = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
-            self.assertEqual(len(found), 4)
+            self.assertEqual(len(found), 4 + len(missing))
             self.assertEqual([n for n in found if not n.startswith("math")],
-                             ["csv.py", "json.pyc", "random"])
+                             sorted(["csv.py", "json.pyc", "random", *missing]))
+            # A repository folder on sys.path is refused whatever it holds.
+            Path(tmp, "reviews").mkdir()
+            with mock.patch.object(ev, "ROOT", Path(tmp).resolve()), \
+                    mock.patch.object(sys, "path", [tmp, str(Path(tmp, "reviews")), *sys.path]):
+                self.assertIn("reviews (a repository folder on sys.path)", ev.foreign_modules())
+            # Builtin and frozen modules are this Python's own.
+            self.assertTrue(ev._stdlib_has("sys"))
+            self.assertTrue(ev._stdlib_has("_frozen_importlib"))
+            self.assertTrue(ev._stdlib_has("json"))
+            if sys.platform != "win32":
+                self.assertFalse(ev._stdlib_has("msvcrt"))
+            # An empty folder of the same name elsewhere on sys.path is no
+            # standard module either (reviews/36 12, finding 2).
+            with tempfile.TemporaryDirectory() as other:
+                for name in missing:
+                    Path(other, name).mkdir()
+                with mock.patch.object(ev, "ROOT", Path(tmp)), \
+                        mock.patch.object(sys, "path", [other, *sys.path]):
+                    again = sorted(n.split(" ")[0] for n in ev.foreign_modules() if "shadows" in n)
+                self.assertEqual(again, found)
 
     def test_git_runs_in_the_repository_root(self):
         seen = []

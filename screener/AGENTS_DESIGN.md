@@ -9,48 +9,53 @@ across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
-## Next session: start here (written 2026-11-11)
+## Next session: start here (written 2026-11-12)
 
 Open items, most important first:
 
-1. **The evaluation is reviewed and fixed in code, but the stop is still
-   on.** The answer key could not be rebuilt on 2026-11-11: Georgia DOT's
-   exits layer was down. `--decide` refuses until the key is rebuilt
-   under the new builder rules and the keep thresholds are measured on
-   it. The checklist is the last section of
-   `reviews/36_screener_eval_cohorts_metric/07_fixes_thresholds_and_what_is_left.md`
-   (rebuild, check the key, re-run `--null-test`, refresh the numbers in
-   `PROGRAM.md` and `README.md`, then clear `REVIEW_PENDING`). Do not run
-   the AutoResearch loop from a session that has opened
-   `autoresearch/data/` or that folder: it reads only `PROGRAM.md`.
-2. **One operator decision on the key** (`07`, "Open decision"): whether
-   the rule that leaves out recent buyers should start before 2015. As
-   decided it starts on 1 January 2015; a handful of 2015-2017 positives
-   are owners who bought in 2012-2014.
-3. **The quote checker's third round has had no independent check**
-   (`reviews/35_screener_lead_layer/09_quotecheck_fixes_and_skeptic_run.md`).
-   The first two rounds were checked; the third answers the second check.
-   Four operator decisions are listed there (an allow-list of government
-   hosts, other listing sites, a contact address in the User-Agent, the
-   ArcGIS robots.txt question).
-4. **Both pilot leads now have a skeptic verdict** (`leads/` on the
-   `screener-data` branch): #6 `killed` (a developer's project; no sale
-   shown yet), #44 `weakened` (its plan label was replaced in 2025). The
-   seven parcels of the #6 assemblage are marked `maybe`. For a person:
-   pull the deeds for those seven; ask Fairburn Planning what the 2025
-   plan and the C-2 text allow at #44.
+1. **The evaluation's stop is lifted (2026-11-12), and nothing has been
+   merged to `main` yet.** Everything below is on
+   `claude/magical-dirac-0kll8l`:
+   - the key rebuilt under the new rules: 45 sites, 35 dev / 10 test;
+   - the owner-name fix;
+   - `MIN_GAIN` 2.5;
+   - evaluator rounds 4 to 7 and quote-checker rounds 4 to 8.
+
+   The record is `reviews/36_screener_eval_cohorts_metric/14` and `15`.
+   Before a loop: merge the branch, then a human records the baseline
+   where the loop will run (`--decide --new-baseline`). Start the loop from
+   a fresh session that reads only `PROGRAM.md`, never one that has
+   opened `autoresearch/data/` or `reviews/36`.
+2. **The loop's log does not survive a cloud session.** `experiments.tsv`
+   and `best_ranking.json` are untracked; a new container has neither and
+   `--decide` then stops for a human baseline. Decide where a batch's log
+   is kept before starting one.
+3. **The quote checker** went through twelve rounds on 2026-11-12
+   (`reviews/35_screener_lead_layer`, 10 to 18). The rule it meets is:
+   nothing in `lead.md` can be linked or pasted as an address. A split host
+   ("clerk. zone") can still be read, and a dotted number stays. The
+   twelfth round (`18`'s fixes) has not had an independent read. Four
+   operator decisions are still listed in `09`.
+4. **Leads: every grade A lead of 2026-11-12 has had a document check
+   (`screener-data`: `leads/` and the digest's last section). None
+   survives as written: #29 is `killed`, the rest are `weakened`.** The
+   checks found four gaps in the screen:
+   - built sites pass the land-only screen (`screens.py`, human-owned);
+   - Atlanta's future land use comes from a superseded field. A reviewed
+     fix is held, because the root zoning importer's snippet must change
+     with it. To restore it: `git revert c00525a 0cea72b` (`reviews/35/19`);
+   - a listed hazardous site next door does not count;
+   - operating companies' own buffer land ranks as a lead.
+
+   The first, third and fourth are the operator's to decide. No lead is
+   marked in `decisions.csv`.
 5. **Still open from before:** whether to add the owner the pilot flagged
    to the excluded-owner rules (`screens.py` / `owners.py`, human-owned,
    needs a new baseline).
 6. **Runs are on demand.** Ask a session with the repository attached to
-   follow `RUNBOOK.md` on the `screener-data` branch. A run needs the
-   same Georgia DOT layer, so it fails while that server is down. The
-   weekly scheduled task is switched off, not deleted.
-7. **The loop's log does not survive a cloud session.** `experiments.tsv`
-   and `best_ranking.json` are untracked; a new container has neither and
-   `--decide` then stops for a human baseline. Decide where a batch's
-   log is kept before starting one.
-8. **Not started:** the shared enrichment contract (step 2 below); the
+   follow `RUNBOOK.md` on the `screener-data` branch. A warm run takes
+   about six minutes.
+7. **Not started:** the shared enrichment contract (step 2 below); the
    sites the answer key leaves out as built-but-not-sold; Gwinnett as a
    held-out check and open-records requests for 2016 digests
    (`reviews/35_screener_lead_layer/05_county_feasibility.md`).
@@ -67,7 +72,7 @@ Open items, most important first:
 | Runs | **On demand** (operator decision, 2026-11-10): ask a Claude session with the repository attached to follow `RUNBOOK.md` on the `screener-data` branch. The weekly schedule made earlier is switched off; a scheduled session starts without push access to the repository and could not save its results. |
 | 4. Investigation | `quotecheck.py` and `INVESTIGATE.md` piloted on two leads, reviewed twice and rewritten in three rounds; the third round is not yet checked (`reviews/35_screener_lead_layer`, 06 to 09). The skeptic step has run once on both pilot leads (2026-11-11). `lead.md` is written by the code. |
 | 2. Enrichment contract | Not started. |
-| Evaluation: more as-of years and a graded score | Built, reviewed and fixed in code (2026-11-11); **not cleared**: the key must be rebuilt under the new rules first (see "Next session" above and `reviews/36_screener_eval_cohorts_metric`, 05 to 07). The key in `data/` is still the one merged on 2026-11-10: 49 distinct sites, 38 dev / 11 test. |
+| Evaluation: more as-of years and a graded score | Built, reviewed and fixed; key rebuilt 2026-11-12 (45 distinct sites, 35 dev / 10 test) and thresholds measured on it; stop lifted 2026-11-12 on `claude/magical-dirac-0kll8l` (`reviews/36_screener_eval_cohorts_metric`, 05 to 15). |
 | 6. More counties | Not started. No neighbouring county publishes a 2016 snapshot like Fulton's (`reviews/35_screener_lead_layer/05_county_feasibility.md`). Fulton itself publishes yearly snapshots for 2015-2021 and 2023-2026 (service names seen 2026-11-10; fields not checked). Rebuilding the key is a human-only step. |
 
 What the pilot changed in the plan: the zoning text (Municode) and the
