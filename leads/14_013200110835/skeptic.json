@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "parcel_id": "14 013200110835",
+  "skeptic": {
+    "verdict": "killed",
+    "objection": "This is not vacant industrial land. The county address-point layer, queried by this parcel id, returns 96 active main addresses on the parcel, 2848 Veterans St itself classed Residential - Single Structure: an occupied manufactured-home community, so buying it means closing a lived-in community and relocating residents. The screener's MI code is East Point's M-I Medical Institutional district, not industrial, and the city has since approved a use permit for 138 assisted senior living units in M-I on Norman Berry Drive parcels that lie within 1,500 ft of this site. East Point also treats a warehouse within 5,280 ft of residential property as needing a variance even in its I-1 Light Industrial district, and this parcel is surrounded by homes. The by_right entitlement and grade B rest on a misread zoning code.",
+    "disputes": ["zoning-5", "plans-2", "plans-3"],
+    "claims": [
+      {
+        "text": "The county address-point layer, queried by this parcel id (all fields), returns 96 active main-address points on the parcel; the point for 2848 Veterans St itself is classed Residential - Single Structure. The parcel is in residential use, not vacant land.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/10/query?where=ParcelID%3D%2714%20013200110835%27&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"Label\":\"2848 Veterans St\",\"UnitLow\":null,\"UnitHigh\":null,\"UnitActual\":null,\"City\":\"East Point\",\"State\":\"GA\",\"Zip\":\"30344\",\"Zip4\":null,\"PtType\":\"Main Address\",\"PtClass\":\"Residential - Single Structure\""
+      },
+      {
+        "text": "East Point's code M-I is the Medical Institutional zoning district, not an industrial one; the city's September 18, 2025 Planning and Zoning Commission agenda lists a use permit for 138 units of assisted senior living in M-I at 0 Norman Berry Drive (PINs 14 012500111113, 14 0125LL0200, 14 012500100793).",
+        "source_url": "https://eastpointga.gov/wp-content/uploads/2025/09/Agenda-PZ-Public-Hearing-SEPT-18-2025.pdf",
+        "retrieved": "2026-11-13",
+        "quote": "The applicant is requesting a Use permit to develop 138 units of assisted senior living in the M-I Medical Institutional zoning district."
+      },
+      {
+        "text": "Same agenda: even in the I-1 Light Industrial district, a warehouse within 5,280 ft of residential property needs a variance from Sec. 10-2150.6(a)(1). This parcel is ringed by single-family (class R3) parcels and the senior-living site, so any warehouse here would face that rule if it applies to the parcel's district (not confirmed for M-I).",
+        "source_url": "https://eastpointga.gov/wp-content/uploads/2025/09/Agenda-PZ-Public-Hearing-SEPT-18-2025.pdf",
+        "retrieved": "2026-11-13",
+        "quote": "variances from 10-2150.6(a)(1) to operate a warehouse within 5,280 ft of residential property in the I-1 Light Industrial zoning district"
+      },
+      {
+        "text": "The county parcel layer, queried for all parcels within 1,500 ft of the site point (33.677237, -84.428686), returns the 0 Norman Berry Dr parcel 14 012500111113, one of the three parcels of the M-I senior-living case: the medical-institutional and residential uses are next to this site. The same answer (279 parcels) is mostly class R3 homes with one living unit each.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.428686%2C33.677237&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"ParcelID\":\"14 012500111113\",\"TaxYear\":2027,\"Address\":\"0 NORMAN BERRY DR\""
+      }
+    ],
+    "open_items": [
+      "Ask East Point Planning for a zoning verification letter: confirm the parcel is M-I, whether any warehouse or light-industrial use is allowed in M-I at all, and whether the October 2024 MI moratorium and the deferred Sec. 10-2071 amendment (reported in third-party summaries, not verified) are still in force.",
+      "Ask whether Sec. 10-2150.6(a)(1) (5,280 ft from residential) applies outside I-1/I-2; a third-party news summary (not verified) says it applies to all new industrial uses.",
+      "Disputed zoning-5: its quote is only the map's signature and date line; it does not show the parcel is inside the Cleveland Avenue Overlay. Disputed plans-2: the quote is a generic engagement remark and says nothing about this parcel. Disputed plans-3: the 2022 0 Veterans townhome parcel (14 013200110900) is not among the 279 parcels the county returns within 1,500 ft of the site point, so 'beside the site' is not shown (it may have been renumbered).",
+      "Third-party park directories seen only as search snippets (not fetched, not primary) describe 2848 Veterans St as an operating manufactured-home community; a drive-by would confirm occupancy and count of homes."
+    ]
+  }
+}

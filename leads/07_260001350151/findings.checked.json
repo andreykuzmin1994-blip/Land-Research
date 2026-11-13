@@ -1,0 +1,565 @@
+{
+ "schema": 1,
+ "parcel_id": "07 260001350151",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "conditional",
+   "claims": [
+    {
+     "id": "zoning-1",
+     "text": "This parcel's industrial zoning is tied to a 2024 rezoning case: South Fulton case Z24-002 (the Mayor and Council memo) asked to rezone a 78.3-acre assemblage that includes this parcel from AG-1 and R-2 to M-2 for Industrial Outdoor Storage or Industrial Service Facilities. Staff recommended denial and the Planning Commission deferred it 30 days. The council decision, and any conditions of zoning, were not found. The brief's M-2 comes from the screener's layer and was not re-checked here.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "The applicant is requesting to rezone from the AG-1 (Agricultural) zoning district and R-2 (Single Family Dwelling District) to M-2 (Heavy Industrial) zoning district to develop the properties for Industrial Outdoor Storage (IOS) or Industrial Service Facilities (ISF) on 78.3 acres of land.",
+     "context_before": "rndon road, 7490 herndon road, & 7500 herndon road meeting date: april 17, 2024 ",
+     "context_after": " staff recommendation: denial planning commission recommendation: 30-day deferra",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "zoning-2",
+     "text": "The same memo lists this parcel (07 260001350151) as one of the five parcels in the Z24-002 request.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "07 260001221014, 07 260001351027, 07 260001350904, 07 260001350151, & 07 260001350169",
+     "context_before": "ar status of applicant: applicant city council district(s): 4 parcel id number: ",
+     "context_after": " area of property: 78.3 acres existing zoning: r-2 (single-family dwelling distr",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "zoning-3",
+     "text": "Before the case, the five parcels together were a mix of R-2, AG-1 and M-2; which part was already M-2 is not said in the text (the case maps are images).",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "Existing Zoning: R-2 (Single-Family Dwelling District), AG-1 (Agricultural District) , & M-2 (Heavy Industrial)",
+     "context_before": "7 260001350904, 07 260001350151, & 07 260001350169 area of property: 78.3 acres ",
+     "context_after": " current/past use of the property: the property is currently a landfill. prior z",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "zoning-4",
+     "text": "The staff memo quotes the South Fulton zoning code's purpose statement for M-2, which names distributing, terminal and warehousing uses. This is the district's intent statement, not its use table (Municode is a known wall), so whether warehouse/distribution is permitted without a use permit was not confirmed.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "The M-2 District is intended to provide locations for a full range of manufacturing, fabricating, processing, distributing, research, office associated with industrial use, extraction, and terminal and warehousing uses.",
+     "context_before": "area. the m-2 district is described in the south fulton zoning code as follows: ",
+     "context_after": " staff recommends denial based on these factors. planning commission recommendat",
+     "pdf_page": 5,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "zoning-5",
+     "text": "Condition: outdoor storage needed a separate special use permit in South Fulton. Companion case U24-001 (same applicant, same five parcels) asked for one; staff recommended denial. Its outcome was not found.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+     "retrieved": "2026-11-13",
+     "quote": "The applicant is requesting a special use permit for outdoor storage in conjunction with rezoning application to develop an Industrial Outdoor Storage (IOS) facility or Industrial Service Facilities (ISF).",
+     "context_before": "/history: 1966z-0100 & 1972z-0239 specific information findings of fact request ",
+     "context_after": " these properties will host 5 warehouses on 78.3 acres of land. property locatio",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38e38fbf487ec34cb03fee81.pdf"
+    }
+   ],
+   "open_items": [
+    "Ask South Fulton planning for the Mayor and Council decision on Z24-002 and U24-001 (dates, ordinance number) and any conditions of zoning attached to M-2 on this parcel (buffers, use limits such as IOS-only, access, site plan tie-down). The city's zoning case list shows no council date for either case; the city's 2024 ordinance list loads only through a script form and was not read.",
+    "Confirm the parcel's current zoning on the official South Fulton map: the city's zoning layer is on ArcGIS Online (known wall), and a third-party listing seen only in a search snippet gave AG-1. The brief's M-2 is the screener's own reading.",
+    "The M-2 use table (warehouse, distribution, truck terminal, outdoor storage) is on Municode (known wall) and could not be quoted."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "Case CDP-004 (2024) proposed to move this parcel (7565 Bishop Road) and the four neighbouring parcels from the Rural Neighborhood to the Industrial Zone character area of the 2021 comprehensive plan; staff recommended approval. The brief's future land use, Industrial Zone, matches the proposed designation, which suggests it was adopted; the council resolution itself was not found.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11056/CDP-004-Bishop-Herndon-Road",
+     "retrieved": "2026-11-13",
+     "quote": "redesignate the properties located at 7565 and 7635 Bishop Road; 7460, 7490 and 7500 Herndon Road from Rural Neighborhood Character Area to the Industrial Character Area.",
+     "context_before": "evelopment map, in the \"our south fulton: the 2021 comprehensive plan (cdp)\" to ",
+     "context_after": " the properties collectively are about 78.3 acres. this case is related to z24-0",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/1b7110a44fda077450743edc.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The CDP-004 staff memo recommended approval.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11056/CDP-004-Bishop-Herndon-Road",
+     "retrieved": "2026-11-13",
+     "quote": "STAFF RECOMMENDATION: APPROVAL",
+     "context_before": " properties collectively are about 78.3 acres. this case is related to z24-002. ",
+     "context_after": " 5440 fulton industrial blvd sw \u2022 south fulton, ga 30336 \u2022 office: 470.809.7700 (page break) s",
+     "pdf_page": 1,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/1b7110a44fda077450743edc.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The Planning Commission voted 3 to 1 on September 18, 2024 to approve CDP-004 (the vote is at the top of minutes page 7; the item text ending 'related to Z24-002' is at the foot of page 6).",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11120/PC-minutes-9182024",
+     "retrieved": "2026-11-13",
+     "quote": "Commissioner Hadley made a motion to approve the case. Commissioner Jones seconded the motion. Yay: 3 (Hadley, Jones, DeVaughn) Nay: 1 (Boone) Abstain: Motion passed.",
+     "context_before": "e properties collectively are about 78.3 acres. this case is related to z24-002. (page break) ",
+     "context_after": " j. case cdp-006: a resolution by councilwoman bell to amend the city of south f",
+     "pdf_page": 7,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/5c07aced19aebc68604f7871.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "Before CDP-004 the plan pointed the other way: in April 2024 staff said the Rural Neighborhood designation did not support M-2 here, and the memo describes abutting land as zoned and used residential.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "The subject property has a future land use designation of Rural Neighborhood as designated in the 2021 South Fulton Comprehensive Plan, which does not support the proposed zoning.",
+     "context_before": " is located in council district 4. 2021 comprehensive plan land use designation ",
+     "context_after": " adjacent zoning and land uses north: ag-1 (agricultural district) & the city of",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "plans-5",
+     "text": "Neighbours: the memo says abutting properties are zoned and used as residential and that significant perimeter buffers were proposed.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "The zoning will permit a use that is suitable for development of adjacent and nearby properties because abutting properties are zoned and utilized as residential. Significant buffers are proposed on the perimeter of the development.",
+     "context_before": "is suitable in view of the use and development of adjacent and nearby property; ",
+     "context_after": " 7) whether the zoning proposal will adversely affect the existing use or usabil",
+     "pdf_page": 4,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "plans-6",
+     "text": "Another rezoning on Bishop Road in the last five years: South Fulton's case list shows Z26-013 at 7000 and 7050 Bishop Rd (Planning Commission 08/19/2026), and the city's ordinance list shows ORD2026-035 for Z26-013 on September 22, 2026. Its distance from this parcel was not measured; what it is for was seen only in search snippets (open item).",
+     "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "Z26-013 7000 & 7050 Bishop Rd Staff Report 08/19/2026",
+     "context_before": "staff report 06/17/2026 z26-011 0 & 7930 cedar grove rd staff report 08/19/2026 ",
+     "context_after": " 08/11/2026 z26-007 2210 wallace road & wallace road rear staff report 03/18/202",
+     "words_shared_with_url": [],
+     "page_file": "pages/abbee3e1515f295c7a98c51c.html"
+    },
+    {
+     "id": "plans-7",
+     "text": "The city's ordinance list carries an ordinance for Z26-013 on Bishop Road dated September 22, 2026.",
+     "source_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/Ordinances-4",
+     "retrieved": "2026-11-13",
+     "quote": "Sep 22, 2026 ORD2026-035 _ Z26-013 Bishop Road",
+     "context_before": "036_ordinance_adopting_fy2027_city_budget_revised as approved download \u25bc agenda ",
+     "context_after": " download \u25bc agenda sep 22, 2026 ord2026-034 _ z26-014-cdp26-004 northfield blvd ",
+     "words_shared_with_url": [],
+     "page_file": "pages/5dbccb666b158071d1bcd3f7.html"
+    }
+   ],
+   "open_items": [
+    "Ask the city whether Mayor and Council adopted the CDP-004 resolution (Rural Neighborhood to Industrial Zone) and when.",
+    "Search snippets only (not read, not verified): news summaries describe Z26-013 as about 25.5 acres on Bishop Road rezoned from AG-1 to a Community Unit Plan for a 72-lot single-family subdivision. If it lies close to this parcel, new homes would sit near an industrial site; ask the city for the case map and any buffer requirement against residential."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer, not shown nearby: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 2,000 ft of the brief's map point (-84.625984, 33.548675), returns an empty feature list.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "30},{\"name\":\"lengthinfeet\",\"type\":\"esrifieldtypedouble\",\"alias\":\"lengthinfeet\"},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/c0ee63dea6f44b2f2d77523f.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the same point, answers Fulton County, sewer, service available. That is a service-area polygon, not a nearby main.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\"",
+     "context_before": "\":{\"objectid\":1,\"orig_fid\":1,\"shape_star\":73.23144531,\"shape_stle\":769.14763871,",
+     "context_after": ",\"shape.starea()\":10173715022.83869,\"shape.stlength()\":1481074.5223924106}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/f161d68a62dac091448b67e0.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 2,000 ft of the same point, returns an empty feature list. The county may not be the water provider here (Fairburn or Atlanta may be), so this is not proof there is no main.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"Shape.STLength()\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "\"name\":\"surveydate\",\"type\":\"esrifieldtypedate\",\"alias\":\"surveydate\",\"length\":8},",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/e66462e0b9eab2c1f4c7ca42.html"
+    }
+   ],
+   "open_items": [
+    "Ask who provides water at Bishop Road (City of Fairburn, City of Atlanta or Fulton County) and the nearest main and fire flow; the assessor shows well and septic.",
+    "Ask Fulton County Public Works for the nearest gravity sewer or force main and capacity; no county sewer pipe is mapped within 2,000 ft. The 2024 staff memos said the rezoning should not burden utilities, without detail."
+   ]
+  },
+  "market": {
+   "verdict": "signs_developer_pursuing",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "A developer has pursued this site: in 2024 an applicant (named in the memo as Alain Iskandar) applied to rezone the 78.3-acre assemblage including this parcel to M-2 for industrial outdoor storage or industrial service facilities, described as 5 warehouses.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "The property will consist of 5 warehouses on 78.3 acres of land.",
+     "context_before": "evelop industrial outdoor storage (ios) or industrial service facilities (isf). ",
+     "context_after": " property location the properties total to 78.3 acres of land laying and being i",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    },
+    {
+     "id": "market-2",
+     "text": "The applicant on the 2024 use permit (and on Z24-002) is named as an individual acting as applicant; the memo does not say who owned the land then.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+     "retrieved": "2026-11-13",
+     "quote": "Applicant Information: Alain Iskandar Status of Applicant: Applicant",
+     "context_before": " blvd sw \u2022 south fulton, ga 30336 \u2022 office: 470.809.7700 (page break) application information ",
+     "context_after": " city council district(s): 4 parcel id number: 07 260001221014, 07 260001351027,",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38e38fbf487ec34cb03fee81.pdf"
+    },
+    {
+     "id": "market-3",
+     "text": "The city's filed zoning cases list shows Z24-002 for 7565 Bishop Road with a Planning Commission date only, and the companion plan amendment CDP-004 for the same five addresses; no Mayor and Council date is shown in either row.",
+     "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "CDP-004 7565 & 7635 Bishop Rd; 7460,7490 and 7500 Herndon Road Staff Report 9/18/2024",
+     "context_before": " amendment staff report 3/20/2025 cdp-006 0 roosevelt rd staff report 9/18/2024 ",
+     "context_after": " use permits case # location staff report czim planning commission mayor & counc",
+     "words_shared_with_url": [],
+     "page_file": "pages/abbee3e1515f295c7a98c51c.html"
+    },
+    {
+     "id": "market-4",
+     "text": "Assemblage: the county parcel layer, asked by parcel id for the other four parcels in the 2024 case, shows that three of them (7500, 7490 and 7460 Herndon Rd) have the same owner of record as this parcel; the fourth, 7635 Bishop Rd, is held by a different company named after its address.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"7635 BISHOP RD\",\"AddrNumber\":\"7635\",\"AddrPreDir\":null,\"AddrStreet\":\"BISHOP\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"7635 BISHOP ROAD LLC \"",
+     "context_before": "es\":[{\"attributes\":{\"objectid\":7820,\"parcelid\":\"07 260001350169\",\"taxyear\":2027,",
+     "context_after": ",\"owneraddr1\":\"2250 n druid hills rd ne ste 280\",\"owneraddr2\":\"atlanta ga 30329-",
+     "words_shared_with_url": [],
+     "page_file": "pages/c4ab474025952ac2daa98c6d.html"
+    },
+    {
+     "id": "market-5",
+     "text": "One of the same-owner neighbours in the case, 7500 Herndon Rd, on the same county answer.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"7500 HERNDON RD\",\"AddrNumber\":\"7500\",\"AddrPreDir\":null,\"AddrStreet\":\"HERNDON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"BR FAIRBURN LP \"",
+     "context_before": "54}},{\"attributes\":{\"objectid\":8339,\"parcelid\":\"07 260001221014\",\"taxyear\":2027,",
+     "context_after": ",\"owneraddr1\":\"1228 west ave\",\"owneraddr2\":\"miami beach fl 33139\",\"taxdist\":\"55\"",
+     "words_shared_with_url": [],
+     "page_file": "pages/c4ab474025952ac2daa98c6d.html"
+    },
+    {
+     "id": "market-6",
+     "text": "Watch-out on the land itself: both 2024 memos describe the property (the five parcels together) as currently a landfill, while the Z24-002 memo also says staff knew of no prior development. Which parcel holds the landfill is not said; the brief flags a listed contamination site at 7635 Bishop Road, 474 ft away.",
+     "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+     "retrieved": "2026-11-13",
+     "quote": "Current/Past Use of the Property: The property is currently a landfill.",
+     "context_before": "ily dwelling district), ag-1 (agricultural district) , & m-2 (heavy industrial) ",
+     "context_after": " prior zoning cases/history: 1966z-0100 & 1972z-0239 specific information reques",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+    }
+   ],
+   "open_items": [
+    "Search snippets only (not fetched, not verified): a City of South Fulton news release of October 29, 2025 (CivicAlerts AID 864) is summarised as saying a developer is turning the former illegal landfill at 7635 Bishop Road, the neighbouring parcel in the same 2024 case, into Bishop Industrial Park, a light industrial and logistics site, with a groundbreaking on October 30, 2025. The page could not be read: robots.txt disallows /CivicAlerts.aspx and its mobile copy redirects to a 404. Ask the city for the release and whether 7565 Bishop Rd is part of that park.",
+    "The search results also surfaced a for-lease listing for 7635 Bishop Rd on a CoStar-owned host; it was not opened or used. A person may check by hand whether the neighbouring parcel is marketed.",
+    "The last priced deed (2024-12-19, executor's deed, per the brief) came after the 2024 cases: ask whether the buyer is linked to the 2024 applicant and whether the site is held for the same project.",
+    "Ask the city for any site plan, land disturbance permit or development-authority bond naming 7565 Bishop Rd; none was found. No DRI for Bishop Road turned up in searches."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "Fulton County's parcel layer, asked by this parcel id, gives the owner of record as a limited partnership (an entity, not a person), on 39.18 acres coded residential land use 101 with one living unit.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001350151%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"7565 BISHOP RD\",\"AddrNumber\":\"7565\",\"AddrPreDir\":null,\"AddrStreet\":\"BISHOP\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"BR FAIRBURN LP \"",
+     "context_before": "es\":[{\"attributes\":{\"objectid\":8154,\"parcelid\":\"07 260001350151\",\"taxyear\":2027,",
+     "context_after": ",\"owneraddr1\":\"1228 west ave\",\"owneraddr2\":\"miami beach fl 33139\",\"taxdist\":\"55\"",
+     "words_shared_with_url": [],
+     "page_file": "pages/53a3e1fd1bb3e7d39198cb8d.html"
+    },
+    {
+     "id": "owner-2",
+     "text": "The same record shows a small improvement and one living unit: there appears to be a house on the parcel today.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001350151%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":98800,\"LUCode\":\"101\",\"ClassCode\":\"A5\",\"ExCode\":null,\"LivUnits\":1,\"LandAcres\":39.18",
+     "context_before": "2360,\"landassess\":392840,\"imprassess\":39520,\"totappr\":1080900,\"landappr\":982100,",
+     "context_after": ",\"nbrhood\":\"07007\",\"subdiv\":null,\"subdivnum\":\"2023-0560\",\"subdivlot\":null,\"subdi",
+     "words_shared_with_url": [],
+     "page_file": "pages/53a3e1fd1bb3e7d39198cb8d.html"
+    },
+    {
+     "id": "owner-3",
+     "text": "The same partnership holds three of the four other parcels in the 2024 industrial rezoning assemblage (7490 Herndon Rd shown here), which reads like a vehicle assembling the site for development rather than an operating business.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Address\":\"7490 HERNDON RD\",\"AddrNumber\":\"7490\",\"AddrPreDir\":null,\"AddrStreet\":\"HERNDON\",\"AddrSuffix\":\"RD\",\"AddrPosDir\":null,\"AddrUntTyp\":null,\"AddrUnit\":null,\"Owner\":\"BR FAIRBURN LP \"",
+     "context_before": "98}},{\"attributes\":{\"objectid\":8370,\"parcelid\":\"07 260001351027\",\"taxyear\":2027,",
+     "context_after": ",\"owneraddr1\":\"1228 west ave\",\"owneraddr2\":\"miami fl 33139\",\"taxdist\":\"55\",\"tota",
+     "words_shared_with_url": [],
+     "page_file": "pages/c4ab474025952ac2daa98c6d.html"
+    }
+   ],
+   "open_items": [
+    "The Georgia Secretary of State record (status, formation date, registered agent, principal office) was not read: known wall. The owner may also be registered in Florida or elsewhere; a person should pull the registration by hand.",
+    "The developer-or-investor reading rests on the entity form, the out-of-state mailing address in the brief, the recent purchase and the assemblage; it is an inference, not a record."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "This does not look like raw land an outside buyer can source. A limited partnership bought it in December 2024, after a 2024 industrial rezoning and outdoor-storage permit had been filed for a 78.3-acre assemblage that includes it. The brief and the county layer show the same partnership holding most of that assemblage (about 72 acres). The brief gives the price as $2.05M, about twice the assessor's land value, though the deed may cover more than this parcel. The neighbouring 7635 Bishop Rd tract is already being developed by another industrial outdoor storage company. On top of that, the M-2 zoning the grade rests on is not proven. Staff recommended denial of both the 2024 rezoning and the permit, found outdoor storage incompatible with the neighbours, and the Planning Commission deferred the case. The city's case list shows no council date. Before the case, the land was AG-1, R-2 and some M-2. The first pass's plan support (CDP-004) amends the 2021 plan, which the 2026 Comprehensive Plan has since replaced, and this parcel's 2026 designation was not found. No document shows a closing, a site plan for this parcel or a council denial, so the lead is weakened, not killed.",
+  "disputes": [
+   "zoning-5",
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The 2024 rezoning memo says the five-parcel property was zoned AG-1 and M-2 when the case was filed. The rezoning to M-2 was what the applicant was asking for. M-2 on this parcel is therefore not shown to predate the case, and the case outcome was not found.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+    "retrieved": "2026-11-13",
+    "quote": "The property is zoned AG-1 and M-2. The applicant is requesting to rezone to M-2 to develop Industrial Outdoor Storage (IOS) or Industrial Service Facilities (ISF).",
+    "context_before": "and r-2 (single family dwelling district) to m-2 (heavy industrial). background ",
+    "context_after": " the property will consist of 5 warehouses on 78.3 acres of land. property locat",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The case had already slipped once: notice set Planning Commission for February 21, 2024 and Council for March 19, 2024. The memo is dated April 17, 2024 and ends in a 30-day deferral.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+    "retrieved": "2026-11-13",
+    "quote": "Staff placed the required notice of public hearing in The Daily Report on January 31, 2024, to notify the public that Case Z24-002 would be heard at the Planning Commission Meeting on February 21, 2024, and at the City Council Public Hearing on March 19, 2024.",
+    "context_before": "d their rezoning plan to attendees, and nobody spoke in opposition or in favor. ",
+    "context_after": " staff placed a notification sign in front of the subject property on january 31",
+    "pdf_page": 3,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/38452f5d3cf86d5dafbdeb54.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "The city's filed zoning cases list still shows Z24-002 for this address with a Planning Commission date only and no Mayor and Council date.",
+    "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+    "retrieved": "2026-11-13",
+    "quote": "Z24-002 7565 Bishop Road Staff Report 4/17/2024",
+    "context_before": "bethsaida rd staff report 3/20/2024 z24-003 3260 enon rd staff report 3/20/2024 ",
+    "context_after": " z24-001 cosf rezoning/fulton ind. staff report 3/20/2024 z23-020 6573 campbellt",
+    "words_shared_with_url": [],
+    "page_file": "pages/abbee3e1515f295c7a98c51c.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "In the companion use-permit memo, staff found outdoor storage incompatible with the adjacent land uses and zoning. That is a neighbour-compatibility objection a buyer would face again.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+    "retrieved": "2026-11-13",
+    "quote": "The proposed use of outdoor storage is not compatible with the adjacent land uses and zoning districts.",
+    "context_before": "s the proposed use compatible with the adjacent land uses and zoning districts? ",
+    "context_after": " 4) does the proposed use violate local, state, and/or federal statues, ordinanc",
+    "pdf_page": 3,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/38e38fbf487ec34cb03fee81.pdf"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The same memo describes the pre-case zoning as AG-1 and M-2 and treats it as giving the land a reasonable economic use. Staff saw no need for the industrial rezoning.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+    "retrieved": "2026-11-13",
+    "quote": "The AG-1 (Agricultural) and M-2 (Heavy Industrial) district has numerous allowed uses that support the economic viability of the subject property.",
+    "context_before": "ghborhood; 15) effect on adjacent property; 16) economic use of current zoning; ",
+    "context_after": " 17) other conditions n/a staff analysis: staff recommendation: denial prepared ",
+    "pdf_page": 4,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/38e38fbf487ec34cb03fee81.pdf"
+   },
+   {
+    "id": "skeptic-6",
+    "text": "The 2021 plan that CDP-004 amended is no longer the only plan. A 2026 staff memo for another Bishop Road case cites both the 2021 plan and the 2026 South Fulton Comprehensive Plan. This parcel's designation under the 2026 plan was not found.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
+    "retrieved": "2026-11-13",
+    "quote": "The subject property has a future land use designation of Rural Neighborhood as designated in 2021 South Fulton Comprehensive Plan & Suburban I Neighborhood as designated in the 2026 South Fulton Comprehensive Plan.",
+    "context_before": "ated in council district 4. 2021 & 2026 comprehensive plan land use designation ",
+    "context_after": " adjacent zoning and land uses north: ag-1 (agricultural district) south: ag-1 (",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/77867d88075f52dca720884d.pdf"
+   },
+   {
+    "id": "skeptic-7",
+    "text": "Staff now test cases on Bishop Road against the 2026 plan, so a 2024 amendment to the 2021 map does not by itself show current plan support.",
+    "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
+    "retrieved": "2026-11-13",
+    "quote": "The proposed density is not supported by the 2021 Future Land Use Map; however, the proposed zoning district and density is supported by the 2026 Comprehensive Plan.",
+    "context_before": "ec. 803.06): 1) the suitability of the subject property for the zoned purposes; ",
+    "context_after": " 2) the extent to which the property values of the subject property are diminish",
+    "pdf_page": 3,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/77867d88075f52dca720884d.pdf"
+   }
+  ],
+  "open_items": [
+   "Ask South Fulton planning for the Mayor and Council outcome of Z24-002, U24-001 and the CDP-004 resolution (approved, denied, withdrawn or never heard), with dates and any conditions. Until then the M-2 in the brief is the screener's map reading only. The 2024 ordinance and resolution lists load only through a POST form and were not read.",
+   "Ask which character area the 2026 South Fulton Comprehensive Plan (adopted spring 2026) gives 7565 Bishop Rd. The future land use map is an image in the plan PDF and on the city's ArcGIS Online viewer (known wall).",
+   "Seen, not verifiable: the 2026 plan PDF, https://www.cityofsouthfultonga.gov/DocumentCenter/View/15671/CoSF-Comp-Plan-Combined_Pages-1 (about 157 MB, so possibly too large to check), says in its Industrial Zone category that industrial zones are generally incompatible with residential uses without appropriate buffering. It also says heavy industrial (M-2) may need extra performance standards.",
+   "Ask whether the owner partnership is linked to the 2024 applicant or to the developer of Bishop Industrial Park at 7635 Bishop Rd. If it is, the parcel is already in a developer's hands for its own project.",
+   "Seen, not verifiable: the city release on Bishop Industrial Park (CivicAlerts AID 864) is disallowed by robots.txt. I checked the mobile copy, https://www.cityofsouthfultonga.gov/m/newsflash/Home/Detail/864, and it answers 302 to the city's 404 page. Search snippets place the groundbreaking at 7635 Bishop Rd on October 30, 2025, by 9606 Capital. Whether the park takes in 7565 Bishop Rd is unknown.",
+   "First-pass market-4 says three of the four other case parcels share this owner. Its kept quotes show only 7500 and 7490 Herndon Rd; 7460 Herndon Rd is not quoted. The brief counts two same-owner parcels in the 5-50 acre band.",
+   "The county parcel record (first-pass owner-2) shows one living unit and about $98,800 of improvements: a house is on the parcel. Confirm whether it is occupied or leased.",
+   "Residential case Z26-013 (72 homes, 7000 and 7050 Bishop Rd) is not adjacent. From the county parcel layer's polygon vertices, its nearest point is about 5,660 ft (about 1.07 mi) from this parcel. This is my own rough measure, not a kept claim."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17": {
+   "file": "pages/38452f5d3cf86d5dafbdeb54.pdf",
+   "fetched_at": "2026-11-13T19:23:13Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+   "status": 200,
+   "bytes": 1888221,
+   "sha256": "01e8df87a009b3ed35f8923a97b984000cb1312d86ea1d7d527c6efa30eaeb50"
+  },
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road": {
+   "file": "pages/38e38fbf487ec34cb03fee81.pdf",
+   "fetched_at": "2026-11-13T19:23:23Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+   "status": 200,
+   "bytes": 1345947,
+   "sha256": "cec004c1d70590fe45032c1bb364e4c79967d429e3dc4010d3954249c9c41618"
+  },
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11056/CDP-004-Bishop-Herndon-Road": {
+   "file": "pages/1b7110a44fda077450743edc.pdf",
+   "fetched_at": "2026-11-13T19:23:33Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11056/CDP-004-Bishop-Herndon-Road",
+   "status": 200,
+   "bytes": 195781,
+   "sha256": "4034b1436f63f7a2bd373583e12127d177974dc00dccb287fd969b21a49d011f"
+  },
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11120/PC-minutes-9182024": {
+   "file": "pages/5c07aced19aebc68604f7871.pdf",
+   "fetched_at": "2026-11-13T19:23:43Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/11120/PC-minutes-9182024",
+   "status": 200,
+   "bytes": 318839,
+   "sha256": "60c53748f5f2de13807fee3c42d7e07688279e003e1b365510b68ebd584e93bd"
+  },
+  "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases": {
+   "file": "pages/abbee3e1515f295c7a98c51c.html",
+   "fetched_at": "2026-11-13T19:23:53Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+   "status": 200,
+   "bytes": 490638,
+   "sha256": "7b65487235171574229b1f9306fb16483c47ded5fb07be2ad48b5e5bb8968d6a"
+  },
+  "https://www.cityofsouthfultonga.gov/AgendaCenter/Ordinances-4": {
+   "file": "pages/5dbccb666b158071d1bcd3f7.html",
+   "fetched_at": "2026-11-13T19:24:03Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/AgendaCenter/Ordinances-4",
+   "status": 200,
+   "bytes": 167879,
+   "sha256": "175e5ec6db1cde3a80100bea7d44b4829e464067295ef262f7a121e009910e57"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/c0ee63dea6f44b2f2d77523f.html",
+   "fetched_at": "2026-11-13T19:24:05Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 7437,
+   "sha256": "918dc359067c706f30a79069a257f54cee9a076e2061e931767a66fd16a88897"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/f161d68a62dac091448b67e0.html",
+   "fetched_at": "2026-11-13T19:24:06Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1213,
+   "sha256": "515af0b1e3eab932009564b816c35b707d1a81da7f271e9f1a5dcda11320f0d7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/e66462e0b9eab2c1f4c7ca42.html",
+   "fetched_at": "2026-11-13T19:24:07Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.625984%2C33.548675&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3941,
+   "sha256": "4fdedc8dd0a83d1c15e98d06287f6931a243d734c92e8c178684710c271eadc4"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/c4ab474025952ac2daa98c6d.html",
+   "fetched_at": "2026-11-13T19:24:08Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%20IN%20(%2707%20260001221014%27%2C%2707%20260001351027%27%2C%2707%20260001350904%27%2C%2707%20260001350169%27)&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 6459,
+   "sha256": "9c5de60d3d542bedaa08dcb907cde1454128f701d8629c5fd6ed646eaeb335ef"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001350151%27&outFields=*&returnGeometry=true&outSR=4326&f=json": {
+   "file": "pages/53a3e1fd1bb3e7d39198cb8d.html",
+   "fetched_at": "2026-11-13T19:24:09Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20260001350151%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+   "status": 200,
+   "bytes": 4870,
+   "sha256": "73ef521090359bd75c2aeb0e3f3699a775705f0b8f1e19a6614e9a3fda742fa1"
+  },
+  "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1": {
+   "file": "pages/77867d88075f52dca720884d.pdf",
+   "fetched_at": "2026-11-13T19:24:13Z",
+   "final_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
+   "status": 200,
+   "bytes": 1943867,
+   "sha256": "99a9cc6c9adaeff1a008e9a188e56ecadf5ca5b4616c1acd4a2a4867c39880fc"
+  }
+ },
+ "quotecheck": {
+  "kept": 31,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-13T19:24:13Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "48b2726430a6f0e96c4c543c8c4760882aa07600a94549b78abe1267b38852f3",
+   "skeptic.json": "bb323eef5b80f3fd1eae4d800c98bbfb849e02b2df7eb93c404d179c3a137310"
+  }
+ },
+ "dropped_claims": []
+}

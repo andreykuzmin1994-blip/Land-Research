@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "parcel_id": "09F140000805662",
+  "skeptic": {
+    "verdict": "killed",
+    "objection": "The lot cannot hold a warehouse. Fulton County's own parcel polygon for it (same record, returned with geometry) is a curved strip about 2,170 ft long. By the skeptic's own computation on those coordinates, the widest circle that fits inside it is only about 290 ft across, so no 400 ft deep building envelope (the smallest prototype) fits anywhere on it, whatever the grading. The record's area of about 408,000 sq ft against a perimeter of about 5,320 ft says the same: a rectangle of that area and perimeter is about 165 ft wide. On the county's 2024 aerial it is the leftover land between Oakley Industrial Blvd and the I-85 ramp, held by the developer of the built-out park around it. At most it is a trailer-parking or outdoor-storage strip, not a building site, and the plan and zoning claims rest on 2005 and city-wide text, not on this lot.",
+    "disputes": ["plans-1", "plans-3"],
+    "claims": [
+      {
+        "text": "Asked by parcel id with its geometry, Fulton County's tax parcel layer gives the lot an area of about 408,280 sq ft and a perimeter of about 5,320 ft. The page also returns the polygon (54 corner points). From those points the skeptic computes (not on the page) a bounding box of about 2,170 by 1,160 ft and a largest inscribed circle about 290 ft across, so a 400 ft deep envelope cannot fit on any part of the lot. A rectangle with this area and perimeter would be about 165 ft wide.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F140000805662%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"Shape.STArea()\":408280.43562627491,\"Shape.STLength()\":5320.0777685435742"
+      },
+      {
+        "text": "Asked by parcel id without geometry, the same county record gives the same area and perimeter. The record carries 8.99 acres of land only, with no improvements.",
+        "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F140000805662%27&outFields=*&returnGeometry=false&f=json",
+        "retrieved": "2026-11-13",
+        "quote": "\"TotAppr\":453200,\"LandAppr\":453200,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":8.99"
+      }
+    ],
+    "open_items": [
+      "Seen, not verifiable: Fulton County's 2024 aerial (gismaps.fultoncountyga.gov, Imagery/Pictometry2024_NAIP MapServer export over the parcel's extent, with the county polygon drawn on it by the skeptic). It shows the lot as an open grassed strip. Oakley Industrial Blvd runs along its south edge and an I-85 ramp along its north edge. A small building sits in a notch at the northeast end, outside the polygon. A built warehouse with trailer yards lies across the road to the south. An image cannot be quoted.",
+      "The plans verdict 'supports' rests on city-wide character-area text (plans-1, plans-2) and on the developer's 2005 statement about Land Lots 61, 62 and 80 (plans-3). The lot lies mostly in Land Lots 81 and 82 (zoning-2). No document read places this lot in a character area or in M-1. Union City's site refuses automated requests; ask Union City planning.",
+      "Ask the person to check the park's recorded plat (Block A, Lot 4) and covenants. The strip may be a landscape buffer, a stormwater area or land left over from the Oakley Industrial Blvd extension. Ask GDOT whether any of it is held for the I-85 ramp at exit 66.",
+      "Any residual use (trailer parking, outdoor storage) depends on M-1 rules, park covenants and a curb cut on Oakley Industrial Blvd. All of these are unconfirmed, and that use is not the building-site acquisition the screener ranked.",
+      "Search results only, not read: the June 2025 Union City GC-to-TCMU rezoning for about 295 apartments at '0 Oakley Industrial Boulevard' is described as east of Oakley Industrial Blvd and south of Jonesboro Rd. That does not appear to be this lot, which lies near Flat Shoals Rd. The ATL03 Red Oak data center DRI #4315 (ARC, read) covers parcels 09F13... at Buffington Rd and Jonesboro Rd, not this lot. If the apartments sit within the park's reach, ask Union City whether residential adjacency buffers apply to the park."
+    ]
+  }
+}

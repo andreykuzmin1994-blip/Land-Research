@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "parcel_id": "09F140000805662",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [
+        {
+          "text": "The 2005 ARC regional review of the 192.54-acre Majestic Airport Center III warehouse park (2.3 million sq ft, Land Lots 61, 62 and 80, District 9F) records the park site as zoned M-1 with no rezoning needed: a 2005 statement about the park as a whole, not a reading of today's map for this lot. Fulton County's land lot layer puts most of this parcel in Land Lots 81 and 82 and only its west end in Land Lot 80 (zoning-2), so this lot may lie outside the 2005 site. The M-1 use table itself was not read (Union City's site refuses automated requests).",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID33/Preliminary%20Report.PDF",
+          "retrieved": "2026-11-13",
+          "quote": "The project site is currently zoned M-1 (light industrial). Rezoning is not required for the development. The DRI review was triggered by a land disturbance permit request from the applicant."
+        },
+        {
+          "text": "Land lot of this parcel: Fulton County's land lot layer, asked at the brief's map point for this parcel (-84.513565, 33.582718), answers District 9F, Land Lot 81, not one of the 2005 park's land lots (61, 62, 80). A second query of the same layer by the parcel's extent, checked by the investigator against the parcel polygon, puts 37 of its 54 corner points in Land Lot 81, 11 in Land Lot 82 and 6 (the west end) in Land Lot 80: that split is the investigator's own computation, not on this page.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/17/query?where=1%3D1&geometry=-84.513565%2C33.582718&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"DistNum\":\"09F\",\"LLotNum\":\"0081\",\"TaxPage\":\"14\",\"DistPage\":\"09F-14\",\"DistLLotNo\":\"09F0081\""
+        }
+      ],
+      "open_items": [
+        "Union City's own website (unioncityga.gov) answered 403 even for robots.txt, so the current zoning map, the M-1 use table and any conditions of zoning for this lot could not be read. Ask Union City planning to confirm the lot's district today and whether warehouse/distribution or truck/trailer parking is permitted by right on it.",
+        "The screener's M-1 reading comes from its own zoning layer; no document read here places this specific lot in M-1."
+      ]
+    },
+    "plans": {
+      "verdict": "supports",
+      "claims": [
+        {
+          "text": "Union City's 2020 comprehensive plan update (ARC review copy, January 2021) applies its District-Industrial character area close to I-85. This parcel lies about 0.12 mi from I-85 exit 66 (brief) inside an operating warehouse park, but the plan's Future Development Map was not read at parcel scale, so the character area of this exact lot is not confirmed.",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+          "retrieved": "2026-11-13",
+          "quote": "Application: D-I in close proximity to I-85, US-29, South Fulton Parkway and rail lines for the purpose of convenient transportation access."
+        },
+        {
+          "text": "The same plan says the District-Industrial area is meant for large distribution and industrial development.",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID2086/2021.01.26.CityofUnionCity.CompPlanUpdate_Reduced.pdf",
+          "retrieved": "2026-11-13",
+          "quote": "Building development should be variable within D-I to promote the specific needs of industrial activities or businesses and accommodate large-scale distribution facilities, industrial activities, or office park developments."
+        },
+        {
+          "text": "In 2005 the park's developer told ARC the park was consistent with Union City's Future Land Use Plan, which designated the area light industrial (2005 site: Land Lots 61, 62 and 80; this lot is mostly in 81 and 82).",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID33/Preliminary%20Report.PDF",
+          "retrieved": "2026-11-13",
+          "quote": "Information submitted for the review states that the proposed development is consistent with Union City’s Future Land Use Plan, which designates the area as light industrial."
+        },
+        {
+          "text": "The 2005 review records a regional road project, the Oakley Industrial Boulevard extension to Buffington Road near Flat Shoals Road, that conflicted with the park. This lot is a long curved strip near that end of the road (its northeast tip touches a Flat Shoals Rd parcel), so it may be land shaped by that road alignment; whether the extension was built along it was not checked.",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID33/Preliminary%20Report.PDF",
+          "retrieved": "2026-11-13",
+          "quote": "This project is in the long range plan and is the extension of Oakley Industrial Boulevard to Buffington Road near the intersection of Flat Shoals Road."
+        }
+      ],
+      "open_items": [
+        "Rezoning history in the last five years could not be read (Union City site 403). Search results only (not read, not verifiable): Union City Planning and Zoning Commission minutes of June 30, 2025 list a rezoning of a property addressed 0 Oakley Industrial Blvd from GC to TCMU for about 295 apartments, by an applicant other than this owner; the snippet describes that site as surrounded by auto dealerships and commercial uses, which does not match this lot (zoned M-1 per the screener, between industrial buildings). Many unnumbered lots share the address 0 Oakley Industrial Blvd. Ask Union City which parcel that case covered.",
+        "Confirm on Union City's adopted Future Development Map which character area covers this lot."
+      ]
+    },
+    "utilities": {
+      "verdict": "not_shown",
+      "claims": [
+        {
+          "text": "Sewer, service area: Fulton County's water/sewer service area layer (WR Public Map Viewer layer 16), asked at the brief's map point for this parcel (-84.513565, 33.582718), answers Fulton County, sewer, service available.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.513565%2C33.582718&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\""
+        },
+        {
+          "text": "Sewer, pipes not shown: Fulton County's Waste Water Pipe layer (layer 4), asked for pipes within 800 ft of the same point, returns an empty feature list. The parcel is a strip about 2,000 ft long, so its ends lie beyond 800 ft of the point; city-owned or private lines in the park would not be on this county layer.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?where=1%3D1&geometry=-84.513565%2C33.582718&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=800&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}"
+        },
+        {
+          "text": "Water: no water main map was read. The park's 2005 regional review form names Union City as the water supplier for the park site (2005, park as a whole).",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID33/Preliminary%20Report.PDF",
+          "retrieved": "2026-11-13",
+          "quote": "Name of water supply provider for this site: Union City"
+        },
+        {
+          "text": "Sewer treatment for the park was to be at the Camp Creek plant (2005 review).",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID33/Preliminary%20Report.PDF",
+          "retrieved": "2026-11-13",
+          "quote": "Information submitted with the review states that the Campt Creek plant will provide wastewater treatment for the proposed development."
+        }
+      ],
+      "open_items": [
+        "The lots beside this one carry built warehouses (market section: about 6.2, 36.4 and 43.2 million dollars of improvements), so water and sewer are very likely in the park's streets; the verdict only says no map read here shows the lines. Ask Union City (water) and Fulton County Public Works or Union City (sewer) for the nearest mains and capacity."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {
+          "text": "ODD LOT, NOT A PAD: asked by parcel id, Fulton County's parcel record gives 8.99 ac of land only, no improvements, as Lot 4 of Block A, with an area of about 408,000 sq ft and a perimeter of about 5,320 ft. A compact 9-acre lot has a perimeter near 2,500 ft; from the returned polygon the investigator measures a curved strip about 2,000 ft long and roughly 90 to 250 ft wide, between a road gap of about 60 to 80 ft (the built neighbours' side) and unparcelled land on the I-85 side. That shape cannot hold a 400 ft deep warehouse envelope and reads as a residual or buffer strip of the park. No sale, contract or public notice for it was found.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F140000805662%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"TotAppr\":453200,\"LandAppr\":453200,\"ImprAppr\":0,\"LUCode\":\"400\",\"ClassCode\":\"I4\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":8.99,\"NbrHood\":\"C811\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":\"4\",\"SubdivBlck\":\"A\""
+        },
+        {
+          "text": "Same record: the parcel's area and perimeter (sq ft and ft), the basis of the strip reading above.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F140000805662%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Shape.STArea()\":408280.43562627491,\"Shape.STLength()\":5320.0777685435742"
+        },
+        {
+          "text": "BUILT NEIGHBOURS IN THE SAME PLATTED BLOCK: asked by the parcel's extent, the county layer returns Lot 3 of Block A at 6700 Oakley Industrial Blvd, a building-numbered entity of the same park, with 6.2 million dollars of improvements on 15.54 ac. It touches the lead's southwest end.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5190,33.5800,-84.5095,33.5850&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"TotAppr\":7157500,\"LandAppr\":920200,\"ImprAppr\":6237300,\"LUCode\":\"394\",\"ClassCode\":\"I5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":15.54,\"NbrHood\":\"C811\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":\"3\",\"SubdivBlck\":\"A\""
+        },
+        {
+          "text": "DEVELOPMENT AUTHORITY ON THE NEXT LOT (not this one): Lot 1 of Block A, 6281 Buffington Rd, 72.52 ac with 43.2 million dollars of improvements, is titled to the Development Authority of Fulton County with a mailing address in the same Piedmont Rd building as the park's developer, the usual sign of a bond-lease tax abatement for a built warehouse. The lead lot itself stays in the park entity's name.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5190,33.5800,-84.5095,33.5850&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Owner\":\"DEVELOPMENT AUTHORITY OF FULTON COUNTY \",\"OwnerAddr1\":\"3490 PIEDMONT RD NE SUITE 300\",\"OwnerAddr2\":\"ATLANTA GA 30305\",\"TaxDist\":\"50\",\"TotAssess\":17840000,\"LandAssess\":576000,\"ImprAssess\":17264000,\"TotAppr\":44600000,\"LandAppr\":1440000,\"ImprAppr\":43160000"
+        },
+        {
+          "text": "Across the road gap, the 49.56 ac parcel at 6400 Buffington Rd, held by a Phase Two building-numbered entity of the same park, carries 36.4 million dollars of improvements: the lead lot is left over in a largely built-out phase.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.5190,33.5800,-84.5095,33.5850&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"TotAssess\":16469640,\"LandAssess\":1899200,\"ImprAssess\":14570440,\"TotAppr\":41174100,\"LandAppr\":4748000,\"ImprAppr\":36426100,\"LUCode\":\"398\",\"ClassCode\":\"C5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":49.56"
+        }
+      ],
+      "open_items": [
+        "Places looked: Fulton County parcel layer (by parcel id and by extent), ARC regional review documents, web searches by site address and road names. No listing, sale notice, contract or development-authority release for this lot was found; Union City agendas could not be read (403).",
+        "Ask the person to check whether this strip is common area, landscape buffer, stormwater or reserved road right-of-way under the park's recorded plat (Block A) or covenants; a plat or covenant may restrict what can be built on it. The recorded plat was not read.",
+        "Possible use despite no warehouse fit: a narrow 9 ac strip next to I-85 might suit trailer or truck parking or outdoor storage, if zoning, covenants and access allow; that is the investigator's reading, not a document.",
+        "Search results only (not read): third-party directories list an Amazon fulfillment center at 6281 Buffington Rd (the Development Authority lot)."
+      ]
+    },
+    "owner": {
+      "verdict": "developer_or_investor",
+      "claims": [
+        {
+          "text": "Asked by parcel id, the county record gives the owner as a phase-numbered LLC of the Majestic Airport Center III park, mailing to 3490 Piedmont Rd NE, Suite 210, Atlanta.",
+          "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2709F140000805662%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+          "retrieved": "2026-11-13",
+          "quote": "\"Owner\":\"MAJESTIC AIRPORT CTR III PHASE TWO LLC \",\"OwnerAddr1\":\"3490 PIEDMONT RD NE STE 210\",\"OwnerAddr2\":\"ATLANTA GA 30305\""
+        },
+        {
+          "text": "The park's 2005 regional review names the developer/applicant as Majestic Realty Co. at the same street address and suite (3490 Piedmont Road NE, Suite 210), so the owner reads as a project entity of an industrial developer, not an operator or a family holder.",
+          "source_url": "http://documents.atlantaregional.com/Land%20Use/Reviews/ID33/Preliminary%20Report.PDF",
+          "retrieved": "2026-11-13",
+          "quote": "Majestic Realty Co. One Securities Center 3490 Piedmont Road NE"
+        }
+      ],
+      "open_items": [
+        "Georgia Secretary of State record not read (known wall; and the owner name may not be put into an outside service). Status, formation date and registered agent are unknown.",
+        "The neighbouring built lots are held by building-numbered entities of the same park (market section): a developer that keeps one LLC per building. Whether it would sell a leftover strip, or keeps it as park common area, only the owner can say; a person decides whether to ask."
+      ]
+    }
+  }
+}

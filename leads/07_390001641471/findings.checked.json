@@ -1,0 +1,422 @@
+{
+ "schema": 1,
+ "parcel_id": "07 390001641471",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "Fairburn's zoning text is on Municode (known wall) and its zoning map is on ArcGIS Online (known wall), so neither the M-1 designation in the brief nor the M-1 use table could be quoted here. The brief's M-1 comes from the screener's own layer and was not re-checked.",
+    "The site is Lot 2 of a lot series whose Lot 1 carries a roughly 910,000 sq ft bond-financed warehouse (market section). Ask Fairburn planning whether Lot 2 was part of the same rezoning and whether conditions of zoning (buffers, access, truck routing, use limits) attached to that rezoning bind this lot.",
+    "Search results (snippets only, not read or verified) mention a 2011 Fairburn rezoning for a roughly 169-acre Shugart Farms industrial tract near Bohannon Road and I-85. Whether this lot lies inside it is not known; ask the city for the case file.",
+    "One parcel within 60 ft of this lot is a homesteaded single-family house on Creekwood Dr (plans section); it may adjoin or sit across a road. Ask what buffer or setback M-1 requires against residential use."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "id": "plans-1",
+     "text": "Fairburn's adopted comprehensive plan places existing industrial land in a pocket south of I-85 around Oakley Industrial Boulevard; this parcel's address is 1615 Oakley Industrial Blvd (county parcel record, owner section). The plan's future development map was not read at parcel scale.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "Industrial and utility uses are concentrated between the two corridors along and south of Fairburn Industrial Boulevard and a pocket south of I-85 around Oakley Industrial Boulevard.",
+     "context_before": "e major corridors between the highway and interstate, and the low-density uses. ",
+     "context_after": " vacant land can be found throughout the city within all the areas of other exis",
+     "pdf_page": 36,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-2",
+     "text": "The plan's Light Industrial future development area lists warehousing among its appropriate development types and M-1 among its zoning districts (PDF page 142). The brief gives this parcel's future land use as Office/Industrial; which of the plan's character areas covers it was not confirmed.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "flex space; commercial storage; warehousing, utilities. Density/Intensity 1 to 2 stories Appropriate Zoning District(s) O&I, C-1, C-2, M-1, P&O",
+     "context_before": " office; small-scale production (breweries, makerspaces, food processing, etc); ",
+     "context_after": " 140 city of fairburn comprehensive plan image source: google earth (page break) light industr",
+     "pdf_page": 142,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-3",
+     "text": "The plan's Industrial future development area lists warehousing and manufacturing among its appropriate development types, with M-1 and M-2 among its zoning districts (PDF page 144).",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "large office; warehousing; manufacturing; utilities. Density/Intensity 1 to 2 stories Appropriate Zoning District(s) O&I, C-2, M-1, M-2, P&O",
+     "context_before": " public/ institutional uses (schools, places of worship, and civic facilities); ",
+     "context_after": " 142 city of fairburn comprehensive plan image source: google earth (page break) industrial le",
+     "pdf_page": 144,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-4",
+     "text": "Condition to weigh: the plan says new industrial development should have direct access to an official truck route and not adjoin residential neighbourhoods. Fulton County's parcel layer, asked for parcels within 60 ft of this parcel's own polygon, returns a single-family house (class R3, one living unit, homestead exemption) at 8468 Creekwood Dr among the neighbours. Within 60 ft can include a lot across a road; whether it shares a lot line was not measured.",
+     "source_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+     "retrieved": "2026-11-13",
+     "quote": "New industrial development should only be allowed where there is direct access to an official truck route; where it is not adjacent to residential neighborhoods;",
+     "context_before": "r mechanism for keeping up with wear and tear on local roadways from the truck. ",
+     "context_after": " and where it does not \"open up\" previously rural land to a potential cascade of",
+     "pdf_page": 113,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/0d2514dcf7b12fbafbbf3624.pdf"
+    },
+    {
+     "id": "plans-5",
+     "text": "The adjoining-parcels answer (parcels within 60 ft of this parcel's polygon) includes the 8468 Creekwood Dr record: residential class R3, one living unit, homestead exemption code, $193,200 of improvements.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":193200,\"LUCode\":\"101\",\"ClassCode\":\"R3\",\"ExCode\":\"HF01\",\"LivUnits\":1,\"LandAcres\":1.6621",
+     "context_before": ":100240,\"landassess\":22960,\"imprassess\":77280,\"totappr\":250600,\"landappr\":57400,",
+     "context_after": ",\"nbrhood\":\"07007\",\"subdiv\":null,\"subdivnum\":null,\"subdivlot\":null,\"subdivblck\":",
+     "words_shared_with_url": [],
+     "page_file": "pages/3e0f33456a77c87919ccff04.html"
+    },
+    {
+     "id": "plans-6",
+     "text": "Rezoning check: Fairburn's list of active and recent planning, zoning and variance cases (read 2026-11-13) has four cases (two gas stations, DRB Campbell Commons on Campbellton Fairburn Road, NexMetro on Milam Road); none is on Oakley Industrial Blvd, Creekwood or this parcel.",
+     "source_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+     "retrieved": "2026-11-13",
+     "quote": "The following is an updated list of active and recent planning, zoning, and variance cases along with links to accompanying applications and information on each.",
+     "context_before": "oning pending zoning and development cases pending zoning and development cases ",
+     "context_after": " to request copies of the files, please contact the planning and zoning staff at",
+     "words_shared_with_url": [],
+     "page_file": "pages/63c2340b4ce15a08451d89f9.html"
+    }
+   ],
+   "open_items": [
+    "Rezoning history of the last five years was checked only against the city's current pending-cases list and one March 2022 city administrator report (no mention of this site). Ask Fairburn planning for any rezoning, variance, site plan or land disturbance permit on 07 390001641471 (Lot 2) and its sister lots since 2021.",
+    "Confirm on the adopted Future Development Map whether the parcel is in the Industrial or the Light Industrial area, and whether Oakley Industrial Blvd at this frontage is an official truck route.",
+    "The plan's 'not adjacent to residential neighborhoods' policy and the adjoining house on Creekwood Dr may matter for any discretionary approval (variance, rezoning, use permit) here."
+   ]
+  },
+  "utilities": {
+   "verdict": "not_shown",
+   "claims": [
+    {
+     "id": "utilities-1",
+     "text": "Sewer, at the parcel: Fulton County's Waste Water Pipe layer (WR_Public_Map_Viewer layer 4), asked for pipes within 100 ft of this parcel's own polygon, returns 8 active gravity sewer segments, 12 and 18 inch, Line Creek basin, county service area, city Fairburn. One 18-inch segment's comment records a Line Creek 18-inch open-cut project dated 3/23/2026.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "Project Line Creek 18-inch open cut - 3/23/2026 with WO # 398778\",\"Maintenance\":\"UNK\",\"CreatedBy\":null,\"CreateDate\":null,\"FlowMeter\":\"LC01\",\"Enabled\":1,\"PipeSize\":18,\"Private\":\"0\",\"ServArea\":\"FC\",\"CITY_NAME\":\"FAIRBURN\"",
+     "context_before": "se on asbuilt - 7/29/2021 as per tim mullen. cctv on 9/30/2025 with wo # 394871.",
+     "context_after": ",\"lengthinfeet\":322.15675052,\"shape.stlength()\":322.15653403025254}},{\"attribute",
+     "words_shared_with_url": [],
+     "page_file": "pages/97aecfba51acc02483df2f74.html"
+    },
+    {
+     "id": "utilities-2",
+     "text": "Sewer, service area: Fulton County's water/sewer service area layer (layer 16), asked at the brief's map point (-84.603662, 33.529942), answers Fulton County, sewer, service available.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.603662%2C33.529942&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Name\":\"Fulton County\",\"ServiceTyp\":\"Sewer\",\"ServiceAva\":\"Yes\"",
+     "context_before": "\":{\"objectid\":1,\"orig_fid\":1,\"shape_star\":73.23144531,\"shape_stle\":769.14763871,",
+     "context_after": ",\"shape.starea()\":10173715022.83869,\"shape.stlength()\":1481074.5223924106}}]}",
+     "words_shared_with_url": [],
+     "page_file": "pages/82b07812381ecbdd7cb7e697.html"
+    },
+    {
+     "id": "utilities-3",
+     "text": "Water, not shown: Fulton County's Water Pipe layer (layer 11), asked for pipes within 1,500 ft of the brief's map point, returns an empty feature list. That is expected if the City of Fairburn, not the county, runs water here (next claim); no city water map was read.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.603662%2C33.529942&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"type\":\"esriFieldTypeDouble\",\"alias\":\"Shape.STLength()\"}],\"features\":[]}",
+     "context_before": "\"esrifieldtypedate\",\"alias\":\"surveydate\",\"length\":8},{\"name\":\"shape.stlength()\",",
+     "context_after": "",
+     "words_shared_with_url": [],
+     "page_file": "pages/21fa41fda8e298387684feb1.html"
+    },
+    {
+     "id": "utilities-4",
+     "text": "Water provider: the Development Authority of Fulton County lists Fairburn among the cities that run their own water service, so the city is the likely water provider; its water main map is not published on a host read here.",
+     "source_url": "https://www.developfultoncounty.com/infrastructure.php",
+     "retrieved": "2026-11-13",
+     "quote": "Fulton County municipalities that manage water service for their residents and businesses include: Alpharetta, Atlanta, College Park, East Point, Fairburn, Hapeville, Mountain Park, Palmetto, Roswell and Union City.",
+     "context_before": "tect publicly owned treatment works and prevent the introduction of pollutants. ",
+     "context_after": " electricity & natural gas electricity and natural gas are supplied by divisions",
+     "words_shared_with_url": [],
+     "page_file": "pages/5858d37902c1eecd3d4ac3d1.html"
+    }
+   ],
+   "open_items": [
+    "Verdict is the weaker of the two: sewer lines run within 100 ft of the parcel line (county layer), but no published map read here shows a water main. The assessor's 'Public water' note and the 910,000 sq ft warehouse next door suggest city water is close; ask Fairburn utilities for the nearest main and its size.",
+    "The assessor lists Septic/Approved for the parcel although county gravity sewer runs at it; ask Fulton County Public Works whether the lot can tap the Line Creek lines and about capacity (only the utility can say).",
+    "Seen, not verifiable: a 2020 developer brochure for the Lot 1 building lists its water provider as City of Fairburn and Fulton County (redrockdevelopments.com brochure PDF). A developer's marketing, not a utility map."
+   ]
+  },
+  "market": {
+   "verdict": "signs_developer_pursuing",
+   "claims": [
+    {
+     "id": "market-1",
+     "text": "Developer's hands: the parcel is held by the joint venture that took a $55 million Development Authority of Fulton County bond in November 2019 for a roughly 910,000 sq ft warehouse on Oakley Industrial Boulevard, Fairburn (induced as Red Rock Developments). The parcel record's owner name (owner section) matches the entity in these minutes.",
+     "source_url": "https://www.developfultoncounty.com/pdf/Agendas%20-%20Minutes/2019/111919-Nov-Regular-Meeting.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "the issuance of $55,000,000 in taxable revenue bonds for the development of an approximately 910,000 square foot warehouse distribution facility with approximately 5,000 square feet of office space to be located on Oakley Industrial Boulevard in the City of Fairburn.",
+     "context_before": "ben llc appeared in connection with the request for a final bond resolution for ",
+     "context_after": " more specific details are described in the fact sheet included as part of this ",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/40cf183bb449214f452a1758.pdf"
+    },
+    {
+     "id": "market-2",
+     "text": "Sister lot already built: in the adjoining-parcels answer, the parcel next door at 1625 Oakley Industrial Blvd is LOT 1 (this one is LOT 2), 73.1 ac, class I5, $68.9 million of improvements, held in the Development Authority of Fulton County's name (the usual bond-lease title). That is the bond-financed warehouse; this 20.4-ac lot is the undeveloped remainder of the same lot series.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":68882800,\"LUCode\":\"888\",\"ClassCode\":\"I5\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":73.122,\"NbrHood\":\"C703\",\"Subdiv\":null,\"SubdivNum\":null,\"SubdivLot\":\"LOT 1\"",
+     "context_before": "landassess\":1045130,\"imprassess\":19287180,\"totappr\":72615400,\"landappr\":3732600,",
+     "context_after": ",\"subdivblck\":null,\"featureid\":\"07 390001641430\",\"shape.starea()\":3229002.244134",
+     "words_shared_with_url": [],
+     "page_file": "pages/3e0f33456a77c87919ccff04.html"
+    },
+    {
+     "id": "market-3",
+     "text": "This lot itself is still vacant on the county roll: no improvements assessed, land only, LOT 2 of the series.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20390001641471%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":363360,\"LandAssess\":363360,\"ImprAssess\":0,\"TotAppr\":908400,\"LandAppr\":908400,\"ImprAppr\":0",
+     "context_before": "addr1\":\"1 penn plz suite 4015\",\"owneraddr2\":\"new york ny 10119\",\"taxdist\":\"25a\",",
+     "context_after": ",\"lucode\":\"300\",\"classcode\":\"c5\",\"excode\":null,\"livunits\":0,\"landacres\":20.36,\"n",
+     "words_shared_with_url": [],
+     "page_file": "pages/9bd50cde624cdbee1173618d.html"
+    }
+   ],
+   "open_items": [
+    "No announced project, site plan, permit or new bond for Lot 2 itself was found: Fairburn's pending-cases list does not show it, and web searches of the Development Authority's site found no 2021-2026 item for it. The verdict rests on who holds the land, not on a filed plan.",
+    "Lot 1's tax bill now goes to a Dallas, TX address, not the JV's New York address, which may mean the finished building was sold or leased on while the JV kept Lot 2 as a remainder. Ask (through a broker or title search, not by contacting the owner from here) whether Lot 2 is reserved as expansion land, trailer parking or stormwater for the Lot 1 building (the 2020 brochure for Lot 1 mentions trailer storage 'expandable' and a future loop road; seen, not verified for Lot 2).",
+    "Seen, not verifiable: a CBRE listing titled 'Oakley Industrial Blvd & GA-74, Fairburn, GA, 30213' (land for lease) appeared in search results; cbre.com answers robots.txt with a bot challenge (403), so it was not read and it is not known whether it is this lot.",
+    "Lot 3 of the series (8495 Creekwood Rd, 07 390001641489, 4.67 ac, no improvements) is also held in the Development Authority's name; ask whether it serves the Lot 1 project (detention, access) and whether it touches this lot."
+   ]
+  },
+  "owner": {
+   "verdict": "developer_or_investor",
+   "claims": [
+    {
+     "id": "owner-1",
+     "text": "The Development Authority of Fulton County's November 19, 2019 minutes record a final bond resolution for an entity of the same name as this parcel's owner, induced as Red Rock Developments, with Red Rock and Saben LLC representatives appearing: a developer's project vehicle.",
+     "source_url": "https://www.developfultoncounty.com/pdf/Agendas%20-%20Minutes/2019/111919-Nov-Regular-Meeting.pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Final Bond Resolution for ATL Fairburn JV, LLC (induced as Red Rock Developments;",
+     "context_before": " (who abstained from voting), approved the final bond resolution for halperns'. ",
+     "context_after": " \"red rock\"): mr. jim woodward of gray pannell & woodward llp, mr. john barker, ",
+     "pdf_page": 2,
+     "pdf_order": "reading",
+     "words_shared_with_url": [],
+     "page_file": "pages/40cf183bb449214f452a1758.pdf"
+    },
+    {
+     "id": "owner-2",
+     "text": "Fulton County's parcel record, asked by parcel id, gives the owner of 07 390001641471 and a New York mailing address.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20390001641471%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"ATL FAIRBURN JV LLC \",\"OwnerAddr1\":\"1 PENN PLZ SUITE 4015\",\"OwnerAddr2\":\"NEW YORK NY 10119\"",
+     "context_before": "strial\",\"addrsuffix\":\"blvd\",\"addrposdir\":null,\"addrunttyp\":null,\"addrunit\":null,",
+     "context_after": ",\"taxdist\":\"25a\",\"totassess\":363360,\"landassess\":363360,\"imprassess\":0,\"totappr\"",
+     "words_shared_with_url": [],
+     "page_file": "pages/9bd50cde624cdbee1173618d.html"
+    }
+   ],
+   "open_items": [
+    "Georgia Secretary of State record (status, formation date, registered agent) not read: the site answers 403 (known wall). Ask a person to pull it and to confirm the 2019 bond entity and the parcel owner are the same company (same name is shown in both sources).",
+    "The 'JV' name and New York mailing address suggest a capital partner joined with the developer; who controls a sale of Lot 2 is a question for title and the SoS record."
+   ]
+  }
+ },
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "Lot 2 does not look like a free-standing remainder: it looks like the planned expansion and stormwater corner of the 907,665 SF Lot 1 building next door. The developer's own brochure for that building advertises trailer storage of 161 spaces expandable to 477, and its site-plan drawing (an image, not quotable) puts 220 of those future trailer spaces, plus a detention pond, in the triangle between Oakley Industrial Blvd and Creekwood Rd, which is the shape and position of this 20.4-acre lot on the county parcel map. On the county map the Oakley Industrial Blvd road bed along Lot 2 lies inside Lot 1's tax parcel, and the county street layer shows that segment with no ownership value, created in February 2026. That leaves Creekwood Rd as Lot 2's only certain public frontage. Creekwood Rd is a 24 ft local road, and the houses on its other side face the lot. Nothing here proves an easement, option or expansion right over Lot 2, so the lead is weakened, not killed. Title must settle that before anyone approaches the owner.",
+  "disputes": [
+   "market-1"
+  ],
+  "claims": [
+   {
+    "id": "skeptic-1",
+    "text": "The developer's brochure for the Lot 1 building at 1625 Oakley Industrial Blvd (linked from Red Rock's current Shugart Farms page) advertises its trailer storage as 161 spaces, expandable to 477. Its site-plan drawing (image only) labels the extra spaces as future trailer spaces, 220 of them in the north triangle between Oakley Industrial Blvd and Creekwood Rd. By its shape and position on the county parcel map, that triangle is this Lot 2. The link from the quote to Lot 2 is the skeptic's reading of the drawing, not text.",
+    "source_url": "https://www.redrockdevelopments.com/wp-content/uploads/2021/02/SF-Oakley-brochure_FINAL_01_2021-1.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Trailer storage 161 (12\u2019 x 60\u2019) storage spaces (Expandable to 477)",
+    "context_before": "ingle layer insulation (fm 1-90) \u2022 auto parking 340 spaces, expandable to 370 \u2022 ",
+    "context_after": " \u2022 office square footage bts \u2022 walls painted white \u2022 deck shop primed white \u2022 fl",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/5c7a9185401056ad632df976.pdf"
+   },
+   {
+    "id": "skeptic-2",
+    "text": "The same brochure lists site works already built for future expansion around the Lot 1 building: a future loop road graded with the storm drainage in place.",
+    "source_url": "https://www.redrockdevelopments.com/wp-content/uploads/2021/02/SF-Oakley-brochure_FINAL_01_2021-1.pdf",
+    "retrieved": "2026-11-13",
+    "quote": "Future loop road Graded with storm in place",
+    "context_before": "light \u2022 water provider city of fairburn & fulton county \u2022 fiber provider at&t \u2022 ",
+    "context_after": " (page break) building cross-section 45 mil tpo roof with r-20 single layer insulation (fm 1-9",
+    "pdf_page": 2,
+    "pdf_order": "reading",
+    "words_shared_with_url": [],
+    "page_file": "pages/5c7a9185401056ad632df976.pdf"
+   },
+   {
+    "id": "skeptic-3",
+    "text": "Fulton County's parcel layer was asked which parcel contains the point -84.60402, 33.53109. By the county street layer, that point is on the Oakley Industrial Blvd centreline, about 8 m north-west of Lot 2's north-west line. The layer answers Lot 1 (07 390001641430), so on the county tax map the road bed beside Lot 2 lies inside Lot 1's parcel and not in a separate right-of-way. That parcel is held in the Development Authority's name (the bond-lease title), with the tax bill going to a Dallas address.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.60402%2C33.53109&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ParcelID\":\"07 390001641430\",\"TaxYear\":2027,\"Address\":\"1625 OAKLEY INDUSTRIAL BLVD\"",
+    "context_before": "double\",\"alias\":\"shape.stlength()\"}],\"features\":[{\"attributes\":{\"objectid\":2880,",
+    "context_after": ",\"addrnumber\":\"1625\",\"addrpredir\":null,\"addrstreet\":\"oakley industrial\",\"addrsuf",
+    "words_shared_with_url": [],
+    "page_file": "pages/2a81e08ef6ee268072ce1467.html"
+   },
+   {
+    "id": "skeptic-4",
+    "text": "Fulton County's street centreline layer (FultonStreetBaseMap layer 147) was asked for streets within 60 ft of Lot 2's own polygon. Its Oakley Industrial Blvd segment along Lot 2's north-west side (address range 1625 to 1625, subdivision 'Project Miles', the developer's code name for the Lot 1 building, created 2026-02-19 by its CreateDate) has no Ownership value and is classed Local - Residential, while the older Oakley segment and Creekwood Rd are recorded as Public. Whether this stretch is dedicated public right-of-way that gives Lot 2 frontage is not shown.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Basemap/FultonStreetBaseMap/MapServer/147/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.60218%2C33.5309%5D%2C%5B-84.60219%2C33.52883%5D%2C%5B-84.6022%2C33.5282%5D%2C%5B-84.60258%2C33.52827%5D%2C%5B-84.60286%2C33.52836%5D%2C%5B-84.60312%2C33.52832%5D%2C%5B-84.60334%2C33.52839%5D%2C%5B-84.60343%2C33.52852%5D%2C%5B-84.60351%2C33.52858%5D%2C%5B-84.60357%2C33.52876%5D%2C%5B-84.60367%2C33.52881%5D%2C%5B-84.6037%2C33.52882%5D%2C%5B-84.60379%2C33.52909%5D%2C%5B-84.60383%2C33.52934%5D%2C%5B-84.604%2C33.52933%5D%2C%5B-84.60412%2C33.52924%5D%2C%5B-84.60429%2C33.52932%5D%2C%5B-84.60465%2C33.52943%5D%2C%5B-84.60476%2C33.52935%5D%2C%5B-84.60485%2C33.52913%5D%2C%5B-84.60494%2C33.52913%5D%2C%5B-84.60506%2C33.52926%5D%2C%5B-84.60521%2C33.52922%5D%2C%5B-84.60541%2C33.52907%5D%2C%5B-84.60556%2C33.52907%5D%2C%5B-84.60573%2C33.52915%5D%2C%5B-84.60589%2C33.52914%5D%2C%5B-84.60602%2C33.52902%5D%2C%5B-84.60622%2C33.52908%5D%2C%5B-84.60627%2C33.52912%5D%2C%5B-84.6063%2C33.52939%5D%2C%5B-84.60635%2C33.52951%5D%2C%5B-84.60649%2C33.52965%5D%2C%5B-84.60608%2C33.52986%5D%2C%5B-84.60542%2C33.5302%5D%2C%5B-84.60481%2C33.53053%5D%2C%5B-84.60403%2C33.53096%5D%2C%5B-84.60237%2C33.53194%5D%2C%5B-84.60222%2C33.53181%5D%2C%5B-84.6022%2C33.53151%5D%2C%5B-84.60219%2C33.5312%5D%2C%5B-84.60218%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Label\":\"Oakley Industrial Blvd\",\"FromLeft\":1625,\"ToLeft\":1625,\"FromRight\":0,\"ToRight\":0,\"CityLeft\":\"Fairburn\",\"CityRight\":\"Fairburn\",\"ZipLeft\":\"30213\",\"ZipRight\":\"30213\",\"FuncClass\":\"Local\",\"SymbolClass\":\"Local - Residential\",\"SpeedLimit\":null,\"Surface\":null,\"DirTravel\":null,\"CardDirTrvl\":null,\"Width\":null,\"Lanes\":null,\"WorkZone\":null,\"Subdiv\":\"Project Miles\",\"InstHwyNum\":null,\"USHwyNum\":null,\"StHwyNum\":null,\"CntyHwyNum\":null,\"ExitNumber\":null,\"Ownership\":null",
+    "context_before": "\"name\":\"oakley industrial\",\"posttype\":\"boulevard\",\"postdir\":null,\"postmod\":null,",
+    "context_after": ",\"jurisdiction\":\"fairburn\",\"divided\":\"no\",\"miles\":0.59360839,\"bridge\":\"no\",\"trav",
+    "words_shared_with_url": [],
+    "page_file": "pages/212ccf2d083eddf88b8a2de2.html"
+   },
+   {
+    "id": "skeptic-5",
+    "text": "The same answer gives Creekwood Rd, which runs along Lot 2's east side, as a public local road 24 ft wide with 2 lanes and a 35 mph limit. Its centreline is digitised north to south and lies east of Lot 2, so its left-side (east) address range is 8400 to 8488, in ZIP 30268. That range takes in the homesteaded house at 8468 Creekwood reported in plans-4 and plans-5, which therefore sits across this road from Lot 2. Lot 2's screener frontage of about 1,369 ft matches the length of this east side, not the Oakley side.",
+    "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Basemap/FultonStreetBaseMap/MapServer/147/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.60218%2C33.5309%5D%2C%5B-84.60219%2C33.52883%5D%2C%5B-84.6022%2C33.5282%5D%2C%5B-84.60258%2C33.52827%5D%2C%5B-84.60286%2C33.52836%5D%2C%5B-84.60312%2C33.52832%5D%2C%5B-84.60334%2C33.52839%5D%2C%5B-84.60343%2C33.52852%5D%2C%5B-84.60351%2C33.52858%5D%2C%5B-84.60357%2C33.52876%5D%2C%5B-84.60367%2C33.52881%5D%2C%5B-84.6037%2C33.52882%5D%2C%5B-84.60379%2C33.52909%5D%2C%5B-84.60383%2C33.52934%5D%2C%5B-84.604%2C33.52933%5D%2C%5B-84.60412%2C33.52924%5D%2C%5B-84.60429%2C33.52932%5D%2C%5B-84.60465%2C33.52943%5D%2C%5B-84.60476%2C33.52935%5D%2C%5B-84.60485%2C33.52913%5D%2C%5B-84.60494%2C33.52913%5D%2C%5B-84.60506%2C33.52926%5D%2C%5B-84.60521%2C33.52922%5D%2C%5B-84.60541%2C33.52907%5D%2C%5B-84.60556%2C33.52907%5D%2C%5B-84.60573%2C33.52915%5D%2C%5B-84.60589%2C33.52914%5D%2C%5B-84.60602%2C33.52902%5D%2C%5B-84.60622%2C33.52908%5D%2C%5B-84.60627%2C33.52912%5D%2C%5B-84.6063%2C33.52939%5D%2C%5B-84.60635%2C33.52951%5D%2C%5B-84.60649%2C33.52965%5D%2C%5B-84.60608%2C33.52986%5D%2C%5B-84.60542%2C33.5302%5D%2C%5B-84.60481%2C33.53053%5D%2C%5B-84.60403%2C33.53096%5D%2C%5B-84.60237%2C33.53194%5D%2C%5B-84.60222%2C33.53181%5D%2C%5B-84.6022%2C33.53151%5D%2C%5B-84.60219%2C33.5312%5D%2C%5B-84.60218%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"Label\":\"Creekwood Rd\",\"FromLeft\":8400,\"ToLeft\":8488,\"FromRight\":8461,\"ToRight\":8485,\"CityLeft\":\"Fairburn\",\"CityRight\":\"Fairburn\",\"ZipLeft\":\"30268\",\"ZipRight\":\"30213\",\"FuncClass\":\"Local\",\"SymbolClass\":null,\"SpeedLimit\":\"35\",\"Surface\":null,\"DirTravel\":\"Both\",\"CardDirTrvl\":null,\"Width\":\"24\",\"Lanes\":\"2\",\"WorkZone\":null,\"Subdiv\":\"Project Miles\",\"InstHwyNum\":null,\"USHwyNum\":null,\"StHwyNum\":null,\"CntyHwyNum\":null,\"ExitNumber\":null,\"Ownership\":\"Public\"",
+    "context_before": "arator\":null,\"name\":\"creekwood\",\"posttype\":\"road\",\"postdir\":null,\"postmod\":null,",
+    "context_after": ",\"jurisdiction\":\"fairburn\",\"divided\":\"no\",\"miles\":0.51446865,\"bridge\":null,\"trav",
+    "words_shared_with_url": [],
+    "page_file": "pages/212ccf2d083eddf88b8a2de2.html"
+   }
+  ],
+  "open_items": [
+   "Seen, not verifiable as text: page 2 of the brochure has a site-plan image. It labels (220) FUTURE TRAILER SPACES in the north triangle between Oakley Industrial Blvd and Creekwood Rd, plus (40) future trailer spaces and (56) future trailer storage. Existing storage is (90) plus (71), which gives 161 built and 316 future, adding up to the 477 in the text. It also shows a stormwater detention pond near Creekwood Rd that, scaled against the county parcel polygons, appears to fall inside Lot 2. Ask title for any stormwater, drainage, access or parking easement, option, right of first refusal or tenant expansion right over Lot 2 in favour of the Lot 1 owner or tenant.",
+   "Market verdict: market-1 shows the JV's 2019 bond for the Lot 1 building, not any plan for Lot 2. The better reading of the evidence may be that Lot 2 is held back for the Lot 1 building (trailer and stormwater use) rather than pursued as a separate project. Either way, a sale may need the consent of, or carry obligations to, the Lot 1 owner.",
+   "Ask Fairburn and title whether the Oakley Industrial Blvd segment along Lot 2 (county street layer, created Feb 2026, no ownership value) is dedicated public right-of-way. If it is not, truck access to Lot 2 would be only from Creekwood Rd, a 24 ft local road with homes on the opposite side, or over Lot 1. The adopted plan (plans-4) asks for direct truck-route access and no adjacency to residential neighbourhoods.",
+   "Creekwood Rd's east side carries ZIP 30268 (Palmetto) in the county street layer. Confirm which jurisdiction and zoning govern the houses across the road, and what M-1 buffer or setback applies against them.",
+   "Search results (snippets only, not read): LXP Industrial's 2021 report lists 1625 Oakley Industrial Blvd (Lot 1), and a July 2026 item reports a Brookfield and CPP Investments deal to acquire LXP. If accurate, the Lot 1 owner is an institutional landlord that may want Lot 2 for its building. Not verified.",
+   "Fairburn's '2025 Comprehensive Plan Update' page says that process was expected to finish by October 2025. Confirm that the plan the first pass quoted (DocumentCenter View 2932) is the currently adopted version, and check its future development map at parcel scale.",
+   "The county Structures layer query returned an error, so whether any structure, pavement or pond has been built on Lot 2 since the 2021 brochure was not checked. The county roll (market-3) shows no improvements assessed. Drive the site or look at current aerials."
+  ],
+  "supported": true
+ },
+ "pages": {
+  "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan": {
+   "file": "pages/0d2514dcf7b12fbafbbf3624.pdf",
+   "fetched_at": "2026-11-13T19:14:54Z",
+   "final_url": "https://www.fairburn.com/DocumentCenter/View/2932/Final-Approved-Comp-Plan",
+   "status": 200,
+   "bytes": 158602610,
+   "sha256": "11f1a0b5cf4972d0dc6a341515c0a3add030347a0b2a57b1ea9d4230f39bc83f"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/3e0f33456a77c87919ccff04.html",
+   "fetched_at": "2026-11-13T19:14:57Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 7304,
+   "sha256": "f2557c4ae168296467289908ebe9e59bb189fcd9df9ecb096bdf21afd706d6fc"
+  },
+  "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases": {
+   "file": "pages/63c2340b4ce15a08451d89f9.html",
+   "fetched_at": "2026-11-13T19:15:00Z",
+   "final_url": "https://www.fairburn.com/419/Pending-Zoning-and-Development-Cases",
+   "status": 200,
+   "bytes": 105559,
+   "sha256": "d35e3b5c7316d7ccadc27efa632ff1d259c8a371f9af6a335f6f221c5eb6d2f4"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/97aecfba51acc02483df2f74.html",
+   "fetched_at": "2026-11-13T19:15:01Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/4/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.602178%2C33.5309%5D%2C%5B-84.602193%2C33.528831%5D%2C%5B-84.602198%2C33.528203%5D%2C%5B-84.602582%2C33.528269%5D%2C%5B-84.602863%2C33.528365%5D%2C%5B-84.603124%2C33.528316%5D%2C%5B-84.603337%2C33.528386%5D%2C%5B-84.603426%2C33.528516%5D%2C%5B-84.60351%2C33.528577%5D%2C%5B-84.603566%2C33.528759%5D%2C%5B-84.603673%2C33.528807%5D%2C%5B-84.603704%2C33.528821%5D%2C%5B-84.60379%2C33.529087%5D%2C%5B-84.60383%2C33.529336%5D%2C%5B-84.604002%2C33.529334%5D%2C%5B-84.604116%2C33.529245%5D%2C%5B-84.604291%2C33.529317%5D%2C%5B-84.604651%2C33.529434%5D%2C%5B-84.604762%2C33.529351%5D%2C%5B-84.604847%2C33.529135%5D%2C%5B-84.604937%2C33.529125%5D%2C%5B-84.605061%2C33.529256%5D%2C%5B-84.605213%2C33.52922%5D%2C%5B-84.605408%2C33.529074%5D%2C%5B-84.605565%2C33.529071%5D%2C%5B-84.605733%2C33.529145%5D%2C%5B-84.605888%2C33.529138%5D%2C%5B-84.606023%2C33.529023%5D%2C%5B-84.606223%2C33.52908%5D%2C%5B-84.606273%2C33.529122%5D%2C%5B-84.606298%2C33.529394%5D%2C%5B-84.606348%2C33.529509%5D%2C%5B-84.606488%2C33.529648%5D%2C%5B-84.606081%2C33.529855%5D%2C%5B-84.605419%2C33.530204%5D%2C%5B-84.604806%2C33.530535%5D%2C%5B-84.604031%2C33.530963%5D%2C%5B-84.602374%2C33.531935%5D%2C%5B-84.602225%2C33.531807%5D%2C%5B-84.602205%2C33.531505%5D%2C%5B-84.602189%2C33.531203%5D%2C%5B-84.602178%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 19136,
+   "sha256": "30e42ab23dfcc42cf2a12d1d928636825d8faadcc850b87ff7c49799b810d182"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.603662%2C33.529942&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/82b07812381ecbdd7cb7e697.html",
+   "fetched_at": "2026-11-13T19:15:02Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/16/query?where=1%3D1&geometry=-84.603662%2C33.529942&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 1213,
+   "sha256": "515af0b1e3eab932009564b816c35b707d1a81da7f271e9f1a5dcda11320f0d7"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.603662%2C33.529942&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/21fa41fda8e298387684feb1.html",
+   "fetched_at": "2026-11-13T19:15:09Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub/rest/services/WaterResources/WR_Public_Map_Viewer/MapServer/11/query?where=1%3D1&geometry=-84.603662%2C33.529942&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1500&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 3941,
+   "sha256": "4fdedc8dd0a83d1c15e98d06287f6931a243d734c92e8c178684710c271eadc4"
+  },
+  "https://www.developfultoncounty.com/infrastructure.php": {
+   "file": "pages/5858d37902c1eecd3d4ac3d1.html",
+   "fetched_at": "2026-11-13T19:15:10Z",
+   "final_url": "https://www.developfultoncounty.com/infrastructure.php",
+   "status": 200,
+   "bytes": 26591,
+   "sha256": "a80f3fbb9847c431ee513e41ab31fe383d1398f166412c747463aea109da047f"
+  },
+  "https://www.developfultoncounty.com/pdf/Agendas%20-%20Minutes/2019/111919-Nov-Regular-Meeting.pdf": {
+   "file": "pages/40cf183bb449214f452a1758.pdf",
+   "fetched_at": "2026-11-13T19:15:11Z",
+   "final_url": "https://www.developfultoncounty.com/pdf/Agendas%20-%20Minutes/2019/111919-Nov-Regular-Meeting.pdf",
+   "status": 200,
+   "bytes": 171702,
+   "sha256": "82169cc3b08964a52773e3e0be30b0217da8ddf807357fbadfbb6859320ca7cc"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20390001641471%27&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/9bd50cde624cdbee1173618d.html",
+   "fetched_at": "2026-11-13T19:15:12Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2707%20390001641471%27&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4331,
+   "sha256": "85077137807fa545ce8abec02a2effc4f24c39ad57265eee60e522cc08d64d13"
+  },
+  "https://www.redrockdevelopments.com/wp-content/uploads/2021/02/SF-Oakley-brochure_FINAL_01_2021-1.pdf": {
+   "file": "pages/5c7a9185401056ad632df976.pdf",
+   "fetched_at": "2026-11-13T19:15:14Z",
+   "final_url": "https://www.redrockdevelopments.com/wp-content/uploads/2021/02/SF-Oakley-brochure_FINAL_01_2021-1.pdf",
+   "status": 200,
+   "bytes": 7070929,
+   "sha256": "1fb6fe356a69462121529f4b96b16d5cb1789080179f72d380f7eaf4cd40a076"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.60402%2C33.53109&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json": {
+   "file": "pages/2a81e08ef6ee268072ce1467.html",
+   "fetched_at": "2026-11-13T19:15:14Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.60402%2C33.53109&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 4367,
+   "sha256": "dcbe2bab8bd6550693df8e8db7b1428ff67565466c2ca1e2223ab671f2a29bbd"
+  },
+  "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Basemap/FultonStreetBaseMap/MapServer/147/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.60218%2C33.5309%5D%2C%5B-84.60219%2C33.52883%5D%2C%5B-84.6022%2C33.5282%5D%2C%5B-84.60258%2C33.52827%5D%2C%5B-84.60286%2C33.52836%5D%2C%5B-84.60312%2C33.52832%5D%2C%5B-84.60334%2C33.52839%5D%2C%5B-84.60343%2C33.52852%5D%2C%5B-84.60351%2C33.52858%5D%2C%5B-84.60357%2C33.52876%5D%2C%5B-84.60367%2C33.52881%5D%2C%5B-84.6037%2C33.52882%5D%2C%5B-84.60379%2C33.52909%5D%2C%5B-84.60383%2C33.52934%5D%2C%5B-84.604%2C33.52933%5D%2C%5B-84.60412%2C33.52924%5D%2C%5B-84.60429%2C33.52932%5D%2C%5B-84.60465%2C33.52943%5D%2C%5B-84.60476%2C33.52935%5D%2C%5B-84.60485%2C33.52913%5D%2C%5B-84.60494%2C33.52913%5D%2C%5B-84.60506%2C33.52926%5D%2C%5B-84.60521%2C33.52922%5D%2C%5B-84.60541%2C33.52907%5D%2C%5B-84.60556%2C33.52907%5D%2C%5B-84.60573%2C33.52915%5D%2C%5B-84.60589%2C33.52914%5D%2C%5B-84.60602%2C33.52902%5D%2C%5B-84.60622%2C33.52908%5D%2C%5B-84.60627%2C33.52912%5D%2C%5B-84.6063%2C33.52939%5D%2C%5B-84.60635%2C33.52951%5D%2C%5B-84.60649%2C33.52965%5D%2C%5B-84.60608%2C33.52986%5D%2C%5B-84.60542%2C33.5302%5D%2C%5B-84.60481%2C33.53053%5D%2C%5B-84.60403%2C33.53096%5D%2C%5B-84.60237%2C33.53194%5D%2C%5B-84.60222%2C33.53181%5D%2C%5B-84.6022%2C33.53151%5D%2C%5B-84.60219%2C33.5312%5D%2C%5B-84.60218%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json": {
+   "file": "pages/212ccf2d083eddf88b8a2de2.html",
+   "fetched_at": "2026-11-13T19:15:15Z",
+   "final_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/Basemap/FultonStreetBaseMap/MapServer/147/query?geometry=%7B%22rings%22%3A%5B%5B%5B-84.60218%2C33.5309%5D%2C%5B-84.60219%2C33.52883%5D%2C%5B-84.6022%2C33.5282%5D%2C%5B-84.60258%2C33.52827%5D%2C%5B-84.60286%2C33.52836%5D%2C%5B-84.60312%2C33.52832%5D%2C%5B-84.60334%2C33.52839%5D%2C%5B-84.60343%2C33.52852%5D%2C%5B-84.60351%2C33.52858%5D%2C%5B-84.60357%2C33.52876%5D%2C%5B-84.60367%2C33.52881%5D%2C%5B-84.6037%2C33.52882%5D%2C%5B-84.60379%2C33.52909%5D%2C%5B-84.60383%2C33.52934%5D%2C%5B-84.604%2C33.52933%5D%2C%5B-84.60412%2C33.52924%5D%2C%5B-84.60429%2C33.52932%5D%2C%5B-84.60465%2C33.52943%5D%2C%5B-84.60476%2C33.52935%5D%2C%5B-84.60485%2C33.52913%5D%2C%5B-84.60494%2C33.52913%5D%2C%5B-84.60506%2C33.52926%5D%2C%5B-84.60521%2C33.52922%5D%2C%5B-84.60541%2C33.52907%5D%2C%5B-84.60556%2C33.52907%5D%2C%5B-84.60573%2C33.52915%5D%2C%5B-84.60589%2C33.52914%5D%2C%5B-84.60602%2C33.52902%5D%2C%5B-84.60622%2C33.52908%5D%2C%5B-84.60627%2C33.52912%5D%2C%5B-84.6063%2C33.52939%5D%2C%5B-84.60635%2C33.52951%5D%2C%5B-84.60649%2C33.52965%5D%2C%5B-84.60608%2C33.52986%5D%2C%5B-84.60542%2C33.5302%5D%2C%5B-84.60481%2C33.53053%5D%2C%5B-84.60403%2C33.53096%5D%2C%5B-84.60237%2C33.53194%5D%2C%5B-84.60222%2C33.53181%5D%2C%5B-84.6022%2C33.53151%5D%2C%5B-84.60219%2C33.5312%5D%2C%5B-84.60218%2C33.5309%5D%5D%5D%2C%22spatialReference%22%3A%7B%22wkid%22%3A4326%7D%7D&geometryType=esriGeometryPolygon&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=60&units=esriSRUnit_Foot&outFields=%2A&returnGeometry=false&f=json",
+   "status": 200,
+   "bytes": 9464,
+   "sha256": "81950c7282dd05cdd449f61761099aa0183af5f490b36fe1e09d32ab2e84cd95"
+  }
+ },
+ "quotecheck": {
+  "kept": 20,
+  "dropped": 0,
+  "downgraded": [],
+  "checked_at": "2026-11-13T19:15:15Z",
+  "proves": "each kept quote was on the page at its URL when this tool fetched it (see pages); nothing more. Claim text, objections and open_items are the agents' own words, not checked",
+  "inputs": {
+   "findings.json": "c0f7a1a91b75eda4192024f3c6763d93a5c61afe2758addf4c876ca0fb1154a5",
+   "skeptic.json": "8c3e5fa2c59051f1add4904da52c533272e935eede76716c85795971dc5d34f5"
+  }
+ },
+ "dropped_claims": []
+}

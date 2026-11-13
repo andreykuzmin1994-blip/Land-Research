@@ -1,8 +1,8 @@
 # Lead check: parcel 14 006800060376, run fulton-2026-11-13-screens
 
-**In one line (the launching session's reading, not checked):** Zoned and planned industrial with no sign of a deal, but the screen fit no building and homes face its frontage. Ask Atlanta zoning about residential buffers and the Zoning 2.0 remap, and ask the city or GDOT whether trucks can enter from Mount Zion Rd or only from Waters Rd.
+**In one line (the launching session's reading, not checked):** Zoned and planned industrial with no sign of a deal, but the screen fit no building and the agents measure houses across its frontage; the same owner holds lots next door. Ask Atlanta zoning about buffers, the Zoning 2.0 remap and use permits, and the city or GDOT about truck entry.
 
-Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. Words in double quotation marks were on the linked page when it was fetched (2026-11-13T17:47:31Z). Everything else is an agent's own reading, not checked.
+Written by `quotecheck` from `findings.checked.json`; nobody edits it by hand. Words in double quotation marks were on the linked page when it was fetched (2026-11-13T19:23:02Z). Everything else is an agent's own reading, not checked.
 
 ## What the documents say
 

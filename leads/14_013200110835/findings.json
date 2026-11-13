@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "parcel_id": "14 013200110835",
+  "run": "fulton-2026-11-13-screens",
+  "sections": {
+    "zoning": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "The screener read this parcel's East Point code MI as industrial (by right). In East Point, MI is the Medical Institutional district of Sec. 10-2071, not an industrial district: a March 2025 Planning & Zoning Commission notice lists a city-initiated text amendment of Sec. 10-2071 Medical Institutional to narrow its scope and put some uses behind a use permit. The district's use table (Municode) could not be read, so whether warehouse/distribution is allowed is not confirmed from the text; the verdict is unknown for that reason only, but the by_right reading looks wrong.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2025/03/March-PZC-PH-Meeting-Public-Notice-and-Agenda_03.20.2025.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Text Amendment of Sec. 10-2071 Medical Institutional Zoning district classification to streamline the scope and intent of the Medical Institutional zoning district to provide for amended permitted uses and uses permitted through use permit only."},
+        {"text": "The adopted 2022-2023 comprehensive plan ties MI to the hospital campus: the Regional Center character area aims to grow South Fulton Medical Center, and its typical zoning districts include MI (alongside residential R3/R4 and commercial districts).",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2025/06/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy_rv.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Grow South Fulton Medical Center as a regional center, with professional medical"},
+        {"text": "Same plan, same Regional Center section: typical zoning districts listed, MI among residential and commercial districts.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2025/06/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy_rv.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Typical zoning districts: R3, R4, C1, C2, CR, CL, MI, EI, MIX, OIT"},
+        {"text": "The county parcel layer, queried for parcels within 1,200 ft of the site point (33.677237, -84.428686), returns the former South Fulton / Atlanta Medical Center South hospital parcel at 1170 Cleveland Ave (13.5 ac, owned by a Wellstar entity) as a neighbour: the MI zoning here sits in a medical campus, not an industrial area.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.428686%2C33.677237&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=1200&units=esriSRUnit_Foot&outFields=ParcelID,Address,Owner,LUCode,ClassCode,LandAcres,ImprAppr&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"ParcelID\":\"14 0125  LL0291\",\"Address\":\"1170 CLEVELAND AVE\",\"Owner\":\"WELLSTAR ATLANTA MEDICAL CENTER INC \",\"LUCode\":\"540\",\"ClassCode\":\"C5\",\"LandAcres\":13.51"},
+        {"text": "Overlay: the city's Cleveland Avenue Overlay District map (Department of Planning & Zoning, June 3, 2011) outlines, by my reading of the map image, the block bounded by Veterans Street, Long Street and Washington Avenue that holds 1st, 2nd, 5th and 7th Streets, i.e. this parcel's internal streets. The overlay's standards were not read (Municode).",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2022/01/Cleveland-Avenue-Overlay-District.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Keyetta M. Holmes Senior Planner Department of Planning & Zoning June 3, 2011"}
+      ],
+      "open_items": [
+        "East Point's zoning text is on Municode (known wall) and the city's zoning layer is on an ArcGIS Online host (known wall); a third-party code copy (eastpoint-ga.elaws.us) timed out at robots.txt. Ask East Point Planning & Community Development for a zoning verification letter: confirm the parcel is MI (Medical Institutional), list MI's permitted and use-permit uses, and say whether the Sec. 10-2071 amendment deferred in 2025 was later adopted.",
+        "Search-result summaries (third-party, not fetched, not verified) say East Point placed a moratorium on MI applications in October 2024, that council approved a moratorium in December 2023 on reuse of the former Atlanta Medical Center South hospital property next door, and that a city ordinance requires new industrial uses to be one mile (5,280 ft) from residential property. Ask the city whether any of these applies to this parcel; the one-mile rule alone would rule out industrial use here (single-family homes, a school and apartments are within 1,200 ft).",
+        "Confirm whether the Cleveland Avenue Overlay District covers the parcel today and what it requires (uses, design, buffers).",
+        "Internal streets named 1st, 2nd, 5th, 7th and Long Street appear on the city's own street and overlay maps; ask whether any are public right-of-way crossing the parcel, which would split the site."
+      ]
+    },
+    "plans": {
+      "verdict": "against",
+      "claims": [
+        {"text": "The adopted comprehensive plan's key points from public engagement say warehouse/logistics/light industrial belongs only in the business park area south of Camp Creek Parkway and west of I-285. By my reading of the coordinates (33.677, -84.429, next to the hospital on Cleveland Ave / Norman Berry Dr), this parcel is east of I-285 and north of Camp Creek Parkway, i.e. outside that area.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2025/06/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy_rv.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Warehouse/logistics/light industrial is only appropriate in business park area south of Camp Creek Parkway and west of I-285"},
+        {"text": "The same engagement summary lists affordable and senior housing as key issues; redeveloping an occupied manufactured-home community would run against that.",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2025/06/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy_rv.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Affordable and senior housing remain key issues"},
+        {"text": "Nearby case: the November 15, 2022 Community Zoning Information Meeting agenda lists a preliminary plat for 18 townhome lots in R-T at 0 Veterans (parcel 14 013200110900, a different parcel on the same street and county block numbering). New housing is being platted beside the site.",
+         "source_url": "http://eastpointga.gov/wp-content/uploads/2022/11/November-CZIM-Agenda-and-Public-Notice-003.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "0 Veterans (14013200110900) Applicant seeks a preliminary plat for an 18 lot subdivide to build town homes in R-T."},
+        {"text": "The plan's Future Development Map replaced the old parcel-based future land use map, so the screener's FLU value (PI) comes from the older tool; the parcel's character area on the new map was not read (map image).",
+         "source_url": "https://eastpointga.gov/wp-content/uploads/2025/06/EastPointPlanDraft5_FinalForAdoption_2023.07.17_Copy_rv.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "This replaces the old tool of a parcel-based Future Land Use"}
+      ],
+      "open_items": [
+        "Confirm the parcel's character area on the Future Development Map (likely Regional Center around South Fulton Medical Center, not checked).",
+        "The city's zoning-cases page answered 404 and its agenda portal (eastpointcityga.iqm2.com) gave an empty reply to robots.txt; no list of rezoning cases for the last five years could be read. Ask the city for any rezoning, use permit or moratorium on or beside 2848 Veterans St since 2021."
+      ]
+    },
+    "utilities": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "East Point runs its own water and sewer system (164+ miles of water mains, 153+ miles of sewer mains), but its web page shows no map, so whether mains run at or next to this parcel is not shown here.",
+         "source_url": "https://eastpointga.gov/water-sewer/",
+         "retrieved": "2026-11-13",
+         "quote": "The water distribution system is comprised of a main line that runs 164+ miles."},
+        {"text": "Sewer: same page, collection system size only; no map.",
+         "source_url": "https://eastpointga.gov/water-sewer/",
+         "retrieved": "2026-11-13",
+         "quote": "The collections system contains 153+ miles of sewer main lines."}
+      ],
+      "open_items": [
+        "Ask East Point Water & Sewer for the nearest water main and sewer line and their capacity. A third-party park listing seen only as a search snippet (not fetched, not verified) said the community's water comes from a well and sewer is city-provided; worth checking."
+      ]
+    },
+    "market": {
+      "verdict": "no_sign_found",
+      "claims": [
+        {"text": "Already in use: the county address-point layer, queried by this parcel id, returns 96 active main addresses on the parcel, on internal streets (Long St, 1st, 2nd, 3rd, 4th, 5th, 6th, 7th St and Veterans St), field data dated 11/16/2017. That is the pattern of an occupied manufactured-home community, not vacant land. No sign of a sale, contract or developer was found.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/10/query?where=ParcelID%3D%2714%20013200110835%27&outFields=Label,City,Status,PtType,Comment&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "{\"Label\":\"34 Long St\",\"City\":\"East Point\",\"Status\":\"Active\",\"PtType\":\"Main Address\",\"Comment\":\"Field Data 11/16/2017\"}"},
+        {"text": "The county parcel record (queried by parcel id) carries improvements appraised at $130,200 on land of $619,800, land-use code 213 and class C4 (commercial); the meaning of code 213 was not found on a public page.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20013200110835%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"TotAppr\":750000,\"LandAppr\":619800,\"ImprAppr\":130200,\"LUCode\":\"213\",\"ClassCode\":\"C4\""},
+        {"text": "The only Veterans Street case on the November 2022 city zoning agenda is 0 Veterans (a different parcel, townhomes); 2848 Veterans St is not on it. No rezoning by a developer was found for this parcel in the places looked.",
+         "source_url": "http://eastpointga.gov/wp-content/uploads/2022/11/November-CZIM-Agenda-and-Public-Notice-003.pdf",
+         "retrieved": "2026-11-13",
+         "quote": "Applicant seeks a preliminary plat for an 18 lot subdivide to build town homes in R-T."}
+      ],
+      "open_items": [
+        "Search results (third-party listings, not fetched, not primary) describe 2848 Veterans St as an operating all-ages manufactured-home land-lease community with on-site management and homes listed for sale or rent in it. Drive by to confirm occupancy; buying it would mean closing an occupied community and relocating residents.",
+        "The county assessor page (qpublic.schneidercorp.com) answered a bot challenge (403), so the meaning of land-use code 213 and the deed history were not read."
+      ]
+    },
+    "owner": {
+      "verdict": "unknown",
+      "claims": [
+        {"text": "The county record (queried by parcel id) shows an LLC owner with a Texas mailing address; the Secretary of State record was not read (known wall), so status, formation and agent are unknown. The 96 active addresses on the parcel suggest the owner operates the community, but that is not from a state record.",
+         "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%20013200110835%27&outFields=*&returnGeometry=false&f=json",
+         "retrieved": "2026-11-13",
+         "quote": "\"OwnerAddr1\":\"330 RAYFORD RD #312\",\"OwnerAddr2\":\"SPRING TX 77386\""}
+      ],
+      "open_items": [
+        "Georgia Secretary of State business search is a known wall; a person should pull the entity record (status, formed, registered agent) and check whether it is registered in Texas as well.",
+        "A search-result snippet (third-party, not fetched) named a manufactured-housing community operator and a property-management firm for the park; treat as a lead to confirm, not a finding."
+      ]
+    }
+  }
+}

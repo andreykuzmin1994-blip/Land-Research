@@ -1,0 +1,46 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0180  LL0368",
+ "skeptic": {
+  "verdict": "weakened",
+  "objection": "This is not vacant industrial land: the county classes it as utility property with 1.5 million dollars of improvements, and EPA registers a propane terminal at 71 Fairfield Place NW, an address the city puts on this parcel. The owner, a gas-utility affiliate with gas-utility land across the street, looks like it operates the site, so a sale would need the terminal closed or moved, and nothing shows that is planned. The first pass also missed that the parcel is not all I-1. The east end of the larger eastern piece, the 10.5 acre piece the building fit uses, is zoned R-4 single-family (about 2.6 acres by my overlay of the city zoning polygons on the county parcel shape) and shown as Single-Family Residential on the future land use map (about 3.6 acres). That leaves roughly 7.8 acres of I-1 in that piece, around an existing terminal and with residential districts on several sides. The 135,200 SF envelope probably does not fit on the industrial part, and the by_right and supports verdicts hold only for part of the parcel.",
+  "disputes": [
+   "zoning-1",
+   "zoning-4",
+   "plans-1"
+  ],
+  "claims": [
+   {
+    "text": "The city's zoning district layer, queried at a point in the east end of the parcel's larger (eastern) piece (33.754193, -84.460674; inside the county parcel shape by my own point-in-polygon test), returns R-4 single-family residential, not I-1. By my overlay of the city's zoning polygons on the county parcel shape, about 2.6 of the piece's 10.5 acres are R-4, in a strip about 200 ft wide running the full depth of the piece.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.460674%2C33.754193&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"ZONECLASS\":\"R-4\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH6SIMIREDIRE\""
+   },
+   {
+    "text": "The city's Development Patterns / Future Land Use layer, queried at the same point inside the parcel's eastern piece, returns Single-Family Residential (Medium Lot Single Family), not Industrial. By my overlay, about 3.6 acres of the eastern piece are Single-Family Residential on this layer. plans-1 queried only one point and reported Industrial for the parcel.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.460674%2C33.754193&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"PIN\":\"Medium Lot Single Family\",\"CONVERSION\":\"FLU + Zoning\",\"NDP\":\"MLSF\",\"FID_L8LAND\":2251,\"LANDUSECOD\":\"SFR\",\"LANDUSEDES\":\"Single-Family Residential\""
+   },
+   {
+    "text": "For comparison, the same future land use layer queried at a point inside the parcel's smaller western piece (33.754596, -84.463712) returns Industrial: the western 3.9 acre piece is industrial on the plan, as plans-1 said for the eastern point.",
+    "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.463712%2C33.754596&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+    "retrieved": "2026-11-13",
+    "quote": "\"PIN\":\"Industrial\",\"CONVERSION\":\"FLU only\",\"NDP\":\"I\",\"FID_L8LAND\":2296,\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\""
+   },
+   {
+    "text": "EPA's Facility Registry gives the propane terminal at 71 Fairfield Place NW a state air-program record (AIRS 1312100918). The city's address layer puts that address on the parcel's eastern piece, inside its I-1 part, along with the 10,258 sq ft building (my own point-in-polygon test). The record carries no dates, so whether the terminal operates today is not shown.",
+    "source_url": "https://data.epa.gov/efservice/FRS_PROGRAM_FACILITY/REGISTRY_ID/110013693770/JSON",
+    "retrieved": "2026-11-13",
+    "quote": "\"primary_name\": \"AMERIGAS ATLANTA TERMINAL\", \"std_state_code\": null, \"county_name\": null, \"small_bus_ind\": \"N\", \"source_of_data\": \"AIR\""
+   }
+  ],
+  "open_items": [
+   "Ask Atlanta Office of Zoning and Development to confirm the zoning line: is the east end of the eastern piece really R-4 single-family (a split-zoned parcel), or is the city polygon mis-drawn against the county parcel line? A zoning verification letter should name every district on the parcel.",
+   "Re-run the building fit on the I-1 part only (about 3.9 ac west piece and about 7.8 ac of the east piece, the latter roughly 650 by 690 ft by my overlay) and inside Atlanta's transitional yard and screening rules toward R-4, RG-3 and MR-2-C (Municode wall, not read). The 520 x 260 ft envelope on the 10.5 acre piece likely depends on the R-4 strip.",
+   "Whether the propane terminal operates today is not shown by any primary source I could read. Seen, not verifiable: third-party directory listings found by web search (not opened) list AmeriGas at 71 Fairfield Pl NW, one with a 2026 update date, and Heritage Propane there as closed. Check the Georgia EPD air permit record for AIRS 121-00918 and ask the fire marshal for an LP-gas permit.",
+   "The future land use layer shows a 2008 land use amendment CDP-08-24 (Industrial to Medium-Density Residential, Z-08-028) touching the parcel's bounding box. It is older than five years and was not mapped onto the parcel; ask planning whether it touched this parcel.",
+   "Owner intent: the owner of record is a gas-utility affiliate, and the gas utility holds land across Verbena St. Treat a sale as a corporate real-estate decision to relocate the terminal, and check title for a lease to the propane distributor and the cell-site ground lease at 2370 Verbena St NW."
+  ]
+ }
+}

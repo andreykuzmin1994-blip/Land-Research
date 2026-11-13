@@ -1,0 +1,193 @@
+{
+ "schema": 1,
+ "parcel_id": "14 0180  LL0368",
+ "run": "fulton-2026-11-13-screens",
+ "sections": {
+  "zoning": {
+   "verdict": "by_right",
+   "claims": [
+    {
+     "text": "City of Atlanta's zoning district layer, queried at a point inside the parcel's eastern piece (33.754476, -84.462237), returns I-1 Light Industrial, linked to the I-1 chapter of the city code.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ZONECLASS\":\"I-1\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH16LIINDIRE\""
+    },
+    {
+     "text": "Atlanta City Council ordinance 23-O-1058 (2023, on the city clerk's library) states that warehousing, self-storage and distribution centers are permitted generally in Light Industrial (I-1) districts; the ordinance itself proposes to bar them only within 500 ft of the Beltline corridor. Whether it was adopted was not confirmed.",
+     "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/10376/1221734/pdf",
+     "retrieved": "2026-11-13",
+     "quote": "Due to a proofreading error during recent quick fix zoning updates to the Atlanta City Code, the use of warehousing, self-storage, and distribution centers in Light Industrial Districts was permitted generally but not limited within the Beltline Corridor"
+    },
+    {
+     "text": "The amended I-1 use item in the same ordinance: warehousing and distribution centers, except within 500 ft of the Beltline corridor.",
+     "source_url": "https://mcclibraryfunctions.azurewebsites.us/api/ordinanceDownload/10376/1221734/pdf",
+     "retrieved": "2026-11-13",
+     "quote": "except when any part of the property is within 500 feet of the beltline corridor as defined in City Code Section 16-36.007"
+    },
+    {
+     "text": "The city zoning record at the parcel point has blank SPI, subarea, TSA and case fields and status Current: plain I-1, no conditional (-C) suffix or special public interest district shown.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"SPI\":\" \",\"SUBAREA\":\" \",\"TSA\":\" \",\"STATUS\":\"Current\",\"CASEIN\":\" \",\"CASEOUT\":\" \",\"SUNRISE\":-2208988800000"
+    },
+    {
+     "text": "The city's zoning overlay layer, queried at the same point, returns no overlay district.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/21/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+    },
+    {
+     "text": "A zoning query over a box around the parcel (plus 100 ft) also returns residential districts, among them RG-3 multi-family and R-4A single-family; transitional yard and screening rules toward residential would apply on those sides (not read: Municode wall).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/22/query?geometry=-84.46579%2C33.75317%2C-84.46026%2C33.75522&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=100&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"OBJECTID\":12656,\"ZONECLASS\":\"RG-3\",\"ZONEDESC\":\"https://library.municode.com/ga/atlanta/codes/code_of_ordinances?nodeId=PTIIICOORANDECO_PT16ZO_CH8REGEDIRE\""
+    }
+   ],
+   "open_items": [
+    "The I-1 district text itself is on Municode (known wall) and atlantaga.gov answers robots.txt with 403; the use permission rests on the 2023 ordinance's own recital. Ask Atlanta Office of Zoning and Development for a zoning verification letter for warehouse/distribution on this parcel, and whether 23-O-1058 was adopted.",
+    "Confirm the parcel is more than 500 ft from the Beltline corridor (my reading of the map: the parcel is in Dixie Hills near I-20/MLK Jr Dr, well west of the Westside Beltline, but this was not measured from a city layer).",
+    "The parcel borders multi-family and single-family residential districts: ask what transitional yards, buffers, screening and height limits apply on those sides.",
+    "The parcel holds an existing propane terminal (see market): ask the fire marshal what separation distances from LP-gas storage would govern any new building on the remaining land."
+   ]
+  },
+  "plans": {
+   "verdict": "supports",
+   "claims": [
+    {
+     "text": "The city's Development Patterns / Future Land Use layer, queried at a point inside the parcel, returns Industrial.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/19/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"LANDUSECOD\":\"I\",\"LANDUSEDES\":\"Industrial\",\"LASTUPDATE\":null"
+    },
+    {
+     "text": "The city's rezoning case layer, queried within 2,000 ft of a point inside the parcel, returns nine case records, none from or to an industrial district and none on this I-1 parcel; the one pending case is a small (0.56 ac) C-1-C to C-1 change, Z-25-036.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"C-1-C\",\"TO_ZONE\":\"C-1\",\"DOCKET_NO\":\"Z-25-036\",\"STATUS\":null"
+    },
+    {
+     "text": "Another nearby case on the same layer: Z-23-031, C-3 to MRC-3 (mixed residential-commercial), 11.4 ac, complete in 2023, not on this parcel: the corridor nearby is being rezoned toward mixed use.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"C-3\",\"TO_ZONE\":\"MRC-3\",\"DOCKET_NO\":\"Z-23-031\",\"STATUS\":\"COMPLETE\""
+    },
+    {
+     "text": "The city's special use permit layer, queried within 2,000 ft of a point inside the parcel, returns no special use permit.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/24/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+    },
+    {
+     "text": "The city's building moratorium layer, queried at a point inside the parcel, returns no moratorium.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/11/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "{\"name\":\"SHAPE.LEN\",\"type\":\"esriFieldTypeDouble\",\"alias\":\"SHAPE.LEN\"}],\"features\":[]}"
+    }
+   ],
+   "open_items": [
+    "Future land use and the case layers were queried at one point in the parcel's eastern piece; the western piece (around 33.7546, -84.4645) was not queried separately. Confirm the whole parcel is Industrial on the adopted CDP map.",
+    "Nearby rezonings (C-3 to MRC-3, R-4A to R-5, R-4 to PD-H) point toward residential and mixed use on the MLK Jr Dr corridor; ask planning whether new truck-intensive industrial use here would meet neighbourhood opposition."
+   ]
+  },
+  "utilities": {
+   "verdict": "unknown",
+   "claims": [],
+   "open_items": [
+    "No published water or sewer map was read: Atlanta Department of Watershed Management publishes no queryable public layer found in an earlier lead, and atlantaga.gov is a robots wall. The parcel holds existing buildings with city address points, so service probably exists, but no map shows it. Ask Watershed Management for the nearest water main and sewer to 2370 Verbena St NW / 71 Fairfield Pl NW and for capacity."
+   ]
+  },
+  "market": {
+   "verdict": "no_sign_found",
+   "claims": [
+    {
+     "text": "EPA's Facility Registry lists 'AmeriGas Atlanta Terminal' at 71 Fairfield Place NW, Atlanta, under the EPA air program (AIRS/AFS). The city's address layer (next claim) puts 71 Fairfield Place NW on this parcel: the parcel appears to be an operating or recently operating propane terminal, not vacant land.",
+     "source_url": "https://data.epa.gov/efservice/FRS_PROGRAM_FACILITY/REGISTRY_ID/110013693770/JSON",
+     "retrieved": "2026-11-13",
+     "quote": "\"primary_name\": \"AMERIGAS ATLANTA TERMINAL\", \"std_state_code\": null, \"county_name\": \"FULTON\", \"small_bus_ind\": null, \"source_of_data\": \"AIRS/AFS\""
+    },
+    {
+     "text": "Atlanta's site address layer, queried by this parcel id, returns three addresses on the parcel: 71 Fairfield Place NW, 2370 Verbena Street NW and 2392 Verbena Street NW.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/0/query?where=PARCELID%3D%2714%200180%20%20LL0368%27&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FULLADDR\":\"71 FAIRFIELD PLACE NW\",\"FULLNAME\":\"FAIRFIELD PLACE NW\""
+    },
+    {
+     "text": "The same EPA registry entry also carries the name Heritage Propane (from EPA's ICIS compliance system) at 71 Fairfield Place.",
+     "source_url": "https://data.epa.gov/efservice/FRS_PROGRAM_FACILITY/REGISTRY_ID/110013693770/JSON",
+     "retrieved": "2026-11-13",
+     "quote": "\"primary_name\": \"HERITAGE PROPANE\", \"std_state_code\": null, \"county_name\": \"FULTON\", \"small_bus_ind\": \"N\", \"source_of_data\": \"ICIS\""
+    },
+    {
+     "text": "EPA's facility search for Fairfield addresses in Atlanta returns one facility, at 71 Fairfield Pl NW, standard name GASCO (Atlanta).",
+     "source_url": "https://data.epa.gov/efservice/FRS_FACILITY_SITE/CITY_NAME/ATLANTA/LOCATION_ADDRESS/CONTAINING/FAIRFIELD/JSON",
+     "retrieved": "2026-11-13",
+     "quote": "\"primary_name\": \"GASCO (ATLANTA)\", \"std_state_code\": \"GA\", \"county_name\": \"FULTON\", \"small_bus_ind\": \"N\", \"std_street_name\": \"FAIRFIELD PL NW\""
+    },
+    {
+     "text": "The county parcel record (queried by parcel id) shows $1,500,000 of improvements on top of $3,307,500 land value, land use code 703 and class U3 (utility), with zero taxable assessment: a built utility-class property, not vacant land.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200180%20%20LL0368%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"TotAssess\":0,\"LandAssess\":1323000,\"ImprAssess\":600000,\"TotAppr\":4807500,\"LandAppr\":3307500,\"ImprAppr\":1500000,\"LUCode\":\"703\",\"ClassCode\":\"U3\""
+    },
+    {
+     "text": "EPA's facility search for Verbena addresses in Atlanta lists a wireless carrier site at 2370 Verbena St NW, one of the addresses the city places on this parcel: likely a cell tower lease on the land.",
+     "source_url": "https://data.epa.gov/efservice/FRS_FACILITY_SITE/CITY_NAME/ATLANTA/LOCATION_ADDRESS/CONTAINING/VERBENA/JSON",
+     "retrieved": "2026-11-13",
+     "quote": "\"primary_name\": \"CINGULAR WIRELESS LLC - 3052 DH DIXIE HILLS\", \"std_state_code\": \"GA\", \"county_name\": \"FULTON\""
+    },
+    {
+     "text": "The city's building footprint layer, queried over the parcel's bounding box, returns five footprints; by my own point-in-polygon test against the county parcel shape, three lie inside the parcel, the largest about 10,258 sq ft (others about 1,407 and 306 sq ft).",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/10/query?geometry=-84.46579%2C33.75317%2C-84.46026%2C33.75522&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"AREASQFT\":10258.02547809,\"COMMENTS\":null"
+    },
+    {
+     "text": "No rezoning or special use application on this parcel appears on the city's case layers within 2,000 ft (see plans): no sign of a developer applying. The case nearest in time is an unrelated 0.56 ac commercial case.",
+     "source_url": "https://gis.atlantaga.gov/dpcd/rest/services/OpenDataService1/MapServer/23/query?geometry=-84.462237%2C33.754476&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=2000&units=esriSRUnit_Foot&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"FROM_ZONE\":\"C-1-C\",\"TO_ZONE\":\"C-1\",\"DOCKET_NO\":\"Z-25-036\",\"STATUS\":null"
+    },
+    {
+     "text": "Contamination check: Georgia EPD's 2026 Hazardous Site Inventory list by county shows the Fulton County entries; none is named for propane, gas, Verbena St or Fairfield Pl, so the site is not listed by name (an HSI site can be listed under another name, so this is not a clean bill).",
+     "source_url": "https://epd.georgia.gov/document/pdf/hsi-list-county-2026/download",
+     "retrieved": "2026-11-13",
+     "quote": "10077 1610 Southland Circle (FKA \"Indcon\") FULTON V"
+    }
+   ],
+   "open_items": [
+    "Biggest finding: the parcel appears to hold an active (or recently active) propane bulk terminal (EPA names AmeriGas Atlanta Terminal, Heritage Propane, Gasco at 71 Fairfield Pl NW, an address the city puts on this parcel) plus about 10,000 sq ft of buildings and a likely cell-tower lease. It is not vacant land: any industrial reuse needs the terminal to close or relocate, tank and piping removal, and a Phase I/II environmental review.",
+    "Seen, not verifiable: a web search (third-party listing sites, not opened) returned business listings for AmeriGas and Heritage Propane at 71 Fairfield Pl NW. Whether the terminal operates today is unconfirmed: EPA ECHO (echodata.epa.gov) disallows all robots, so the air permit status (AIRS 13-121-00918) was not read. Check the Georgia EPD air permit record.",
+    "Ask whether the 2370 Verbena St NW wireless site is a ground lease with years left; it would encumber the parcel.",
+    "Pipelines: no public pipeline map was read (the national pipeline map viewer is not a quotable public page). Ask the gas utility or check title for pipeline easements serving the terminal.",
+    "Web searches by street address and street names (never the owner) found no sale listing, news, development authority release or DRI for the parcel. CoStar, LoopNet and Crexi were not used."
+   ]
+  },
+  "owner": {
+   "verdict": "operator",
+   "claims": [
+    {
+     "text": "The county record for this parcel (queried by parcel id) gives the owner as an LLC mailing to a suite on Peachtree St in Atlanta 30308.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200180%20%20LL0368%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"AGL PROPANE LLC \",\"OwnerAddr1\":\"817 PEACHTREE ST # 1000\",\"OwnerAddr2\":\"ATLANTA GA 30308\""
+    },
+    {
+     "text": "The same record classes the parcel as utility property (class U3, land use 703) with improvements, and the site carries EPA-registered propane terminal records (see market): it looks like an operating energy business's site, not an investor vehicle.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?where=ParcelID%3D%2714%200180%20%20LL0368%27&outFields=*&returnGeometry=true&outSR=4326&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"ImprAppr\":1500000,\"LUCode\":\"703\",\"ClassCode\":\"U3\",\"ExCode\":null,\"LivUnits\":0,\"LandAcres\":14.7"
+    },
+    {
+     "text": "The county parcel layer queried by a map box around the parcel (not by owner) shows parcels across Verbena St on Sewanee Ave NW held by the regional gas utility, also class U3: the area holds other gas-utility land.",
+     "source_url": "https://gismaps.fultoncountyga.gov/arcgispub2/rest/services/PropertyMapViewer/PropertyMapViewer/MapServer/11/query?geometry=-84.4662,33.7528,-84.4598,33.7556&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json",
+     "retrieved": "2026-11-13",
+     "quote": "\"Owner\":\"ATLANTA GAS LIGHT CO \",\"OwnerAddr1\":\"80 BAKER ST NE\",\"OwnerAddr2\":\"ATLANTA GA 30303\",\"TaxDist\":\"05\",\"TotAssess\":0,\"LandAssess\":0,\"ImprAssess\":0"
+    }
+   ],
+   "open_items": [
+    "The Georgia Secretary of State record (status, formation, registered agent) was not read: known wall. Ask whether the owner of record is the terminal operator or leases the site to the propane distributor named in EPA's records; a lease would affect any sale.",
+    "Last recorded sale 2001 (per brief) at $300,319: a long-held operating site; sale would likely require a corporate decision to relocate the terminal."
+   ]
+  }
+ }
+}

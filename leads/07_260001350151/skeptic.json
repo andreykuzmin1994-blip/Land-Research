@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "parcel_id": "07 260001350151",
+  "skeptic": {
+    "verdict": "weakened",
+    "objection": "This does not look like raw land an outside buyer can source. A limited partnership bought it in December 2024, after a 2024 industrial rezoning and outdoor-storage permit had been filed for a 78.3-acre assemblage that includes it. The brief and the county layer show the same partnership holding most of that assemblage (about 72 acres). The brief gives the price as $2.05M, about twice the assessor's land value, though the deed may cover more than this parcel. The neighbouring 7635 Bishop Rd tract is already being developed by another industrial outdoor storage company. On top of that, the M-2 zoning the grade rests on is not proven. Staff recommended denial of both the 2024 rezoning and the permit, found outdoor storage incompatible with the neighbours, and the Planning Commission deferred the case. The city's case list shows no council date. Before the case, the land was AG-1, R-2 and some M-2. The first pass's plan support (CDP-004) amends the 2021 plan, which the 2026 Comprehensive Plan has since replaced, and this parcel's 2026 designation was not found. No document shows a closing, a site plan for this parcel or a council denial, so the lead is weakened, not killed.",
+    "disputes": ["zoning-5", "plans-1"],
+    "claims": [
+      {"text": "The 2024 rezoning memo says the five-parcel property was zoned AG-1 and M-2 when the case was filed. The rezoning to M-2 was what the applicant was asking for. M-2 on this parcel is therefore not shown to predate the case, and the case outcome was not found.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+       "retrieved": "2026-11-13",
+       "quote": "The property is zoned AG-1 and M-2. The applicant is requesting to rezone to M-2 to develop Industrial Outdoor Storage (IOS) or Industrial Service Facilities (ISF)."},
+      {"text": "The case had already slipped once: notice set Planning Commission for February 21, 2024 and Council for March 19, 2024. The memo is dated April 17, 2024 and ends in a 30-day deferral.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9943/Z24-002_7565-Bishop-Road_PC_4_17",
+       "retrieved": "2026-11-13",
+       "quote": "Staff placed the required notice of public hearing in The Daily Report on January 31, 2024, to notify the public that Case Z24-002 would be heard at the Planning Commission Meeting on February 21, 2024, and at the City Council Public Hearing on March 19, 2024."},
+      {"text": "The city's filed zoning cases list still shows Z24-002 for this address with a Planning Commission date only and no Mayor and Council date.",
+       "source_url": "https://www.cityofsouthfultonga.gov/2433/Zoning-Cases",
+       "retrieved": "2026-11-13",
+       "quote": "Z24-002 7565 Bishop Road Staff Report 4/17/2024"},
+      {"text": "In the companion use-permit memo, staff found outdoor storage incompatible with the adjacent land uses and zoning. That is a neighbour-compatibility objection a buyer would face again.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+       "retrieved": "2026-11-13",
+       "quote": "The proposed use of outdoor storage is not compatible with the adjacent land uses and zoning districts."},
+      {"text": "The same memo describes the pre-case zoning as AG-1 and M-2 and treats it as giving the land a reasonable economic use. Staff saw no need for the industrial rezoning.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/9482/U24-001_7565-Bishop-Road",
+       "retrieved": "2026-11-13",
+       "quote": "The AG-1 (Agricultural) and M-2 (Heavy Industrial) district has numerous allowed uses that support the economic viability of the subject property."},
+      {"text": "The 2021 plan that CDP-004 amended is no longer the only plan. A 2026 staff memo for another Bishop Road case cites both the 2021 plan and the 2026 South Fulton Comprehensive Plan. This parcel's designation under the 2026 plan was not found.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
+       "retrieved": "2026-11-13",
+       "quote": "The subject property has a future land use designation of Rural Neighborhood as designated in 2021 South Fulton Comprehensive Plan & Suburban I Neighborhood as designated in the 2026 South Fulton Comprehensive Plan."},
+      {"text": "Staff now test cases on Bishop Road against the 2026 plan, so a 2024 amendment to the 2021 map does not by itself show current plan support.",
+       "source_url": "https://www.cityofsouthfultonga.gov/DocumentCenter/View/15971/Z26-013-7000---7050-Bishop-rm1",
+       "retrieved": "2026-11-13",
+       "quote": "The proposed density is not supported by the 2021 Future Land Use Map; however, the proposed zoning district and density is supported by the 2026 Comprehensive Plan."}
+    ],
+    "open_items": [
+      "Ask South Fulton planning for the Mayor and Council outcome of Z24-002, U24-001 and the CDP-004 resolution (approved, denied, withdrawn or never heard), with dates and any conditions. Until then the M-2 in the brief is the screener's map reading only. The 2024 ordinance and resolution lists load only through a POST form and were not read.",
+      "Ask which character area the 2026 South Fulton Comprehensive Plan (adopted spring 2026) gives 7565 Bishop Rd. The future land use map is an image in the plan PDF and on the city's ArcGIS Online viewer (known wall).",
+      "Seen, not verifiable: the 2026 plan PDF, https://www.cityofsouthfultonga.gov/DocumentCenter/View/15671/CoSF-Comp-Plan-Combined_Pages-1 (about 157 MB, so possibly too large to check), says in its Industrial Zone category that industrial zones are generally incompatible with residential uses without appropriate buffering. It also says heavy industrial (M-2) may need extra performance standards.",
+      "Ask whether the owner partnership is linked to the 2024 applicant or to the developer of Bishop Industrial Park at 7635 Bishop Rd. If it is, the parcel is already in a developer's hands for its own project.",
+      "Seen, not verifiable: the city release on Bishop Industrial Park (CivicAlerts AID 864) is disallowed by robots.txt. I checked the mobile copy, https://www.cityofsouthfultonga.gov/m/newsflash/Home/Detail/864, and it answers 302 to the city's 404 page. Search snippets place the groundbreaking at 7635 Bishop Rd on October 30, 2025, by 9606 Capital. Whether the park takes in 7565 Bishop Rd is unknown.",
+      "First-pass market-4 says three of the four other case parcels share this owner. Its kept quotes show only 7500 and 7490 Herndon Rd; 7460 Herndon Rd is not quoted. The brief counts two same-owner parcels in the 5-50 acre band.",
+      "The county parcel record (first-pass owner-2) shows one living unit and about $98,800 of improvements: a house is on the parcel. Confirm whether it is occupied or leased.",
+      "Residential case Z26-013 (72 homes, 7000 and 7050 Bishop Rd) is not adjacent. From the county parcel layer's polygon vertices, its nearest point is about 5,660 ft (about 1.07 mi) from this parcel. This is my own rough measure, not a kept claim."
+    ]
+  }
+}
