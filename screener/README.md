@@ -312,12 +312,35 @@ service, a check that was off, a missing result or an unknown state is
 | Slope | a lidar reading came back (the steep-ground screen was applied) | | the reading failed, or the open ground is under one lidar pixel |
 | Soils | an answer came back under both thresholds, or with no rating | hydric or poorly-drained share at or above `max_hydric_pct` / `max_poorly_drained_pct` (25; 0 = off) | the soil service failed |
 | Parcel map against the tax record | they agree | | an acreage mismatch (every map-based check may be off) |
-| Same owner built next door (`owner_next_door`) | no adjacent same-owner parcel is built on | one is: adjacent directly or through other same-owner parcels | adjacency could not be measured |
+| Same owner built next door (`owner_next_door`) | no adjacent same-owner parcel is built on | one is: adjacent directly or through other same-owner parcels, in the run's 5-50 ac groups or, with `next_door_any_size`, among touching parcels of any size | adjacency could not be measured, or the any-size check failed or was outside `next_door_max_parcels` |
 
-Three watch items count only when found (the fact is on the tax roll or
-it is not): a listed contamination site on the parcel; the assessor's
-"land-locked" entry (when frontage did not already count); and a last
-priced deed more recent than `recent_purchase_years` (5; 0 = off).
+Watch items count only when found (the fact is on the tax roll or it is
+not): a listed contamination site on the parcel, or within
+`contamination_near_ft` (250; 0 = off), or on a bordering parcel (any
+size, `next_door_any_size`); an owner name that reads like a quarry or
+aggregates company or a waste or sanitation company (`operating_owner`,
+`owners.operating_kind`); the assessor's "land-locked" entry (when
+frontage did not already count); and a last priced deed more recent than
+`recent_purchase_years` (5; 0 = off). Contamination counts once, the
+closest fact first.
+
+**Neighbours of any size (`nextdoor.py`, added 2026-11-13 after the lead
+document checks).** The run fetches only 5-50 acre parcels, so a quarry
+pit or a 94-acre distribution centre next to a lead is not in its
+same-owner groups. For the top `next_door_max_parcels` (250) by rank, the
+screener asks the county parcel layer for the parcels touching each one
+(within the owner-cluster gap, 10 ft), whatever their size, and follows
+the same owner's parcels outward up to three steps (`owners.same_owner`,
+the loose name rule). A same-owner parcel counts as built by the screen's
+own test (improvements over `[screens] max_improvement_value` and over
+half the land value), unless its county land-use code is residential (1xx: a family's own house is not an
+operating site). A listed site (EPA, GA EPD HSI) whose mapped point falls
+on a touching parcel, but not on the lead itself, is the "bordering
+parcel" item. Both add a flag line. About one request pair per lead,
+cached with the map data; a failure is "not checked" and counted in
+`summary.md`. Limits: an operator holding its plant under another
+company name is not followed; a site mapped at a street address off the
+bordering parcel is missed; nothing here reads deeds or leases.
 
 `blocked` if the zoning path is `hard` (that rests on no other check).
 Otherwise a parcel outside a check's `max_parcels` cap, or run with a
@@ -332,11 +355,12 @@ Limits:
   prototypes (the smallest needs a clear 400 x 445 ft), not proof nothing
   can be built; frontage is measured to a road centreline; soils are
   map-unit level.
-- The "built next door" item sees only same-owner parcels the run fetched
-  (5-50 acres, exact owner name and mailing address; see Owner clusters).
-  A plant on a smaller or larger parcel, or under another company name,
-  is not seen, so "clear" here is weak. Its flag line ("Same owner,
-  adjacent and built on") stays in the watch-outs even with
+- The "built next door" item sees the same-owner parcels the run fetched
+  (5-50 acres, exact owner name and mailing address; see Owner clusters)
+  and, with `next_door_any_size`, touching parcels of any size under a
+  loosely matching name. A plant under another company name is not seen,
+  so "clear" here is still weak. Its flag lines ("Same owner, adjacent and
+  built on", "Same owner, any size") stay in the watch-outs even with
   `owner_next_door = false`.
 - The recent-deed item reads the county deed file. Any priced deed
   counts, so a transfer between related companies reads the same as a
@@ -449,6 +473,18 @@ reviewed), the meaning differences above, spatial clustering and privacy
   ASSN INC"), or carry HOA inside a company name with a legal form ("... HOA
   INC"; THE doesn't count, since Hoa and The are also Vietnamese given and
   middle names); ASSOC, ASSOCIATION or POA alone don't count.
+  `built_min_building_sf` (2500) and `built_min_improvement_value`
+  (50000) drop a parcel the county's deed file lists with that many square
+  feet of commercial buildings and at least that much in improvements: an
+  operating site, even when its improvements are a small share of the
+  land value (a fuel terminal, a rental-car facility). `0` square feet
+  switches it off. It reads the current roll, so it is a live-only screen:
+  the frozen evaluation never applies it (its answer-key sites are built on
+  now). Norfolk Southern's real-estate company (SOUTHERN REGION INDUSTRIAL
+  REALTY) counts as railroad-owned (`exclude_utility_owned`). Unlike the
+  building screen, that owner rule is shared with `build_eval`: the frozen
+  key is unchanged, but a rebuild of it would drop that owner's parcels
+  from the candidate pool too.
   `[owners] adjacency_gap_ft` sets how close two same-owner parcels must be
   to count as adjacent (see Owner clusters below; flags only).
   `[fit] enabled` and `max_parcels` switch the building-fit check off or
@@ -462,8 +498,12 @@ reviewed), the meaning differences above, spatial clustering and privacy
   request per parcel).
   `[grade]` holds the lead grade's switch, its thresholds
   (`min_frontage_ft`, `max_hydric_pct`, `max_poorly_drained_pct`,
-  `owner_next_door`, `recent_purchase_years`) and `digest_max`, the most
-  leads `leads.md` lists (see Lead grade; report only, no web request).
+  `owner_next_door`, `recent_purchase_years`, `contamination_near_ft`,
+  `operating_owner`) and `digest_max`, the most leads `leads.md` lists
+  (see Lead grade; report only). The grade itself asks no service;
+  `next_door_any_size` and `next_door_max_parcels` switch on and cap the
+  neighbour check it reads (`nextdoor.py`, one request pair per parcel,
+  run whether or not grading is on).
   `[run] slope_cache_days` is how long a lidar slope answer is reused.
 - `screener/inputs/decisions.csv`: mark parcels `pass`, `listed`,
   `pursue` or `maybe` (by hand or with `python -m screener.decide`).
@@ -482,7 +522,7 @@ reviewed), the meaning differences above, spatial clustering and privacy
 ```
 parcels (county GIS, 5-50 ac, chosen cities)
   -> ownership & land-only screens   (assessor record)
-  -> deed history                    (county CAMA extract)
+  -> deed history, built-site screen (county CAMA extract: commercial buildings)
   -> map checks                      (flood, wetlands, easements, protected land,
                                       contamination, exits, rail, Opportunity Zones,
                                       nearby industrial parcels)

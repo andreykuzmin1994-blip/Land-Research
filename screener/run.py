@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import dataclasses
 import csv
 import importlib
 import re
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from . import (arcgis, checks, detention, facts, frontage, grade, layers, owner_clusters, report,
-               scoring, screens, sitefit, snapshot, soils)
+               nextdoor, scoring, screens, sitefit, snapshot, soils)
 from .geo import expand, tile_envelopes
 
 HERE = Path(__file__).resolve().parent
@@ -291,9 +292,8 @@ def main(argv: list[str] | None = None) -> int:
             rejected.append(p)
         else:
             live.append(p)
-    funnel.append(("not built on, not government / developer / association / exempt", len(live)))
-    log(f"  {len(live):,} pass the ownership and land-only screens")
     if not live:
+        funnel.append(("not built on, not government / developer / association / exempt", 0))
         log("nothing left to screen")
         return 1
 
@@ -301,10 +301,33 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cama = county.load_cama(HERE / "cache", {p["parcel_id"]: p["owner"] for p in live},
                                 refresh=args.refresh)
+        # Commercial buildings on the current roll: a live-only screen
+        # (screens.building_rejects), never in the frozen evaluation.
+        load_structures = getattr(county, "load_structures", None)
+        structures = (load_structures(HERE / "cache", {p["parcel_id"] for p in live})
+                      if load_structures else {})
     except arcgis.ArcGISError as exc:
         return stop("the county deed file", exc)
+    kept = []
     for p in live:
         p.update(cama.get(p["parcel_id"], {}))
+        # The structure record stays in this local dict, never on p, so no
+        # scorer or screen after this one can read it.
+        why = screens.building_rejects(p, scr, structures.get(p["parcel_id"]))
+        if why:
+            p["reject_reasons"] = why
+            rejected.append(p)
+        else:
+            kept.append(p)
+    live = kept
+    if not load_structures:
+        notes.append("Commercial buildings on the tax roll not checked for this county: the "
+                     "built-site screen used the improvement value alone")
+    funnel.append(("not built on, not government / developer / association / exempt", len(live)))
+    log(f"  {len(live):,} pass the ownership and land-only screens")
+    if not live:
+        log("nothing left to screen")
+        return 1
 
     tiles = tile_envelopes([p["geometry"].bounds for p in live])
     xs = [b for p in live for b in (p["geometry"].bounds[0], p["geometry"].bounds[2])]
@@ -454,6 +477,7 @@ def main(argv: list[str] | None = None) -> int:
         return "not screened in this trial run"
     built_on = {p["parcel_id"] for p in rejected
                 if any(r.startswith("already built on") for r in p["reject_reasons"])}
+    band_built: dict[str, list[str]] = {}
     for p in survivors:
         p["flags"].extend(owner_clusters.describe(p["parcel_id"], owner_groups, status_of,
                                                   mismatch.__contains__))
@@ -461,9 +485,36 @@ def main(argv: list[str] | None = None) -> int:
                                                built_on.__contains__)
         if built:
             p["flags"].append(owner_clusters.built_line(built))
+        band_built[p["parcel_id"]] = built
         # None: adjacency could not be measured, so "none built" is not known.
         p[grade.NEXT_DOOR_KEY] = (None if owner_clusters.adjacency_not_checked(
             p["parcel_id"], owner_groups) else len(built))
+    # Neighbours of any size (the owner's own plant, a listed site on a
+    # bordering parcel): live-only, after the sort, for the grade and the
+    # flags alone (nextdoor.py). Each same-owner parcel is counted once.
+    parcels_url = getattr(county, "PARCELS_URL", None)
+    any_on = grade_cfg.next_door_any_size and bool(parcels_url)
+    if grade_cfg.next_door_any_size and not any_on:
+        # No county parcel layer to ask: the item is off, not "not checked".
+        grade_cfg = dataclasses.replace(grade_cfg, next_door_any_size=False)
+        notes.append("Neighbouring parcels of any size not checked for this county (no "
+                     "parcel layer to ask): the same-owner item covers the run's own parcels")
+    if any_on:
+        log(f"Neighbouring parcels of any size for the top "
+            f"{grade_cfg.next_door_max_parcels or len(survivors):,}")
+    nextdoor.attach(survivors, parcels_url or "", enabled=any_on,
+                    max_parcels=grade_cfg.next_door_max_parcels, gap_ft=gap_ft,
+                    built_value=float(scr["max_improvement_value"]),
+                    sites=nextdoor.site_points(idx), workers=int(run_cfg.get("workers", 6)),
+                    notes=notes, log=log)
+    for p in survivors:
+        p["flags"].extend(nextdoor.flag_lines(p))
+        found = p.get(nextdoor.OWNER_KEY)
+        if isinstance(found, list) and (found or isinstance(p.get(grade.NEXT_DOOR_KEY), int)):
+            # A plant found next door counts even when the band adjacency
+            # could not be measured; each parcel is counted once.
+            ids = set(band_built.get(p["parcel_id"], [])) | {b.parcel_id for b in found}
+            p[grade.NEXT_DOOR_KEY] = len(ids)
     # The lead grade reads the report facts above and is live-only like
     # them: attached last, for the reports alone (grade.py). It changes no
     # score and no order.
@@ -472,7 +523,9 @@ def main(argv: list[str] | None = None) -> int:
                   ("building fit", "fit", fit_on, fit_max),
                   ("detention pond", "detention", pond_on, pond_max),
                   ("soils", "soils", soils_on, soils_max),
-                  ("road frontage", "frontage", front_on, front_max)], notes)
+                  ("road frontage", "frontage", front_on, front_max)]
+                 + ([("neighbouring parcels", "grade.next_door_max_parcels", True,
+                      grade_cfg.next_door_max_parcels)] if any_on else []), notes)
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)
