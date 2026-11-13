@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="834" viewBox="0 0 640 834" font-family="sans-serif">
+<title>Site plan #34 parcel 09F260101070774</title>
+<rect x="0" y="0" width="640" height="834" fill="#ffffff"/>
+<path class="parcel-fill" d="M484.2,178.8 L501.7,226.6 L573.5,426.0 L500.7,457.4 L370.8,505.6 L334.3,519.2 L199.1,570.3 L124.2,598.0 L66.5,620.0 L67.7,553.7 L97.3,470.1 L110.0,201.4 L190.2,155.4 L422.2,20.0 L424.9,27.2 L432.6,46.0 L447.7,83.8 L462.5,121.7 Z M338.6,309.8 L297.6,198.0 L148.3,252.7 L149.9,256.9 L145.6,258.5 L185.1,366.0 Z" fill="#f4f1ea" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="largest-open" d="M484.2,178.8 L501.7,226.6 L573.5,426.0 L500.7,457.4 L370.8,505.6 L334.3,519.2 L199.1,570.3 L124.2,598.0 L66.5,620.0 L67.7,553.7 L97.3,470.1 L110.0,201.4 L190.2,155.4 L422.2,20.0 L424.9,27.2 L432.6,46.0 L447.7,83.8 L462.5,121.7 Z M338.6,309.8 L297.6,198.0 L148.3,252.7 L149.9,256.9 L145.6,258.5 L185.1,366.0 Z" fill="#cfe8c4" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="envelope" d="M336.3,507.4 L296.8,348.8 L120.3,392.8 L159.9,551.4 Z" fill="#f2c9a0" fill-rule="evenodd" fill-opacity="0.8" stroke="#b5534a" stroke-width="2.0"/>
+<path class="pond" d="M323.4,451.2 L486.9,451.2 L486.9,369.5 L323.4,369.5 Z" fill="#7fc4bd" fill-rule="evenodd" fill-opacity="0.9" stroke="#1f6f68" stroke-width="2.0"/>
+<path class="parcel" d="M484.2,178.8 L501.7,226.6 L573.5,426.0 L500.7,457.4 L370.8,505.6 L334.3,519.2 L199.1,570.3 L124.2,598.0 L66.5,620.0 L67.7,553.7 L97.3,470.1 L110.0,201.4 L190.2,155.4 L422.2,20.0 L424.9,27.2 L432.6,46.0 L447.7,83.8 L462.5,121.7 Z M338.6,309.8 L297.6,198.0 L148.3,252.7 L149.9,256.9 L145.6,258.5 L185.1,366.0 Z" fill="none" fill-rule="evenodd" fill-opacity="1.0" stroke="#222222" stroke-width="1.5"/>
+<path class="frontage" d="M484.2,178.8 L501.7,226.6 L573.5,426.0 L564.9,429.7 M413.8,24.9 L422.2,20.0 L424.9,27.2 L432.6,46.0 L447.7,83.8 L462.5,121.7 L484.2,178.8" fill="none" stroke="#d9480f" stroke-width="5.0" stroke-linecap="round"/>
+<text x="228.3" y="454.1" font-size="11" text-anchor="middle" font-weight="bold">front/rear-load 104,000 SF</text>
+<rect x="594.0" y="22.0" width="28" height="48" fill="#ffffff" fill-opacity="0.8"/>
+<path class="north" d="M608.0,26.0 L616.0,52.0 L608.0,46.0 L600.0,52.0 Z" fill="#222222"/>
+<text x="608.0" y="66.0" font-size="12" text-anchor="middle" font-weight="bold">N</text>
+<path class="scale" d="M20.0,633.0 L20.0,638.0 L101.7,638.0 L101.7,633.0" fill="none" stroke="#222222" stroke-width="2.0"/>
+<text x="107.7" y="638.0" font-size="11" text-anchor="start" font-weight="normal">200 ft</text>
+<rect x="20" y="660.0" width="14" height="10" fill="#f4f1ea" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="670.0" font-size="12" text-anchor="start" font-weight="normal">Parcel (county map) 21.8 ac</text>
+<rect x="20" y="678.0" width="14" height="10" fill="#9cc3e0" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="688.0" font-size="12" text-anchor="start" font-weight="normal">Constrained 0%: floodplain, wetlands and water, easements, protected land</text>
+<rect x="20" y="696.0" width="14" height="10" fill="#cfe8c4" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="706.0" font-size="12" text-anchor="start" font-weight="normal">Largest open part 21.8 ac</text>
+<rect x="20" y="714.0" width="14" height="10" fill="#f2c9a0" stroke="#b5534a" stroke-width="1.0"/>
+<text x="40.0" y="724.0" font-size="12" text-anchor="start" font-weight="normal">Envelope: front/rear-load 400 x 260 ft building, 104,000 SF (+ truck court + trailer</text>
+<text x="40.0" y="742.0" font-size="12" text-anchor="start" font-weight="normal">parking)</text>
+<rect x="20" y="750.0" width="14" height="10" fill="#7fc4bd" stroke="#1f6f68" stroke-width="1.0"/>
+<text x="40.0" y="760.0" font-size="12" text-anchor="start" font-weight="normal">Detention pond 400 x 200 ft beside the envelope: rough allowance, no hydrology</text>
+<rect x="20" y="768.0" width="14" height="10" fill="#d9480f" stroke="#d9480f" stroke-width="1.0"/>
+<text x="40.0" y="778.0" font-size="12" text-anchor="start" font-weight="normal">Road frontage about 1,107 ft (longest: local road, GDOT route 1121200060700); curb</text>
+<text x="40.0" y="796.0" font-size="12" text-anchor="start" font-weight="normal">cut not checked</text>
+<text x="20.0" y="814.0" font-size="11" text-anchor="start" font-weight="normal">North up. Steep ground not shown. A screening sketch, not a survey.</text>
+</svg>
