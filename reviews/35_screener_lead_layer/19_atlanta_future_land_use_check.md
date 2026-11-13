@@ -12,8 +12,8 @@
 > root run or score moves. Live Atlanta screener grades read NDP from the
 > next screener run.
 >
-> Follow-up check (Tier 1, one fresh-context reviewer, 2026-11-13; model
-> as reported by the session, Opus 5.5): **sound**. The reapplied screener
+> Follow-up check (Tier 1, one fresh-context reviewer on the session's
+> own model, 2026-11-13): **sound**. The reapplied screener
 > code is byte-identical to b190eb6..90a46ec. No root module reads a flu
 > entry's field (`ZoningSource` has no such attribute; only role="zoning"
 > sources are fetched, here and in `adjacency_import.py`). The snippet does
