@@ -79,9 +79,24 @@ ZONING_SOURCES: list[dict[str, Any]] = [
     {"name": "Atlanta zoning", "kind": "overlay", "jurisdictions": {"Atlanta"},
      "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/0",
      "zoning_field": "ZONECLASS"},
+    # The layer is "Development Patterns - Future Land Use" from the plan passed
+    # in July 2025, drawn from its NDP field. LANDUSEDES on the same record is
+    # the superseded future land use: it read "Industrial" on parcels the plan
+    # now calls Low Density Residential (leads #156 and #195, 2026-11-12). The
+    # long names follow the layer's own legend; DP_NAME is not used because it
+    # disagrees with NDP on some records. IF and LD-MU are in use but not in the
+    # legend (3 records and 1): named for their legend twins I-Flex and LDMU.
     {"name": "Atlanta future land use", "kind": "overlay", "jurisdictions": {"Atlanta"},
      "url": "https://gis.atlantaga.gov/dpcd/rest/services/LandUsePlanning/LandUsePlanning/MapServer/8",
-     "flu_field": "LANDUSEDES"},
+     "flu_field": "NDP",
+     "flu_labels": {"CMTY": "Community", "HDMU": "High Density Mixed Use",
+                    "HDR": "High Density Residential", "I": "Industrial",
+                    "I-Flex": "Industrial Flex", "IF": "Industrial Flex",
+                    "LDMU": "Low Density Mixed Use", "LD-MU": "Low Density Mixed Use",
+                    "LDR": "Low Density Residential", "LLSF": "Large Lot Single Family",
+                    "MDMU": "Medium Density Mixed Use", "MDR": "Medium Density Residential",
+                    "MLSF": "Medium Lot Single Family", "OS": "Open Space",
+                    "R-Flex": "Residential Flex"}},
 ]
 # No machine-readable zoning found (2026-10-27): College Park, Hapeville,
 # Palmetto, Chattahoochee Hills. Those parcels show "unknown — check with

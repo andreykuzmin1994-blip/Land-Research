@@ -1,15 +1,26 @@
 # Check of the Atlanta future-land-use fix (commit b190eb6)
 
-> **Held, 2026-11-13 (operator's choice).** The fix and its test (b190eb6,
-> 90a46ec) were reverted before merging (0cea72b, c00525a). CI caught a
-> root-system test, `tests/test_zoning_import.py`
-> `test_snippet_matches_the_screener_sources_exactly`. It requires
+> **Restored, 2026-11-13.** The fix and its test (b190eb6, 90a46ec) were
+> held before merging (reverted in 0cea72b, c00525a): CI's root test `tests/test_zoning_import.py`
+> `test_snippet_matches_the_screener_sources_exactly` requires
 > `reviews/21_zoning/sources_json_snippet.json` (the root zoning importer's
-> proposed sources) to match `screener/fulton.py` exactly. The root
-> importer has no code translation for NDP. A follow-up restores the fix
-> with `git revert c00525a 0cea72b`, and changes the snippet and
-> `zoning_import.py` under the root system's full orientation and review
-> tier. Until then, live Atlanta grades read LANDUSEDES.
+> proposed sources) to match `screener/fulton.py`. The follow-up reapplies
+> both commits and sets the snippet's `atlanta_flu` `flu_field` to NDP.
+> `zoning_import.py` is unchanged: it checks that a `role="flu"` entry names
+> a field and then drops it (no FLU is fetched or written), so it needs no
+> NDP code table. `sources.json` has no `zoning_sources` key yet, so no
+> root run or score moves. Live Atlanta screener grades read NDP from the
+> next screener run.
+>
+> Follow-up check (Tier 1, one fresh-context reviewer on the session's
+> own model, 2026-11-13): **sound**. The reapplied screener
+> code is byte-identical to b190eb6..90a46ec. No root module reads a flu
+> entry's field (`ZoningSource` has no such attribute; only role="zoning"
+> sources are fetched, here and in `adjacency_import.py`). The snippet does
+> not carry `flu_labels`: the validator would accept and ignore it, which
+> is dead config in a block meant for a human-owned file. A future root
+> reader of future land use adds the table and its validation then.
+> Tests: zoning 127, operator decisions 48, screener 24, all OK.
 
 Fresh-context reviewer, 2026-11-12. Summarised by the launching session;
 the reviewer's report follows in its own order.
