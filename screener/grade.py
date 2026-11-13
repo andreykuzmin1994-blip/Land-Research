@@ -283,7 +283,10 @@ def _watch(p: dict[str, Any], lead: Lead, s: Settings, frontage_counted: bool) -
         lead.found.append(f"a bordering parcel holds a listed contamination site "
                           f"({bordering[0]})")
     kind = operating_kind(p.get("owner")) if s.operating_owner else None
-    if kind:
+    next_door = p.get(NEXT_DOOR_KEY)
+    plant_found = (s.owner_next_door and isinstance(next_door, int)
+                   and not isinstance(next_door, bool) and next_door > 0)
+    if kind and not plant_found:          # the plant next door already says it
         lead.found.append(f"the owner's name reads like {kind}: possibly buffer or expansion "
                           "land of its own operation")
     if not frontage_counted and (p.get("road") or "").lower() == "land-locked":
@@ -319,13 +322,15 @@ def grade_parcel(p: dict[str, Any], s: Settings, not_graded: str = "") -> Lead:
 def _outside(rank: int, caps: list[tuple[str, str, bool, int]]) -> str:
     """Why a check was never attempted at this rank ('' if all were).
     caps: (label, settings table, enabled, max_parcels) per check that can
-    be switched off or capped."""
+    be switched off or capped; a table may name its key ("grade.
+    next_door_max_parcels"), else the key is max_parcels."""
     for label, table, enabled, cap in caps:
         if not enabled:
             return f"{label} not run (switched off)"
     for label, table, enabled, cap in caps:
         if cap and rank > cap:
-            return f"{label} only checked for the top {cap} ([{table}] max_parcels)"
+            name, _, key = table.partition(".")
+            return f"{label} only checked for the top {cap} ([{name}] {key or 'max_parcels'})"
     return ""
 
 

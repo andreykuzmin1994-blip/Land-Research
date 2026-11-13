@@ -331,9 +331,9 @@ same-owner groups. For the top `next_door_max_parcels` (250) by rank, the
 screener asks the county parcel layer for the parcels touching each one
 (within the owner-cluster gap, 10 ft), whatever their size, and follows
 the same owner's parcels outward up to three steps (`owners.same_owner`,
-the loose name rule). A same-owner parcel counts as built when its
-improvements exceed `[screens] max_improvement_value`, unless its county
-land-use code is residential (1xx: a family's own house is not an
+the loose name rule). A same-owner parcel counts as built by the screen's
+own test (improvements over `[screens] max_improvement_value` and over
+half the land value), unless its county land-use code is residential (1xx: a family's own house is not an
 operating site). A listed site (EPA, GA EPD HSI) whose mapped point falls
 on a touching parcel, but not on the lead itself, is the "bordering
 parcel" item. Both add a flag line. About one request pair per lead,
@@ -481,7 +481,10 @@ reviewed), the meaning differences above, spatial clustering and privacy
   switches it off. It reads the current roll, so it is a live-only screen:
   the frozen evaluation never applies it (its answer-key sites are built on
   now). Norfolk Southern's real-estate company (SOUTHERN REGION INDUSTRIAL
-  REALTY) counts as railroad-owned (`exclude_utility_owned`).
+  REALTY) counts as railroad-owned (`exclude_utility_owned`). Unlike the
+  building screen, that owner rule is shared with `build_eval`: the frozen
+  key is unchanged, but a rebuild of it would drop that owner's parcels
+  from the candidate pool too.
   `[owners] adjacency_gap_ft` sets how close two same-owner parcels must be
   to count as adjacent (see Owner clusters below; flags only).
   `[fit] enabled` and `max_parcels` switch the building-fit check off or

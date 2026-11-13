@@ -37,7 +37,8 @@ def attribute_rejects(p: dict[str, Any], s: dict[str, Any],
     return why
 
 
-def building_rejects(p: dict[str, Any], s: dict[str, Any]) -> list[str]:
+def building_rejects(p: dict[str, Any], s: dict[str, Any],
+                     structures: dict[str, Any] | None = None) -> list[str]:
     """Live-only screen: the county lists commercial buildings on the parcel
     (fulton.load_structures), so it is an operating site, not land, even when
     its improvements are a small share of the land value (a rental-car
@@ -45,11 +46,14 @@ def building_rejects(p: dict[str, Any], s: dict[str, Any]) -> list[str]:
 
     It reads the current tax roll, so the frozen evaluation never applies it:
     its answer-key sites are built on now, and this screen would remove them.
+    ``structures`` is the parcel's fulton.load_structures record; run.main
+    keeps it off the parcel, so no scorer ever sees it.
     """
+    structures = structures or {}
     min_sf = s.get("built_min_building_sf", 2500)
     min_imp = s.get("built_min_improvement_value", 50000)
-    sf = p.get("commercial_building_sf") or 0
-    n = p.get("commercial_buildings") or 0
+    sf = structures.get("commercial_building_sf") or 0
+    n = structures.get("commercial_buildings") or 0
     imp = p.get("improvement_value") or 0
     if min_sf and sf >= min_sf and imp >= min_imp:
         return [f"already built on (the county lists {n} commercial building"

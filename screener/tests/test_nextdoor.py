@@ -13,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import unittest
+import unittest.mock
 import zipfile
 from pathlib import Path
 
@@ -30,22 +31,23 @@ SCR = {"built_min_building_sf": 2500, "built_min_improvement_value": 50000}
 
 class BuildingScreenTests(unittest.TestCase):
     def test_thresholds(self):
-        p = {"commercial_buildings": 3, "commercial_building_sf": 4407.0,
-             "improvement_value": 230700.0}
-        self.assertEqual(screens.building_rejects(p, SCR), [
+        p = {"improvement_value": 230700.0}
+        st = {"commercial_buildings": 3, "commercial_building_sf": 4407.0}
+        rej = screens.building_rejects
+        self.assertEqual(rej(p, SCR, st), [
             "already built on (the county lists 3 commercial buildings, 4,407 sq ft, and "
             "improvements $230,700)"])
-        self.assertEqual(screens.building_rejects({**p, "commercial_building_sf": 2499.0}, SCR), [])
-        self.assertEqual(screens.building_rejects({**p, "improvement_value": 49999.0}, SCR), [])
-        self.assertEqual(screens.building_rejects(p, {**SCR, "built_min_building_sf": 0}), [])
-        self.assertEqual(screens.building_rejects({"improvement_value": 9e6}, SCR), [])
-        one = {**p, "commercial_buildings": 1}
-        self.assertIn("1 commercial building,", screens.building_rejects(one, SCR)[0])
+        self.assertEqual(rej(p, SCR, {**st, "commercial_building_sf": 2499.0}), [])
+        self.assertEqual(rej({"improvement_value": 49999.0}, SCR, st), [])
+        self.assertEqual(rej(p, {**SCR, "built_min_building_sf": 0}, st), [])
+        self.assertEqual(rej({"improvement_value": 9e6}, SCR, None), [])
+        self.assertEqual(rej({**p, **st}, SCR), [])        # read from the record, not from p
+        self.assertIn("1 commercial building,",
+                      rej(p, SCR, {**st, "commercial_buildings": 1})[0])
 
     def test_defaults_when_settings_lack_the_keys(self):
-        p = {"commercial_buildings": 1, "commercial_building_sf": 3000.0,
-             "improvement_value": 60000.0}
-        self.assertTrue(screens.building_rejects(p, {}))
+        st = {"commercial_buildings": 1, "commercial_building_sf": 3000.0}
+        self.assertTrue(screens.building_rejects({"improvement_value": 60000.0}, {}, st))
 
     def test_the_evaluation_never_applies_it(self):
         for path in (SCREENER / "autoresearch").glob("*.py"):
@@ -105,9 +107,9 @@ class OwnerRuleTests(unittest.TestCase):
                 self.assertEqual(owners.operating_kind(name), want)
 
 
-def neighbour(oid, pid, corner, owner, imp=0.0, acres=50.0, lucode="391"):
+def neighbour(oid, pid, corner, owner, imp=0.0, acres=50.0, lucode="391", land=100000.0):
     return polygon_feature(square(*corner), ParcelID=pid, Owner=owner, ImprAppr=imp,
-                           LandAcres=acres, LUCode=lucode)
+                           LandAppr=land, LandAcres=acres, LUCode=lucode)
 
 
 class CheckOneTests(Offline):
@@ -141,6 +143,32 @@ class CheckOneTests(Offline):
                               acres=3.0, lucode="401")}
         res, _ = self.run_check(feats)
         self.assertEqual([b.parcel_id for b in res.built], ["SHOP"])
+
+    def test_the_screens_own_built_test(self):
+        side = square(*A).bounds[2] - A[0]
+        feats = {1: neighbour(1, "MOSTLY_LAND", (A[0] + side, A[1]), "TEST OPERATOR INC",
+                              imp=300000.0, land=2_000_000.0)}
+        res, _ = self.run_check(feats)
+        self.assertEqual(res.built, [])
+
+    def test_an_odd_answer_costs_one_parcel_not_the_run(self):
+        notes = []
+        ps = [county_parcel("L1", A), county_parcel("L2", (A[0] + 0.01, A[1]))]
+        calls = []
+
+        def boom(p, *a):
+            calls.append(p["parcel_id"])
+            if p["parcel_id"] == "L1":
+                raise AttributeError("'int' object has no attribute 'strip'")
+            return nextdoor.Result()
+        with unittest.mock.patch.object(nextdoor, "check_one", boom):
+            nextdoor.attach(ps, self.URL, enabled=True, max_parcels=0, gap_ft=10.0,
+                            built_value=250000.0, sites=nextdoor.Sites([]), workers=2,
+                            notes=notes)
+        self.assertIsNone(ps[0][nextdoor.OWNER_KEY])
+        self.assertIn("unreadable answer (AttributeError)", ps[0][nextdoor.REASON_KEY])
+        self.assertEqual(ps[1][nextdoor.OWNER_KEY], [])
+        self.assertIn("NEIGHBOUR CHECK FAILED for 1 of 2", notes[0])
 
     def test_site_on_a_bordering_parcel_not_on_the_lead(self):
         side = square(*A).bounds[2] - A[0]
@@ -189,6 +217,11 @@ class GradeRuleTests(unittest.TestCase):
         lead = self.grade(**{nextdoor.SITES_KEY: ["T"],
                              "contamination": [{"name": "Z", "kind": "EPA", "feet": 100}]})
         self.assertEqual(len(lead.found), 1)          # one contamination item, not two
+
+    def test_operator_with_its_plant_next_door_counts_once(self):
+        lead = self.grade(owner="CLM SANITATION LLC", **{grade.NEXT_DOOR_KEY: 1})
+        self.assertEqual(len(lead.found), 1)
+        self.assertIn("built-on parcel", lead.found[0])
 
     def test_operating_owner(self):
         lead = self.grade(owner="CLM SANITATION LLC")
@@ -258,6 +291,51 @@ class RunTests(RunHarness):
         self.assertIn("Same owner, any size", a["flags"])
         self.assertIn("the same owner holds 1 built-on parcel adjacent", a["lead_found"])
         self.assertNotIn("any size", b["flags"])
+
+    def test_the_building_facts_never_reach_a_scorer(self):
+        from screener import rank, scoring
+        seen = []
+        for obj, name in ((rank, "learned_score"), (scoring, "fixed_score"),
+                          (screens, "site_rejects"), (screens, "flags")):
+            real = getattr(obj, name)
+
+            def spy(p, *a, _real=real, **k):
+                seen.append(frozenset(p))
+                return _real(p, *a, **k)
+            self.patch(obj, name, spy)
+        self.load_structures.return_value = {
+            pid: {"commercial_buildings": 1, "commercial_building_sf": 100.0}
+            for pid in ("14F0001 0001", "14F0002 0002")}
+        self.assertEqual(self.main()[0], 0)
+        self.assertTrue(seen)
+        for keys in seen:
+            for key in keys:
+                self.assertNotIn("commercial", key)
+                self.assertNotIn("lead_", key)
+
+    def test_plant_found_once_even_when_band_and_any_size_both_see_it(self):
+        side = square(*A).bounds[2] - A[0]
+        plant = county_parcel("14F0001 0009", (A[0] + side, A[1]))
+        plant.update(improvement_value=5_000_000.0, total_value=5_400_000.0)
+        self.parcels.append(plant)
+        self.neighbours.feats.update({1: neighbour(1, "14F0001 0009", (A[0] + side, A[1]),
+                                                   "TEST OWNER ALPHA", imp=5e6)})
+        self.assertEqual(self.main()[0], 0)
+        a = self.rows()["14F0001 0001"]
+        self.assertIn("the same owner holds 1 built-on parcel adjacent", a["lead_found"])
+
+    def test_past_the_cap_is_not_graded(self):
+        settings = self.tmp / "settings.toml"
+        text = (SCREENER / "settings.toml").read_text().replace(
+            "next_door_max_parcels = 250", "next_door_max_parcels = 1")
+        settings.write_text(text)
+        self.serve(self.routes, self.downloads)
+        with unittest.mock.patch("sys.stdout", io.StringIO()):
+            self.assertEqual(run.main(["--settings", str(settings), "--out", str(self.out)]), 0)
+        rows = sorted(self.rows().values(), key=lambda r: int(r["rank"]))
+        self.assertNotIn("not graded", rows[0]["lead_grade"])
+        self.assertEqual(rows[1]["lead_grade"], "not graded: neighbouring parcels only checked "
+                         "for the top 1 ([grade] next_door_max_parcels)")
 
     def test_neighbour_layer_failure_is_not_checked(self):
         self.neighbours.ids_answer = {"error": {"code": 500, "message": "down"}}

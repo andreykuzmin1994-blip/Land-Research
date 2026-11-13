@@ -13,8 +13,8 @@ score, a screen or an evaluation feature, and the keys it puts on a parcel
 carry grade's "lead_" stem (the spy tests in test_grade.py hold).
 
 Limits: the county layer's polygons only (no deeds); a neighbour counts as
-built from its assessed improvements over the screen's cap, unless its land
-use code is residential (a family's own house next to its land is not an
+built by the screen's own test (improvements over the cap and over half the
+land value), unless its land use code is residential (a family's own house next to its land is not an
 operating site); a listed site counts when the
 site's mapped point falls on (or within the gap of) a touching parcel, so a
 site drawn at a street address off that parcel is missed.
@@ -37,7 +37,7 @@ from .owners import same_owner
 OWNER_KEY = "_lead_owner_built_any_size"        # list of Built, or None: not checked
 SITES_KEY = "_lead_contaminated_neighbour"      # list of site names, or None: not checked
 REASON_KEY = "_lead_next_door_not_checked"      # why, when the two above are None
-FIELDS = "ParcelID,Owner,ImprAppr,LandAcres,LUCode"
+FIELDS = "ParcelID,Owner,ImprAppr,LandAppr,LandAcres,LUCode"
 PAD_DEG = 0.0003            # about 100 ft: the bbox pad for the touching query
 MAX_HOPS = 3                # same-owner steps outward from the lead
 MAX_VISITED = 30            # same-owner parcels followed per lead
@@ -112,19 +112,21 @@ def check_one(p: dict[str, Any], url: str, gap_ft: float, built_value: float,
         nxt = []
         for geom in frontier:
             for attrs, shape in _touching(url, geom, gap_ft):
-                other = (attrs.get("ParcelID") or "").strip()
+                other = str(attrs.get("ParcelID") or "").strip()
                 if not other or other in seen:
                     continue
                 if first:
                     _sites_on(shape, nearby, gap_ft, res)
-                if not owner or not same_owner(attrs.get("Owner"), owner):
+                if not owner or not same_owner(str(attrs.get("Owner") or ""), owner):
                     continue
                 seen.add(other)
                 imp = _num(attrs.get("ImprAppr")) or 0.0
-                # A house is not an operating site: residential land-use codes
-                # (Fulton's 1xx) never count, however valuable.
-                residential = (attrs.get("LUCode") or "").strip().startswith("1")
-                if imp > built_value and not residential:
+                land = _num(attrs.get("LandAppr")) or 0.0
+                # The screen's own test (screens.attribute_rejects), and a house
+                # is not an operating site: residential land-use codes (Fulton's
+                # 1xx) never count, however valuable.
+                residential = str(attrs.get("LUCode") or "").strip().startswith("1")
+                if imp > built_value and imp > 0.5 * land and not residential:
                     res.built.append(Built(other, _num(attrs.get("LandAcres")), imp))
                 if len(seen) <= MAX_VISITED:
                     nxt.append(shape)
@@ -185,6 +187,8 @@ def attach(ranked: list[dict[str, Any]], url: str, *, enabled: bool, max_parcels
             return f"the county parcel layer failed ({type(exc).__name__})"
         except GEOSException:
             return "a geometry fault"
+        except Exception as exc:  # one odd answer must not cost the whole run
+            return f"an unreadable answer ({type(exc).__name__})"
 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, MAX_WORKERS))) as pool:
         results = list(pool.map(work, todo))

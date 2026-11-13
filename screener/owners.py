@@ -112,7 +112,8 @@ _INDUSTRIAL_NAME_RE = re.compile(
 OPERATING_KINDS = (
     ("a quarry or aggregates company", re.compile(
         # QUARRY only with a company word: "QUARRY HILLS HOA" is a subdivision.
-        r"\bQUARR(Y|IES) (CO|COMPANY|CORP|INC|LLC|PRODUCTS|MATERIALS)\b|\bAGGREGATES?\b|"
+        r"\bQUARR(Y|IES) (CO|COMPANY|CORP|INC|PRODUCTS|MATERIALS)\b|"
+        r"\bAGGREGATES? (CO|COMPANY|CORP|INC|LLC|USA)\b|"
         r"\bMARTIN MARIETTA\b|\bVULCAN MATERIALS\b|"
         r"\bVULCAN CONSTRUCTION MATERIALS\b|\bHANSON AGGREGATES\b")),
     ("a waste or sanitation company", re.compile(

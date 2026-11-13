@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import dataclasses
 import csv
 import importlib
 import re
@@ -310,8 +311,9 @@ def main(argv: list[str] | None = None) -> int:
     kept = []
     for p in live:
         p.update(cama.get(p["parcel_id"], {}))
-        p.update(structures.get(p["parcel_id"], {}))
-        why = screens.building_rejects(p, scr)
+        # The structure record stays in this local dict, never on p, so no
+        # scorer or screen after this one can read it.
+        why = screens.building_rejects(p, scr, structures.get(p["parcel_id"]))
         if why:
             p["reject_reasons"] = why
             rejected.append(p)
@@ -492,6 +494,11 @@ def main(argv: list[str] | None = None) -> int:
     # flags alone (nextdoor.py). Each same-owner parcel is counted once.
     parcels_url = getattr(county, "PARCELS_URL", None)
     any_on = grade_cfg.next_door_any_size and bool(parcels_url)
+    if grade_cfg.next_door_any_size and not any_on:
+        # No county parcel layer to ask: the item is off, not "not checked".
+        grade_cfg = dataclasses.replace(grade_cfg, next_door_any_size=False)
+        notes.append("Neighbouring parcels of any size not checked for this county (no "
+                     "parcel layer to ask): the same-owner item covers the run's own parcels")
     if any_on:
         log(f"Neighbouring parcels of any size for the top "
             f"{grade_cfg.next_door_max_parcels or len(survivors):,}")
@@ -503,7 +510,9 @@ def main(argv: list[str] | None = None) -> int:
     for p in survivors:
         p["flags"].extend(nextdoor.flag_lines(p))
         found = p.get(nextdoor.OWNER_KEY)
-        if isinstance(found, list) and isinstance(p.get(grade.NEXT_DOOR_KEY), int):
+        if isinstance(found, list) and (found or isinstance(p.get(grade.NEXT_DOOR_KEY), int)):
+            # A plant found next door counts even when the band adjacency
+            # could not be measured; each parcel is counted once.
             ids = set(band_built.get(p["parcel_id"], [])) | {b.parcel_id for b in found}
             p[grade.NEXT_DOOR_KEY] = len(ids)
     # The lead grade reads the report facts above and is live-only like
@@ -514,7 +523,9 @@ def main(argv: list[str] | None = None) -> int:
                   ("building fit", "fit", fit_on, fit_max),
                   ("detention pond", "detention", pond_on, pond_max),
                   ("soils", "soils", soils_on, soils_max),
-                  ("road frontage", "frontage", front_on, front_max)], notes)
+                  ("road frontage", "frontage", front_on, front_max)]
+                 + ([("neighbouring parcels", "grade.next_door_max_parcels", True,
+                      grade_cfg.next_door_max_parcels)] if any_on else []), notes)
     funnel.append(("ranked", len(survivors)))
 
     reasons = collections.Counter(reason_key(p["reject_reasons"][0]) for p in rejected)
