@@ -63,7 +63,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import detention, frontage, sitefit, soils
+from . import detention, frontage, nextdoor, sitefit, soils
+from .owners import operating_kind
 
 # Name stem of every key this module puts on a parcel (the static and spy
 # guards import it).
@@ -91,6 +92,10 @@ class Settings:
     max_hydric_pct: float = 25.0            # 0 = off
     max_poorly_drained_pct: float = 25.0    # 0 = off
     owner_next_door: bool = True
+    next_door_any_size: bool = True          # nextdoor.py: neighbours of any size
+    next_door_max_parcels: int = 250         # 0 = all ranked parcels
+    contamination_near_ft: float = 250.0     # a listed site this close counts (0 = off)
+    operating_owner: bool = True             # owner name reads like a quarry / waste company
     recent_purchase_years: float = 5.0      # 0 = off
     digest_max: int = 40
 
@@ -120,8 +125,16 @@ def settings(cfg: dict[str, Any]) -> Settings:
     if isinstance(digest_max, bool) or not isinstance(digest_max, int) or digest_max < 0:
         raise ValueError(f"[grade] digest_max must be a whole number, 0 or more "
                          f"(got {digest_max!r})")
+    nd_max = t.get("next_door_max_parcels", d.next_door_max_parcels)
+    if isinstance(nd_max, bool) or not isinstance(nd_max, int) or nd_max < 0:
+        raise ValueError(f"[grade] next_door_max_parcels must be a whole number, 0 or more "
+                         f"(got {nd_max!r})")
     return Settings(
         enabled=_flag(t, "enabled", d.enabled),
+        next_door_any_size=_flag(t, "next_door_any_size", d.next_door_any_size),
+        next_door_max_parcels=nd_max,
+        contamination_near_ft=_number(t, "contamination_near_ft", d.contamination_near_ft),
+        operating_owner=_flag(t, "operating_owner", d.operating_owner),
         min_frontage_ft=_number(t, "min_frontage_ft", d.min_frontage_ft),
         max_hydric_pct=_number(t, "max_hydric_pct", d.max_hydric_pct),
         max_poorly_drained_pct=_number(t, "max_poorly_drained_pct", d.max_poorly_drained_pct),
@@ -235,21 +248,44 @@ def _slope_soils_and_map(p: dict[str, Any], lead: Lead, s: Settings) -> None:
 
 
 def _next_door(p: dict[str, Any], lead: Lead, s: Settings) -> None:
-    if not s.owner_next_door:
-        return
-    built = p.get(NEXT_DOOR_KEY)
-    if isinstance(built, bool) or not isinstance(built, int) or built < 0:
-        lead.not_checked.append("same-owner adjacency not checked")
-    elif built > 0:
-        lead.found.append(f"the same owner holds {built} built-on parcel"
-                          f"{'s' if built != 1 else ''} adjacent to this one, directly or "
-                          "through its other parcels (possibly spare land of an operating site)")
+    """NEXT_DOOR_KEY counts the built-on same-owner parcels next door: the
+    run's 5-50 ac groups and, when next_door_any_size is on, the neighbours
+    of any size nextdoor.py found (run.main counts each parcel once)."""
+    any_size = p.get(nextdoor.OWNER_KEY)
+    any_missing = s.next_door_any_size and not isinstance(any_size, list)
+    why = p.get(nextdoor.REASON_KEY) or "no result"
+    if s.owner_next_door:
+        built = p.get(NEXT_DOOR_KEY)
+        if isinstance(built, bool) or not isinstance(built, int) or built < 0:
+            lead.not_checked.append("same-owner adjacency not checked")
+            return
+        if built > 0:
+            lead.found.append(f"the same owner holds {built} built-on parcel"
+                              f"{'s' if built != 1 else ''} adjacent to this one, directly or "
+                              "through its other parcels (possibly spare land of an operating "
+                              "site)")
+            return
+    if any_missing and (s.owner_next_door or s.contamination_near_ft):
+        lead.not_checked.append(f"neighbouring parcels of any size not checked ({why})")
 
 
 def _watch(p: dict[str, Any], lead: Lead, s: Settings, frontage_counted: bool) -> None:
-    sites = p.get("contamination") or []
-    if any(isinstance(x, dict) and x.get("feet") == 0 for x in sites):
+    sites = [x for x in p.get("contamination") or [] if isinstance(x, dict)]
+    near = sorted((_num(x.get("feet")) or 0.0, str(x.get("name") or "site")) for x in sites
+                  if _num(x.get("feet")) is not None)
+    bordering = p.get(nextdoor.SITES_KEY) if s.next_door_any_size else None
+    if near and near[0][0] == 0:
         lead.found.append("a listed contamination site is on the parcel")
+    elif s.contamination_near_ft and near and near[0][0] <= s.contamination_near_ft:
+        lead.found.append(f"a listed contamination site {near[0][0]:,.0f} ft away "
+                          f"({near[0][1]})")
+    elif s.contamination_near_ft and isinstance(bordering, list) and bordering:
+        lead.found.append(f"a bordering parcel holds a listed contamination site "
+                          f"({bordering[0]})")
+    kind = operating_kind(p.get("owner")) if s.operating_owner else None
+    if kind:
+        lead.found.append(f"the owner's name reads like {kind}: possibly buffer or expansion "
+                          "land of its own operation")
     if not frontage_counted and (p.get("road") or "").lower() == "land-locked":
         lead.found.append("the assessor lists the parcel as land-locked")
     years = _num(p.get("years_held"))

@@ -91,6 +91,9 @@ _UTILITY_RE = re.compile(
     r"\bRAILWAY\b|\bRAILROAD\b|\bRAIL ROAD\b|\bRWY\b|"
     r"\b(RR|R R|RY)\s+(CO|COMPANY|CORP|INC|SYSTEM)\b|\bLINE (RR|R R|RY)\b|"
     r"\bNORFOLK SOUTHERN\b|\bCSX\b|\bC S X\b|\bSEABOARD\b|\bCENTRAL OF (GA|GEORGIA)\b|"
+    # Norfolk Southern's real-estate company (lead check of 2026-11-12: its
+    # tax bills go to the railroad's real-estate office).
+    r"\bSOUTHERN REGION INDUSTRIAL REALTY\b|"
     r"\bGEORGIA POWER\b|\bGAS LIGHT\b|\bNATURAL GAS\b|\bTRANSCO\b|\bPIPELINE\b|"
     r"\bPIPE LINE\b|\bELECTRIC MEMBERSHIP\b|\bGEORGIA TRANSMISSION\b|\bOGLETHORPE POWER\b|"
     r"\bMUNICIPAL ELECTRIC\b|\bBELLSOUTH\b|\bAT&T\b"
@@ -101,6 +104,19 @@ _UTILITY_RE = re.compile(
 _INDUSTRIAL_NAME_RE = re.compile(
     r"\bINDUSTRIAL\b|\bLOGISTICS\b|\bDISTRIBUTION\b|\bWAREHOUSE\b|\bCOMMERCE (CENTER|PARK)\b|"
     r"\bTRADE CENTER\b|\bBUSINESS PARK\b|\bINDUSTRIAL PARK\b"
+)
+# Operating businesses that hold land beside their own operation as buffer
+# or expansion room (lead checks of 2026-11-12: a quarry's strips, a waste
+# hauler's yard). Report-only: the lead grade counts it as found; nothing is
+# screened out, since such an owner can also be a seller of surplus land.
+OPERATING_KINDS = (
+    ("a quarry or aggregates company", re.compile(
+        # QUARRY only with a company word: "QUARRY HILLS HOA" is a subdivision.
+        r"\bQUARR(Y|IES) (CO|COMPANY|CORP|INC|LLC|PRODUCTS|MATERIALS)\b|\bAGGREGATES?\b|"
+        r"\bMARTIN MARIETTA\b|\bVULCAN MATERIALS\b|"
+        r"\bVULCAN CONSTRUCTION MATERIALS\b|\bHANSON AGGREGATES\b")),
+    ("a waste or sanitation company", re.compile(
+        r"\bSANITATION\b|\bWASTE\b|\bDISPOSAL\b|\bLANDFILL\b|\bREPUBLIC SERVICES\b")),
 )
 # A CONFERENCE ASSOCIATION is a church conference's legal body ("SOUTH
 # ATLANTIC CONFERENCE ASSOC"); CONFERENCE alone is not a church word.
@@ -183,6 +199,15 @@ def _is_religious(n: str) -> bool:
 def industrial_named(name: str | None) -> bool:
     """Owner name reads like an industrial developer vehicle or business."""
     return bool(_INDUSTRIAL_NAME_RE.search(normalize(name)))
+
+
+def operating_kind(name: str | None) -> str | None:
+    """The kind of operating business the owner name reads like, or None."""
+    n = normalize(name)
+    for kind, pattern in OPERATING_KINDS:
+        if pattern.search(n):
+            return kind
+    return None
 
 
 def mailing_state(addr2: str | None) -> str | None:

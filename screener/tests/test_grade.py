@@ -20,7 +20,7 @@ import unittest
 from pathlib import Path
 
 from screener import (arcgis, checks, decide, detention, digest, facts, frontage, grade,
-                      owner_clusters, rank, report, run, scoring, screens, sitefit, soils)
+                      nextdoor, owner_clusters, rank, report, run, scoring, screens, sitefit, soils)
 from screener.tests.test_integrity import (
     A, B, C, GOOD_SLOPE, FakeResponse, Offline, RunHarness, county_parcel, fake_roads,
     fake_sda, square,
@@ -45,6 +45,7 @@ def clear_parcel(**over):
                                       poorly_drained_pct=0.0, dwellings_limited_pct=0.0),
         "contamination": [], "road": "Paved", "years_held": 20.0, "last_sale_price": 90000.0,
         "steep_pct": 4.0, grade.NEXT_DOOR_KEY: 0,
+        nextdoor.OWNER_KEY: [], nextdoor.SITES_KEY: [],
     }
     p.update(over)
     return p

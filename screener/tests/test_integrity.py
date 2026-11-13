@@ -529,11 +529,16 @@ class RunHarness(Offline):
         self.industrial = mock.Mock(return_value=[(-84.49, 33.605)])
         self.patch(fulton, "fetch_parcels", self.fetch_parcels)
         self.patch(fulton, "load_cama", self.load_cama)
+        self.load_structures = mock.Mock(return_value={})
+        self.patch(fulton, "load_structures", self.load_structures)
         self.patch(fulton, "fetch_industrial_points", self.industrial)
         self.routes = {f"{layers.LAYERS[k].url}/query": v for k, v in world().items()}
         self.routes[checks.SLOPE_URL] = lambda params: GOOD_SLOPE
         self.routes[soils.SDA_URL] = fake_sda()
         self.routes[frontage.IDENTIFY_URL] = fake_roads()
+        # The county parcel layer, asked by nextdoor.py for touching parcels.
+        self.neighbours = FakeLayer({})
+        self.routes[f"{fulton.PARCELS_URL}/query"] = self.neighbours
         self.downloads = {}
 
     def set_layer(self, key, fake):

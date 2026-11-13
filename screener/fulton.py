@@ -232,6 +232,30 @@ def _read_cama_zip(zip_path: Path, parcel_ids: set[str]
     return sales, supplement
 
 
+def load_structures(cache_dir: Path, parcel_ids: set[str]) -> dict[str, dict[str, Any]]:
+    """Commercial buildings the county lists per parcel (the deed file's
+    Tax_StructureCommercial table): {"commercial_buildings": n,
+    "commercial_building_sf": total}. Current roll only, for the live
+    built-site screen (screens.building_rejects); never for an as-of year.
+    Reuses the deed file read_cama downloaded (same cache, same lifetime)."""
+    zip_path = arcgis.download(CAMA_URL, cache_dir / "fulton_cama.zip",
+                               max_age_days=30, check=zipfile.is_zipfile)
+    out: dict[str, dict[str, Any]] = {}
+    try:
+        with zipfile.ZipFile(zip_path) as z, z.open("Tax_StructureCommercial.txt") as fh:
+            for row in csv.DictReader(io.TextIOWrapper(fh, encoding="latin-1"), delimiter="\t"):
+                pid = (row.get("ParcelID") or "").strip()
+                if pid in parcel_ids:
+                    rec = out.setdefault(pid, {"commercial_buildings": 0,
+                                               "commercial_building_sf": 0.0})
+                    rec["commercial_buildings"] += 1
+                    rec["commercial_building_sf"] += max(_num(row.get("AreaSF")), 0.0)
+    except (zipfile.BadZipFile, KeyError, zlib.error, EOFError, csv.Error) as exc:
+        raise arcgis.ArcGISError(f"the county deed file {zip_path} can't be read ({exc}); "
+                                 "delete it or re-run with --refresh") from None
+    return out
+
+
 def acquisition(sales: list[dict[str, Any]], owner: str | None) -> dict[str, Any] | None:
     """The deed by which `owner` most likely took title.
 

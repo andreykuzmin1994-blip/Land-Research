@@ -21,6 +21,8 @@ jurisdictions = [
 
 [screens]
 max_improvement_value = 250000  # skip parcels already built on (and improvements > half the land value)
+built_min_building_sf = 2500    # also skip parcels the county lists with this many sq ft of commercial
+built_min_improvement_value = 50000  # buildings and at least this in improvements (0 sq ft = off; live only)
 max_flood_pct = 40              # % of parcel in the 100-year floodplain
 max_floodway_pct = 10           # % in a regulatory floodway
 max_wetland_pct = 20            # % mapped wetlands (ponds/streams counted separately)
@@ -94,5 +96,9 @@ min_frontage_ft = 50          # less public road frontage than this counts as fo
 max_hydric_pct = 25           # hydric soil share at or above this counts as found (0 = off)
 max_poorly_drained_pct = 25   # poorly drained soil share at or above this counts as found (0 = off)
 owner_next_door = true        # count "the same owner holds a built-on parcel next door"
+next_door_any_size = true     # ...looking at touching parcels of any size, not only 5-50 ac (nextdoor.py)
+next_door_max_parcels = 250   # top N by rank asked about their neighbours (0 = all)
+contamination_near_ft = 250   # count a listed contamination site this close, or on a bordering parcel (0 = off)
+operating_owner = true        # count an owner name that reads like a quarry or waste company
 recent_purchase_years = 5     # count a priced deed more recent than this (0 = off)
 digest_max = 40               # most leads listed in leads.md (A first, then B); each gets a brief
