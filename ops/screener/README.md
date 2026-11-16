@@ -31,7 +31,8 @@ does not reset the screener AutoResearch baseline.
    make a check pass by skipping it. The supervisor then copies the result
    into a fresh worktree on a new `screener-fix/<county>-<time>` branch
    and checks it with git (hooks and fsmonitor off):
-   - any symlink in the copy, or a change touching `rank.py`,
+   - any symlink, FIFO or other non-regular file in the copy, a file over
+     5 MB or over 200 MB in all (refused unread), or a change touching `rank.py`,
      `scoring.py`, `screens.py`, any `screener/*.toml` or listed settings
      file, `autoresearch/`, `inputs/`, a `.gitignore`/`.gitattributes`,
      an existing test (renames count as delete + add), a file mode, or
@@ -39,8 +40,9 @@ does not reset the screener AutoResearch baseline.
      is kept in the logs for reading);
    - no change (an outage, or a source gone for good) → the diagnosis is
      sent to you, nothing else;
-   - otherwise the unit tests run (as `screener-fix`, since the new code
-     is untrusted), the fix is committed to the branch, and you get "fix
+   - otherwise the unit tests run on a fresh copy of exactly what gets
+     committed (as `screener-fix`, since the new code is untrusted; the
+     result is advisory, as the code under test is the fix itself), the fix is committed to the branch, and you get "fix
      ready for review".
 
    The path rules cannot judge what allowed code does: an edit to an
@@ -103,8 +105,10 @@ before the next experiment.
    /home/screener/Land-Research/ops/screener/install.sh
    ```
 
-   It creates the `screener-fix` user and `/srv/screener-fix`, makes
-   `/home/screener` private, lets `screener` run commands as
+   It creates the `screener-fix` user and `/srv/screener-fix` (owned by
+   `screener`, so the fixer can't plant entries there), makes
+   `/home/screener` private, denies `screener-fix` cron and at jobs (so
+   nothing it runs outlives a hand-off), lets `screener` run commands as
    `screener-fix` (a step down, never up), gives `screener-fix` its own
    Python, copies `screener-ops.env.example` to
    `/home/screener/.config/screener-ops.env` if none exists, and enables

@@ -45,6 +45,8 @@ FIX_PYTHON="${FIX_PYTHON:-/home/screener-fix/.venv/bin/python}"
 FIX_PUSH="${FIX_PUSH:-0}"
 FIX_REMOTE="${FIX_REMOTE:-origin}"
 FIX_SSH_KEY="${FIX_SSH_KEY:-}"
+MAX_FIX_FILE_KB="${MAX_FIX_FILE_KB:-5120}"     # largest file accepted from the fixer
+MAX_FIX_TOTAL_KB="${MAX_FIX_TOTAL_KB:-204800}" # all its files together (cache/output aside)
 SLEEP="${SLEEP:-sleep}"   # tests replace this
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -63,7 +65,9 @@ notify() {
   printf '%s [%s] %s\n%s\n\n' "$(date -u +%FT%TZ)" "${3:-default}" "$1" "$2" >> "$LOG_DIR/alerts.log"
   log "ALERT: $1"
   [ -n "$NTFY_URL" ] || return 0
-  curl -sS -m 20 -H "Title: $1" -H "Priority: ${3:-default}" --data-binary "$2" "$NTFY_URL" \
+  # The URL goes in on stdin, not argv: other users can read argv in ps.
+  printf 'url = "%s"\n' "$NTFY_URL" |
+    curl -sS -m 20 -K - -H "Title: $1" -H "Priority: ${3:-default}" --data-binary "$2" \
     >/dev/null 2>>"$MAIN_LOG" || log "  (alert not delivered)"
 }
 
@@ -182,6 +186,34 @@ forbidden_path() {
 
 fixer() { "${FIX_AS[@]}" "$@"; }   # run a command as the sandbox user
 
+# Kill everything the fixer user runs, repeatedly, so nothing it started
+# keeps changing its copy while we read it. (install.sh also denies it
+# cron and at, so nothing comes back later.)
+kill_fixer() {
+  [ -n "$FIX_USER" ] || return 0
+  local i
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    fixer pkill -KILL -u "$FIX_USER" >/dev/null 2>&1
+    fixer pgrep -u "$FIX_USER" >/dev/null 2>&1 || return 0
+    $SLEEP 0.2
+  done
+  log "  fixer processes still running after 10 kills"
+}
+
+# new_copy LABEL: a fresh, unpredictably named folder in FIX_DIR (which
+# only we can create entries in) that the fixer's group may write.
+new_copy() {
+  local d
+  d="$(mktemp -d "$FIX_DIR/$1.XXXXXXXX")" && chmod 2770 "$d" && echo "$d"
+}
+
+rm_copy() {  # the fixer deletes what it made, then we remove the rest
+  [ -n "$1" ] && [ -d "$1" ] || return 0
+  fixer find "$1" -mindepth 1 -delete >>"$MAIN_LOG" 2>&1
+  rm -rf "$1" >>"$MAIN_LOG" 2>&1
+  return 0
+}
+
 fix_ready() {  # prints why the hand-off can't run, if it can't
   [ -d "$FIX_DIR" ] && [ -w "$FIX_DIR" ] || { echo "$FIX_DIR missing or not writable (run install.sh)"; return 1; }
   fixer true 2>/dev/null || { echo "cannot run commands as '$FIX_USER' (run install.sh)"; return 1; }
@@ -205,7 +237,7 @@ $tail_txt" urgent
 
   local id="$county-$STAMP"
   local fix_branch="screener-fix/$id"
-  local work="$FIX_DIR/$id"           # the fixer's plain copy (no .git)
+  local work=""                       # the fixer's plain copy (no .git)
   local wt="$STATE_DIR/worktrees/$id" # trusted worktree the result is copied into
   local clog="$LOG_DIR/$id-claude.log" diag="$LOG_DIR/$id-diagnosis.md" patch="$LOG_DIR/$id-fix.patch"
 
@@ -215,8 +247,9 @@ $tail_txt" urgent
   # live cache).
   mkdir -p "$STATE_DIR/worktrees"
   if ! "${SAFE_GIT[@]}" -C "$REPO_DIR" worktree add -q -b "$fix_branch" "$wt" HEAD >>"$MAIN_LOG" 2>&1 ||
+     ! work="$(new_copy "$id")" ||
      ! ( umask 007
-         mkdir -p "$work" && tar -C "$wt" --exclude=./.git -cf - . | tar -x -C "$work" &&
+         tar -C "$wt" --exclude=./.git -cf - . | tar -x -C "$work" &&
          { [ ! -d "$REPO_DIR/screener/cache" ] ||
            cp -r --preserve=timestamps "$REPO_DIR/screener/cache" "$work/screener/cache"; } &&
          chmod -R g+rwX "$work" ) >>"$MAIN_LOG" 2>&1; then
@@ -273,35 +306,43 @@ EOF
         "Bash($FIX_PYTHON -m screener.run:*)" "Bash($FIX_PYTHON -m unittest:*)" \
       </dev/null) >"$clog" 2>&1
   local crc=$?
-  # Nothing the fixer started may keep changing the copy while it is read.
-  [ -n "$FIX_USER" ] && fixer pkill -KILL -u "$FIX_USER" >/dev/null 2>&1
+  kill_fixer
 
-  # Refuse a copy with any symlink in the code (not the cache/output copies,
-  # which are never read): reading through one could pull in this user's files.
-  local links
-  links="$(find "$work" \( -path "$work/screener/cache" -o -path "$work/screener/output" \) -prune \
-           -o -type l -print 2>/dev/null | sed "s|^$work/||" | head -5)"
-  if [ -f "$work/screener-fix-DIAGNOSIS.md" ] && [ ! -L "$work/screener-fix-DIAGNOSIS.md" ]; then
-    head -c 20000 "$work/screener-fix-DIAGNOSIS.md" >"$diag"
-  else
-    { echo "Claude wrote no diagnosis (exit $crc). Its output:"; tail -30 "$clog"; } >"$diag"
-  fi
-  local summary; summary="$(head -1 "$diag" | cut -c1-200)"
-  if [ -n "$links" ]; then
-    notify "Screener: $county FAILED, fix refused" "The fixer's copy contains symlinks ($links); nothing was used. Diagnosis: $summary" urgent
-    RESULTS+=("$county: FAILED; fix refused (symlinks)")
+  # Check the copy before reading anything from it: only regular files and
+  # folders (a symlink could pull in this user's files, a FIFO could hang a
+  # read), no huge files (the worktree shares the live repo's disk and
+  # objects). The cache and output copies are never read and are skipped.
+  local prune=( \( -path "$work/screener/cache" -o -path "$work/screener/output" \) -prune -o )
+  local odd big total
+  odd="$(find "$work" "${prune[@]}" ! -type f ! -type d -print 2>/dev/null | sed "s|^$work/||" | head -5)"
+  big="$(find "$work" "${prune[@]}" -type f -size +"${MAX_FIX_FILE_KB}k" -print 2>/dev/null | sed "s|^$work/||" | head -5)"
+  total="$(find "$work" "${prune[@]}" -type f -printf '%s\n' 2>/dev/null | awk '{s+=$1} END {print int(s/1024)}')"
+  if [ -n "$odd" ] || [ -n "$big" ] || [ "${total:-0}" -gt "$MAX_FIX_TOTAL_KB" ]; then
+    { echo "The fixer's copy was refused unread."; tail -30 "$clog"; } >"$diag"
+    notify "Screener: $county FAILED, fix refused" "The fixer's copy has non-regular files (${odd:-none}), files over ${MAX_FIX_FILE_KB} KB (${big:-none}) or ${total:-0} KB in all (cap ${MAX_FIX_TOTAL_KB} KB); nothing was used. Claude's output: $clog" urgent
+    RESULTS+=("$county: FAILED; fix refused (unsafe files in the fixer's copy)")
     cleanup "$wt" "$fix_branch" "$work" delete; return
   fi
 
-  # Copy the result back into the worktree; git there is ours.
+  # Copy the result back into the worktree; git there is ours. The
+  # diagnosis comes along and is read from here, where the fixer can't
+  # swap it.
   if ! { find "$wt" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} + &&
-          tar -C "$work" --exclude=./screener/cache --exclude=./screener/output \
-              --exclude=./screener-fix-DIAGNOSIS.md -cf - . | tar -x -C "$wt"; } >>"$MAIN_LOG" 2>&1; then
-    notify "Screener: $county FAILED" "Could not copy the fixer's result into a worktree (see $MAIN_LOG). Diagnosis: $summary
-Full note: $diag" urgent
+          timeout 10m tar -C "$work" --exclude=./screener/cache --exclude=./screener/output -cf - . |
+          timeout 10m tar -x -C "$wt"; } >>"$MAIN_LOG" 2>&1; then
+    { echo "The fixer's result could not be copied."; tail -30 "$clog"; } >"$diag"
+    notify "Screener: $county FAILED" "Could not copy the fixer's result into a worktree (see $MAIN_LOG). Claude's output: $clog" urgent
     RESULTS+=("$county: FAILED (could not read the fix)")
     cleanup "$wt" "$fix_branch" "$work" delete; return
   fi
+  local dfile="$wt/screener-fix-DIAGNOSIS.md"
+  if [ -f "$dfile" ] && [ ! -L "$dfile" ]; then
+    head -c 20000 "$dfile" >"$diag"
+  else
+    { echo "Claude wrote no diagnosis (exit $crc). Its output:"; tail -30 "$clog"; } >"$diag"
+  fi
+  rm -f "$dfile"
+  local summary; summary="$(head -1 "$diag" | cut -c1-200)"
 
   local G=("${SAFE_GIT[@]}" -C "$wt") st path bad="" changed=0
   "${G[@]}" add -A >>"$MAIN_LOG" 2>&1
@@ -330,17 +371,24 @@ It was discarded (patch kept: $patch). Diagnosis: $summary" urgent
     cleanup "$wt" "$fix_branch" "$work" delete; return
   fi
 
-  # Re-check the fix ourselves, as the fixer user: the new code is untrusted.
-  local tests_ok=yes
-  (cd "$work" && timeout -k 1m 30m "${FIX_AS[@]}" "$FIX_PYTHON" -m unittest discover -s screener/tests -t .) \
-    >>"$clog" 2>&1 || tests_ok=no
+  # Re-run the tests on a fresh copy of exactly what gets committed, as the
+  # fixer user (the new code is untrusted). Advisory only: the code under
+  # test is the fix itself, so a hostile fix could fake a pass.
+  local tests_ok=no tcopy=""
+  if tcopy="$(new_copy "$id-test")" &&
+     ( umask 007; tar -C "$wt" --exclude=./.git -cf - . | tar -x -C "$tcopy" && chmod -R g+rwX "$tcopy" ) >>"$MAIN_LOG" 2>&1 &&
+     (cd "$tcopy" && timeout -k 1m 30m "${FIX_AS[@]}" "$FIX_PYTHON" -m unittest discover -s screener/tests -t .) >>"$clog" 2>&1
+  then tests_ok=yes
+  fi
+  kill_fixer
+  rm_copy "$tcopy"
 
   if ! "${G[@]}" -c user.name="screener-ops" -c user.email="screener-ops@localhost" \
        commit -q -F - <<EOF >>"$MAIN_LOG" 2>&1
 screener-fix: $county: $summary
 
 Proposed by the unattended supervisor after $attempts failed runs.
-Not reviewed. Unit tests on this commit: $tests_ok.
+Not reviewed. Unit tests on this commit (advisory): $tests_ok.
 
 $(tail -n +2 "$diag")
 EOF
@@ -362,7 +410,7 @@ EOF
   fi
   notify "Screener: $county fix ready for review" "Diagnosis: $summary
 Fix: $where
-Unit tests: $tests_ok. Review the diff, merge it if right, and the next scheduled run uses it.
+Unit tests (advisory): $tests_ok. Review the diff, merge it if right, and the next scheduled run uses it.
 Note: a merged change under screener/ (other than rank.py) means re-recording the
 AutoResearch baseline (evaluate --decide --new-baseline) before the next experiment." high
   RESULTS+=("$county: FAILED; fix proposed on $fix_branch (tests: $tests_ok)")
@@ -372,7 +420,7 @@ AutoResearch baseline (evaluate --decide --new-baseline) before the next experim
 cleanup() {  # WORKTREE BRANCH FIXER_COPY keep|delete
   "${SAFE_GIT[@]}" -C "$REPO_DIR" worktree remove --force "$1" >>"$MAIN_LOG" 2>&1 || true
   [ "$4" = delete ] && "${SAFE_GIT[@]}" -C "$REPO_DIR" branch -q -D "$2" >>"$MAIN_LOG" 2>&1
-  fixer rm -rf "$3" >>"$MAIN_LOG" 2>&1
+  rm_copy "$3"
   return 0
 }
 

@@ -25,7 +25,17 @@ if ! id "$FIX_USER" >/dev/null 2>&1; then
 fi
 chmod 750 "/home/$FIX_USER"
 usermod -aG "$FIX_USER" "$RUN_USER"
-install -d -m 2770 -o "$FIX_USER" -g "$FIX_USER" "$FIX_DIR"
+# The handover folder belongs to the run user: the fixer can work inside the
+# copies made for it but cannot create, rename or plant entries here.
+install -d "$FIX_DIR"
+chown "$RUN_USER:$FIX_USER" "$FIX_DIR"
+chmod 2750 "$FIX_DIR"
+
+# No cron or at jobs for the fixer: nothing it runs may outlive the hand-off.
+for f in /etc/cron.deny /etc/at.deny; do
+  touch "$f"
+  grep -qx "$FIX_USER" "$f" || echo "$FIX_USER" >>"$f"
+done
 
 # The run user may run commands as the fixer (a step down, never up).
 echo "$RUN_USER ALL=($FIX_USER) NOPASSWD: ALL" >/etc/sudoers.d/screener-fix
@@ -36,7 +46,9 @@ visudo -cf /etc/sudoers.d/screener-fix >/dev/null
 if [ ! -x "/home/$FIX_USER/.venv/bin/python" ]; then
   sudo -u "$FIX_USER" -H python3 -m venv "/home/$FIX_USER/.venv"
 fi
-sudo -u "$FIX_USER" -H "/home/$FIX_USER/.venv/bin/pip" install -q -r <(cat "$REPO/screener/requirements.txt")
+# (A copy it can read: sudo closes inherited descriptors, so no <(...).)
+install -m 644 "$REPO/screener/requirements.txt" "/home/$FIX_USER/.screener-requirements.txt"
+sudo -u "$FIX_USER" -H "/home/$FIX_USER/.venv/bin/pip" install -q -r "/home/$FIX_USER/.screener-requirements.txt"
 
 if [ ! -f "/home/$RUN_USER/.config/screener-ops.env" ]; then
   install -d -o "$RUN_USER" -g "$RUN_USER" "/home/$RUN_USER/.config"

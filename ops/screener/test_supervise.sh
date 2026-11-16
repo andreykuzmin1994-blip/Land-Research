@@ -54,6 +54,8 @@ case "$FAKE_CLAUDE" in
   symlink) ln -s /etc/hostname screener/link.py; echo "URL = 'new'" >>screener/fake.py ;;
   toml)    printf '[run]\ncounty = "other"\n' >screener/settings-other.toml ;;
   mode)    chmod +x screener/fake.py ;;
+  big)     head -c 6000000 /dev/zero >screener/big.dat; echo "URL = 'new'" >>screener/fake.py ;;
+  fifo)    mkfifo screener/pipe; echo "URL = 'new'" >>screener/fake.py ;;
   cache)   echo poisoned >screener/cache/live.txt; echo "URL = 'new'" >>screener/fake.py ;;
   none)    ;;
 esac
@@ -125,13 +127,13 @@ check "fixer copy removed" '[ -z "$(ls -A $CASE/fixdir)" ]'
 check "fixer copy had no .git" '[ ! -f $CASE/fake/saw-git ]'
 check "fix-ready alert" 'alerts | grep -q "fix ready for review"'
 
-for mode in rank outside test rename testmv symlink toml mode; do
+for mode in rank outside test rename testmv symlink toml mode big fifo; do
   echo "Claude edits a forbidden file ($mode)"
   new_case "forbid-$mode"; FAKE_RUN=fail FAKE_CLAUDE=$mode "$SUP" 2>/dev/null
   check "fix refused" 'alerts | grep -q "fix refused"'
   check "no fix branch" '[ -z "$(branches)" ]'
-  # A symlink is refused before any diff is made.
-  [ "$mode" = symlink ] || check "patch kept for reading" 'ls $CASE/state/logs/*-fix.patch >/dev/null 2>&1'
+  # Unsafe files (symlink, FIFO, huge) are refused before any diff is made.
+  [[ " symlink big fifo " == *" $mode "* ]] || check "patch kept for reading" 'ls $CASE/state/logs/*-fix.patch >/dev/null 2>&1'
 done
 
 echo "Claude adds a new test with its fix (allowed)"
