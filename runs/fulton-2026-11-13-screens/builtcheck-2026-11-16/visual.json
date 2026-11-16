@@ -1,0 +1,2245 @@
+{
+ "visual": {
+  "1": {
+   "rank": 1,
+   "state": "partly_built",
+   "building_share_pct": 25,
+   "paved_share_pct": 25,
+   "usable_as_raw_land": "partly",
+   "evidence": "The west arm of the outline takes in the south end of a large operating warehouse (white-roof section) and its east truck court and dock strip. The east wedge holds a car parking lot, a wooded band and the west part of a graded bare-dirt field. A narrow drive strip between the two arms is cut out.",
+   "confidence": "medium"
+  },
+  "2": {
+   "rank": 2,
+   "state": "other_use",
+   "building_share_pct": 2,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "no",
+   "evidence": "Almost the whole outline is an active aggregate quarry processing plant, with conveyors, crushers, stone stockpiles, haul roads and a settling pond. Only a thin wooded fringe runs along the north and west edges.",
+   "confidence": "high"
+  },
+  "3": {
+   "rank": 3,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "A long narrow strip fully covered by deciduous woods, squeezed between rail yards and intermodal trailer tracks on both sides. No structures or paving inside.",
+   "confidence": "high"
+  },
+  "4": {
+   "rank": 4,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Two pieces north of the interstate on either side of a road crossing. Both are wooded, with a lighter pine/grass clearing band and a small pond in each piece. No buildings or paving inside.",
+   "confidence": "high"
+  },
+  "5": {
+   "rank": 5,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "A tall rectangle almost entirely of pine and hardwood forest, crossed near its north end by a rail line. A small grassy area sits above the tracks. A cemetery and a small structure lie just outside the east line.",
+   "confidence": "high"
+  },
+  "6": {
+   "rank": 6,
+   "state": "houses",
+   "building_share_pct": 3,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "An occupied single-family house sits in the centre with a curving driveway, plus a metal-roof outbuilding at the west corner. The rest is open lawn/field and trees along the road.",
+   "confidence": "high"
+  },
+  "7": {
+   "rank": 7,
+   "state": "other_use",
+   "building_share_pct": 1,
+   "paved_share_pct": 25,
+   "usable_as_raw_land": "partly",
+   "evidence": "The north and middle sit inside an active quarry complex, with gravel haul roads, white aggregate stockpiles, disturbed ground, equipment and trailers along the east edge, and settling ponds. The southern fifth is wooded with a pond.",
+   "confidence": "medium"
+  },
+  "8": {
+   "rank": 8,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "A long narrow strip fully covered by mixed pine and hardwood forest, reaching east from a road. No structures, clearing or paving inside.",
+   "confidence": "high"
+  },
+  "9": {
+   "rank": 9,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "Almost the whole outline is dense pine forest, with a cleared strip along the road on the southwest edge. A lumber and rail yard and a small paved lot lie just outside the northeast and south lines.",
+   "confidence": "high"
+  },
+  "10": {
+   "rank": 10,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "An L-shaped parcel of mixed pine and hardwood woods with a small open clearing and footpaths near the centre. A truck and trailer yard lies just outside to the north.",
+   "confidence": "high"
+  },
+  "11": {
+   "rank": 11,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 1,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline is a gravel/dirt truck and trailer yard holding dozens of parked trailers, tractors and some containers under tarps. Only the wooded fringes along the rail line, the road and the south tip are unused.",
+   "confidence": "high"
+  },
+  "12": {
+   "rank": 12,
+   "state": "houses",
+   "building_share_pct": 35,
+   "paved_share_pct": 20,
+   "usable_as_raw_land": "no",
+   "evidence": "The whole rectangle is a dense manufactured-home park with rows of mobile homes on internal drives, plus a few houses or buildings at the north and south ends.",
+   "confidence": "high"
+  },
+  "13": {
+   "rank": 13,
+   "state": "under_construction_or_graded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "About 60% of the outline is a cleared, rough-graded earth pad with tracks and riprap at the southwest edge, and the rest is a tree buffer. There are no buildings or paving inside; the outline only touches the edge of a neighbouring equipment yard at its NE corner.",
+   "confidence": "high"
+  },
+  "14": {
+   "rank": 14,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 10,
+   "paved_share_pct": 70,
+   "usable_as_raw_land": "partly",
+   "evidence": "The west half is old concrete slabs and foundations from demolished buildings. The east half is a gravel/paved lot with many parked trailers and trucks, and older industrial buildings stand along the north edge. This is a brownfield in active truck/trailer use, not raw land.",
+   "confidence": "medium"
+  },
+  "15": {
+   "rank": 15,
+   "state": "operating_building",
+   "building_share_pct": 30,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "The triangle takes in a large part of an operating warehouse roof plus its truck court, with trailers parked at the docks along the NW side. A thin tree strip runs along the SW edge.",
+   "confidence": "high"
+  },
+  "16": {
+   "rank": 16,
+   "state": "operating_building",
+   "building_share_pct": 0,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "The building sits in the hole, and the ring around it is that building's car park, drive aisles, rear drive and landscaping. The ring also takes in the parking area of the warehouse to the south and a tree buffer on the east.",
+   "confidence": "high"
+  },
+  "17": {
+   "rank": 17,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "The outline is pine/hardwood forest with no buildings. A cleared power-line corridor with transmission poles crosses it diagonally from the NE to the south, and dirt trails run through, so part of the land is encumbered by the easement.",
+   "confidence": "high"
+  },
+  "18": {
+   "rank": 18,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "partly",
+   "evidence": "The west-central part is a paved/gravel trailer parking yard packed with parked trailers, with a small pond at its SW corner. The rest of the outline is a wooded slope plus a strip along the road on the south.",
+   "confidence": "medium"
+  },
+  "19": {
+   "rank": 19,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "The outline is mostly mixed forest. Near the highway at the south end there is a small cleared garden/field, a short drive and one small structure, possibly a shed or small house; other structures sit on or just outside the SW line.",
+   "confidence": "medium"
+  },
+  "20": {
+   "rank": 20,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The L-shaped outline is fully wooded with no buildings or paving, and it borders the interstate on the south. Its narrow northern arm (about 150 ft wide) limits how much of it can be used.",
+   "confidence": "high"
+  },
+  "21": {
+   "rank": 21,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Entire outline is continuous deciduous/pine woods between the interstate and a residential street. The only possible structure is a tiny linear object near the north edge.",
+   "confidence": "high"
+  },
+  "22": {
+   "rank": 22,
+   "state": "vacant_open",
+   "building_share_pct": 1,
+   "paved_share_pct": 4,
+   "usable_as_raw_land": "partly",
+   "evidence": "Long, narrow sliver between the interstate ramp and a road, mostly cleared grass field with tree strips. A small building and paved pad sit in the NE corner, so the awkward shape limits a usable footprint.",
+   "confidence": "medium"
+  },
+  "23": {
+   "rank": 23,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 20,
+   "usable_as_raw_land": "yes",
+   "evidence": "No buildings. The western half is a cleared former pad of grass and gravel with gravel drives and a few parked vehicles, the eastern half is wooded, and a rail line runs along the south edge. The inner hole is excluded.",
+   "confidence": "medium"
+  },
+  "24": {
+   "rank": 24,
+   "state": "operating_building",
+   "building_share_pct": 25,
+   "paved_share_pct": 50,
+   "usable_as_raw_land": "no",
+   "evidence": "A large operating building with extensive car-filled parking lots, plus a pad-site restaurant in the NW corner. A wooded patch in the NW and tree buffers along the east edge are the only open land.",
+   "confidence": "high"
+  },
+  "25": {
+   "rank": 25,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Fully wooded triangular tract between a rail line and a road. Warehouses sit just outside the south boundary.",
+   "confidence": "high"
+  },
+  "26": {
+   "rank": 26,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly woods and scrub south of a large warehouse's truck court. In the east is a cleared dirt/gravel area holding a trailer and some debris, and a dirt track runs along the south edge. No permanent buildings.",
+   "confidence": "medium"
+  },
+  "27": {
+   "rank": 27,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 10,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "no",
+   "evidence": "An active lumber and trailer storage yard: rows of parked trailers, lumber stacks, several sheds and canopies, and a paved lot along the south road. Only the NE slope is vegetated.",
+   "confidence": "high"
+  },
+  "28": {
+   "rank": 28,
+   "state": "partly_built",
+   "building_share_pct": 3,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "partly",
+   "evidence": "The northern ~60% is wooded. The southern part is an active gravel/paved industrial yard with stored materials, equipment and parked cars, and includes the edge of a building on the west line.",
+   "confidence": "high"
+  },
+  "29": {
+   "rank": 29,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "unclear",
+   "evidence": "A heavily excavated quarry or borrow-pit landscape with haul roads, rock stockpiles, bare graded earth and a large sediment-filled pond covering roughly 30% of the outline. Not natural raw land; it may be an active extraction or fill operation.",
+   "confidence": "medium"
+  },
+  "30": {
+   "rank": 30,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Dense pine and hardwood woods next to a lake on the west. A salvage/vehicle yard is just outside the east edge, and a small bare, possibly wet patch lies near the south boundary.",
+   "confidence": "high"
+  },
+  "31": {
+   "rank": 31,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 15,
+   "usable_as_raw_land": "partly",
+   "evidence": "Narrow north-south strip, mostly wooded in the north half, with a cleared gravel pad holding some equipment in the middle and open grass with a dirt drive in the south. No buildings inside the line. Manufactured-home community sits directly east.",
+   "confidence": "medium"
+  },
+  "32": {
+   "rank": 32,
+   "state": "partly_built",
+   "building_share_pct": 8,
+   "paved_share_pct": 12,
+   "usable_as_raw_land": "partly",
+   "evidence": "About two-thirds is dense pine woods (east and north). The southwest corner takes in a small office building with its parking lot and the northern end of a warehouse's truck court and roof that extends south out of the parcel.",
+   "confidence": "medium"
+  },
+  "33": {
+   "rank": 33,
+   "state": "vacant_open",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Large open pasture or old field with pine regrowth blocks and a wooded drainage in the south. One house near the northwest corner and a small shed in the middle. Ponds lie just outside the line.",
+   "confidence": "high"
+  },
+  "34": {
+   "rank": 34,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "partly",
+   "evidence": "Gravel yard with large stacks of pipe or coils stored outdoors, parked trucks and trailers in the east and southwest lobes. The middle is wooded, with a small pond. The adjacent warehouses sit just outside the line.",
+   "confidence": "high"
+  },
+  "35": {
+   "rank": 35,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "unclear",
+   "evidence": "Grassy, graded hillside with curved terrace benches that look like a closed landfill or engineered fill, plus a wooded band across the south. A sliver of parking lot is at the south tip. A salvage yard is adjacent.",
+   "confidence": "medium"
+  },
+  "36": {
+   "rank": 36,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "no",
+   "evidence": "About two-thirds of the outline is a quarry settling pond full of milky water and sediment. The rest is bare, disturbed quarry ground plus a tree strip and haul road along the west road frontage.",
+   "confidence": "high"
+  },
+  "37": {
+   "rank": 37,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "The north half is disturbed quarry ground at the edge of a settling pond, with spoil and haul roads. The south half is a wooded buffer strip next to a townhouse development.",
+   "confidence": "medium"
+  },
+  "38": {
+   "rank": 38,
+   "state": "partly_built",
+   "building_share_pct": 2,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "partly",
+   "evidence": "The southwest third is an operating truck stop with a large paved truck and trailer parking lot and fuel and service buildings. The north and east are wooded, sloping land with a cleared utility path.",
+   "confidence": "high"
+  },
+  "39": {
+   "rank": 39,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "L-shaped parcel covered almost entirely in deciduous woods and scrub, with a small clearing in the southwest. A strip of the neighbouring apartment complex's parking lot lies along the north line. No buildings inside.",
+   "confidence": "high"
+  },
+  "40": {
+   "rank": 40,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 85,
+   "usable_as_raw_land": "no",
+   "evidence": "Nearly the whole parcel is a striped, paved trailer and truck parking yard full of parked trailers. It also has a landscaped stormwater pond in the northwest and a car parking lot along the south edge that serves the warehouse to the south.",
+   "confidence": "high"
+  },
+  "41": {
+   "rank": 41,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Entire outline is woodland, partly thinned or cut-over pine and hardwood, with no buildings, roads or paving inside. A small commercial building and lot sit just outside the west tip.",
+   "confidence": "high"
+  },
+  "42": {
+   "rank": 42,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "partly",
+   "evidence": "The southern lobe holds a gravel/paved trailer yard with parked semi-trailers in its upper half and woods below it. The northern wedge is wooded and grassy along the road, and a strip of access drive and parking serves the warehouse next door.",
+   "confidence": "medium"
+  },
+  "43": {
+   "rank": 43,
+   "state": "operating_building",
+   "building_share_pct": 4,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "partly",
+   "evidence": "Most of the outline is an operating rail bulk terminal: a silo/loading structure, loop rail spurs full of hopper cars, and concrete truck drives. Only the south-east rectangle (about a quarter of the parcel) is brushy or wooded vacant land.",
+   "confidence": "high"
+  },
+  "44": {
+   "rank": 44,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "yes",
+   "evidence": "There is a large open grass field and a wooded western block with no buildings. Inside the line are a paved roundabout with a fountain at the hotel/office entrance, a strip of parking and drive north of it, and the public road along the south edge. The building itself is outside the line.",
+   "confidence": "medium"
+  },
+  "45": {
+   "rank": 45,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "yes",
+   "evidence": "Cleared, disturbed ground with old concrete slabs or rubble pads, a dirt access track and a small pond, with wooded land to the west and north. No standing buildings or active operations are visible. It looks like a former site that was cleared or graded.",
+   "confidence": "medium"
+  },
+  "46": {
+   "rank": 46,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 60,
+   "usable_as_raw_land": "no",
+   "evidence": "Two large gravel lots inside the line are packed with stored vehicles, which looks like auto auction or salvage storage. The rest is graded slopes, detention ponds and a strip of wooded buffer.",
+   "confidence": "high"
+  },
+  "47": {
+   "rank": 47,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline lies on an active landfill: graded cells, exposed waste with excavators working, and haul roads. The south-west tip is a wooded buffer next to the landfill.",
+   "confidence": "high"
+  },
+  "48": {
+   "rank": 48,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "Almost entirely wooded, with a dirt trail around the perimeter and a small clearing in the middle, beside a lake to the west and the interstate to the south. The truck lot and gas-station buildings to the north-east lie outside the line or in notches.",
+   "confidence": "high"
+  },
+  "49": {
+   "rank": 49,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 75,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline is a gravel/paved truck and trailer parking yard with many trailers and cars parked. Only the eastern end has a grass patch and a tree line.",
+   "confidence": "high"
+  },
+  "50": {
+   "rank": 50,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 75,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline is large surface parking lots full of cars and buses, with small booth or shelter buildings. Apart from that there is one wooded block and some roadway and landscaped edges.",
+   "confidence": "high"
+  },
+  "51": {
+   "rank": 51,
+   "state": "under_construction_or_graded",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "partly",
+   "evidence": "Northern triangle is cleared, rough-graded bare dirt with sediment basins (no structures); southern part is wooded with stormwater ponds along the edge. Strip along the north edge includes road shoulder.",
+   "confidence": "medium"
+  },
+  "52": {
+   "rank": 52,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 70,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline is a gravel/paved truck and trailer parking yard with rows of trailers and stored vehicles/equipment; only a narrow wooded strip on the west and some woods/pond edge on the east are unused.",
+   "confidence": "high"
+  },
+  "53": {
+   "rank": 53,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "yes",
+   "evidence": "Long narrow strip of continuous forest between a warehouse and a rail line; the north tip clips a corner of a warehouse truck court/driveway and an access road crosses it.",
+   "confidence": "high"
+  },
+  "54": {
+   "rank": 54,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "Very narrow linear wooded strip squeezed between a road and a rail line; undeveloped but its sliver shape limits buildability.",
+   "confidence": "high"
+  },
+  "55": {
+   "rank": 55,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Large parcel almost entirely forested; the north tip includes a small parking area and a sliver of road edge, no buildings inside.",
+   "confidence": "high"
+  },
+  "56": {
+   "rank": 56,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "partly",
+   "evidence": "Northern half is a disused, cracked paved lot with a demolished building slab (no standing structure, no cars); southern half is wooded; a narrow access strip runs north to the main road.",
+   "confidence": "medium"
+  },
+  "57": {
+   "rank": 57,
+   "state": "under_construction_or_graded",
+   "building_share_pct": 2,
+   "paved_share_pct": 40,
+   "usable_as_raw_land": "partly",
+   "evidence": "Brownfield demolition/site-work area: old concrete slabs, rubble piles and an excavated earthen trench, with a small building near the east edge; the south lobe crosses the road and includes roadside strip.",
+   "confidence": "medium"
+  },
+  "58": {
+   "rank": 58,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "Active gravel truck/trailer yard with many parked trailers, cars and a small shed building; remainder is wooded edges and a grassy power-line area in the northeast.",
+   "confidence": "high"
+  },
+  "59": {
+   "rank": 59,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 60,
+   "usable_as_raw_land": "no",
+   "evidence": "Strip along the south side of a lumber yard containing stacked lumber outdoor storage on pavement, a stormwater pond and an access road; small grassy area at the east end.",
+   "confidence": "high"
+  },
+  "60": {
+   "rank": 60,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Rectangular parcel fully covered by mixed pine/hardwood forest, bordered by a rail line at the north; no structures or paving.",
+   "confidence": "high"
+  },
+  "61": {
+   "rank": 61,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "Triangle of mostly pine/hardwood woods, with a cleared grass strip running NE-SW across the north half that looks like a power-line corridor, plus a dirt track. No buildings or paving inside the line.",
+   "confidence": "medium"
+  },
+  "62": {
+   "rank": 62,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "Two separate wooded pieces between apartment complexes. The west piece takes in the south part of a pond, and the east piece is dense woods along the highway. There are no structures, but the pieces are split up and the pond takes part of the land.",
+   "confidence": "medium"
+  },
+  "63": {
+   "rank": 63,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Whole rectangle is unbroken hardwood/pine forest, with no structures, clearings or paving. An apartment complex sits just outside the south edge.",
+   "confidence": "high"
+  },
+  "64": {
+   "rank": 64,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Triangle of dense pine woods north of the interstate, crossed by one narrow linear cut (possibly a utility line). No buildings or paving.",
+   "confidence": "high"
+  },
+  "65": {
+   "rank": 65,
+   "state": "other_use",
+   "building_share_pct": 5,
+   "paved_share_pct": 20,
+   "usable_as_raw_land": "partly",
+   "evidence": "Two pieces split by a road along the rail line. They hold mown fields with rows of beds or markers that look like an urban farm or garden, an old brick building, and a gravel yard with trailers or containers in the east piece. The NE edge is treed. The land is already in some active use.",
+   "confidence": "low"
+  },
+  "66": {
+   "rank": 66,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "no",
+   "evidence": "A narrow N-S strip cuts through an active quarry: haul roads, bare rock and graded pit floor, and spoil piles. The south end is woods and touches an apartment building at the SW corner.",
+   "confidence": "high"
+  },
+  "67": {
+   "rank": 67,
+   "state": "operating_building",
+   "building_share_pct": 15,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "no",
+   "evidence": "An operating industrial building with gravel and paved truck/trailer parking all around it, with trailers and cars parked. The red ring on the roof is a small hole. Only the south tail and the edges are wooded or grass.",
+   "confidence": "high"
+  },
+  "68": {
+   "rank": 68,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 85,
+   "usable_as_raw_land": "no",
+   "evidence": "Almost the whole L-shaped parcel is a gravel truck/trailer and container storage yard, with parked trailers, containers, chassis and cars. A transmission line crosses it. Only thin treed edges are left.",
+   "confidence": "high"
+  },
+  "69": {
+   "rank": 69,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "The north part is a large gravel truck/trailer parking lot full of tractor-trailers and cars, next to the rail line. The east edge and the south tail are wooded, with a small wet area.",
+   "confidence": "high"
+  },
+  "70": {
+   "rank": 70,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly mixed woods. It has a small clearing with scattered debris or small items in the NE lobe and what looks like a house or outbuilding at the SE corner, just inside the line. A big open power-line corridor lies just outside to the SW.",
+   "confidence": "medium"
+  },
+  "71": {
+   "rank": 71,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "partly",
+   "evidence": "North lobe is a salvage/vehicle storage yard packed with cars and small sheds; middle-east is a trailer parking yard and the south part a paved car lot serving the building in the hole; a long narrow building sits in the southwest strip. Only a wooded band (~30%) in the middle/west is undeveloped and it is narrow and hemmed in.",
+   "confidence": "high"
+  },
+  "72": {
+   "rank": 72,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "No buildings or paving; north part is mature woods, the middle is young pine/scrub regrowth and the south near Roosevelt Hwy is open grass with scattered trees. A dirt track runs along the east side.",
+   "confidence": "high"
+  },
+  "73": {
+   "rank": 73,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Triangle entirely covered by deciduous/pine forest along the south side of the interstate; no buildings, roads or clearing inside the outline. No visible street access other than the freeway edge.",
+   "confidence": "high"
+  },
+  "74": {
+   "rank": 74,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "no",
+   "evidence": "The northern ~65% is bare graded fill inside an active landfill, with exposed waste, dozers and trucks at the top edge; the southern ~35% is a wooded strip next to a haul road.",
+   "confidence": "high"
+  },
+  "75": {
+   "rank": 75,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "partly",
+   "evidence": "Large stormwater pond (~20%) with a smaller basin, ringed by trees; the south part is cleared, earlier-graded ground growing back in grass, and the northeast is wooded. It sits between built warehouses and looks like leftover/detention land for the park, so only part may be buildable.",
+   "confidence": "medium"
+  },
+  "76": {
+   "rank": 76,
+   "state": "under_construction_or_graded",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "partly",
+   "evidence": "About 55% of the outline is a freshly graded bare-dirt pad that continues onto the land west of it, with rock piles and no structures; the rest is a tree buffer along the roads and a bit of road/intersection at the south tip. It looks like an active site-prep job.",
+   "confidence": "high"
+  },
+  "77": {
+   "rank": 77,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Dense mixed woods covering almost the whole corner lot at Jonesboro Rd; no buildings. Only a sliver of driveway/parking at the southern tip touches the outline.",
+   "confidence": "high"
+  },
+  "78": {
+   "rank": 78,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 8,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly wooded land: a narrow wooded slope strip along the west edge of an industrial/trailer yard, and a southern block crossed by several curving rail spurs, with a bit of gravel/cleared ground to the southeast. No buildings, but the rail lines and the narrow shape cut up the usable area.",
+   "confidence": "medium"
+  },
+  "79": {
+   "rank": 79,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 80,
+   "usable_as_raw_land": "no",
+   "evidence": "Almost the whole parcel is a gravel/paved vehicle storage yard holding hundreds of cars plus vans and buses, with a small office building near the road. Only a thin wooded strip along the north edge and a small pond area are not in use.",
+   "confidence": "high"
+  },
+  "80": {
+   "rank": 80,
+   "state": "other_use",
+   "building_share_pct": 1,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "no",
+   "evidence": "The outline covers a built automotive driving/test track: paved circuit loops with red-and-white curbing, a skid pad and a small trackside canopy, with grass infield between the loops.",
+   "confidence": "high"
+  },
+  "81": {
+   "rank": 81,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Outline wraps around (notches out) a house with a shed and yard by the road; the land inside the line is dense pine stand plus a wooded/brushy strip along the south edge.",
+   "confidence": "medium"
+  },
+  "82": {
+   "rank": 82,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Long rectangle of mixed forest with a small pond in the middle; no buildings or paving. Industrial and storage buildings to the north, mobile-home community to the south.",
+   "confidence": "high"
+  },
+  "83": {
+   "rank": 83,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Triangle beside the interstate, almost entirely forested. The north tip reaches an open power-line corridor, and a thin strip runs north-south through the parcel. No structures.",
+   "confidence": "high"
+  },
+  "84": {
+   "rank": 84,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Wooded triangle fronting Roosevelt Hwy, with an old rail or trail corridor just outside to the northwest; no buildings or paving inside.",
+   "confidence": "high"
+  },
+  "85": {
+   "rank": 85,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 18,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly hardwood and pine woods, but the south-central part is a dirt/gravel lot holding parked trailers, trucks and cars that joins the trucking terminal just south.",
+   "confidence": "high"
+  },
+  "86": {
+   "rank": 86,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Small triangle of dense pine woods between the interstate ramp and a newly built paved parking lot and pond to the east; nothing built inside.",
+   "confidence": "high"
+  },
+  "87": {
+   "rank": 87,
+   "state": "vacant_open",
+   "building_share_pct": 2,
+   "paved_share_pct": 6,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly overgrown scrub and young trees with a rail spur curving along the west edge. The north corner has a small building with vehicles/junk, and on the east edge a white-roofed shed sits next to a salvage yard that is mostly outside the line.",
+   "confidence": "medium"
+  },
+  "88": {
+   "rank": 88,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "no",
+   "evidence": "The north half is a graded landfill slope (tracked, partly grassed, with an exposed fill/debris face beside it) crossed by a haul road; the south half is woods.",
+   "confidence": "medium"
+  },
+  "89": {
+   "rank": 89,
+   "state": "partly_built",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Large open grass field and thin woods with a house, a shed and parked vehicles in the northeast part along the road. A large distribution warehouse sits just outside to the west.",
+   "confidence": "medium"
+  },
+  "90": {
+   "rank": 90,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Narrow strip running south from the highway frontage, covered by pine and hardwood woods with some brushy openings near the road; no structures or paving.",
+   "confidence": "high"
+  },
+  "91": {
+   "rank": 91,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Entire outline is mixed hardwood/pine forest with no structures, clearing or paving; trailers parked just outside the north line and road along the east edge.",
+   "confidence": "high"
+  },
+  "92": {
+   "rank": 92,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "L-shaped parcel almost entirely wooded with a small shed/debris clearing in the northern strip; the southern edge clips the rear of apartment buildings and their lot.",
+   "confidence": "medium"
+  },
+  "93": {
+   "rank": 93,
+   "state": "partly_built",
+   "building_share_pct": 0,
+   "paved_share_pct": 40,
+   "usable_as_raw_land": "partly",
+   "evidence": "Western half is an active gravel/dirt yard with rows of dump trailers, trucks and stacked equipment/material piles; eastern half is wooded.",
+   "confidence": "high"
+  },
+  "94": {
+   "rank": 94,
+   "state": "operating_building",
+   "building_share_pct": 45,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "no",
+   "evidence": "Outline covers most of a large operating warehouse/retail-type building plus its car parking and truck court on both sides; only thin landscaped strips remain.",
+   "confidence": "high"
+  },
+  "95": {
+   "rank": 95,
+   "state": "other_use",
+   "building_share_pct": 2,
+   "paved_share_pct": 12,
+   "usable_as_raw_land": "no",
+   "evidence": "Outline is mostly an active golf entertainment driving-range outfield (turf, targets, netting poles) whose building sits just south of the line; also includes a public road along the north and wooded slopes on the edges.",
+   "confidence": "high"
+  },
+  "96": {
+   "rank": 96,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Large polygon almost entirely forested between a rail line and a warehouse site; only a few manufactured homes/structures touch the southwest corner and southern edge.",
+   "confidence": "medium"
+  },
+  "97": {
+   "rank": 97,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "partly",
+   "evidence": "Two polygons mostly overgrown woods with remnant concrete slabs, foundation ruins and dirt tracks from former structures in the north part; a parking lot serving a building just outside sits along the south edge.",
+   "confidence": "medium"
+  },
+  "98": {
+   "rank": 98,
+   "state": "partly_built",
+   "building_share_pct": 5,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "partly",
+   "evidence": "Northwest portion holds an operating metal building with a large gravel truck/trailer yard and stored containers; the east and south portions are scrub and woods.",
+   "confidence": "high"
+  },
+  "99": {
+   "rank": 99,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 1,
+   "paved_share_pct": 70,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the parcel is an active log/timber storage yard with stacked log decks, equipment and dirt haul roads, plus a small paved lot at the north end; a wooded strip runs along the west edge.",
+   "confidence": "high"
+  },
+  "100": {
+   "rank": 100,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Two lobes of continuous woods with part of a small pond at the south edge; the self-storage buildings sit in an excluded notch outside the line.",
+   "confidence": "high"
+  },
+  "101": {
+   "rank": 101,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 12,
+   "usable_as_raw_land": "partly",
+   "evidence": "An irregular outline wraps around an operating plant (the plant is in a notch outside the line) and stops just north of a large warehouse. What is inside is mostly woods: a block north of the plant, a strip on the west side and a thin wedge along the rail line. The east column also holds a paved truck/parking lot and a small structure that serve the neighbouring plant.",
+   "confidence": "medium"
+  },
+  "102": {
+   "rank": 102,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 40,
+   "usable_as_raw_land": "partly",
+   "evidence": "The centre of the parcel is an operating paved trailer/container yard with about 60 trailers parked in rows and a stormwater pond at the north end. The west and south margins are wooded slopes.",
+   "confidence": "high"
+  },
+  "103": {
+   "rank": 103,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the parcel is a large active gravel truck/trailer yard with well over 100 trailers parked. The rest is a graded slope on the east side and wooded buffers along the road and the residential edge.",
+   "confidence": "high"
+  },
+  "104": {
+   "rank": 104,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 90,
+   "usable_as_raw_land": "no",
+   "evidence": "Nearly the whole parcel is a paved/concrete trailer parking yard with dozens of trailers, continuous with the truck terminal to the south. There is only a thin tree fringe on the north and west.",
+   "confidence": "high"
+  },
+  "105": {
+   "rank": 105,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 25,
+   "usable_as_raw_land": "yes",
+   "evidence": "Most of the parcel is a cleared or demolished former industrial area: bare graded ground with remnant concrete/gravel pads and a spoil pile, and no active use. A wooded strip runs along the north and a tree line along the east. The nearby buildings sit just outside the line.",
+   "confidence": "medium"
+  },
+  "106": {
+   "rank": 106,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "The parcel is almost entirely mixed pine/hardwood forest. Only the northern tip touches the gravel edge of an adjacent concrete/aggregate plant, which sits outside the line along the railroad.",
+   "confidence": "high"
+  },
+  "107": {
+   "rank": 107,
+   "state": "houses",
+   "building_share_pct": 15,
+   "paved_share_pct": 15,
+   "usable_as_raw_land": "partly",
+   "evidence": "The southern half of the parcel is an existing apartment complex: about 25 multifamily buildings with loop drives and parking. The northern half, including the narrow neck to the north, is undeveloped woods.",
+   "confidence": "high"
+  },
+  "108": {
+   "rank": 108,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The parcel is predominantly dense woods. One small house/outbuilding sits near the southwest edge close to the highway, and there may be a small structure near the top-centre notch. Neighbouring houses lie outside the line.",
+   "confidence": "high"
+  },
+  "109": {
+   "rank": 109,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "partly",
+   "evidence": "The east part of the parcel is an active gravel container/outdoor-storage yard packed with shipping containers, pipe and equipment, plus a small building. The west part is woods crossed diagonally by a cleared utility/powerline easement.",
+   "confidence": "high"
+  },
+  "110": {
+   "rank": 110,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "The parcel is mostly pine woods with an open grassy strip along the interstate and a cleared area at the east end where a transmission tower/utility structure stands. The gravel storage yard to the north is outside the line. A small separate triangle in the NE is wooded.",
+   "confidence": "medium"
+  },
+  "111": {
+   "rank": 111,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Almost entirely mixed pine/hardwood forest between the highway and the woods to the east. Only a small sliver of a gas-station/truck-stop parking lot clips the NW corner.",
+   "confidence": "high"
+  },
+  "112": {
+   "rank": 112,
+   "state": "partly_built",
+   "building_share_pct": 12,
+   "paved_share_pct": 40,
+   "usable_as_raw_land": "partly",
+   "evidence": "The western half is an operating truck terminal: a long cross-dock building, a shed and a gravel/paved yard full of parked trailers. The eastern half is wooded, with a meandering drainage/wetland swale next to houses.",
+   "confidence": "high"
+  },
+  "113": {
+   "rank": 113,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Dense forest, with a wet creek/pond area along the southern edge. A house at the north tip may just touch the line, and apartments sit just outside to the south.",
+   "confidence": "medium"
+  },
+  "114": {
+   "rank": 114,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "Wooded patches crossed by several cleared transmission-line corridors with towers, dirt tracks and a creek channel. A substation is just north, and the parcel's top edge takes in a road strip. Utility easements look like they cover a large share of the parcel.",
+   "confidence": "medium"
+  },
+  "115": {
+   "rank": 115,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly forest, with a muddy pond, a small clearing/field and one small structure or shed near the centre. A container yard sits just outside the south line and a dirt quarry-like area outside the east.",
+   "confidence": "medium"
+  },
+  "116": {
+   "rank": 116,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly cut-over woods, crossed by a dirt haul road. The southern part takes in the edge of a large graded dirt pad and a small cleared patch. The NE tip touches an industrial pipe/storage yard and possibly a small shed.",
+   "confidence": "medium"
+  },
+  "117": {
+   "rank": 117,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "partly",
+   "evidence": "The western ~45% is a strip of pine forest along the road. The eastern part is landfill: a grassed capped slope, a perimeter haul road and the edge of the active fill area.",
+   "confidence": "medium"
+  },
+  "118": {
+   "rank": 118,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "A narrow strip of continuous hardwood/pine woods, inside a larger wooded tract between a retail centre and the road/rail line. No structures or paving.",
+   "confidence": "high"
+  },
+  "119": {
+   "rank": 119,
+   "state": "houses",
+   "building_share_pct": 35,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "no",
+   "evidence": "Fully built-out apartment complex: many multi-unit residential buildings with internal drives and parking lots, beside the interstate interchange.",
+   "confidence": "high"
+  },
+  "120": {
+   "rank": 120,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "partly",
+   "evidence": "The southeast ~55% is woods with a dirt track. The north-central part takes in the paved lot of a neighbouring fleet/vehicle storage yard, with buses and vans parked on it. The west lobe on Metropolitan Pkwy is a small cleared/partly treed lot.",
+   "confidence": "medium"
+  },
+  "121": {
+   "rank": 121,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Entire outline is dense pine and hardwood forest fronting the highway and a side road; no structures, clearing or paving inside. Subdivision houses lie just outside to the NW.",
+   "confidence": "high"
+  },
+  "122": {
+   "rank": 122,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 25,
+   "usable_as_raw_land": "partly",
+   "evidence": "Northern and eastern parts are wooded, but the southern part holds an active gravel vehicle storage yard packed with cars and buses, plus a bare gravel pad next to it, along the rail line.",
+   "confidence": "medium"
+  },
+  "123": {
+   "rank": 123,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly wooded, with a cleared dirt strip through the middle. A house/shed with yard clutter sits in the NE corner of the top strip, and small structures and debris sit in the SE lobe by the highway. The roadside houses lie in notches outside the line.",
+   "confidence": "medium"
+  },
+  "124": {
+   "rank": 124,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 8,
+   "usable_as_raw_land": "yes",
+   "evidence": "Wooded tract with an old concrete/gravel drive and pad on the west side and dirt tracks. No buildings; a pond/sediment basin is just outside to the north.",
+   "confidence": "medium"
+  },
+  "125": {
+   "rank": 125,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Largely wooded. A small house or ruin with a cleared yard and debris sits in the centre, and what look like two small houses sit along the western road edge inside the line. Subdivisions border it north and south.",
+   "confidence": "medium"
+  },
+  "126": {
+   "rank": 126,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 50,
+   "usable_as_raw_land": "partly",
+   "evidence": "The eastern half is an active paved truck entrance with a guard canopy and rows of parked trailers serving the adjacent distribution centre; the western strip and SW portion are wooded buffer.",
+   "confidence": "high"
+  },
+  "127": {
+   "rank": 127,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Entire rectangle is mixed pine/hardwood forest, with a cleared dirt track/easement along the north edge by the highway. No structures.",
+   "confidence": "high"
+  },
+  "128": {
+   "rank": 128,
+   "state": "vacant_open",
+   "building_share_pct": 3,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "yes",
+   "evidence": "A demolished former commercial/big-box site: a bare slab, rubble piles, scraped ground and old cracked asphalt parking with no active use. A wooded buffer runs on the north and west edges, and a small existing building sits at the NE notch edge.",
+   "confidence": "medium"
+  },
+  "129": {
+   "rank": 129,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Wooded tract with some open grassy patches and a small pond at the south edge, between a rural road and the interstate. No structures or paving.",
+   "confidence": "high"
+  },
+  "130": {
+   "rank": 130,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "The eastern ~85% is continuous forest. The western end near the road holds about three houses with driveways and cleared yards.",
+   "confidence": "medium"
+  },
+  "131": {
+   "rank": 131,
+   "state": "partly_built",
+   "building_share_pct": 2,
+   "paved_share_pct": 15,
+   "usable_as_raw_land": "partly",
+   "evidence": "Most of the outline is overgrown scrub and brush on hummocky, disturbed ground that may be old fill, plus some tree clumps. The south strip holds trailers, containers and stored material from the adjacent salvage/industrial yard, building edges touch the south line, and a public road runs along the north edge inside the outline.",
+   "confidence": "medium"
+  },
+  "132": {
+   "rank": 132,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 75,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the parcel is a gravel lot packed with parked vehicles, apparently vehicle storage or an auction lot. The south end is graded dirt with construction equipment, and only thin planted or wooded buffers remain along the edges.",
+   "confidence": "high"
+  },
+  "133": {
+   "rank": 133,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "partly",
+   "evidence": "The west and north parts are gravel yard with stacked materials, pipe and trailers belonging to the industrial plant, which clips the northwest line, and the south edge takes in part of a truck/trailer yard. The east third is a wooded strip with some open grass in the middle.",
+   "confidence": "medium"
+  },
+  "134": {
+   "rank": 134,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Almost the whole outline is mixed deciduous and pine woods with no structures inside. A small triangle north of the road may clip a house at its top edge.",
+   "confidence": "high"
+  },
+  "135": {
+   "rank": 135,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly wooded, with a cleared grass strip along the northwest side carrying a power-line tower. There is one small shed/building and some dirt clearing at the north tip.",
+   "confidence": "high"
+  },
+  "136": {
+   "rank": 136,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "A dense pine stand fills almost the entire outline. A sliver along the southwest line borders, and may slightly include, a trailer parking area of the warehouse next door.",
+   "confidence": "high"
+  },
+  "137": {
+   "rank": 137,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 75,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the parcel is a paved trailer-parking yard full of semi trailers, plus part of a warehouse access drive and car parking along the west side. Only a wooded buffer strip remains.",
+   "confidence": "high"
+  },
+  "138": {
+   "rank": 138,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The rectangular outline is fully wooded with mixed hardwoods and pines, with no structures, paving or clearing visible.",
+   "confidence": "high"
+  },
+  "139": {
+   "rank": 139,
+   "state": "partly_built",
+   "building_share_pct": 3,
+   "paved_share_pct": 25,
+   "usable_as_raw_land": "partly",
+   "evidence": "The northeast portion takes in a gravel truck/equipment yard with parked trucks, trailers and vehicles and a metal building at the east corner. The southwest half or more is wooded.",
+   "confidence": "medium"
+  },
+  "140": {
+   "rank": 140,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The whole outline is wooded with pines and hardwoods and has no structures. Houses lie just outside to the south and southeast.",
+   "confidence": "high"
+  },
+  "141": {
+   "rank": 141,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Almost entirely mixed pine/hardwood forest. One small house with yard and driveway sits in the northwest corner on the road frontage.",
+   "confidence": "high"
+  },
+  "142": {
+   "rank": 142,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Fully wooded with dense pine and hardwood, plus one small grassy clearing near the north-centre. No structures or paving. A townhome subdivision borders it on the north and west, and the interstate is to the southeast.",
+   "confidence": "high"
+  },
+  "143": {
+   "rank": 143,
+   "state": "houses",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "A long narrow lot with one large house, a concrete driveway and a cleared yard in the middle. The rest is wooded on both the road end and the deep south end.",
+   "confidence": "high"
+  },
+  "144": {
+   "rank": 144,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "Wooded land cut diagonally by a cleared power-line easement with tower footings, about 15% of the parcel. There are no buildings. A cleared or graded neighbouring site sits just outside the east edge.",
+   "confidence": "high"
+  },
+  "145": {
+   "rank": 145,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "yes",
+   "evidence": "Dense forest with no structures. The southern strip of the outline takes in the paved lanes of the adjacent multi-lane road (right-of-way). There is new construction just west of the line.",
+   "confidence": "high"
+  },
+  "146": {
+   "rank": 146,
+   "state": "partly_built",
+   "building_share_pct": 12,
+   "paved_share_pct": 22,
+   "usable_as_raw_land": "partly",
+   "evidence": "A newly built large warehouse with a truck court, a car park and a ring drive in the southwest, plus a big new concrete pad or trailer lot in the north. There is a smaller paved pad on the east and graded detention areas. The eastern third is still wooded.",
+   "confidence": "high"
+  },
+  "147": {
+   "rank": 147,
+   "state": "operating_building",
+   "building_share_pct": 60,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "no",
+   "evidence": "Fully developed with a large courtyard building on the west, a parking deck in the middle and a multi-storey building with a rooftop pool on the east. A small hole on the east building's roof cuts out part of the same structure.",
+   "confidence": "high"
+  },
+  "148": {
+   "rank": 148,
+   "state": "other_use",
+   "building_share_pct": 15,
+   "paved_share_pct": 75,
+   "usable_as_raw_land": "no",
+   "evidence": "A fenced utility, telecom or substation compound on a gravel yard, with a lattice tower (the tower and its shadow), equipment shelters and a long equipment building. The image is zoomed so far that the 200 ft bar spans almost the whole frame, so the outlined area looks to be under 1 ac, which does not match the 9.8 ac on the tax roll.",
+   "confidence": "medium"
+  },
+  "149": {
+   "rank": 149,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly wooded. A hole in the centre cuts out a small structure, and a small shed or vehicles sit just outside it with a dirt track to the southeast edge. There is no other development, and a large vehicle storage lot lies north of the line.",
+   "confidence": "high"
+  },
+  "150": {
+   "rank": 150,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Fully forested infill parcel between existing warehouses to the north and south, fronting a curved road on the east. The northern edge just touches the neighbouring warehouse car park strip.",
+   "confidence": "high"
+  },
+  "151": {
+   "rank": 151,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Outline is entirely mixed pine/hardwood forest with what looks like a drainage line through the middle; no structures or paving inside. The farmstead buildings sit just outside the southern notch.",
+   "confidence": "high"
+  },
+  "152": {
+   "rank": 152,
+   "state": "unclear",
+   "building_share_pct": 5,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "unclear",
+   "evidence": "Imagery is blacked out for roughly the southern three-quarters of the outline. The visible northern strip shows apartment buildings, a pool, parking and drives inside the line, so it may be part of an apartment complex.",
+   "confidence": "low"
+  },
+  "153": {
+   "rank": 153,
+   "state": "partly_built",
+   "building_share_pct": 0,
+   "paved_share_pct": 25,
+   "usable_as_raw_land": "partly",
+   "evidence": "The eastern quarter is a large striped surface parking lot with islands. The north/northwest is wooded, and the middle/south is an open mowed grass field with a gravel/dirt track along the south edge. There are no buildings.",
+   "confidence": "high"
+  },
+  "154": {
+   "rank": 154,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The rectangle is fully covered in deciduous/pine woods with no structures or paving. Commercial buildings and apartments are just outside to the north and south.",
+   "confidence": "high"
+  },
+  "155": {
+   "rank": 155,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "A narrow wedge of woods between the interstate and a residential road. At the southern end there is one small house with a cleared yard inside the line, and the northern part is a very thin sliver.",
+   "confidence": "medium"
+  },
+  "156": {
+   "rank": 156,
+   "state": "operating_building",
+   "building_share_pct": 35,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "no",
+   "evidence": "A large operating warehouse/distribution building with extensive car parking lots, drives and a guard/entry area fill most of the outline. Only tree buffers along the edges are unbuilt.",
+   "confidence": "high"
+  },
+  "157": {
+   "rank": 157,
+   "state": "under_construction_or_graded",
+   "building_share_pct": 1,
+   "paved_share_pct": 8,
+   "usable_as_raw_land": "partly",
+   "evidence": "Most of the outline is bare excavated/graded earth with haul tracks, vehicles, debris/rock piles and a small shed, so it looks like an active dirt pit or grading site. The southern edge holds stored trailers/chassis belonging to the container yard next door.",
+   "confidence": "medium"
+  },
+  "158": {
+   "rank": 158,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The outline is entirely forested. Only a dirt/gravel track crosses the northwest corner, and there are no structures.",
+   "confidence": "high"
+  },
+  "159": {
+   "rank": 159,
+   "state": "vacant_open",
+   "building_share_pct": 1,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly open pasture/grass with a central stand of trees and a small shed among them. The two houses sit in hole cut-outs that are excluded from the parcel.",
+   "confidence": "medium"
+  },
+  "160": {
+   "rank": 160,
+   "state": "partly_built",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly open pasture and tree clumps, but the southeast part holds an occupied homestead: a house with a drive, a barn/outbuildings, a riding ring and a pond. It is a rural residential/horse property rather than clean raw land.",
+   "confidence": "medium"
+  },
+  "161": {
+   "rank": 161,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "Long strip from the west road to the SE road, almost all woods and scrubby clearing between a strip shopping centre (NE, outside) and a warehouse (S, outside). A small house or shed sits on the line near the north tip.",
+   "confidence": "medium"
+  },
+  "162": {
+   "rank": 162,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 5,
+   "paved_share_pct": 60,
+   "usable_as_raw_land": "no",
+   "evidence": "Mostly a paved trailer-parking yard with dozens of semi trailers, ringed by a tree buffer. Part of a long building on the south edge falls inside the line.",
+   "confidence": "high"
+  },
+  "163": {
+   "rank": 163,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 50,
+   "usable_as_raw_land": "partly",
+   "evidence": "The eastern half is an auto-salvage yard: rows of stored cars on a gravel/dirt pad, with the operating building at the south edge. The western third to half is wooded.",
+   "confidence": "high"
+  },
+  "164": {
+   "rank": 164,
+   "state": "vacant_open",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "Rural estate land: pasture, woods, a large pond with a paved loop path, a small farm compound with sheds in the west and outbuildings near the main house. The main house is in an excluded hole.",
+   "confidence": "medium"
+  },
+  "165": {
+   "rank": 165,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Almost entirely dense woods. The narrow top strip takes in part of an apartment complex: one building, the clubhouse and its parking row.",
+   "confidence": "high"
+  },
+  "166": {
+   "rank": 166,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Open grass with paths, two ponds/lakes covering roughly a quarter to a third of the parcel, and woods to the southeast, between residential subdivisions. Looks like former golf/common open space.",
+   "confidence": "medium"
+  },
+  "167": {
+   "rank": 167,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly continuous woods crossed by a narrow paved path or road loop. A small jog on the west edge takes in a tennis-court style amenity next to a subdivision.",
+   "confidence": "high"
+  },
+  "168": {
+   "rank": 168,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Essentially all wooded, with no structures inside. An office building and its parking sit just outside the south edge, and at most a sliver touches the line.",
+   "confidence": "high"
+  },
+  "169": {
+   "rank": 169,
+   "state": "vacant_open",
+   "building_share_pct": 3,
+   "paved_share_pct": 12,
+   "usable_as_raw_land": "yes",
+   "evidence": "Urban cleared site: bare dirt, scattered trees, and leftover pavement from old internal streets and parking pads. There are a couple of small buildings at the NE corner and a low building along the edge of the hole. The industrial complex in the south is an excluded hole.",
+   "confidence": "medium"
+  },
+  "170": {
+   "rank": 170,
+   "state": "vacant_open",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "A cleared transmission-line corridor with towers runs through open field and woods. There is one small building near the north road frontage, and the houses at the north jog are outside the line.",
+   "confidence": "medium"
+  },
+  "171": {
+   "rank": 171,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline is a paved trailer and chassis parking yard full of trailers, with employee or vehicle parking on its east side. There are stormwater ponds along the south and east edges and a wooded strip at the southern tip.",
+   "confidence": "high"
+  },
+  "172": {
+   "rank": 172,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The whole outline is unbroken pine and hardwood forest with no structures or paving, between I-85 on the south and wooded land to the north.",
+   "confidence": "high"
+  },
+  "173": {
+   "rank": 173,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "The large western block is undeveloped forest, with a thinner cleared or regrowth patch and a trail. A small warehouse with its paving sits inside an inner red ring (a hole, not part of this parcel). A narrow strip runs southeast between two large warehouses to the main road and looks like a driveway or access strip.",
+   "confidence": "medium"
+  },
+  "174": {
+   "rank": 174,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "A long, narrow wedge of woods along the road. Near the south end it includes a cleared dirt patch on the edge of a demolished, graded industrial site to the east. The thin shape limits what could be built here.",
+   "confidence": "medium"
+  },
+  "175": {
+   "rank": 175,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 85,
+   "usable_as_raw_land": "no",
+   "evidence": "A gravel or paved yard filled with parked trucks, trailers and cars, with a couple of small sheds and a parking strip at the south end. A highway overpass crosses the northeast corner.",
+   "confidence": "high"
+  },
+  "176": {
+   "rank": 176,
+   "state": "operating_building",
+   "building_share_pct": 45,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "no",
+   "evidence": "An operating office building with a large parking deck that has solar panels on its roof, plus surface parking lots and driveways. The landscaped southern part runs along the road curve.",
+   "confidence": "high"
+  },
+  "177": {
+   "rank": 177,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "An irregular parcel that is mostly forest, with a narrow wooded arm to the west and an open grassy lobe at the southeast road corner. Houses line the northeast boundary along the road and mostly look to be just outside it, but one or two structures near the line in the southeast lobe may fall inside.",
+   "confidence": "medium"
+  },
+  "178": {
+   "rank": 178,
+   "state": "operating_building",
+   "building_share_pct": 55,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "no",
+   "evidence": "A large hospital or medical campus: several connected buildings, a helipad, a parking garage, surface parking and service drives fill the outline.",
+   "confidence": "high"
+  },
+  "179": {
+   "rank": 179,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The whole outline is forest with a faint trail, south of a highway. Apartment buildings sit just outside the southern line. The image is blacked out below the parcel, but the outline itself is fully visible.",
+   "confidence": "high"
+  },
+  "180": {
+   "rank": 180,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 75,
+   "usable_as_raw_land": "no",
+   "evidence": "A salvage or auto-storage yard on gravel, packed with hundreds of cars, trucks and trailers, with a few small buildings. Only the north frontage and the wooded southern edge are not in use.",
+   "confidence": "high"
+  },
+  "181": {
+   "rank": 181,
+   "state": "under_construction_or_graded",
+   "building_share_pct": 3,
+   "paved_share_pct": 40,
+   "usable_as_raw_land": "partly",
+   "evidence": "Northern two-thirds is cleared, graded red dirt and gravel with debris piles, heavy equipment and four small metal buildings, which looks like a contractor/demolition yard or site prep. The southern third is wooded.",
+   "confidence": "medium"
+  },
+  "182": {
+   "rank": 182,
+   "state": "houses",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "One single-family house with a lawn in the north part. The rest is trees and grass, and a local road crosses near the south edge.",
+   "confidence": "high"
+  },
+  "183": {
+   "rank": 183,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 3,
+   "paved_share_pct": 22,
+   "usable_as_raw_land": "partly",
+   "evidence": "An operating auto salvage yard (hundreds of cars, gravel yard, shop buildings, access drive) fills the centre-west. The remainder is wooded hillside and open grass.",
+   "confidence": "high"
+  },
+  "184": {
+   "rank": 184,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 6,
+   "usable_as_raw_land": "yes",
+   "evidence": "Long narrow strip that is almost entirely wooded. A sliver of a neighbouring trailer/container yard sits at the north tip, and the south end crosses the highway and railroad right-of-way.",
+   "confidence": "medium"
+  },
+  "185": {
+   "rank": 185,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "yes",
+   "evidence": "Open grass field with a power-line easement and a trail crossing it, a pond, stands of pines, and wooded land in the south. No buildings inside the outline apart from the small hole.",
+   "confidence": "high"
+  },
+  "186": {
+   "rank": 186,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 4,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly wooded, with a gravel/dirt road running north-south through it and dirt trails. A possible single house sits in the southwest strip.",
+   "confidence": "medium"
+  },
+  "187": {
+   "rank": 187,
+   "state": "other_use",
+   "building_share_pct": 10,
+   "paved_share_pct": 30,
+   "usable_as_raw_land": "no",
+   "evidence": "Common area of an existing townhome/apartment complex: internal roads, parking and landscaping around the building footprints, which are cut out as holes, plus an amenity area.",
+   "confidence": "high"
+  },
+  "188": {
+   "rank": 188,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly dense woods. Near the southwest edge, a corner of a neighbouring commercial building and its concrete pad with a shed fall inside the line.",
+   "confidence": "medium"
+  },
+  "189": {
+   "rank": 189,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "no",
+   "evidence": "Paved truck/trailer parking lot full of trailers and chassis, with landscaped grass strips around it.",
+   "confidence": "high"
+  },
+  "190": {
+   "rank": 190,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "partly",
+   "evidence": "The southern half is a gravel yard storing shipping containers and trailers. The northern part is wooded.",
+   "confidence": "high"
+  },
+  "191": {
+   "rank": 191,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly an open grassed/hay field with a wooded strip and trees along the south and southeast; a rural road crosses the northern edge of the outline. No buildings inside.",
+   "confidence": "high"
+  },
+  "192": {
+   "rank": 192,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Fully wooded mixed pine/hardwood lot fronting a road on the west; the townhomes are just outside the south line. No structures or paving inside.",
+   "confidence": "high"
+  },
+  "193": {
+   "rank": 193,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 4,
+   "usable_as_raw_land": "yes",
+   "evidence": "Main piece is a long, narrow wooded strip south of a rail line. A small separate triangle north of the tracks takes in the edge of a gravel storage yard and some trees. Usable, but the strip is narrow (about 150 ft wide).",
+   "confidence": "medium"
+  },
+  "194": {
+   "rank": 194,
+   "state": "houses",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly wooded, with one occupied house in a small clearing near the middle, plus a dirt drive and parked vehicles. The rest is woods and brush, next to subdivisions.",
+   "confidence": "medium"
+  },
+  "195": {
+   "rank": 195,
+   "state": "other_use",
+   "building_share_pct": 20,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "no",
+   "evidence": "An irregular polygon that takes in a multi-level parking deck, internal roads and sections of a paved driving/test track. The hole holds an operating building and its parking lot. The vacant dirt lot nearby lies outside the line.",
+   "confidence": "medium"
+  },
+  "196": {
+   "rank": 196,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 65,
+   "usable_as_raw_land": "no",
+   "evidence": "Most of the outline is a paved lot densely filled with stored vehicles, serving a warehouse just west of the line. The north end is an outdoor storage/salvage yard, and a wooded slope runs along the east edge by the interchange.",
+   "confidence": "high"
+  },
+  "197": {
+   "rank": 197,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 12,
+   "usable_as_raw_land": "yes",
+   "evidence": "Cleared, disturbed land with scrub and grass, dirt tracks and a gravel pad in the southeast. It lies between an existing warehouse to the north and an active grading site to the south. No buildings; the small eastern sliver is wooded.",
+   "confidence": "medium"
+  },
+  "198": {
+   "rank": 198,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Wooded strip running from a highway at the south tip toward the north; a truck/trailer yard sits just outside the northeast line. A small piece of road right-of-way is at the southern tip.",
+   "confidence": "high"
+  },
+  "199": {
+   "rank": 199,
+   "state": "other_use",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "no",
+   "evidence": "The outline cuts through an active landfill (exposed fill, haul roads, working-face equipment, capped slopes) and a sediment pond, with woods at the north end. A narrow strip runs south across the highway.",
+   "confidence": "high"
+  },
+  "200": {
+   "rank": 200,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 12,
+   "usable_as_raw_land": "partly",
+   "evidence": "Triangular wooded parcel with a cleared power-line easement along the west edge. The southern part takes in the lanes of a divided highway.",
+   "confidence": "medium"
+  },
+  "201": {
+   "rank": 201,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The outline contains only continuous mixed hardwood and pine forest, with a dirt track along the north edge. There are no structures or paving inside; the houses and apartments are outside the line.",
+   "confidence": "high"
+  },
+  "202": {
+   "rank": 202,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "A long, narrow strip of continuous woodland sits between an industrial park to the west and a residential street to the east. There are no buildings, clearing or paving inside the line.",
+   "confidence": "high"
+  },
+  "203": {
+   "rank": 203,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "An irregular L-shaped parcel that is almost entirely dense forest, lying between large distribution warehouses. A thin arm on the north reaches toward a gravel storage yard, and the south edge takes in a little road and parking-lot edge. There are no buildings inside.",
+   "confidence": "medium"
+  },
+  "204": {
+   "rank": 204,
+   "state": "vacant_open",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly cleared grassland and scrub with a dirt track and what looks like a power-line corridor running diagonally across it. The southeast part is wooded. The northeast edge clips the backs of a few subdivision lots and possibly one or two houses.",
+   "confidence": "medium"
+  },
+  "205": {
+   "rank": 205,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Mostly continuous woodland behind a row of houses. A dark linear band, possibly a utility corridor, crosses the southwest part. Some debris or blue items sit at the edge near the residential notch, but there are no buildings inside.",
+   "confidence": "medium"
+  },
+  "206": {
+   "rank": 206,
+   "state": "operating_building",
+   "building_share_pct": 15,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "no",
+   "evidence": "A large commercial building and a second smaller building sit within extensive parking lots holding hundreds of cars and a row of vans or trucks, which looks like a dealership or fleet lot. Only the perimeter tree buffer is undeveloped.",
+   "confidence": "high"
+  },
+  "207": {
+   "rank": 207,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Dense pine forest plus a grassy strip along the interstate right-of-way edge. There are no structures or paving inside; the gas station and buildings to the west are outside the line.",
+   "confidence": "high"
+  },
+  "208": {
+   "rank": 208,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Continuous forest whose south boundary wraps around a large pond, which is excluded. A small clearing or trail sits near the pond. There are no buildings or paving, though steep or wet ground near the pond is possible.",
+   "confidence": "medium"
+  },
+  "209": {
+   "rank": 209,
+   "state": "partly_built",
+   "building_share_pct": 0,
+   "paved_share_pct": 28,
+   "usable_as_raw_land": "partly",
+   "evidence": "A large, nearly empty paved parking lot covers roughly a quarter to a third of the parcel. The rest is scrub, young trees, a gravel loop drive, a small pond and wooded buffers next to the townhomes.",
+   "confidence": "medium"
+  },
+  "210": {
+   "rank": 210,
+   "state": "vacant_open",
+   "building_share_pct": 2,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Open farmland with plowed crop or nursery rows, a central pond of roughly 8% of the area, dirt work areas, and a barn and shed near the east end. A house in the inner red ring is excluded. A wooded strip runs along the north edge.",
+   "confidence": "medium"
+  },
+  "211": {
+   "rank": 211,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The outlined strip is continuous woods. The houses along the street to the north sit just outside the line, and the lakes are south of the parcel.",
+   "confidence": "high"
+  },
+  "212": {
+   "rank": 212,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Inside the line: woods in the west, grass and scrub in the middle, and a pine stand in the east. The office building with its parking lot and the church to the east are cut out by the boundary notches, so they are not part of the parcel.",
+   "confidence": "medium"
+  },
+  "213": {
+   "rank": 213,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly mixed pine and hardwood forest. One or two houses with a driveway sit at the north edge, and there is a small cabin with a dirt track in the south-central section.",
+   "confidence": "medium"
+  },
+  "214": {
+   "rank": 214,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "yes",
+   "evidence": "Nearly all of it is wooded (pines in the west, hardwood in the rest). The only exception is a thin sliver of a neighbouring gravel trailer yard that touches the southern boundary.",
+   "confidence": "high"
+  },
+  "215": {
+   "rank": 215,
+   "state": "unclear",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "unclear",
+   "evidence": "The image is entirely black apart from the red outline, so there is no imagery to judge.",
+   "confidence": "low"
+  },
+  "216": {
+   "rank": 216,
+   "state": "houses",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "A single house with an outbuilding, a loop driveway and parked vehicles in a wooded lot. There is an open mowed field in the north-east part. The rest is woods.",
+   "confidence": "high"
+  },
+  "217": {
+   "rank": 217,
+   "state": "houses",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "Two pieces split by a gravel road. The east piece has one house with a driveway near its north-west corner, and the rest is woods and brush. The west piece is wooded.",
+   "confidence": "medium"
+  },
+  "218": {
+   "rank": 218,
+   "state": "houses",
+   "building_share_pct": 3,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "A house with two large outbuildings (barn or shop) and a cleared yard in the middle of the parcel. The remaining area is pine and hardwood woods.",
+   "confidence": "high"
+  },
+  "219": {
+   "rank": 219,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The outlined area is fully wooded, with some scrub. The apartment parking to the north and the office lot to the south-east are both outside the line.",
+   "confidence": "high"
+  },
+  "220": {
+   "rank": 220,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "A gravel trailer yard with dozens of trailers parked around its edge, and part of the access drive to the warehouse next door. Tree buffers are the only unpaved area.",
+   "confidence": "high"
+  },
+  "221": {
+   "rank": 221,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Whole outline is mixed hardwood/pine woods with no buildings or paving; a small square clearing near the south edge may be an old foundation or pad. The house in the southern notch sits outside the line, and houses surround the parcel.",
+   "confidence": "high"
+  },
+  "222": {
+   "rank": 222,
+   "state": "partly_built",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "An occupied rural homesite fills the southeast part: a house, a white-roofed outbuilding, a long gravel/paved driveway from the road, lawn and some debris or sheds to the north. The west half and the northern area are wooded.",
+   "confidence": "high"
+  },
+  "223": {
+   "rank": 223,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Long rectangle of dense woods along the highway. At the very south edge, two small buildings and their parking straddle the line, belonging to a commercial or salvage lot just south. Otherwise undeveloped.",
+   "confidence": "medium"
+  },
+  "224": {
+   "rank": 224,
+   "state": "partly_built",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Long east-west strip that is almost all woods, with one house and a small clearing near the east end close to the highway frontage. The church or office building and parking lot to the north are outside the line.",
+   "confidence": "medium"
+  },
+  "225": {
+   "rank": 225,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Very narrow north-south strip of woods with a dirt trail and a possible small shed near the north end. A small separate piece at the top is a bare dirt clearing next to a cemetery. The building at the south end is just outside the line.",
+   "confidence": "medium"
+  },
+  "226": {
+   "rank": 226,
+   "state": "vacant_wooded",
+   "building_share_pct": 1,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "partly",
+   "evidence": "Leftover land around a new townhome subdivision: a wooded ravine and slope strip on the west, then a graded dirt band with power lines across the middle-south (utility corridor or disturbed ground, with construction equipment near the SE notch) and woods along the south. The townhomes are just east of the line.",
+   "confidence": "medium"
+  },
+  "227": {
+   "rank": 227,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 45,
+   "usable_as_raw_land": "partly",
+   "evidence": "The NE half is part of an active gravel truck/trailer parking yard full of trailers and vehicles, and includes a graded bare pad (possibly a pond or pad) in the north corner. The SW half, toward the highway, is woods.",
+   "confidence": "high"
+  },
+  "228": {
+   "rank": 228,
+   "state": "partly_built",
+   "building_share_pct": 2,
+   "paved_share_pct": 2,
+   "usable_as_raw_land": "partly",
+   "evidence": "Mostly woods and brush, with a metal-roof building, a small shed and dirt drives near the west road frontage, plus another small structure in the north-central area. It looks like a rural homesite or junk storage, and the rest is undeveloped.",
+   "confidence": "medium"
+  },
+  "229": {
+   "rank": 229,
+   "state": "partly_built",
+   "building_share_pct": 1,
+   "paved_share_pct": 1,
+   "usable_as_raw_land": "partly",
+   "evidence": "Large parcel: the north two-thirds is woods with a dirt track loop, and the south-center is open pasture or hay field across the road. A narrow east strip holds a rural house, a white outbuilding and a driveway, and the hole cuts out another house. The warehouse and pond to the north are outside.",
+   "confidence": "medium"
+  },
+  "230": {
+   "rank": 230,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Whole outline is woods with a small pond in the center (possible wet area). There are no buildings or paving, and the houses to the north are outside the line.",
+   "confidence": "high"
+  },
+  "231": {
+   "rank": 231,
+   "state": "other_use",
+   "building_share_pct": 25,
+   "paved_share_pct": 40,
+   "usable_as_raw_land": "no",
+   "evidence": "The outline holds an operating apartment complex: several multi-unit residential buildings with parking lots and drives. The north tip runs onto the interstate lanes. The wooded block to the south is outside the line.",
+   "confidence": "high"
+  },
+  "232": {
+   "rank": 232,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The parcel is solid pine and hardwood forest with no structures or paving. Houses at the south edge sit just outside the line.",
+   "confidence": "high"
+  },
+  "233": {
+   "rank": 233,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "Most of the parcel is dense forest between a road and residential subdivisions. The edge of a townhouse row may touch the southwest line, and the top tip takes in some road right-of-way.",
+   "confidence": "high"
+  },
+  "234": {
+   "rank": 234,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "This is a long wooded rectangle, mixed pine and hardwood, crossed by a dirt trail and a thin tree line. There are no buildings inside it. Houses line the road just south of the line.",
+   "confidence": "high"
+  },
+  "235": {
+   "rank": 235,
+   "state": "vacant_wooded",
+   "building_share_pct": 2,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "Most of the parcel is forest. A cleared power-line corridor runs along the southwest edge. The north line runs along the back of a large warehouse, so it may take in a thin sliver of that building, but the warehouse is otherwise outside.",
+   "confidence": "high"
+  },
+  "236": {
+   "rank": 236,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "This is a narrow wooded strip between the highway and a large distribution warehouse to the south. It has no structures, but its sliver shape limits what could be built.",
+   "confidence": "high"
+  },
+  "237": {
+   "rank": 237,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "This is a triangular hardwood-forest parcel alongside the interstate, with no structures or paving.",
+   "confidence": "high"
+  },
+  "238": {
+   "rank": 238,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 2,
+   "paved_share_pct": 55,
+   "usable_as_raw_land": "no",
+   "evidence": "The northern two-thirds is a paved truck/trailer yard with rows of parked trailers, car parking and a small guard building. The south part is grass and a cleared power-line easement.",
+   "confidence": "high"
+  },
+  "239": {
+   "rank": 239,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "partly",
+   "evidence": "The parcel is an irregular ring of woods plus open grass that looks like former golf fairways. The holes exclude a housing subdivision, and the parcel wraps around homes on several sides. There are no buildings inside.",
+   "confidence": "medium"
+  },
+  "240": {
+   "rank": 240,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "This is a fully wooded rectangle between a parkway and the interstate, with no structures or paving. A distribution warehouse is across the road to the northwest.",
+   "confidence": "high"
+  },
+  "241": {
+   "rank": 241,
+   "state": "unclear",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "unclear",
+   "evidence": "The image is completely black apart from the red outline and scale bar, so there is no orthophoto to judge.",
+   "confidence": "low"
+  },
+  "242": {
+   "rank": 242,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 0,
+   "usable_as_raw_land": "yes",
+   "evidence": "The whole outline is unbroken mixed pine and hardwood forest between the interstate on the north and a subdivision to the east. There are no structures or paving.",
+   "confidence": "high"
+  },
+  "243": {
+   "rank": 243,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "yes",
+   "evidence": "Most of the parcel is dense forest north of Roosevelt Hwy. A strip of the highway right-of-way runs inside the southern part of the outline. The gas station on the west corner sits inside a hole, so it is excluded.",
+   "confidence": "high"
+  },
+  "244": {
+   "rank": 244,
+   "state": "houses",
+   "building_share_pct": 25,
+   "paved_share_pct": 35,
+   "usable_as_raw_land": "no",
+   "evidence": "This is a built townhome/apartment community. The many holes are the building footprints, and the parcel itself is the internal streets, parking, lawns and a clubhouse area. A wooded ravine strip in the middle is the only undeveloped part.",
+   "confidence": "high"
+  },
+  "245": {
+   "rank": 245,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 3,
+   "usable_as_raw_land": "yes",
+   "evidence": "The parcel is wooded with no buildings. There is a small clearing next to the house outside the notch, and a short stretch of Flat Shoals Rd is at the southern tip.",
+   "confidence": "high"
+  },
+  "246": {
+   "rank": 246,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "yes",
+   "evidence": "Dense pine forest covers the whole outline. The only paving is the Flat Shoals Rd lanes along the southern edge, and there are no structures.",
+   "confidence": "high"
+  },
+  "247": {
+   "rank": 247,
+   "state": "vacant_open",
+   "building_share_pct": 0,
+   "paved_share_pct": 10,
+   "usable_as_raw_land": "yes",
+   "evidence": "Most of the parcel is an open grassed field that looks previously cleared or graded, with small ponds at the north end and the southeast. Access roads run along the west edge and south end, and a strip of woods lies on the east side. There are no buildings.",
+   "confidence": "high"
+  },
+  "248": {
+   "rank": 248,
+   "state": "paved_yard_or_storage",
+   "building_share_pct": 0,
+   "paved_share_pct": 85,
+   "usable_as_raw_land": "no",
+   "evidence": "Nearly the whole outline is an active gravel truck and trailer parking yard with dozens of tractors, trailers and cars. The rest is a wooded fringe on the north and the road frontage on the south.",
+   "confidence": "high"
+  },
+  "249": {
+   "rank": 249,
+   "state": "vacant_wooded",
+   "building_share_pct": 0,
+   "paved_share_pct": 5,
+   "usable_as_raw_land": "yes",
+   "evidence": "The land is thinned or partly cut-over forest with dirt tracks and a small cleared patch near the north. A paved road crosses the northern part of the outline, and there are no buildings.",
+   "confidence": "high"
+  }
+ }
+}

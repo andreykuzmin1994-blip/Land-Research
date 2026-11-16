@@ -1,0 +1,5017 @@
+[
+ {
+  "id": "4",
+  "title": "#4 0 IRWIN RD, South Fulton / unincorporated (47.5 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 310 deep, court + trailer row, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 1140.0,
+   "D_ft": 310,
+   "sf": 353000,
+   "office_sf": 7000,
+   "clear_height_ft": 36
+  },
+  "total_sf": 353000,
+  "total_sf_if_access": 353000,
+  "doors": 71,
+  "trailers": {
+   "court_rows": 71,
+   "drop_yards": 0,
+   "total": 71,
+   "target": 71
+  },
+  "cars": {
+   "provided": 195,
+   "row_capacity": 215,
+   "required": 195,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 195",
+   "ada": 6,
+   "per_1000_sf": 0.55,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 47.6,
+   "sf_per_gross_ac": 7400,
+   "gross_far": 0.17,
+   "impervious_ac": 17.5,
+   "impervious_pct": 37,
+   "paving_envelope_ac": 34.3
+  },
+  "detention": {
+   "storage_acft": 6.5,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 3206,
+   "road": "local road, GDOT route 1121200062000",
+   "truck_route_ft": 170,
+   "car_route_ft": 744
+  },
+  "grading": {
+   "relief_ft": 56,
+   "cut_fill_cy": 166000,
+   "steep_share_pct": 2,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 3,711 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 513 ft apart, under half the building diagonal (591 ft)"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 56 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,422 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 353000,
+    "L": 1140.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 353000,
+    "L": 1140.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 47.6,
+   "paving_envelope_ac": 34.3,
+   "building_envelope_ac": 32.3,
+   "mapped_constraints_ac": 3.01,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.71,
+   "frontage_ft": 3206,
+   "frontage_road": "local road, GDOT route 1121200062000",
+   "edges_ft": {
+    "ROW": 3214,
+    "RES_REAR": 3711,
+    "OTHER": 2211
+   }
+  },
+  "rank": "4",
+  "svg": "plan4-4.svg"
+ },
+ {
+  "id": "8",
+  "title": "#8 0 SPENCE RD, South Fulton / unincorporated (27.0 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 160 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 720.0,
+   "D_ft": 160,
+   "sf": 115000,
+   "office_sf": 2500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 115000,
+  "total_sf_if_access": 115000,
+  "doors": 23,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 12,
+   "total": 12,
+   "target": 12
+  },
+  "cars": {
+   "provided": 85,
+   "row_capacity": 95,
+   "required": 81,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 81",
+   "ada": 4,
+   "per_1000_sf": 0.74,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 25.8,
+   "sf_per_gross_ac": 4500,
+   "gross_far": 0.1,
+   "impervious_ac": 8.3,
+   "impervious_pct": 32,
+   "paving_envelope_ac": 14.9
+  },
+  "detention": {
+   "storage_acft": 3.1,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": false,
+   "frontage_ft": 284,
+   "road": "minor arterial, SR 92",
+   "truck_route_ft": 521,
+   "car_route_ft": 496
+  },
+  "grading": {
+   "relief_ft": 48,
+   "cut_fill_cy": 50000,
+   "steep_share_pct": 8,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 5,237 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "ACCESS_SHARED",
+     "note": "one driveway: cars split from trucks inside the throat"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "1 driveway(s): a second fire access (emergency-only link) or fire-official approval needed"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 48 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "4,473 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.5 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 3.2 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 115000,
+    "L": 720.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 38000,
+    "L": 240.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 38000,
+    "L": 240.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 25.8,
+   "paving_envelope_ac": 14.9,
+   "building_envelope_ac": 14.8,
+   "mapped_constraints_ac": 0.24,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 2.35,
+   "frontage_ft": 284,
+   "frontage_road": "minor arterial, SR 92",
+   "edges_ft": {
+    "ROW": 293,
+    "RES_REAR": 3172,
+    "RES_SIDE": 2065
+   }
+  },
+  "rank": "8",
+  "svg": "plan4-8.svg"
+ },
+ {
+  "id": "30",
+  "title": "#30 601 SENOIA RD, Fairburn (13.5 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "fairburn",
+  "configuration": "rear-load 230 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 500.0,
+   "D_ft": 230,
+   "sf": 115000,
+   "office_sf": 2500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 115000,
+  "total_sf_if_access": 115000,
+  "doors": 23,
+  "trailers": {
+   "court_rows": 12,
+   "drop_yards": 0,
+   "total": 12,
+   "target": 12
+  },
+  "cars": {
+   "provided": 82,
+   "row_capacity": 82,
+   "required": 81,
+   "basis": "Fairburn warehouse formula (draft); market 81",
+   "ada": 4,
+   "per_1000_sf": 0.71,
+   "stall": "10 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 14.5,
+   "sf_per_gross_ac": 7900,
+   "gross_far": 0.18,
+   "impervious_ac": 7.0,
+   "impervious_pct": 48,
+   "paving_envelope_ac": 11.2
+  },
+  "detention": {
+   "storage_acft": 2.6,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": false,
+   "frontage_ft": 381,
+   "road": "local road, GDOT route 1121200514309",
+   "truck_route_ft": 848,
+   "car_route_ft": 703
+  },
+  "grading": {
+   "relief_ft": 37,
+   "cut_fill_cy": 41000,
+   "steep_share_pct": 3,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 2,313 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "COLLECTOR_FRONTAGE",
+     "note": "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"
+    },
+    {
+     "flag": "ACCESS_SHARED",
+     "note": "one driveway: cars split from trucks inside the throat"
+    },
+    {
+     "flag": "DEAD_END_ACCESS",
+     "note": "single access about 848 ft long (over 750 ft needs fire-official approval)"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "1 driveway(s): a second fire access (emergency-only link) or fire-official approval needed"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 37 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fairburn; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,942 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.7 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 230 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 115000,
+    "L": 500.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator rear-load 260, court + trailer row, cars along office wall",
+    "operator": true,
+    "sf": 114000,
+    "L": 440.0,
+    "D": 260,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator rear-load 260, court only, cars along office wall",
+    "operator": true,
+    "sf": 130000,
+    "L": 500.0,
+    "D": 260,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 115000,
+    "L": 500.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 68000,
+    "L": 360.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 72000,
+    "L": 380.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 14.5,
+   "paving_envelope_ac": 11.2,
+   "building_envelope_ac": 10.9,
+   "mapped_constraints_ac": 0.1,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.48,
+   "frontage_ft": 381,
+   "frontage_road": "local road, GDOT route 1121200514309",
+   "edges_ft": {
+    "ROW": 390,
+    "RES_REAR": 1553,
+    "OTHER": 1055,
+    "RES_SIDE": 760
+   }
+  },
+  "rank": "30",
+  "svg": "plan4-30.svg"
+ },
+ {
+  "id": "21",
+  "title": "#21 0 MOUNT ZION RD SW, Atlanta (9.4 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "atlanta",
+  "configuration": "rear-load 190 deep, court only, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 360.0,
+   "D_ft": 190,
+   "sf": 68000,
+   "office_sf": 1500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 68000,
+  "total_sf_if_access": 68000,
+  "doors": 14,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 0,
+   "total": 0,
+   "target": 7
+  },
+  "cars": {
+   "provided": 70,
+   "row_capacity": 102,
+   "required": 69,
+   "basis": "market ratio (Atlanta's 1/600 code minimum unverified)",
+   "ada": 3,
+   "per_1000_sf": 1.02,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 8.7,
+   "sf_per_gross_ac": 7900,
+   "gross_far": 0.18,
+   "impervious_ac": 4.8,
+   "impervious_pct": 55,
+   "paving_envelope_ac": 8.0
+  },
+  "detention": {
+   "storage_acft": 1.8,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 720,
+   "road": "local road, GDOT route 1121200311803",
+   "truck_route_ft": 469,
+   "car_route_ft": 63
+  },
+  "grading": {
+   "relief_ft": 38,
+   "cut_fill_cy": 27000,
+   "steep_share_pct": 1,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 346 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "ATL_PARKING_CODE",
+     "note": "parking at the market ratio; Atlanta's 1/600 SF code minimum (unverified after the parking reforms) would need far more"
+    },
+    {
+     "flag": "TRAILER_SHORT",
+     "note": "0 trailer stalls against a target of 7"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 38 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for atlanta; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,864 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 1.9 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 3.0 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 190 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 68000,
+    "L": 360.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 91000,
+    "L": 480.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 90000,
+    "L": 560.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 90000,
+    "L": 560.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 64000,
+    "L": 400.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 54000,
+    "L": 340.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 8.7,
+   "paving_envelope_ac": 8.0,
+   "building_envelope_ac": 7.6,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.55,
+   "frontage_ft": 720,
+   "frontage_road": "local road, GDOT route 1121200311803",
+   "edges_ft": {
+    "ROW": 730,
+    "OTHER": 1530,
+    "RES_SIDE": 346
+   }
+  },
+  "rank": "21",
+  "svg": "plan4-21.svg"
+ },
+ {
+  "id": "25",
+  "title": "#25 0 WELCOME ALL RD, South Fulton / unincorporated (11.2 ac tax roll) - 100 ft cemetery test buffer",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 160 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 420.0,
+   "D_ft": 160,
+   "sf": 67000,
+   "office_sf": 1500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 67000,
+  "total_sf_if_access": 67000,
+  "doors": 13,
+  "trailers": {
+   "court_rows": 7,
+   "drop_yards": 0,
+   "total": 7,
+   "target": 7
+  },
+  "cars": {
+   "provided": 70,
+   "row_capacity": 72,
+   "required": 68,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 68",
+   "ada": 3,
+   "per_1000_sf": 1.04,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 9.4,
+   "sf_per_gross_ac": 7100,
+   "gross_far": 0.16,
+   "impervious_ac": 5.0,
+   "impervious_pct": 53,
+   "paving_envelope_ac": 8.4
+  },
+  "detention": {
+   "storage_acft": 1.9,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 947,
+   "road": "minor arterial, GDOT route 1121200138800",
+   "truck_route_ft": 239,
+   "car_route_ft": 234
+  },
+  "grading": {
+   "relief_ft": 46,
+   "cut_fill_cy": 38000,
+   "steep_share_pct": 18,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "GRADING_RISK",
+     "note": "18% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 46 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ACREAGE_MISMATCH",
+     "note": "county map 9.4 ac vs tax roll 11.2 ac"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,122 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 3.3 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 67000,
+    "L": 420.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 65000,
+    "L": 340.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 76000,
+    "L": 400.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 77000,
+    "L": 480.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 68000,
+    "L": 360.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 9.4,
+   "paving_envelope_ac": 8.4,
+   "building_envelope_ac": 7.8,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.53,
+   "steep_ac": 1.24,
+   "frontage_ft": 947,
+   "frontage_road": "minor arterial, GDOT route 1121200138800",
+   "edges_ft": {
+    "ROW": 955,
+    "OTHER": 1747
+   }
+  },
+  "rank": "25",
+  "svg": "plan4-25.svg"
+ },
+ {
+  "id": "33",
+  "title": "#33 6790 JOHNSON RD, Fairburn (46.7 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "fairburn",
+  "configuration": "operator cross-dock 520 deep, courts + trailer rows, cars at office end",
+  "operator_prototype": true,
+  "building": {
+   "L_ft": 1000.0,
+   "D_ft": 520,
+   "sf": 520000,
+   "office_sf": 10500,
+   "clear_height_ft": 36
+  },
+  "total_sf": 520000,
+  "total_sf_if_access": 520000,
+  "doors": 104,
+  "trailers": {
+   "court_rows": 136,
+   "drop_yards": 0,
+   "total": 136,
+   "target": 136
+  },
+  "cars": {
+   "provided": 290,
+   "row_capacity": 302,
+   "required": 286,
+   "basis": "Fairburn warehouse formula (draft); market 286",
+   "ada": 7,
+   "per_1000_sf": 0.56,
+   "stall": "10 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 46.7,
+   "sf_per_gross_ac": 11100,
+   "gross_far": 0.26,
+   "impervious_ac": 27.9,
+   "impervious_pct": 60,
+   "paving_envelope_ac": 41.3
+  },
+  "detention": {
+   "storage_acft": 10.4,
+   "ponds": 2,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 2518,
+   "road": "local road, GDOT route 1121200063409",
+   "truck_route_ft": 1346,
+   "car_route_ft": 43
+  },
+  "grading": {
+   "relief_ft": 37,
+   "cut_fill_cy": 166000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 3,530 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "COLLECTOR_FRONTAGE",
+     "note": "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 37 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fairburn; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 1.9 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "operator cross-dock 520 deep, courts + trailer rows, cars at office end",
+    "operator": true,
+    "sf": 520000,
+    "L": 1000.0,
+    "D": 520,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "cross-dock 470 deep, courts + trailer rows, cars at office end",
+    "operator": false,
+    "sf": 498000,
+    "L": 1060.0,
+    "D": 470,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator cross-dock 520 deep, courts only, cars at office end",
+    "operator": true,
+    "sf": 520000,
+    "L": 1000.0,
+    "D": 520,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 403000,
+    "L": 1300.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "cross-dock 470 deep, courts only, cars at office end",
+    "operator": false,
+    "sf": 498000,
+    "L": 1060.0,
+    "D": 470,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 391000,
+    "L": 1260.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 46.7,
+   "paving_envelope_ac": 41.3,
+   "building_envelope_ac": 40.4,
+   "mapped_constraints_ac": 0.01,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.09,
+   "frontage_ft": 2518,
+   "frontage_road": "local road, GDOT route 1121200063409",
+   "edges_ft": {
+    "ROW": 2526,
+    "RES_REAR": 2381,
+    "OTHER": 160,
+    "RES_SIDE": 1149
+   }
+  },
+  "rank": "33",
+  "svg": "plan4-33.svg"
+ },
+ {
+  "id": "39",
+  "title": "#39 0 WASHINGTON RD, South Fulton / unincorporated (38.9 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 310 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 1000.0,
+   "D_ft": 310,
+   "sf": 310000,
+   "office_sf": 6000,
+   "clear_height_ft": 36
+  },
+  "total_sf": 310000,
+  "total_sf_if_access": 310000,
+  "doors": 62,
+  "trailers": {
+   "court_rows": 62,
+   "drop_yards": 0,
+   "total": 62,
+   "target": 62
+  },
+  "cars": {
+   "provided": 175,
+   "row_capacity": 184,
+   "required": 171,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 171",
+   "ada": 6,
+   "per_1000_sf": 0.56,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 36.0,
+   "sf_per_gross_ac": 8600,
+   "gross_far": 0.2,
+   "impervious_ac": 14.3,
+   "impervious_pct": 40,
+   "paving_envelope_ac": 30.8
+  },
+  "detention": {
+   "storage_acft": 5.3,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1276,
+   "road": "minor arterial, GDOT route 1121200138900",
+   "truck_route_ft": 24,
+   "car_route_ft": 613
+  },
+  "grading": {
+   "relief_ft": 77,
+   "cut_fill_cy": 199000,
+   "steep_share_pct": 11,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 1,941 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "SHORT_THROAT",
+     "note": "truck throat about 24 ft from the street to the court (100 ft wanted for stacking)"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 451 ft apart, under half the building diagonal (523 ft)"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "11% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 77 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "8,616 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 310000,
+    "L": 1000.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 279000,
+    "L": 900.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 316000,
+    "L": 1020.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 279000,
+    "L": 900.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 36.0,
+   "paving_envelope_ac": 30.8,
+   "building_envelope_ac": 30.1,
+   "mapped_constraints_ac": 0.51,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 5.41,
+   "frontage_ft": 1276,
+   "frontage_road": "minor arterial, GDOT route 1121200138900",
+   "edges_ft": {
+    "ROW": 1304,
+    "OTHER": 3339,
+    "RES_SIDE": 1941
+   }
+  },
+  "rank": "39",
+  "svg": "plan4-39.svg"
+ },
+ {
+  "id": "48",
+  "title": "#48 0 SENOIA RD, Fairburn (31.9 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "fairburn",
+  "configuration": "rear-load 310 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 980.0,
+   "D_ft": 310,
+   "sf": 304000,
+   "office_sf": 6000,
+   "clear_height_ft": 36
+  },
+  "total_sf": 304000,
+  "total_sf_if_access": 304000,
+  "doors": 61,
+  "trailers": {
+   "court_rows": 61,
+   "drop_yards": 0,
+   "total": 61,
+   "target": 61
+  },
+  "cars": {
+   "provided": 170,
+   "row_capacity": 171,
+   "required": 168,
+   "basis": "Fairburn warehouse formula (draft); market 168",
+   "ada": 6,
+   "per_1000_sf": 0.56,
+   "stall": "10 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 31.7,
+   "sf_per_gross_ac": 9600,
+   "gross_far": 0.22,
+   "impervious_ac": 14.3,
+   "impervious_pct": 45,
+   "paving_envelope_ac": 28.7
+  },
+  "detention": {
+   "storage_acft": 5.3,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1744,
+   "road": "local road, GDOT route 1121200514309",
+   "truck_route_ft": 652,
+   "car_route_ft": 237
+  },
+  "grading": {
+   "relief_ft": 39,
+   "cut_fill_cy": 95000,
+   "steep_share_pct": 16,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "COLLECTOR_FRONTAGE",
+     "note": "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 327 ft apart, under half the building diagonal (514 ft)"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "16% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 39 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fairburn; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "9,569 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 304000,
+    "L": 980.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 273000,
+    "L": 880.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 353000,
+    "L": 1140.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 360000,
+    "L": 1160.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 31.7,
+   "paving_envelope_ac": 28.7,
+   "building_envelope_ac": 27.0,
+   "mapped_constraints_ac": 0.79,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 3.85,
+   "frontage_ft": 1744,
+   "frontage_road": "local road, GDOT route 1121200514309",
+   "edges_ft": {
+    "ROW": 1813,
+    "OTHER": 3967
+   }
+  },
+  "rank": "48",
+  "svg": "plan4-48.svg"
+ },
+ {
+  "id": "55",
+  "title": "#55 0 JOHN RIVERS RD, Fairburn (46.9 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "fairburn",
+  "configuration": "rear-load 310 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 1380.0,
+   "D_ft": 310,
+   "sf": 428000,
+   "office_sf": 8500,
+   "clear_height_ft": 36
+  },
+  "total_sf": 505000,
+  "total_sf_if_access": 505000,
+  "doors": 86,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 86,
+   "total": 86,
+   "target": 86
+  },
+  "cars": {
+   "provided": 240,
+   "row_capacity": 256,
+   "required": 236,
+   "basis": "Fairburn warehouse formula (draft); market 236",
+   "ada": 7,
+   "per_1000_sf": 0.56,
+   "stall": "10 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 52.0,
+   "sf_per_gross_ac": 9700,
+   "gross_far": 0.22,
+   "impervious_ac": 27.1,
+   "impervious_pct": 52,
+   "paving_envelope_ac": 48.7
+  },
+  "detention": {
+   "storage_acft": 10.1,
+   "ponds": 2,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 3416,
+   "road": "minor arterial, SR 14",
+   "truck_route_ft": 722,
+   "car_route_ft": 308
+  },
+  "grading": {
+   "relief_ft": 42,
+   "cut_fill_cy": 86000,
+   "steep_share_pct": 3,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RELIEF",
+     "note": "about 42 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fairburn; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "9,704 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.5 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "second_building": {
+   "configuration": "rear-load 160 deep, court only, cars along office wall",
+   "L_ft": 480.0,
+   "D_ft": 160,
+   "sf": 77000,
+   "doors": 15,
+   "trailers": 8,
+   "trailers_target": 8,
+   "cars_capacity": 79,
+   "cars_required": 77,
+   "own_driveways": true,
+   "route_ft": 110
+  },
+  "totals_both_buildings": {
+   "doors": 101,
+   "trailers": 94,
+   "trailers_target": 94,
+   "cars_capacity": 335
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 391000,
+    "L": 1260.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 324000,
+    "L": 1200.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 324000,
+    "L": 1200.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator cross-dock 520 deep, courts only, cars at office end",
+    "operator": true,
+    "sf": 312000,
+    "L": 600.0,
+    "D": 520,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 52.0,
+   "paving_envelope_ac": 48.7,
+   "building_envelope_ac": 46.1,
+   "mapped_constraints_ac": 0.12,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 1.99,
+   "frontage_ft": 3416,
+   "frontage_road": "minor arterial, SR 14",
+   "edges_ft": {
+    "ROW": 3434,
+    "OTHER": 4419
+   }
+  },
+  "rank": "55",
+  "svg": "plan4-55.svg"
+ },
+ {
+  "id": "83",
+  "title": "#83 0 WEST POINT ATL RD, Fairburn (37.9 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "fairburn",
+  "configuration": "rear-load 310 deep, court only, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 1380.0,
+   "D_ft": 310,
+   "sf": 428000,
+   "office_sf": 8500,
+   "clear_height_ft": 36
+  },
+  "total_sf": 428000,
+  "total_sf_if_access": 428000,
+  "doors": 86,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 86,
+   "total": 86,
+   "target": 86
+  },
+  "cars": {
+   "provided": 240,
+   "row_capacity": 244,
+   "required": 236,
+   "basis": "Fairburn warehouse formula (draft); market 236",
+   "ada": 7,
+   "per_1000_sf": 0.56,
+   "stall": "10 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 44.4,
+   "sf_per_gross_ac": 9600,
+   "gross_far": 0.22,
+   "impervious_ac": 20.0,
+   "impervious_pct": 45,
+   "paving_envelope_ac": 38.9
+  },
+  "detention": {
+   "storage_acft": 7.5,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 4024,
+   "road": "local road, GDOT route 1121200150609",
+   "truck_route_ft": 508,
+   "car_route_ft": 276
+  },
+  "grading": {
+   "relief_ft": 37,
+   "cut_fill_cy": 102000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "TRANSMISSION_EASEMENT_ASSUMED",
+     "note": "6 mapped transmission line(s); corridor widths assumed by voltage; no building or pond under the lines, paving only with the utility's consent"
+    },
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 2,042 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "COLLECTOR_FRONTAGE",
+     "note": "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 37 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ACREAGE_MISMATCH",
+     "note": "county map 44.4 ac vs tax roll 37.9 ac"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fairburn; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "9,629 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.5 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 428000,
+    "L": 1380.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 397000,
+    "L": 1280.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 366000,
+    "L": 1180.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 347000,
+    "L": 1120.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 44.4,
+   "paving_envelope_ac": 38.9,
+   "building_envelope_ac": 32.3,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 4.54,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.03,
+   "frontage_ft": 4024,
+   "frontage_road": "local road, GDOT route 1121200150609",
+   "edges_ft": {
+    "ROW": 4036,
+    "RES_REAR": 319,
+    "OTHER": 4363,
+    "RES_SIDE": 1723
+   }
+  },
+  "rank": "83",
+  "svg": "plan4-83.svg"
+ },
+ {
+  "id": "115-170",
+  "title": "#115 + #170 + 7460/7490 Herndon Rd (same owner), South Fulton",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": false,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 310 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 940.0,
+   "D_ft": 310,
+   "sf": 291000,
+   "office_sf": 6000,
+   "clear_height_ft": 36
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 291000,
+  "doors": 58,
+  "trailers": {
+   "court_rows": 58,
+   "drop_yards": 0,
+   "total": 58,
+   "target": 58
+  },
+  "cars": {
+   "provided": 165,
+   "row_capacity": 174,
+   "required": 161,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 161",
+   "ada": 6,
+   "per_1000_sf": 0.57,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 77.6,
+   "sf_per_gross_ac": 3800,
+   "gross_far": 0.09,
+   "impervious_ac": 13.2,
+   "impervious_pct": 17,
+   "paving_envelope_ac": 46.4
+  },
+  "detention": {
+   "storage_acft": 4.9,
+   "ponds": 0,
+   "fits": false,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1307,
+   "road": "local road, GDOT route 1121200064200",
+   "truck_route_ft": 0,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 82,
+   "cut_fill_cy": 158000,
+   "steep_share_pct": 16,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "ROUTE_INFEASIBLE",
+     "note": "no truck route inside the paving envelope from the driveway to the court"
+    },
+    {
+     "flag": "CAR_ROUTE_NONE",
+     "note": "no car route from a driveway to the car field without crossing truck pavement"
+    }
+   ],
+   "2": [
+    {
+     "flag": "TRANSMISSION_EASEMENT_ASSUMED",
+     "note": "1 mapped transmission line(s); corridor widths assumed by voltage; no building or pond under the lines, paving only with the utility's consent"
+    },
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 7,611 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 254 ft apart, under half the building diagonal (495 ft)"
+    },
+    {
+     "flag": "POND_DOES_NOT_FIT",
+     "note": "1 pond(s) of 4.9 ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "16% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 82 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "3,756 SF per gross acre; Georgia comps run about 10,500-15,400"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 291000,
+    "L": 940.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 310 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 260000,
+    "L": 840.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 304000,
+    "L": 980.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 279000,
+    "L": 900.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 275000,
+    "L": 1020.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 91000,
+    "L": 480.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 91000,
+    "L": 480.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 77000,
+    "L": 480.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 77000,
+    "L": 480.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 58000,
+    "L": 360.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 77.6,
+   "paving_envelope_ac": 46.4,
+   "building_envelope_ac": 41.8,
+   "mapped_constraints_ac": 14.13,
+   "transmission_ac": 4.98,
+   "test_cut_ac": 0.0,
+   "steep_ac": 5.67,
+   "frontage_ft": 1307,
+   "frontage_road": "local road, GDOT route 1121200064200",
+   "edges_ft": {
+    "ROW": 1335,
+    "RES_REAR": 5873,
+    "OTHER": 884,
+    "RES_SIDE": 1738
+   }
+  },
+  "rank": "115+170",
+  "svg": "plan4-115-170.svg"
+ },
+ {
+  "id": "170",
+  "title": "#170 7500 HERNDON RD, South Fulton / unincorporated (23.0 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": false,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 190 deep, court + trailer row, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 540.0,
+   "D_ft": 190,
+   "sf": 103000,
+   "office_sf": 2000,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 103000,
+  "doors": 21,
+  "trailers": {
+   "court_rows": 11,
+   "drop_yards": 0,
+   "total": 11,
+   "target": 11
+  },
+  "cars": {
+   "provided": 75,
+   "row_capacity": 92,
+   "required": 72,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 72",
+   "ada": 3,
+   "per_1000_sf": 0.73,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 26.2,
+   "sf_per_gross_ac": 3900,
+   "gross_far": 0.09,
+   "impervious_ac": 8.9,
+   "impervious_pct": 34,
+   "paving_envelope_ac": 15.8
+  },
+  "detention": {
+   "storage_acft": 3.3,
+   "ponds": 0,
+   "fits": false,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": false,
+   "frontage_ft": 400,
+   "road": "local road, GDOT route 1121200064200",
+   "truck_route_ft": 3208,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 33,
+   "cut_fill_cy": 38000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "CAR_ROUTE_NONE",
+     "note": "no car route from a driveway to the car field without crossing truck pavement"
+    }
+   ],
+   "2": [
+    {
+     "flag": "TRANSMISSION_EASEMENT_ASSUMED",
+     "note": "1 mapped transmission line(s); corridor widths assumed by voltage; no building or pond under the lines, paving only with the utility's consent"
+    },
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 4,775 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "ACCESS_SHARED",
+     "note": "one driveway: cars split from trucks inside the throat"
+    },
+    {
+     "flag": "DEAD_END_ACCESS",
+     "note": "single access about 3,208 ft long (over 750 ft needs fire-official approval)"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "1 driveway(s): a second fire access (emergency-only link) or fire-official approval needed"
+    },
+    {
+     "flag": "POND_DOES_NOT_FIT",
+     "note": "1 pond(s) of 3.3 ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 33 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "3,917 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 3.8 (comps about 2.0-2.1)"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 103000,
+    "L": 540.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 103000,
+    "L": 540.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 67000,
+    "L": 420.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 67000,
+    "L": 420.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 61000,
+    "L": 380.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 61000,
+    "L": 380.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 26.2,
+   "paving_envelope_ac": 15.8,
+   "building_envelope_ac": 12.6,
+   "mapped_constraints_ac": 0.28,
+   "transmission_ac": 4.85,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.0,
+   "frontage_ft": 400,
+   "frontage_road": "local road, GDOT route 1121200064200",
+   "edges_ft": {
+    "RES_REAR": 2945,
+    "OTHER": 884,
+    "ROW": 409,
+    "RES_SIDE": 1831
+   }
+  },
+  "rank": "170",
+  "svg": "plan4-170.svg"
+ },
+ {
+  "id": "3",
+  "title": "#3 0 MARIETTA RD NW, Atlanta (18.4 ac tax roll)",
+  "fits": true,
+  "hypothetical": true,
+  "feasible": false,
+  "jurisdiction_rules": "atlanta",
+  "configuration": "rear-load 230 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 920.0,
+   "D_ft": 230,
+   "sf": 212000,
+   "office_sf": 4000,
+   "clear_height_ft": 36
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 212000,
+  "doors": 42,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 21,
+   "total": 21,
+   "target": 21
+  },
+  "cars": {
+   "provided": 150,
+   "row_capacity": 156,
+   "required": 149,
+   "basis": "market ratio (Atlanta's 1/600 code minimum unverified)",
+   "ada": 5,
+   "per_1000_sf": 0.71,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 20.5,
+   "sf_per_gross_ac": 10300,
+   "gross_far": 0.24,
+   "impervious_ac": 11.2,
+   "impervious_pct": 55,
+   "paving_envelope_ac": 19.4
+  },
+  "detention": {
+   "storage_acft": 4.2,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG none rated; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": false,
+   "car_driveway": false,
+   "frontage_ft": 0,
+   "road": null,
+   "truck_route_ft": 0,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 51,
+   "cut_fill_cy": 67000,
+   "steep_share_pct": 14,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [
+    {
+     "flag": "ATL_PARKING_CODE",
+     "note": "parking at the market ratio; Atlanta's 1/600 SF code minimum (unverified after the parking reforms) would need far more"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "14% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 51 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for atlanta; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "10,327 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.0 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 230 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 212000,
+    "L": 920.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 175000,
+    "L": 760.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 160000,
+    "L": 840.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 160000,
+    "L": 840.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 148000,
+    "L": 780.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 115000,
+    "L": 720.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 20.5,
+   "paving_envelope_ac": 19.4,
+   "building_envelope_ac": 19.4,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 2.77,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "OTHER": 4927
+   }
+  },
+  "rank": "3",
+  "svg": "plan4-3.svg"
+ },
+ {
+  "id": "5",
+  "title": "#5 0 STACKS RD REAR, South Fulton / unincorporated (12.8 ac tax roll)",
+  "fits": true,
+  "hypothetical": true,
+  "feasible": false,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 160 deep, court only, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 720.0,
+   "D_ft": 160,
+   "sf": 115000,
+   "office_sf": 2500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 115000,
+  "doors": 23,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 12,
+   "total": 12,
+   "target": 12
+  },
+  "cars": {
+   "provided": 85,
+   "row_capacity": 130,
+   "required": 81,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 81",
+   "ada": 4,
+   "per_1000_sf": 0.74,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 12.2,
+   "sf_per_gross_ac": 9500,
+   "gross_far": 0.22,
+   "impervious_ac": 7.2,
+   "impervious_pct": 59,
+   "paving_envelope_ac": 11.3
+  },
+  "detention": {
+   "storage_acft": 2.7,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": false,
+   "car_driveway": false,
+   "frontage_ft": 0,
+   "road": null,
+   "truck_route_ft": 0,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 28,
+   "cut_fill_cy": 31000,
+   "steep_share_pct": 2,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 40 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 28 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "9,476 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.5 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.7 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 115000,
+    "L": 720.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 109000,
+    "L": 680.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 129000,
+    "L": 680.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 109000,
+    "L": 680.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 57000,
+    "L": 300.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 12.2,
+   "paving_envelope_ac": 11.3,
+   "building_envelope_ac": 11.3,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.53,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "RES_REAR": 40,
+    "OTHER": 3401
+   }
+  },
+  "rank": "5",
+  "svg": "plan4-5.svg"
+ },
+ {
+  "id": "9",
+  "title": "#9 0 CONNALLY DR, East Point (19.9 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "east point",
+  "configuration": "rear-load 310 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 820.0,
+   "D_ft": 310,
+   "sf": 254000,
+   "office_sf": 5000,
+   "clear_height_ft": 30
+  },
+  "total_sf": 254000,
+  "total_sf_if_access": 254000,
+  "doors": 51,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 0,
+   "total": 0,
+   "target": 51
+  },
+  "cars": {
+   "provided": 140,
+   "row_capacity": 140,
+   "required": 140,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 140",
+   "ada": 5,
+   "per_1000_sf": 0.55,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 21.5,
+   "sf_per_gross_ac": 11800,
+   "gross_far": 0.27,
+   "impervious_ac": 12.7,
+   "impervious_pct": 59,
+   "paving_envelope_ac": 20.2
+  },
+  "detention": {
+   "storage_acft": 4.7,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG none rated; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1252,
+   "road": "major collector, GDOT route 1121200301107",
+   "truck_route_ft": 770,
+   "car_route_ft": 27
+  },
+  "grading": {
+   "relief_ft": 12,
+   "cut_fill_cy": 20000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "USE_PERMIT_REQUIRED",
+     "note": "East Point: warehousing is use-permit only in I-1/I-2 and needs 5,280 ft from residential (draft reading)"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 283 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "HEIGHT_CAP",
+     "note": "draft height cap 40 ft: clear height lowered to 30 ft"
+    },
+    {
+     "flag": "TRAILER_SHORT",
+     "note": "0 trailer stalls against a target of 51"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for east point; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "DOOR_DENSITY_HIGH",
+     "note": "under 14 ft of dock wall per door"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 254000,
+    "L": 820.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 235000,
+    "L": 1020.0,
+    "D": 230,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 270 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 211000,
+    "L": 780.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 270 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 200000,
+    "L": 740.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 243000,
+    "L": 900.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 254000,
+    "L": 820.0,
+    "D": 310,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 21.5,
+   "paving_envelope_ac": 20.2,
+   "building_envelope_ac": 19.6,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.29,
+   "frontage_ft": 1252,
+   "frontage_road": "major collector, GDOT route 1121200301107",
+   "edges_ft": {
+    "OTHER": 2803,
+    "ROW": 1290,
+    "RES_SIDE": 283
+   }
+  },
+  "rank": "9",
+  "svg": "plan4-9.svg"
+ },
+ {
+  "id": "10",
+  "title": "#10 0 WELCOME ALL RD, South Fulton / unincorporated (12.0 ac tax roll)",
+  "fits": false,
+  "jurisdiction_rules": "south fulton",
+  "flags": {
+   "1": [
+    {
+     "flag": "NO_FIT",
+     "note": "no building variant fits the envelope with its truck court, parking and pond"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 546 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    }
+   ],
+   "3": []
+  },
+  "inputs": {
+   "parcel_ac_map": 5.8,
+   "paving_envelope_ac": 4.7,
+   "building_envelope_ac": 4.6,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.0,
+   "frontage_ft": 293,
+   "frontage_road": "minor arterial, GDOT route 1121200138800",
+   "edges_ft": {
+    "OTHER": 1561,
+    "ROW": 302,
+    "RES_SIDE": 546
+   }
+  },
+  "rank": "10"
+ },
+ {
+  "id": "13",
+  "title": "#13 0 M L KING JR DR R, Fulton Industrial District (7.7 ac tax roll)",
+  "fits": true,
+  "hypothetical": true,
+  "feasible": false,
+  "jurisdiction_rules": "fulton industrial",
+  "configuration": "rear-load 160 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 420.0,
+   "D_ft": 160,
+   "sf": 67000,
+   "office_sf": 1500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 67000,
+  "doors": 13,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 0,
+   "total": 0,
+   "target": 7
+  },
+  "cars": {
+   "provided": 70,
+   "row_capacity": 79,
+   "required": 68,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 68",
+   "ada": 3,
+   "per_1000_sf": 1.04,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 7.7,
+   "sf_per_gross_ac": 8800,
+   "gross_far": 0.2,
+   "impervious_ac": 5.0,
+   "impervious_pct": 65,
+   "paving_envelope_ac": 7.1
+  },
+  "detention": {
+   "storage_acft": 1.9,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG none rated; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": false,
+   "car_driveway": false,
+   "frontage_ft": 0,
+   "road": null,
+   "truck_route_ft": 0,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 21,
+   "cut_fill_cy": 17000,
+   "steep_share_pct": 15,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [
+    {
+     "flag": "TRAILER_SHORT",
+     "note": "0 trailer stalls against a target of 7"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "15% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fulton industrial; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "8,765 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 3.3 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 67000,
+    "L": 420.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 38000,
+    "L": 240.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 38000,
+    "L": 240.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 7.7,
+   "paving_envelope_ac": 7.1,
+   "building_envelope_ac": 7.1,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 1.13,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "OTHER": 2638
+   }
+  },
+  "rank": "13",
+  "svg": "plan4-13.svg"
+ },
+ {
+  "id": "19",
+  "title": "#19 6623 ROOSEVELT HWY, Fairburn (14.6 ac tax roll)",
+  "fits": false,
+  "jurisdiction_rules": "fairburn",
+  "flags": {
+   "1": [
+    {
+     "flag": "NO_FIT",
+     "note": "no building variant fits the envelope with its truck court, parking and pond"
+    },
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 2,415 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    }
+   ],
+   "3": []
+  },
+  "inputs": {
+   "parcel_ac_map": 10.1,
+   "paving_envelope_ac": 7.0,
+   "building_envelope_ac": 6.8,
+   "mapped_constraints_ac": 0.3,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.07,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "RES_REAR": 2415,
+    "OTHER": 672
+   }
+  },
+  "rank": "19"
+ },
+ {
+  "id": "20",
+  "title": "#20 0 FAYETTEVILLE RD, South Fulton / unincorporated (23.9 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": false,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 270 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 560.0,
+   "D_ft": 270,
+   "sf": 151000,
+   "office_sf": 3000,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 151000,
+  "doors": 30,
+  "trailers": {
+   "court_rows": 15,
+   "drop_yards": 0,
+   "total": 15,
+   "target": 15
+  },
+  "cars": {
+   "provided": 110,
+   "row_capacity": 147,
+   "required": 106,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 106",
+   "ada": 5,
+   "per_1000_sf": 0.73,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 22.3,
+   "sf_per_gross_ac": 6800,
+   "gross_far": 0.16,
+   "impervious_ac": 8.3,
+   "impervious_pct": 37,
+   "paving_envelope_ac": 13.6
+  },
+  "detention": {
+   "storage_acft": 3.1,
+   "ponds": 0,
+   "fits": false,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": false,
+   "car_driveway": false,
+   "frontage_ft": 211,
+   "road": "minor arterial, GDOT route 1121200131609",
+   "truck_route_ft": 0,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 26,
+   "cut_fill_cy": 35000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "ACCESS_CONSTRAINED",
+     "note": "no frontage run can hold a truck driveway (about 190 ft of curb with 75 ft radii, 110 ft from corners)"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 4,659 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "0 driveway(s): a second fire access (emergency-only link) or fire-official approval needed"
+    },
+    {
+     "flag": "POND_DOES_NOT_FIT",
+     "note": "1 pond(s) of 3.1 ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 26 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "6,776 SF per gross acre; Georgia comps run about 10,500-15,400"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 270 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 151000,
+    "L": 560.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 146000,
+    "L": 540.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 146000,
+    "L": 540.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 106000,
+    "L": 460.0,
+    "D": 230,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "operator rear-load 260, court only, cars along office wall",
+    "operator": true,
+    "sf": 109000,
+    "L": 420.0,
+    "D": 260,
+    "feasible": false,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 22.3,
+   "paving_envelope_ac": 13.6,
+   "building_envelope_ac": 13.6,
+   "mapped_constraints_ac": 0.16,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.51,
+   "frontage_ft": 211,
+   "frontage_road": "minor arterial, GDOT route 1121200131609",
+   "edges_ft": {
+    "RES_REAR": 1721,
+    "OTHER": 1139,
+    "ROW": 219,
+    "RES_SIDE": 2938
+   }
+  },
+  "rank": "20",
+  "svg": "plan4-20.svg"
+ },
+ {
+  "id": "23",
+  "title": "#23 4380 STACKS RD # REAR, South Fulton / unincorporated (21.0 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 270 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 800.0,
+   "D_ft": 270,
+   "sf": 216000,
+   "office_sf": 4500,
+   "clear_height_ft": 36
+  },
+  "total_sf": 216000,
+  "total_sf_if_access": 216000,
+  "doors": 43,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 22,
+   "total": 22,
+   "target": 22
+  },
+  "cars": {
+   "provided": 155,
+   "row_capacity": 158,
+   "required": 152,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 152",
+   "ada": 6,
+   "per_1000_sf": 0.72,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 21.8,
+   "sf_per_gross_ac": 9900,
+   "gross_far": 0.23,
+   "impervious_ac": 11.1,
+   "impervious_pct": 51,
+   "paving_envelope_ac": 20.5
+  },
+  "detention": {
+   "storage_acft": 4.2,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1107,
+   "road": "local road, GDOT route 1121200060700",
+   "truck_route_ft": 32,
+   "car_route_ft": 178
+  },
+  "grading": {
+   "relief_ft": 27,
+   "cut_fill_cy": 41000,
+   "steep_share_pct": 2,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "SHORT_THROAT",
+     "note": "truck throat about 32 ft from the street to the court (100 ft wanted for stacking)"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 335 ft apart, under half the building diagonal (422 ft)"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 27 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "9,897 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 270 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 216000,
+    "L": 800.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 189000,
+    "L": 820.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 184000,
+    "L": 800.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 221000,
+    "L": 960.0,
+    "D": 230,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 160000,
+    "L": 840.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 21.8,
+   "paving_envelope_ac": 20.5,
+   "building_envelope_ac": 19.8,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.43,
+   "frontage_ft": 1107,
+   "frontage_road": "local road, GDOT route 1121200060700",
+   "edges_ft": {
+    "OTHER": 4574,
+    "ROW": 1116
+   }
+  },
+  "rank": "23",
+  "svg": "plan4-23.svg"
+ },
+ {
+  "id": "26",
+  "title": "#26 3855 RUBY HARPER BLVD, Atlanta (10.5 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "atlanta",
+  "configuration": "rear-load 160 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 640.0,
+   "D_ft": 160,
+   "sf": 102000,
+   "office_sf": 2000,
+   "clear_height_ft": 32
+  },
+  "total_sf": 102000,
+  "total_sf_if_access": 102000,
+  "doors": 20,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 10,
+   "total": 10,
+   "target": 10
+  },
+  "cars": {
+   "provided": 75,
+   "row_capacity": 90,
+   "required": 72,
+   "basis": "market ratio (Atlanta's 1/600 code minimum unverified)",
+   "ada": 3,
+   "per_1000_sf": 0.73,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 13.3,
+   "sf_per_gross_ac": 7700,
+   "gross_far": 0.18,
+   "impervious_ac": 6.9,
+   "impervious_pct": 52,
+   "paving_envelope_ac": 11.3
+  },
+  "detention": {
+   "storage_acft": 2.6,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 500,
+   "road": "local road, GDOT route 1121200138103",
+   "truck_route_ft": 165,
+   "car_route_ft": 123
+  },
+  "grading": {
+   "relief_ft": 29,
+   "cut_fill_cy": 25000,
+   "steep_share_pct": 12,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "ATL_PARKING_CODE",
+     "note": "parking at the market ratio; Atlanta's 1/600 SF code minimum (unverified after the parking reforms) would need far more"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 268 ft apart, under half the building diagonal (330 ft)"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "12% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 29 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ACREAGE_MISMATCH",
+     "note": "county map 13.3 ac vs tax roll 10.5 ac"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for atlanta; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,724 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.0 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.9 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 102000,
+    "L": 640.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 93000,
+    "L": 580.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 91000,
+    "L": 480.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 58000,
+    "L": 360.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 57000,
+    "L": 300.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 13.3,
+   "paving_envelope_ac": 11.3,
+   "building_envelope_ac": 11.0,
+   "mapped_constraints_ac": 0.37,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 2.18,
+   "frontage_ft": 500,
+   "frontage_road": "local road, GDOT route 1121200138103",
+   "edges_ft": {
+    "OTHER": 3271,
+    "ROW": 509
+   }
+  },
+  "rank": "26",
+  "svg": "plan4-26.svg"
+ },
+ {
+  "id": "41",
+  "title": "#41 0 OLD SENOIA RD, South Fulton / unincorporated (15.4 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": false,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 190 deep, court only, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 680.0,
+   "D_ft": 190,
+   "sf": 129000,
+   "office_sf": 2500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 129000,
+  "doors": 26,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 13,
+   "total": 13,
+   "target": 13
+  },
+  "cars": {
+   "provided": 95,
+   "row_capacity": 123,
+   "required": 91,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 91",
+   "ada": 4,
+   "per_1000_sf": 0.74,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 15.4,
+   "sf_per_gross_ac": 8400,
+   "gross_far": 0.19,
+   "impervious_ac": 8.0,
+   "impervious_pct": 52,
+   "paving_envelope_ac": 11.5
+  },
+  "detention": {
+   "storage_acft": 3.0,
+   "ponds": 0,
+   "fits": false,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 536,
+   "road": "local road, GDOT route 1121200061900",
+   "truck_route_ft": 564,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 46,
+   "cut_fill_cy": 53000,
+   "steep_share_pct": 5,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "CAR_ROUTE_NONE",
+     "note": "no car route from a driveway to the car field without crossing truck pavement"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 2,183 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "driveways 259 ft apart, under half the building diagonal (353 ft)"
+    },
+    {
+     "flag": "POND_DOES_NOT_FIT",
+     "note": "1 pond(s) of 3.0 ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 46 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "8,412 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.7 (comps about 2.0-2.1)"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 190 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 129000,
+    "L": 680.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 115000,
+    "L": 720.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 133000,
+    "L": 700.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 129000,
+    "L": 560.0,
+    "D": 230,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 86000,
+    "L": 540.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 48000,
+    "L": 300.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 15.4,
+   "paving_envelope_ac": 11.5,
+   "building_envelope_ac": 11.2,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.51,
+   "frontage_ft": 536,
+   "frontage_road": "local road, GDOT route 1121200061900",
+   "edges_ft": {
+    "RES_REAR": 671,
+    "OTHER": 1067,
+    "ROW": 546,
+    "RES_SIDE": 1513
+   }
+  },
+  "rank": "41",
+  "svg": "plan4-41.svg"
+ },
+ {
+  "id": "44",
+  "title": "#44 0 SULLIVAN RD, College Park (18.6 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "college park",
+  "configuration": "rear-load 230 deep, court + trailer row, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 820.0,
+   "D_ft": 230,
+   "sf": 189000,
+   "office_sf": 4000,
+   "clear_height_ft": 25
+  },
+  "total_sf": 189000,
+  "total_sf_if_access": 189000,
+  "doors": 38,
+  "trailers": {
+   "court_rows": 19,
+   "drop_yards": 0,
+   "total": 19,
+   "target": 19
+  },
+  "cars": {
+   "provided": 135,
+   "row_capacity": 170,
+   "required": 133,
+   "basis": "College Park 10% of floor area / 330 (draft); market 133",
+   "ada": 5,
+   "per_1000_sf": 0.72,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 17.8,
+   "sf_per_gross_ac": 10600,
+   "gross_far": 0.24,
+   "impervious_ac": 10.1,
+   "impervious_pct": 57,
+   "paving_envelope_ac": 16.1
+  },
+  "detention": {
+   "storage_acft": 3.8,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1858,
+   "road": "local road, GDOT route 1121200056705",
+   "truck_route_ft": 14,
+   "car_route_ft": 284
+  },
+  "grading": {
+   "relief_ft": 37,
+   "cut_fill_cy": 30000,
+   "steep_share_pct": 4,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "HEIGHT_CAP",
+     "note": "draft height cap 35 ft: clear height lowered to 25 ft - below market for distribution"
+    }
+   ],
+   "2": [
+    {
+     "flag": "SHORT_THROAT",
+     "note": "truck throat about 14 ft from the street to the court (100 ft wanted for stacking)"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 37 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for college park; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 230 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 189000,
+    "L": 820.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 184000,
+    "L": 680.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 221000,
+    "L": 820.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 310 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 211000,
+    "L": 680.0,
+    "D": 310,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 189000,
+    "L": 820.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 17.8,
+   "paving_envelope_ac": 16.1,
+   "building_envelope_ac": 13.8,
+   "mapped_constraints_ac": 0.26,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.8,
+   "frontage_ft": 1858,
+   "frontage_road": "local road, GDOT route 1121200056705",
+   "edges_ft": {
+    "ROW": 1876,
+    "OTHER": 2545
+   }
+  },
+  "rank": "44",
+  "svg": "plan4-44.svg"
+ },
+ {
+  "id": "45",
+  "title": "#45 2100 SPINK ST NW, Atlanta (16.2 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "atlanta",
+  "configuration": "operator rear-load 260, court only, cars along office wall",
+  "operator_prototype": true,
+  "building": {
+   "L_ft": 460.0,
+   "D_ft": 260,
+   "sf": 120000,
+   "office_sf": 2500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 120000,
+  "total_sf_if_access": 120000,
+  "doors": 24,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 12,
+   "total": 12,
+   "target": 12
+  },
+  "cars": {
+   "provided": 85,
+   "row_capacity": 90,
+   "required": 84,
+   "basis": "market ratio (Atlanta's 1/600 code minimum unverified)",
+   "ada": 4,
+   "per_1000_sf": 0.71,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 15.3,
+   "sf_per_gross_ac": 7800,
+   "gross_far": 0.18,
+   "impervious_ac": 6.8,
+   "impervious_pct": 44,
+   "paving_envelope_ac": 13.8
+  },
+  "detention": {
+   "storage_acft": 2.5,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1006,
+   "road": "local road, GDOT route 1121200072603",
+   "truck_route_ft": 641,
+   "car_route_ft": 422
+  },
+  "grading": {
+   "relief_ft": 31,
+   "cut_fill_cy": 21000,
+   "steep_share_pct": 6,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 809 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "ATL_PARKING_CODE",
+     "note": "parking at the market ratio; Atlanta's 1/600 SF code minimum (unverified after the parking reforms) would need far more"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 31 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for atlanta; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,813 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 1.8 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "operator rear-load 260, court only, cars along office wall",
+    "operator": true,
+    "sf": 120000,
+    "L": 460.0,
+    "D": 260,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 124000,
+    "L": 540.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator rear-load 260, court + trailer row, cars along office wall",
+    "operator": true,
+    "sf": 114000,
+    "L": 440.0,
+    "D": 260,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 151000,
+    "L": 560.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 151000,
+    "L": 560.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 146000,
+    "L": 540.0,
+    "D": 270,
+    "feasible": false,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 15.3,
+   "paving_envelope_ac": 13.8,
+   "building_envelope_ac": 13.2,
+   "mapped_constraints_ac": 0.15,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 2.81,
+   "frontage_ft": 1006,
+   "frontage_road": "local road, GDOT route 1121200072603",
+   "edges_ft": {
+    "ROW": 1015,
+    "RES_SIDE": 809,
+    "OTHER": 2062
+   }
+  },
+  "rank": "45",
+  "svg": "plan4-45.svg"
+ },
+ {
+  "id": "53",
+  "title": "#53 0 SOUTH FULTON PKWY, Union City (29.5 ac tax roll)",
+  "fits": true,
+  "hypothetical": true,
+  "feasible": false,
+  "jurisdiction_rules": "union city",
+  "configuration": "rear-load 160 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 720.0,
+   "D_ft": 160,
+   "sf": 115000,
+   "office_sf": 2500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 229000,
+  "doors": 23,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 12,
+   "total": 12,
+   "target": 12
+  },
+  "cars": {
+   "provided": 85,
+   "row_capacity": 90,
+   "required": 81,
+   "basis": "employees proxy SF/2,500 (Union City, draft); market 81",
+   "ada": 4,
+   "per_1000_sf": 0.74,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 28.1,
+   "sf_per_gross_ac": 8100,
+   "gross_far": 0.19,
+   "impervious_ac": 14.4,
+   "impervious_pct": 51,
+   "paving_envelope_ac": 26.0
+  },
+  "detention": {
+   "storage_acft": 5.4,
+   "ponds": 2,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": false,
+   "car_driveway": false,
+   "frontage_ft": 0,
+   "road": null,
+   "truck_route_ft": 0,
+   "car_route_ft": 0
+  },
+  "grading": {
+   "relief_ft": 43,
+   "cut_fill_cy": 48000,
+   "steep_share_pct": 16,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 0 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "GRADING_RISK",
+     "note": "16% of the graded area is steeper than 15% (lidar)"
+    },
+    {
+     "flag": "RELIEF",
+     "note": "about 43 ft of relief across the graded area: terraces or retaining walls likely"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for union city; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "8,149 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 4.5 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.8 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "second_building": {
+   "configuration": "rear-load 190 deep, court only, cars at office end",
+   "L_ft": 600.0,
+   "D_ft": 190,
+   "sf": 114000,
+   "doors": 23,
+   "trailers": 12,
+   "trailers_target": 12,
+   "cars_capacity": 84,
+   "cars_required": 80,
+   "own_driveways": true,
+   "route_ft": 0
+  },
+  "totals_both_buildings": {
+   "doors": 46,
+   "trailers": 24,
+   "trailers_target": 24,
+   "cars_capacity": 174
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 115000,
+    "L": 720.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 118000,
+    "L": 620.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 106000,
+    "L": 660.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 80000,
+    "L": 420.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 61000,
+    "L": 380.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 57000,
+    "L": 300.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 28.1,
+   "paving_envelope_ac": 26.0,
+   "building_envelope_ac": 24.7,
+   "mapped_constraints_ac": 0.19,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 5.09,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "RES_REAR": 0,
+    "OTHER": 6928
+   }
+  },
+  "rank": "53",
+  "svg": "plan4-53.svg"
+ },
+ {
+  "id": "56",
+  "title": "#56 4600 JONESBORO RD, Union City (9.8 ac tax roll)",
+  "fits": false,
+  "jurisdiction_rules": "union city",
+  "flags": {
+   "1": [
+    {
+     "flag": "NO_FIT",
+     "note": "no building variant fits the envelope with its truck court, parking and pond"
+    },
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [],
+   "3": []
+  },
+  "inputs": {
+   "parcel_ac_map": 9.8,
+   "paving_envelope_ac": 8.9,
+   "building_envelope_ac": 8.2,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.04,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "OTHER": 3884
+   }
+  },
+  "rank": "56"
+ },
+ {
+  "id": "57",
+  "title": "#57 99 UNIVERSITY AVE SW R, Atlanta (11.4 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "atlanta",
+  "configuration": "rear-load 190 deep, court only, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 420.0,
+   "D_ft": 190,
+   "sf": 80000,
+   "office_sf": 1500,
+   "clear_height_ft": 32
+  },
+  "total_sf": 80000,
+  "total_sf_if_access": 80000,
+  "doors": 16,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 8,
+   "total": 8,
+   "target": 8
+  },
+  "cars": {
+   "provided": 80,
+   "row_capacity": 84,
+   "required": 80,
+   "basis": "market ratio (Atlanta's 1/600 code minimum unverified)",
+   "ada": 4,
+   "per_1000_sf": 1.0,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 11.0,
+   "sf_per_gross_ac": 7200,
+   "gross_far": 0.17,
+   "impervious_ac": 5.4,
+   "impervious_pct": 49,
+   "paving_envelope_ac": 10.2
+  },
+  "detention": {
+   "storage_acft": 2.0,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG none rated; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": false,
+   "frontage_ft": 515,
+   "road": "major collector, SR 54",
+   "truck_route_ft": 142,
+   "car_route_ft": 365
+  },
+  "grading": {
+   "relief_ft": 3,
+   "cut_fill_cy": 1000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "ATL_PARKING_CODE",
+     "note": "parking at the market ratio; Atlanta's 1/600 SF code minimum (unverified after the parking reforms) would need far more"
+    },
+    {
+     "flag": "ACCESS_SHARED",
+     "note": "one driveway: cars split from trucks inside the throat"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "1 driveway(s): a second fire access (emergency-only link) or fire-official approval needed"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for atlanta; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,229 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.9 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 80000,
+    "L": 420.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 72000,
+    "L": 380.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 70000,
+    "L": 440.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 67000,
+    "L": 420.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator rear-load 260, court only, cars along office wall",
+    "operator": true,
+    "sf": 104000,
+    "L": 400.0,
+    "D": 260,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 86000,
+    "L": 540.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 11.0,
+   "paving_envelope_ac": 10.2,
+   "building_envelope_ac": 9.9,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.48,
+   "frontage_ft": 515,
+   "frontage_road": "major collector, SR 54",
+   "edges_ft": {
+    "ROW": 524,
+    "OTHER": 3222
+   }
+  },
+  "rank": "57",
+  "svg": "plan4-57.svg"
+ },
+ {
+  "id": "60",
+  "title": "#60 0 STACKS RD, South Fulton / unincorporated (6.7 ac tax roll)",
+  "fits": false,
+  "jurisdiction_rules": "south fulton",
+  "flags": {
+   "1": [
+    {
+     "flag": "NO_FIT",
+     "note": "no building variant fits the envelope with its truck court, parking and pond"
+    },
+    {
+     "flag": "ACCESS_NONE",
+     "note": "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 0 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    }
+   ],
+   "3": []
+  },
+  "inputs": {
+   "parcel_ac_map": 7.4,
+   "paving_envelope_ac": 6.7,
+   "building_envelope_ac": 6.7,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 1.67,
+   "frontage_ft": 0,
+   "frontage_road": null,
+   "edges_ft": {
+    "RES_REAR": 0,
+    "OTHER": 2733
+   }
+  },
+  "rank": "60"
+ },
+ {
+  "id": "64",
+  "title": "#64 0 IRWIN RD, Fairburn (11.8 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "fairburn",
+  "configuration": "rear-load 190 deep, court only, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 560.0,
+   "D_ft": 190,
+   "sf": 106000,
+   "office_sf": 2000,
+   "clear_height_ft": 32
+  },
+  "total_sf": 106000,
+  "total_sf_if_access": 106000,
+  "doors": 21,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 0,
+   "total": 0,
+   "target": 11
+  },
+  "cars": {
+   "provided": 75,
+   "row_capacity": 93,
+   "required": 75,
+   "basis": "Fairburn warehouse formula (draft); market 75",
+   "ada": 3,
+   "per_1000_sf": 0.7,
+   "stall": "10 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 11.8,
+   "sf_per_gross_ac": 9000,
+   "gross_far": 0.21,
+   "impervious_ac": 6.4,
+   "impervious_pct": 54,
+   "paving_envelope_ac": 10.6
+  },
+  "detention": {
+   "storage_acft": 2.4,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1484,
+   "road": "local road, GDOT route 1121200062000",
+   "truck_route_ft": 361,
+   "car_route_ft": 43
+  },
+  "grading": {
+   "relief_ft": 10,
+   "cut_fill_cy": 10000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "COLLECTOR_FRONTAGE",
+     "note": "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"
+    },
+    {
+     "flag": "TRAILER_SHORT",
+     "note": "0 trailer stalls against a target of 11"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for fairburn; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "8,990 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 2.6 (comps about 2.0-2.1)"
+    },
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 190 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 106000,
+    "L": 560.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 102000,
+    "L": 640.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 77000,
+    "L": 480.0,
+    "D": 160,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 95000,
+    "L": 500.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 110000,
+    "L": 480.0,
+    "D": 230,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 72000,
+    "L": 380.0,
+    "D": 190,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 11.8,
+   "paving_envelope_ac": 10.6,
+   "building_envelope_ac": 9.4,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.0,
+   "frontage_ft": 1484,
+   "frontage_road": "local road, GDOT route 1121200062000",
+   "edges_ft": {
+    "ROW": 1489,
+    "OTHER": 2019
+   }
+  },
+  "rank": "64",
+  "svg": "plan4-64.svg"
+ },
+ {
+  "id": "84",
+  "title": "#84 4105 ROOSEVELT HWY, South Fulton / unincorporated (5.3 ac tax roll)",
+  "fits": false,
+  "jurisdiction_rules": "south fulton",
+  "flags": {
+   "1": [
+    {
+     "flag": "NO_FIT",
+     "note": "no building variant fits the envelope with its truck court, parking and pond"
+    }
+   ],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 1,153 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    }
+   ],
+   "3": []
+  },
+  "inputs": {
+   "parcel_ac_map": 5.2,
+   "paving_envelope_ac": 2.9,
+   "building_envelope_ac": 2.5,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.09,
+   "frontage_ft": 713,
+   "frontage_road": "principal arterial, SR 14",
+   "edges_ft": {
+    "RES_REAR": 885,
+    "ROW": 722,
+    "RES_SIDE": 268,
+    "OTHER": 809
+   }
+  },
+  "rank": "84"
+ },
+ {
+  "id": "100",
+  "title": "#100 0 GOODSON CONNECTOR, Union City (16.0 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": true,
+  "jurisdiction_rules": "union city",
+  "configuration": "rear-load 270 deep, court only, cars along office wall",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 600.0,
+   "D_ft": 270,
+   "sf": 162000,
+   "office_sf": 3000,
+   "clear_height_ft": 32
+  },
+  "total_sf": 162000,
+  "total_sf_if_access": 162000,
+  "doors": 32,
+  "trailers": {
+   "court_rows": 0,
+   "drop_yards": 0,
+   "total": 0,
+   "target": 16
+  },
+  "cars": {
+   "provided": 115,
+   "row_capacity": 122,
+   "required": 114,
+   "basis": "employees proxy SF/2,500 (Union City, draft); market 114",
+   "ada": 5,
+   "per_1000_sf": 0.71,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 14.6,
+   "sf_per_gross_ac": 11100,
+   "gross_far": 0.26,
+   "impervious_ac": 8.2,
+   "impervious_pct": 56,
+   "paving_envelope_ac": 13.0
+  },
+  "detention": {
+   "storage_acft": 3.1,
+   "ponds": 1,
+   "fits": true,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": true,
+   "frontage_ft": 1029,
+   "road": "local road, GDOT route 1121200061121",
+   "truck_route_ft": 45,
+   "car_route_ft": 417
+  },
+  "grading": {
+   "relief_ft": 21,
+   "cut_fill_cy": 25000,
+   "steep_share_pct": 0,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 179 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "SHORT_THROAT",
+     "note": "truck throat about 45 ft from the street to the court (100 ft wanted for stacking)"
+    },
+    {
+     "flag": "TRAILER_SHORT",
+     "note": "0 trailer stalls against a target of 16"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for union city; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "POND_SITE_FROM_LIDAR",
+     "note": "pond placed low, near the module and on its side of mapped wetlands; no outfall, maintenance drive or grading design"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 270 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 162000,
+    "L": 600.0,
+    "D": 270,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 120000,
+    "L": 520.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 190 deep, court + trailer row, cars along office wall",
+    "operator": false,
+    "sf": 114000,
+    "L": 600.0,
+    "D": 190,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 138000,
+    "L": 600.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 230 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 120000,
+    "L": 520.0,
+    "D": 230,
+    "feasible": true,
+    "route_problem": false
+   },
+   {
+    "variant": "operator rear-load 260, court only, cars along office wall",
+    "operator": true,
+    "sf": 156000,
+    "L": 600.0,
+    "D": 260,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 14.6,
+   "paving_envelope_ac": 13.0,
+   "building_envelope_ac": 11.2,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 1.06,
+   "frontage_ft": 1029,
+   "frontage_road": "local road, GDOT route 1121200061121",
+   "edges_ft": {
+    "ROW": 1057,
+    "RES_SIDE": 179,
+    "OTHER": 4564
+   }
+  },
+  "rank": "100",
+  "svg": "plan4-100.svg"
+ },
+ {
+  "id": "110",
+  "title": "#110 0 GULLATT RD, Fairburn (6.0 ac tax roll)",
+  "fits": false,
+  "jurisdiction_rules": "fairburn",
+  "flags": {
+   "1": [
+    {
+     "flag": "NO_FIT",
+     "note": "no building variant fits the envelope with its truck court, parking and pond"
+    }
+   ],
+   "2": [
+    {
+     "flag": "COLLECTOR_FRONTAGE",
+     "note": "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"
+    }
+   ],
+   "3": []
+  },
+  "inputs": {
+   "parcel_ac_map": 5.6,
+   "paving_envelope_ac": 4.8,
+   "building_envelope_ac": 4.1,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.21,
+   "frontage_ft": 754,
+   "frontage_road": "local road, GDOT route 1121200063409",
+   "edges_ft": {
+    "ROW": 763,
+    "OTHER": 1727
+   }
+  },
+  "rank": "110"
+ },
+ {
+  "id": "124",
+  "title": "#124 0 CAMPBELL DR, South Fulton / unincorporated (5.0 ac tax roll)",
+  "fits": true,
+  "hypothetical": false,
+  "feasible": false,
+  "jurisdiction_rules": "south fulton",
+  "configuration": "rear-load 160 deep, court + trailer row, cars at office end",
+  "operator_prototype": false,
+  "building": {
+   "L_ft": 260.0,
+   "D_ft": 160,
+   "sf": 42000,
+   "office_sf": 1000,
+   "clear_height_ft": 32
+  },
+  "total_sf": 0,
+  "total_sf_if_access": 42000,
+  "doors": 8,
+  "trailers": {
+   "court_rows": 4,
+   "drop_yards": 0,
+   "total": 4,
+   "target": 4
+  },
+  "cars": {
+   "provided": 45,
+   "row_capacity": 47,
+   "required": 42,
+   "basis": "warehouse 1/2,000 SF + office 3/1,000 (Fulton / South Fulton / East Point code, draft); market 42",
+   "ada": 2,
+   "per_1000_sf": 1.08,
+   "stall": "9 x 18 ft"
+  },
+  "coverage": {
+   "gross_ac": 5.3,
+   "sf_per_gross_ac": 7900,
+   "gross_far": 0.18,
+   "impervious_ac": 3.6,
+   "impervious_pct": 68,
+   "paving_envelope_ac": 3.9
+  },
+  "detention": {
+   "storage_acft": 1.3,
+   "ponds": 0,
+   "fits": false,
+   "basis": "1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG B; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"
+  },
+  "access": {
+   "truck_driveway": true,
+   "car_driveway": false,
+   "frontage_ft": 456,
+   "road": "local road, GDOT route 1121200162300",
+   "truck_route_ft": 57,
+   "car_route_ft": 298
+  },
+  "grading": {
+   "relief_ft": 23,
+   "cut_fill_cy": 9000,
+   "steep_share_pct": 1,
+   "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"
+  },
+  "flags": {
+   "1": [],
+   "2": [
+    {
+     "flag": "RESIDENTIAL_EDGE",
+     "note": "about 438 ft of boundary touches residential parcels (county land-use codes); draft buffers applied"
+    },
+    {
+     "flag": "ACCESS_SHARED",
+     "note": "one driveway: cars split from trucks inside the throat"
+    },
+    {
+     "flag": "SHORT_THROAT",
+     "note": "truck throat about 57 ft from the street to the court (100 ft wanted for stacking)"
+    },
+    {
+     "flag": "FIRE_SECOND_ACCESS",
+     "note": "1 driveway(s): a second fire access (emergency-only link) or fire-official approval needed"
+    },
+    {
+     "flag": "POND_DOES_NOT_FIT",
+     "note": "1 pond(s) of 1.3 ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"
+    },
+    {
+     "flag": "LOADING_FACES_RES",
+     "note": "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"
+    },
+    {
+     "flag": "STREET_FACING_DOCKS",
+     "note": "a truck court faces the street within 100 ft (screening; some codes forbid it)"
+    },
+    {
+     "flag": "ZONING_DRAFT",
+     "note": "setbacks and buffers are draft screening values for south fulton; zoning_rules.json is the authority"
+    },
+    {
+     "flag": "STREAMS_PIPELINES",
+     "note": "stream lines and petroleum pipelines are not mapped; mapped water, wetlands and floodplain get a 25 ft buffer"
+    }
+   ],
+   "3": [
+    {
+     "flag": "BELOW_COMP_BAND",
+     "note": "7,906 SF per gross acre; Georgia comps run about 10,500-15,400"
+    },
+    {
+     "flag": "LD_OUT_OF_BAND",
+     "note": "length/depth 1.6 (comps 2.0-3.8)"
+    },
+    {
+     "flag": "IMPERVIOUS_RATIO",
+     "note": "impervious / building footprint 3.7 (comps about 2.0-2.1)"
+    }
+   ]
+  },
+  "alternatives": [
+   {
+    "variant": "rear-load 160 deep, court + trailer row, cars at office end",
+    "operator": false,
+    "sf": 42000,
+    "L": 260.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": false
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars along office wall",
+    "operator": false,
+    "sf": 45000,
+    "L": 280.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   },
+   {
+    "variant": "rear-load 160 deep, court only, cars at office end",
+    "operator": false,
+    "sf": 38000,
+    "L": 240.0,
+    "D": 160,
+    "feasible": false,
+    "route_problem": true
+   }
+  ],
+  "inputs": {
+   "parcel_ac_map": 5.3,
+   "paving_envelope_ac": 3.9,
+   "building_envelope_ac": 3.7,
+   "mapped_constraints_ac": 0.0,
+   "transmission_ac": 0.0,
+   "test_cut_ac": 0.0,
+   "steep_ac": 0.11,
+   "frontage_ft": 456,
+   "frontage_road": "local road, GDOT route 1121200162300",
+   "edges_ft": {
+    "RES_REAR": 438,
+    "ROW": 465,
+    "OTHER": 1043
+   }
+  },
+  "rank": "124",
+  "svg": "plan4-124.svg"
+ }
+]
