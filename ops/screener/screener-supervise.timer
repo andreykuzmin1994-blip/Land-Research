@@ -1,0 +1,13 @@
+[Unit]
+Description=Weekly land screener run
+
+[Timer]
+# Sunday 15:00 UTC (morning in the US), well clear of the USDA soils
+# service's nightly outage (about 00:00-02:00 Mountain).
+OnCalendar=Sun *-*-* 15:00:00 UTC
+# A run missed while the server was off starts at the next boot.
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target
