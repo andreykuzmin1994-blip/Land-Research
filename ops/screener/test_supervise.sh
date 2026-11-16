@@ -30,6 +30,8 @@ case "$2" in
       refresh) [[ "$*" == *--refresh* ]] && ok; echo "  ! bad answer; re-run later, or with --refresh"; exit 1 ;;
       usage) echo "usage: run.py [--refresh] [--refresh-slope]"; echo "run.py: error: unrecognized arguments: --limt"; exit 2 ;;
       empty) echo "[12:00:00] nothing left to screen"; exit 1 ;;
+      outwarn) o=""; p=""; for x in "$@"; do [ "$p" = --out ] && o="$x"; p="$x"; done
+               mkdir -p "$o"; echo "- SOIL SERVICE FAILURES: re-run later" >"$o/summary.md"; exit 0 ;;
       warn) mkdir -p screener/output/fake-x
             echo "- SOIL SERVICE FAILURES: re-run later" >screener/output/fake-x/summary.md; exit 0 ;;
     esac ;;
@@ -109,6 +111,11 @@ check "--limit 50 passed" 'grep -q -- "--limit 50" $CASE/fake/run-args'
 echo "warnings in summary.md get an alert"
 new_case warn; FAKE_RUN=warn FAKE_CLAUDE=none "$SUP" 2>/dev/null
 check "warning alert" 'alerts | grep -q "done with warnings"'
+
+echo "warnings are found in an --out folder too"
+new_case outwarn; FAKE_RUN=outwarn FAKE_CLAUDE=none "$SUP" --out "$CASE/elsewhere" 2>/dev/null
+check "warning alert" 'alerts | grep -q "done with warnings"'
+check "summary names the --out folder" 'alerts | grep -q -- "-> $CASE/elsewhere"'
 
 echo "persistent failure, Claude fixes the county module"
 new_case fix; FAKE_RUN=fail FAKE_CLAUDE=fix "$SUP" 2>/dev/null; rc=$?

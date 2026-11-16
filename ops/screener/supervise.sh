@@ -117,7 +117,13 @@ run_county() {
     notify "Screener: $county settings missing" "No file $REPO_DIR/$settings." high
     RESULTS+=("$county: settings file missing"); return 1
   fi
-  local waits=(0 $RETRY_WAITS) attempt=0 rc=1 refresh=() alog=""
+  local waits=(0 $RETRY_WAITS) attempt=0 rc=1 refresh=() alog="" out="" prev="" a
+  # An --out folder given to the screener is where its summary.md lands.
+  for a in "$@"; do
+    [ "$prev" = --out ] && out="$a"
+    case "$a" in --out=*) out="${a#--out=}" ;; esac
+    prev="$a"
+  done
   for w in "${waits[@]}"; do
     attempt=$((attempt + 1))
     if [ "$w" -gt 0 ]; then log "$county: waiting $((w / 60)) min before attempt $attempt"; $SLEEP "$w"; fi
@@ -128,7 +134,7 @@ run_county() {
         --settings "$REPO_DIR/$settings" "${refresh[@]}" "$@") >"$alog" 2>&1
     rc=$?
     if [ "$rc" -eq 0 ]; then
-      report_success "$county" "$alog" "$attempt"; return 0
+      report_success "$county" "$alog" "$attempt" "$out"; return 0
     fi
     # Not worth retrying or handing off: a usage/settings error (argparse
     # exits 2) or a run that found no candidates.
@@ -152,8 +158,8 @@ $(tail -5 "$alog")" urgent
 }
 
 report_success() {
-  local county="$1" alog="$2" attempt="$3" out summary warn
-  out="$(ls -1dt "$REPO_DIR/screener/output/$county"-* 2>/dev/null | head -1)"
+  local county="$1" alog="$2" attempt="$3" out="${4:-}" summary warn
+  [ -n "$out" ] || out="$(ls -1dt "$REPO_DIR/screener/output/$county"-* 2>/dev/null | head -1)"
   summary="$out/summary.md"
   warn=""
   if [ -f "$summary" ]; then
