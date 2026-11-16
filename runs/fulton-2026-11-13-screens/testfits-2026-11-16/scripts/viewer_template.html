@@ -1,0 +1,283 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Site Plan Viewer</title>
+<style>
+:root{--bg:#f4f3ef;--panel:#fff;--ink:#1d2327;--mute:#5d676e;--line:#d9d6cd;--accent:#2b6cb0;--sel:#e8f0fa;
+--open:#2f6f4f;--unchecked:#3f5f86;--doubt:#a86a00;--taken:#b3402f;--drop:#8a2d22;--listed:#6b5b95;--test:#6b4fa0;--plan:#ffffff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15181a;--panel:#1e2225;--ink:#e6e3dc;--mute:#9aa3a9;--line:#33393d;--sel:#23324a;--accent:#7fb0e6}}
+:root[data-theme="dark"]{--bg:#15181a;--panel:#1e2225;--ink:#e6e3dc;--mute:#9aa3a9;--line:#33393d;--sel:#23324a;--accent:#7fb0e6}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+button{font:inherit}
+.app{display:grid;grid-template-columns:340px 1fr;height:100vh}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+.head{padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+h1{font-size:17px;margin:0 0 2px}.sub{color:var(--mute);font-size:12.5px}
+.controls{display:grid;gap:6px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.controls input,.controls select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:2px 9px;font-size:12.5px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.chip:disabled{opacity:.45;cursor:default}
+.count{font-size:12.5px;color:var(--mute)}.count button{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+#list{overflow:auto;flex:1;min-height:0;padding:6px}
+.item{display:grid;grid-template-columns:64px 1fr;gap:8px;padding:6px;border-radius:8px;cursor:pointer;border:1px solid transparent;width:100%;text-align:left;background:none;color:inherit}
+.item:hover{background:var(--sel)}.item[aria-current=true]{background:var(--sel);border-color:var(--accent)}
+.thumb{width:64px;height:64px;border:1px solid var(--line);border-radius:4px;background:var(--plan);overflow:hidden}
+.thumb svg{width:100%;height:auto;display:block}
+.it-t{font-weight:600;font-size:13.5px;line-height:1.25}.it-s{color:var(--mute);font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.s-open{background:var(--open)}.s-unchecked{background:var(--unchecked)}.s-doubt{background:var(--doubt)}.s-taken{background:var(--taken)}.s-drop{background:var(--drop)}.s-listed{background:var(--listed)}
+.tag{font-size:11px;font-weight:600;padding:0 6px;border-radius:999px;background:var(--test);color:#fff;margin-left:4px}
+main{display:grid;grid-template-rows:auto 1fr;min-width:0;min-height:0}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+.bar button,.bar a.btn,.bar select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;text-decoration:none}
+.bar a.btn[aria-disabled=true]{opacity:.45;pointer-events:none}
+#cmpsel{width:auto;max-width:320px;flex:0 1 320px}
+.bar label{font-size:13px;display:flex;gap:4px;align-items:center}
+.bar .sp{flex:1}
+.stage{display:grid;grid-template-columns:1fr 360px;min-height:0}
+.stage.cmp{grid-template-columns:1fr 1fr}
+.view{position:relative;overflow:hidden;background:var(--bg);touch-action:none;min-height:0}
+.view .canvas{position:absolute;left:0;top:0;transform-origin:0 0;background:var(--plan);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.view .canvas svg{display:block}
+.vlabel{position:absolute;left:8px;top:8px;right:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;z-index:2}
+.vlabel .mini{color:var(--mute)}
+.scalenote{position:absolute;left:8px;bottom:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;z-index:2}
+.facts{overflow:auto;padding:12px 14px;border-left:1px solid var(--line);background:var(--panel)}
+.facts h2{font-size:17px;margin:0 0 2px}.facts .place{color:var(--mute);margin-bottom:8px}
+.badge{display:inline-block;font-size:12px;font-weight:600;color:#fff;border-radius:999px;padding:1px 9px;margin:0 4px 6px 0}
+[hidden]{display:none!important}
+dl{display:grid;grid-template-columns:minmax(6em,9.5em) 1fr;gap:3px 10px;margin:8px 0;font-size:13.5px}dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
+.note{font-size:13px;background:var(--bg);border-radius:6px;padding:8px 10px;margin:8px 0;overflow-wrap:anywhere}
+.lbl{color:var(--mute);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0}td,th{border-bottom:1px solid var(--line);padding:3px 4px;text-align:left;vertical-align:top}
+.empty{padding:30px;color:var(--mute)}
+.facts button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer}
+@media (max-width:860px){.app{grid-template-columns:1fr;height:auto}aside{max-height:46vh}main{min-height:80vh}.stage,.stage.cmp{grid-template-columns:1fr}.view{height:55vh}.view.fitted{touch-action:pan-y}.facts{border-left:0;border-top:1px solid var(--line)}}
+</style></head><body>
+<div class="app">
+<aside>
+ <div class="head"><h1>Site Plan Viewer</h1><div class="sub">Run __RUN__ · screening sketches from public maps, not surveys</div></div>
+ <div class="controls">
+  <input id="q" type="search" placeholder="Search address, parcel, rank…" aria-label="Search">
+  <div class="row2">
+   <select id="sort" aria-label="Sort"><option value="rank">Sort: rank</option><option value="sf">Sort: building SF</option><option value="acres">Sort: county-map acres</option></select>
+   <select id="fitf" aria-label="Building fit"><option value="">Any fit</option><option value="fits">Operator prototypes fit</option><option value="none">Operator prototypes don't fit</option><option value="small">Fits only smaller test buildings</option><option value="cross">Cross-dock</option></select>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="count" id="count" aria-live="polite"></div>
+ </div>
+ <div id="list" aria-label="Site plans"></div>
+</aside>
+<main>
+ <div class="bar">
+  <button id="prev" title="Previous (←)" aria-label="Previous plan">◀</button><button id="next" title="Next (→)" aria-label="Next plan">▶</button>
+  <button id="zin" title="Zoom in (+)" aria-label="Zoom in">＋</button><button id="zout" title="Zoom out (−)" aria-label="Zoom out">－</button><button id="zfit" title="Fit (0)">Fit</button>
+  <button id="cmp" title="Compare with another plan (c)">Compare</button>
+  <select id="cmpsel" aria-label="Compare with" hidden></select>
+  <label id="samewrap" hidden><input type="checkbox" id="same" checked> Same scale</label>
+  <span class="sp"></span>
+  <a class="btn" id="dl" download>Download SVG</a>
+ </div>
+ <div class="stage" id="stage">
+  <div class="view" id="v1"><div class="vlabel" id="l1"></div><div class="canvas" id="c1"></div><div class="scalenote" id="s1" hidden></div></div>
+  <div class="facts" id="facts"></div>
+  <div class="view" id="v2" hidden><div class="vlabel" id="l2"></div><div class="canvas" id="c2"></div><div class="scalenote" id="s2" hidden></div></div>
+ </div>
+</main>
+</div>
+<script>
+const PLANS = __DATA__;
+const ST = {open:"Pursue",unchecked:"Not checked",doubt:"Open doubt",taken:"Probably taken",drop:"Likely drop",listed:"Listed"};
+const COL = {open:"var(--open)",unchecked:"var(--unchecked)",doubt:"var(--doubt)",taken:"var(--taken)",drop:"var(--drop)",listed:"var(--listed)"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = s => String(s ?? "").toLowerCase().replace(/\s+/g," ").trim();
+const fmt = n => Number(n).toLocaleString();
+let uid=0; const svgOf=p=>{const u="hx"+(++uid);return p.svg.replace(/id="hx"/g,`id="${u}"`).replace(/url\(#hx\)/g,`url(#${u})`);};
+const filt = {status:new Set(), kind:new Set()};
+let shown = [], cur = 0, cmpId = null;
+function store(k,v){try{localStorage.setItem("spv:"+k,v)}catch(e){}}
+function load(k){try{return localStorage.getItem("spv:"+k)}catch(e){return null}}
+const acresText = p => [p.taxAc!=null?`${p.taxAc} ac tax roll`:null, p.mapAc!=null?`${p.mapAc} ac county map`:null].filter(Boolean).join(" · ");
+const smallOnly = p => p.kind==="test" && !p.stdFits && p.sf>0;
+
+// chips with counts
+const chipDefs = [["kind","run","Run plans"],["kind","test","Test fits"],...Object.entries(ST).map(([k,v])=>["status",k,v])];
+for (const [g,k,label] of chipDefs){
+  const n = PLANS.filter(p=>(g==="kind"?p.kind:p.status)===k).length;
+  const b=document.createElement("button");b.className="chip";b.type="button";b.setAttribute("aria-pressed","false");b.dataset.g=g;b.dataset.k=k;
+  b.innerHTML=(g==="status"?`<span class="dot s-${k}"></span>`:"")+esc(label)+` <span class="lbl">${n}</span>`;
+  if(!n){b.disabled=true;b.title="No plans have this status";}
+  b.onclick=()=>{const s=filt[g];s.has(k)?s.delete(k):s.add(k);b.setAttribute("aria-pressed",s.has(k));render();};
+  $("#chips").appendChild(b);
+}
+["q","sort","fitf"].forEach(id=>$("#"+id).addEventListener("input",()=>render()));
+
+function match(p){
+  const q=norm($("#q").value);
+  if(q && !norm(`#${p.rank} ${p.title} ${p.pid} ${p.place}`).includes(q)) return false;
+  if(filt.status.size && !filt.status.has(p.status)) return false;
+  if(filt.kind.size && !filt.kind.has(p.kind)) return false;
+  const f=$("#fitf").value;
+  if(f==="fits" && !p.stdFits) return false;
+  if(f==="none" && p.stdFits) return false;
+  if(f==="small" && !smallOnly(p)) return false;
+  if(f==="cross" && !/cross-dock/.test(p.fit)) return false;
+  return true;
+}
+function clearFilters(){
+  $("#q").value="";$("#fitf").value="";filt.status.clear();filt.kind.clear();
+  document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));render();
+}
+function render(){
+  const s=$("#sort").value;
+  const curId = shown[cur]?.id || load("cur");
+  shown = PLANS.filter(match).sort((a,b)=> s==="sf"? b.sf-a.sf || a.rank-b.rank : s==="acres"? (b.mapAc||0)-(a.mapAc||0) : a.rank-b.rank || (a.kind==="run"?-1:1));
+  const active = $("#q").value || $("#fitf").value || filt.status.size || filt.kind.size;
+  $("#count").innerHTML=`Showing ${shown.length} of ${PLANS.length} plans`+(active?' · <button type="button" id="clr">clear filters</button>':"");
+  if(active) $("#clr").onclick=clearFilters;
+  const L=$("#list"); L.innerHTML="";
+  if(!shown.length){L.innerHTML='<div class="empty">No plans match.</div>';}
+  shown.forEach((p,i)=>{
+    const b=document.createElement("button");b.className="item";b.type="button";
+    b.innerHTML=`<div class="thumb" aria-hidden="true">${svgOf(p)}</div><div><div class="it-t">${esc(p.title)}${p.kind==="test"?'<span class="tag">test fit</span>':""}</div>
+      <div class="it-s"><span class="dot s-${p.status}"></span>${esc(ST[p.status])} · ${esc(p.place)}</div>
+      <div class="it-s">${p.sf? fmt(p.sf)+" SF":"no building fit"} · ${esc(p.mapAc??p.taxAc)} ac</div></div>`;
+    b.onclick=()=>show(i);
+    L.appendChild(b);
+  });
+  const idx = shown.findIndex(p=>p.id===curId);
+  show(idx<0?0:idx);
+}
+function show(i){
+  if(!shown.length){
+    ["c1","l1","facts","c2","l2"].forEach(id=>$("#"+id).innerHTML="");
+    const a=$("#dl");a.removeAttribute("href");a.setAttribute("aria-disabled","true");return;
+  }
+  cur=(i+shown.length)%shown.length;
+  const p=shown[cur]; store("cur",p.id);
+  document.querySelectorAll(".item").forEach((el,j)=>{el.setAttribute("aria-current",j===cur?"true":"false");});
+  document.querySelectorAll(".item")[cur]?.scrollIntoView({block:"nearest"});
+  put(1,p); facts(p);
+  const a=$("#dl"); if(a.dataset.url) URL.revokeObjectURL(a.dataset.url);
+  a.dataset.url=URL.createObjectURL(new Blob([p.svg],{type:"image/svg+xml"})); a.href=a.dataset.url; a.download=`site-plan-${p.id}.svg`; a.removeAttribute("aria-disabled");
+  if(cmpId!==null) fillCmp(p);
+}
+function facts(p){
+  const fr = p.frontage>0 ? `${fmt(Math.round(p.frontage))} ft (${p.frontageRoad})` : (p.frontageRoad || "none within 50 ft of a GDOT road");
+  const rows=[["Parcel",p.pid],["Acres",acresText(p)+(p.open!=null?` · largest open part ${p.open} ac (county map)`:"")],["Zoning",p.zoning],["Grade",p.grade],
+    ["Building drawn",p.fit+(p.sf?` · ${fmt(p.sf)} SF${p.second?" in 2 buildings":""}`:"")],["Detention pond",p.pond]];
+  if(p.kind==="run") rows.push(["Ground",`flood ${p.flood}%, wetlands ${p.wet}%, steep ${p.steep}% (steep ground not located)`],["Frontage",fr],["Access",p.exit]);
+  if(p.kind==="test"){
+    rows.push(["Operator prototypes",p.standard]);
+    if(p.runFit) rows.push(["Run's own fit",p.runFit]);
+    if(p.maxNoPond && p.maxNoPond>p.sf - (p.second?p.second.sf:0)) rows.push(["Same building, no pond room",`${fmt(p.maxNoPond)} SF`]);
+    if(p.cut) rows.push(["Test cut",`${p.cut}% of the parcel (red hatch)`]);
+    if(p.steep) rows.push(["Steep share (run)",`${p.steep} (not located)`]);
+  }
+  if(p.second) rows.push(["Second building",`${p.second.label} ${p.second.length_ft} ft long · ${fmt(p.second.sf)} SF · own pond ${p.second.pond}`]);
+  let h=`<h2>${esc(p.title)}</h2><div class="place">${esc(p.place)}</div>
+   <span class="badge" style="background:${COL[p.status]}">${esc(ST[p.status])}</span>${p.kind==="test"?'<span class="badge" style="background:var(--test)">Test fit</span>':""}
+   <dl>${rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+  if(p.explain) h+=`<div class="note"><span class="lbl">What this test fit does:</span> ${esc(p.explain)}</div>`;
+  if(p.candidates){h+=`<table><tr><th>Building tried</th><th>Largest</th><th>With pond room (lower bound)</th></tr>${p.candidates.map(v=>`<tr><td>${esc(v.building)}${v.operator_prototype?" <span class='lbl'>(operator)</span>":" <span class='lbl'>(test)</span>"}</td><td>${v.max_sf?fmt(v.max_sf)+" SF"+(v.at_cap?(v.operator_prototype?" (full prototype length)":" (test length cap)"):""):"no fit"}</td><td>${v.with_pond_sf?fmt(v.with_pond_sf)+" SF":"no"}</td></tr>`).join("")}</table>`;}
+  if(p.scenario){
+    const sc=p.scenario; const parts=[];
+    if(sc.lots) parts.push("Lots merged (county class, city zoning): "+sc.lots.map(l=>`${l.address} (${l.class}, ${Object.entries(l.zoning).map(([k,v])=>k+" "+v+" ac").join(", ")||"no zoning returned"})`).join("; "));
+    if(sc.box_query) parts.push(sc.box_query);
+    if(sc.parcels) parts.push("Parcels merged: "+sc.parcels.map(x=>x.address).join("; ")+(sc.left_out?` · left out: ${sc.left_out}`:""));
+    if(sc.buffer_ft) parts.push(`Cemetery parcel ${sc.cemetery_parcel}: ${sc.relation}; about ${fmt(sc.shared_boundary_ft)} ft of shared line; ${sc.buffer_overlap_acres} ac of #25 inside the ${sc.buffer_ft} ft test buffer`);
+    if(sc.zoning_on_parcel) parts.push("Zoning on the parcel (city layer): "+Object.entries(sc.zoning_on_parcel).map(([k,v])=>`${k} ${v} ac`).join(", "));
+    if(parts.length) h+=`<div class="note">${parts.map(esc).join("<br>")}</div>`;
+  }
+  if(p.note) h+=`<div class="note"><span class="lbl">Mark in decisions.csv:</span> ${esc(p.note)}</div>`;
+  if(p.skeptic) h+=`<div class="note"><span class="lbl">Document check: skeptic verdict</span> ${esc(p.skeptic)}${p.headline?`<br><span class="lbl">Headline (agent reading, not verified):</span> ${esc(p.headline)}`:""}</div>`;
+  if(p.related){const r=PLANS.find(x=>x.id===p.related); if(r) h+=`<p><button type="button" id="sbs">Compare with ${esc(r.title)}${r.kind==="run"?" (run plan)":""}</button></p>`;}
+  if(p.maps && /^https:\/\/www\.google\.com\/maps\//.test(p.maps)) h+=`<p><a href="${esc(p.maps)}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a></p>`;
+  h+=`<p class="lbl">North up, from the county parcel map. Blue: floodplain, mapped wetlands and water, easements, protected land (and any test cut). Green: largest open part. Orange: building envelope (building + truck court + trailer row where stated). Teal: detention pond allowance. Steep ground, utility easements, zoning setbacks beyond 25 ft and car parking are not drawn.</p>`;
+  $("#facts").innerHTML=h;
+  const sb=$("#sbs"); if(sb) sb.onclick=()=>{cmpId=p.related;openCmp();};
+}
+// zoom & pan
+const Z={1:{s:1,x:0,y:0,fitted:true,w:0,h:0},2:{s:1,x:0,y:0,fitted:true,w:0,h:0}};
+const planOf={1:null,2:null};
+function put(n,p){
+  planOf[n]=p; const c=$("#c"+n); c.innerHTML=svgOf(p);
+  $("#l"+n).innerHTML=`${esc(p.title)}<span class="mini"> · ${p.sf?fmt(p.sf)+" SF":"no building fit"} · ${esc(acresText(p))} · ${esc(ST[p.status])}</span>`;
+  requestAnimationFrame(refit);
+}
+function apply(n){const z=Z[n];$("#c"+n).style.transform=`translate(${z.x}px,${z.y}px) scale(${z.s})`;$("#v"+n).classList.toggle("fitted",z.fitted);}
+function dims(n){const svg=$("#c"+n).querySelector("svg");return svg?[+svg.getAttribute("width")||640,+svg.getAttribute("height")||800]:null;}
+function fitScale(n){const v=$("#v"+n),d=dims(n);if(!d)return null;return Math.min((v.clientWidth-24)/d[0],(v.clientHeight-60)/d[1]);}
+function place(n,s){const v=$("#v"+n),d=dims(n);if(!d)return;Z[n]={s,x:(v.clientWidth-d[0]*s)/2,y:Math.max(44,(v.clientHeight-d[1]*s)/2+16),fitted:true,w:v.clientWidth,h:v.clientHeight};apply(n);}
+function refit(){
+  const cmpOn = cmpId!==null && !$("#v2").hidden;
+  const same = cmpOn && $("#same").checked && planOf[1]?.fpp && planOf[2]?.fpp;
+  if(same){
+    // equal feet per screen pixel in both panes: s_i = k * fpp_i, k the largest that fits both
+    const k=Math.min(fitScale(1)/planOf[1].fpp, fitScale(2)/planOf[2].fpp);
+    place(1,k*planOf[1].fpp); place(2,k*planOf[2].fpp);
+    $("#s1").hidden=$("#s2").hidden=false; $("#s1").textContent=$("#s2").textContent="Same scale in both panes";
+  } else {
+    place(1,fitScale(1)); if(cmpOn) place(2,fitScale(2));
+    $("#s1").hidden=$("#s2").hidden=!cmpOn; if(cmpOn) $("#s1").textContent=$("#s2").textContent="Not to the same scale: check each scale bar";
+  }
+}
+function zoomAt(n,f,cx,cy){
+  const z=Z[n], v=$("#v"+n); if(cx===undefined){cx=v.clientWidth/2;cy=v.clientHeight/2;}
+  const ns=Math.min(12,Math.max(0.05,z.s*f)); z.x=cx-(cx-z.x)*ns/z.s; z.y=cy-(cy-z.y)*ns/z.s; z.s=ns; z.fitted=false; apply(n);
+}
+for (const n of [1,2]){
+  const v=$("#v"+n); let drag=null; const pts=new Map(); let pinch=null;
+  v.addEventListener("wheel",e=>{e.preventDefault();const r=v.getBoundingClientRect();zoomAt(n,e.deltaY<0?1.15:1/1.15,e.clientX-r.left,e.clientY-r.top);},{passive:false});
+  v.addEventListener("pointerdown",e=>{
+    if(e.pointerType==="touch" && Z[n].fitted && pts.size===0){pts.set(e.pointerId,[e.clientX,e.clientY]);drag=null;return;}
+    v.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pts.size===1)drag=[e.clientX,e.clientY]; else {drag=null;pinch=null;}
+  });
+  v.addEventListener("pointermove",e=>{
+    if(!pts.has(e.pointerId))return; pts.set(e.pointerId,[e.clientX,e.clientY]);
+    if(pts.size===2){const [a,b]=[...pts.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);const r=v.getBoundingClientRect();
+      if(pinch) zoomAt(n,d/pinch,(a[0]+b[0])/2-r.left,(a[1]+b[1])/2-r.top); pinch=d; return;}
+    if(drag){Z[n].x+=e.clientX-drag[0];Z[n].y+=e.clientY-drag[1];Z[n].fitted=false;drag=[e.clientX,e.clientY];apply(n);}
+  });
+  const up=e=>{pts.delete(e.pointerId);pinch=null;if(pts.size===1){drag=[...pts.values()][0].slice();}else if(!pts.size)drag=null;};
+  v.addEventListener("pointerup",up);v.addEventListener("pointercancel",up);
+  v.addEventListener("dblclick",()=>refit());
+}
+const both=f=>{zoomAt(1,f);if(cmpId!==null)zoomAt(2,f);};
+$("#zin").onclick=()=>both(1.25);$("#zout").onclick=()=>both(0.8);$("#zfit").onclick=refit;
+$("#prev").onclick=()=>show(cur-1);$("#next").onclick=()=>show(cur+1);
+$("#same").onchange=refit;
+// compare
+function openCmp(){
+  $("#stage").classList.add("cmp");$("#v2").hidden=false;$("#facts").hidden=true;$("#cmpsel").hidden=false;$("#samewrap").hidden=false;$("#cmp").textContent="Close compare";
+  fillCmp(shown[cur]);
+}
+function closeCmp(){
+  cmpId=null;$("#stage").classList.remove("cmp");$("#v2").hidden=true;$("#facts").hidden=false;$("#cmpsel").hidden=true;$("#samewrap").hidden=true;$("#cmp").textContent="Compare";
+  planOf[2]=null;requestAnimationFrame(refit);
+}
+function fillCmp(p){
+  if(!p) return;
+  const sel=$("#cmpsel"); sel.innerHTML=PLANS.filter(x=>x.id!==p.id).sort((a,b)=>a.rank-b.rank).map(x=>`<option value="${esc(x.id)}">${esc(x.title)}${x.kind==="test"?" (test fit)":""}</option>`).join("");
+  if(!cmpId || cmpId===p.id) cmpId=p.related || PLANS.find(x=>x.rank===p.rank && x.id!==p.id)?.id || sel.options[0]?.value;
+  sel.value=cmpId; const q=PLANS.find(x=>x.id===cmpId); if(q) put(2,q);
+}
+$("#cmpsel").onchange=e=>{cmpId=e.target.value;put(2,PLANS.find(x=>x.id===cmpId));};
+$("#cmp").onclick=()=>{ if(cmpId!==null) closeCmp(); else {cmpId=undefined;openCmp();} };
+document.addEventListener("keydown",e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.target.matches("input,select,textarea"))return;
+  if(e.key==="ArrowRight"||e.key==="j")show(cur+1); else if(e.key==="ArrowLeft"||e.key==="k")show(cur-1);
+  else if(e.key==="+"||e.key==="=")both(1.25); else if(e.key==="-")both(0.8); else if(e.key==="0")refit(); else if(e.key==="c")$("#cmp").click();
+});
+let rt=null;
+addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{
+  for(const n of [1,2]){const v=$("#v"+n),z=Z[n];if(v.hidden)continue;
+    if(Math.abs(v.clientWidth-z.w)<2 && Math.abs(v.clientHeight-z.h)<60) continue;   // URL bar show/hide on phones
+    if(z.fitted) refit(); else {z.w=v.clientWidth;z.h=v.clientHeight;}
+  }},120);});
+render();
+</script></body></html>

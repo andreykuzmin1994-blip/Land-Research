@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="924" viewBox="0 0 640 924" font-family="sans-serif">
+<title>Site plan #65 parcel 14 0180  LL0368 (test fit)</title><defs><pattern id="hx" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#c92a2a" stroke-width="2"/></pattern></defs>
+<rect x="0" y="0" width="640" height="924" fill="#ffffff"/>
+<path class="parcel-fill" d="M316.2,339.1 L253.2,313.3 L253.2,304.7 L171.3,263.4 L109.3,240.2 L20.0,214.9 L20.2,190.9 L299.7,193.4 L312.9,289.1 Z M618.3,452.7 L549.7,428.4 L550.0,434.8 L333.3,346.1 L330.6,286.7 L317.9,193.9 L463.3,197.3 L463.4,187.3 L601.6,189.1 L601.4,329.0 L615.2,329.3 L614.4,400.1 L620.0,421.1 Z" fill="#f4f1ea" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="largest-open" d="M333.3,346.1 L330.6,286.7 L321.6,221.6 L416.7,222.8 L417.2,222.8 L463.4,222.7 L513.6,223.4 L514.1,420.1 Z" fill="#cfe8c4" fill-rule="evenodd" fill-opacity="1.0" stroke="none" stroke-width="0.0"/>
+<path class="constrained" d="M20.0,214.9 L20.2,190.9 L299.7,193.4 L312.9,289.1 L303.6,221.4 L95.3,218.7 L95.0,219.1 L92.1,221.2 L89.1,222.9 L85.9,224.4 L82.6,225.6 L79.2,226.4 L75.7,226.9 L72.2,227.0 L62.6,227.0 Z M549.7,428.4 L550.0,434.8 L333.3,346.1 L514.1,420.1 L513.6,223.4 L463.4,222.7 L417.2,222.8 L416.7,222.8 L321.6,221.6 L317.9,193.9 L463.3,197.3 L463.4,187.3 L601.6,189.1 L601.4,329.0 L615.2,329.3 L614.4,400.1 L620.0,421.1 L618.3,452.7 Z" fill="#9cc3e0" fill-rule="evenodd" fill-opacity="0.8" stroke="none" stroke-width="0.0"/>
+<path class="envelope" d="M441.8,380.7 L513.3,380.7 L513.3,294.9 L441.8,294.9 Z" fill="#f2c9a0" fill-rule="evenodd" fill-opacity="0.8" stroke="#b5534a" stroke-width="2.0"/>
+<path class="pond" d="M352.6,294.8 L495.7,294.8 L495.7,223.3 L352.6,223.3 Z" fill="#7fc4bd" fill-rule="evenodd" fill-opacity="0.9" stroke="#1f6f68" stroke-width="2.0"/>
+<path class="scenario-exclusion" d="M513.6,223.4 L463.4,222.7 L417.2,222.8 L416.7,222.8 L321.6,221.6 L317.9,193.9 L463.3,197.3 L463.4,187.3 L601.6,189.1 L601.4,329.0 L615.2,329.3 L614.4,400.1 L620.0,421.1 L618.3,452.7 L549.7,428.4 L550.0,434.8 L514.1,420.1 Z M95.3,218.7 L95.0,219.1 L92.1,221.2 L89.1,222.9 L85.9,224.4 L82.6,225.6 L79.2,226.4 L75.7,226.9 L72.2,227.0 L62.6,227.0 L20.0,214.9 L20.2,190.9 L299.7,193.4 L303.6,221.4 Z" fill="url(#hx)" fill-opacity="0.7" stroke="#c92a2a" stroke-width="1.5"/><path class="parcel" d="M316.2,339.1 L253.2,313.3 L253.2,304.7 L171.3,263.4 L109.3,240.2 L20.0,214.9 L20.2,190.9 L299.7,193.4 L312.9,289.1 Z M618.3,452.7 L549.7,428.4 L550.0,434.8 L333.3,346.1 L330.6,286.7 L317.9,193.9 L463.3,197.3 L463.4,187.3 L601.6,189.1 L601.4,329.0 L615.2,329.3 L614.4,400.1 L620.0,421.1 Z" fill="none" fill-rule="evenodd" fill-opacity="1.0" stroke="#222222" stroke-width="1.5"/>
+<text x="469.5" y="341.8" font-size="11" text-anchor="middle" font-weight="bold">small-bay flex 120 ft deep (test) 24,000 SF</text>
+<rect x="594.0" y="22.0" width="28" height="48" fill="#ffffff" fill-opacity="0.8"/>
+<path class="north" d="M608.0,26.0 L616.0,52.0 L608.0,46.0 L600.0,52.0 Z" fill="#222222"/>
+<text x="608.0" y="66.0" font-size="12" text-anchor="middle" font-weight="bold">N</text>
+<path class="scale" d="M20.0,633.0 L20.0,638.0 L198.8,638.0 L198.8,633.0" fill="none" stroke="#222222" stroke-width="2.0"/>
+<text x="204.8" y="638.0" font-size="11" text-anchor="start" font-weight="normal">500 ft</text>
+<rect x="20" y="660.0" width="14" height="10" fill="#f4f1ea" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="670.0" font-size="12" text-anchor="start" font-weight="normal">Parcel (county map) 14.4 ac</text>
+<rect x="20" y="678.0" width="14" height="10" fill="#9cc3e0" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="688.0" font-size="12" text-anchor="start" font-weight="normal">Constrained 0%: floodplain, wetlands and water, easements, protected land</text>
+<rect x="20" y="696.0" width="14" height="10" fill="#cfe8c4" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="706.0" font-size="12" text-anchor="start" font-weight="normal">Largest open part 5.3 ac</text>
+<rect x="20" y="714.0" width="14" height="10" fill="#f2c9a0" stroke="#b5534a" stroke-width="1.0"/>
+<text x="40.0" y="724.0" font-size="12" text-anchor="start" font-weight="normal">Envelope: small-bay flex 120 ft deep (test) 200 x 120 ft building, 24,000 SF (+ 120</text>
+<text x="40.0" y="742.0" font-size="12" text-anchor="start" font-weight="normal">ft court, no trailer row)</text>
+<rect x="20" y="750.0" width="14" height="10" fill="#7fc4bd" stroke="#1f6f68" stroke-width="1.0"/>
+<text x="40.0" y="760.0" font-size="12" text-anchor="start" font-weight="normal">Detention pond 400 x 200 ft beside the envelope: rough allowance, no hydrology</text>
+
+<rect x="20" y="768.0" width="14" height="10" fill="url(#hx)" stroke="#c92a2a" stroke-width="1.0"/>
+<text x="40.0" y="778.0" font-size="12" text-anchor="start" font-weight="normal">Test cut 46% of the parcel (red hatch): residential zoning (city layer, measured</text>
+<text x="40.0" y="796.0" font-size="12" text-anchor="start" font-weight="normal">from the zoning line) + 100 ft test buffer. Not a mapped constraint; it is also</text>
+<text x="40.0" y="814.0" font-size="12" text-anchor="start" font-weight="normal">shaded blue.</text>
+<rect x="20" y="822.0" width="14" height="10" fill="#f4f1ea" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="832.0" font-size="12" text-anchor="start" font-weight="normal">The same building without leaving room for the pond: up to 57,600 SF (480 ft long).</text>
+<text x="40.0" y="850.0" font-size="12" text-anchor="start" font-weight="normal">Sizes are lower bounds (two search orders tried).</text>
+<rect x="20" y="858.0" width="14" height="10" fill="#f4f1ea" stroke="#222222" stroke-width="1.0"/>
+<text x="40.0" y="868.0" font-size="12" text-anchor="start" font-weight="normal">Acres: 14.4 county map, 14.7 tax roll; steep share (run&#x27;s lidar check) 20.2%: steep</text>
+<text x="40.0" y="886.0" font-size="12" text-anchor="start" font-weight="normal">ground not located</text>
+<text x="20.0" y="904.0" font-size="11" text-anchor="start" font-weight="normal">North up. Steep ground not shown. A screening sketch, not a survey.</text>
+</svg>
