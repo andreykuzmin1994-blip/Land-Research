@@ -7,9 +7,6 @@ After=network-online.target
 Type=oneshot
 User=screener
 WorkingDirectory=/home/screener/Land-Research
-# Claude Code's installer puts `claude` in ~/.local/bin, which systemd's
-# default PATH lacks.
-Environment=PATH=/home/screener/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/screener/Land-Research/ops/screener/supervise.sh
 # Retries sleep for hours inside one run; never time the service out.
 TimeoutStartSec=infinity

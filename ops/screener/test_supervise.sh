@@ -6,7 +6,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUP="$HERE/supervise.sh"
 ROOT="$(mktemp -d)"
-trap 'rm -rf "$ROOT"' EXIT
+[ -n "${KEEP:-}" ] || trap 'rm -rf "$ROOT"' EXIT; echo "tmp: $ROOT"
 PASS=0 FAIL=0
 
 ok()   { PASS=$((PASS + 1)); echo "  ok   $1"; }
@@ -28,6 +28,8 @@ case "$2" in
       fail) echo "  ! the county parcel layer is unavailable (HTTP 404)."; exit 1 ;;
       fail2) [ "$n" -gt 2 ] && ok; echo "  ! flaky"; exit 1 ;;
       refresh) [[ "$*" == *--refresh* ]] && ok; echo "  ! bad answer; re-run later, or with --refresh"; exit 1 ;;
+      usage) echo "usage: run.py [--refresh] [--refresh-slope]"; echo "run.py: error: unrecognized arguments: --limt"; exit 2 ;;
+      empty) echo "[12:00:00] nothing left to screen"; exit 1 ;;
       warn) mkdir -p screener/output/fake-x
             echo "- SOIL SERVICE FAILURES: re-run later" >screener/output/fake-x/summary.md; exit 0 ;;
     esac ;;
@@ -35,16 +37,24 @@ esac
 exit 0
 EOF
 
-# Fake claude: acts in its working directory (the worktree) per $FAKE_CLAUDE.
+# Fake claude: acts in its working directory (the fixer's plain copy) per $FAKE_CLAUDE.
 cat >"$ROOT/fakeclaude" <<'EOF'
 #!/usr/bin/env bash
+[ "$1" = --version ] && exit 0
 echo "$*" >"$FAKE_STATE/claude-args"
+[ -e .git ] && touch "$FAKE_STATE/saw-git"
 case "$FAKE_CLAUDE" in
   fix)     echo "URL = 'new'" >>screener/fake.py ;;
   rank)    echo "# nudge" >>screener/rank.py ;;
   outside) echo "x" >>README.md ;;
   test)    echo "# weakened" >>screener/tests/test_fake.py ;;
   newtest) echo "# new" >screener/tests/test_new.py; echo "URL = 'new'" >>screener/fake.py ;;
+  rename)  mv screener/rank.py screener/rank_old.py ;;
+  testmv)  mv screener/tests/test_fake.py screener/tests/test_fake2.py ;;
+  symlink) ln -s /etc/hostname screener/link.py; echo "URL = 'new'" >>screener/fake.py ;;
+  toml)    printf '[run]\ncounty = "other"\n' >screener/settings-other.toml ;;
+  mode)    chmod +x screener/fake.py ;;
+  cache)   echo poisoned >screener/cache/live.txt; echo "URL = 'new'" >>screener/fake.py ;;
   none)    ;;
 esac
 printf 'County moved its parcel layer\nEvidence: 404 at the old URL.\n' >screener-fix-DIAGNOSIS.md
@@ -59,10 +69,13 @@ new_case() {
    printf '[run]\ncounty = "fake"\n' >screener/settings.toml && : >screener/requirements.txt &&
    echo "URL = 'old'" >screener/fake.py && echo "x = 1" >screener/rank.py &&
    echo "# t" >screener/tests/test_fake.py && echo "readme" >README.md &&
-   printf 'screener/output/\nscreener/cache/\n' >.gitignore && git add -A && git commit -qm init)
+   printf 'screener/output/\nscreener/cache/\n' >.gitignore && git add -A && git commit -qm init &&
+   mkdir -p screener/cache && echo live >screener/cache/live.txt)
+  mkdir -p "$d/fixdir"
   export SCREENER_OPS_CONFIG=/nonexistent REPO_DIR="$d/repo" STATE_DIR="$d/state" \
          PYTHON="$ROOT/fakepy" CLAUDE_BIN="$ROOT/fakeclaude" FAKE_STATE="$d/fake" \
-         PULL=0 SOILS_QUIET=0 SLEEP=true RETRY_WAITS="5 5" NTFY_URL="" CLAUDE_FIX=1 FIX_PUSH=0
+         PULL=0 SOILS_QUIET=0 SLEEP=true RETRY_WAITS="5 5" NTFY_URL="" CLAUDE_FIX=1 FIX_PUSH=0 \
+         FIX_USER="" FIX_DIR="$d/fixdir" FIX_PYTHON="$ROOT/fakepy"
   CASE="$d"
 }
 alerts() { cat "$CASE/state/logs/alerts.log" 2>/dev/null; }
@@ -108,19 +121,44 @@ check "diagnosis file not committed" '! git -C $CASE/repo show --name-only "$b" 
 check "cache symlink not committed" '! git -C $CASE/repo show --name-only "$b" | grep -q cache'
 check "main checkout untouched" '[ -z "$(git -C $CASE/repo status --porcelain)" ] && grep -q old $CASE/repo/screener/fake.py'
 check "worktree removed" '[ -z "$(ls -A $CASE/state/worktrees)" ]'
+check "fixer copy removed" '[ -z "$(ls -A $CASE/fixdir)" ]'
+check "fixer copy had no .git" '[ ! -f $CASE/fake/saw-git ]'
 check "fix-ready alert" 'alerts | grep -q "fix ready for review"'
 
-for mode in rank outside test; do
+for mode in rank outside test rename testmv symlink toml mode; do
   echo "Claude edits a forbidden file ($mode)"
   new_case "forbid-$mode"; FAKE_RUN=fail FAKE_CLAUDE=$mode "$SUP" 2>/dev/null
   check "fix refused" 'alerts | grep -q "fix refused"'
   check "no fix branch" '[ -z "$(branches)" ]'
-  check "patch kept for reading" 'ls $CASE/state/logs/*-fix.patch >/dev/null 2>&1'
+  # A symlink is refused before any diff is made.
+  [ "$mode" = symlink ] || check "patch kept for reading" 'ls $CASE/state/logs/*-fix.patch >/dev/null 2>&1'
 done
 
 echo "Claude adds a new test with its fix (allowed)"
 new_case newtest; FAKE_RUN=fail FAKE_CLAUDE=newtest "$SUP" 2>/dev/null
 check "fix branch exists" '[ -n "$(branches)" ]'
+
+echo "a fixer's cache writes stay out of the live cache"
+new_case cache; FAKE_RUN=fail FAKE_CLAUDE=cache "$SUP" 2>/dev/null
+check "fix branch exists" '[ -n "$(branches)" ]'
+check "live cache untouched" '[ "$(cat $CASE/repo/screener/cache/live.txt)" = live ]'
+
+echo "usage/settings error (exit 2): no retry, no hand-off"
+new_case usage; FAKE_RUN=usage FAKE_CLAUDE=fix "$SUP" 2>/dev/null; rc=$?
+check "exit 1" '[ $rc -eq 1 ]'
+check "one run" '[ "$(cat $CASE/fake/count)" = 1 ]'
+check "Claude not called" '[ ! -f $CASE/fake/claude-args ]'
+check "alert" 'alerts | grep -q "arguments rejected"'
+
+echo "nothing left to screen: no retry, no hand-off"
+new_case empty; FAKE_RUN=empty FAKE_CLAUDE=fix "$SUP" 2>/dev/null
+check "one run" '[ "$(cat $CASE/fake/count)" = 1 ]'
+check "Claude not called" '[ ! -f $CASE/fake/claude-args ]'
+
+echo "hand-off not set up (no fixer folder)"
+new_case nofix; rmdir "$CASE/fixdir"; FAKE_RUN=fail FAKE_CLAUDE=fix "$SUP" 2>/dev/null
+check "explains why" 'alerts | grep -q "no AI hand-off: .*missing"'
+check "Claude not called" '[ ! -f $CASE/fake/claude-args ]'
 
 echo "Claude makes no change (outage)"
 new_case none; FAKE_RUN=fail FAKE_CLAUDE=none "$SUP" 2>/dev/null
@@ -129,7 +167,7 @@ check "no fix branch" '[ -z "$(branches)" ]'
 
 echo "hand-off off"
 new_case off; FAKE_RUN=fail FAKE_CLAUDE=fix CLAUDE_FIX=0 "$SUP" 2>/dev/null
-check "plain failure alert" 'alerts | grep -q "no AI hand-off\|hand-off is off"'
+check "plain failure alert" 'alerts | grep -q "no AI hand-off: the Claude hand-off is off"'
 check "Claude not called" '[ ! -f $CASE/fake/claude-args ]'
 
 echo "a second supervisor exits while one holds the lock"
