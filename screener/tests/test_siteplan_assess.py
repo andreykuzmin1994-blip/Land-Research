@@ -639,7 +639,41 @@ class TightenedRules(ts.Offline):
         beside = ({"LUCode": "101"}, ts.wgs(box(900, 0, 1100, 900)))
         side, _ = ts.planned("sf_homes_beside", lambda: ts.site(900, 900, neighbours=[beside]))
         self.assertGreater(side["inputs"]["edges_ft"]["RES_SIDE"], 850)
-        self.assertLess(side["inputs"]["edges_ft"].get("RES_REAR", 0), 40)
+        # the 20 ft read round the back corner joins the side run: it is not a rear line asking for 110 ft
+        self.assertNotIn("RES_REAR", side["inputs"]["edges_ft"])
+        rows = [r for r in side["compliance"]["rows"] if "residential" in r["item"]]
+        self.assertEqual({r["status"] for r in rows}, {"meets"})
+        self.assertFalse([r for r in rows if "rear" in r["item"]])
+
+    def test_homes_behind_a_shallow_site(self):
+        # review 38/04, second review, finding 1: the turn-round also runs in the
+        # rescue pass (every first-pass layout failed on a route here)
+        homes = ({"LUCode": "101"}, ts.wgs(box(0, 600, 800, 800)))
+        rec, d = ts.planned("sf_homes_shallow", lambda: ts.site(800, 600, neighbours=[homes]))
+        self.assertIs(rec["feasible"], True)
+        self.assertGreater(rec["total_sf"], 50000)
+        rear = sp.unary_union([ln for k, ln in d.edges if k == "RES_REAR"])
+        self.assertGreaterEqual(d.p.module.distance(rear), 110 - 1)
+        self.assertEqual({r["status"] for r in rec["compliance"]["rows"] if "setback" in r["item"]}, {"meets"})
+
+    def test_budget_stop_while_turning_keeps_the_layout(self):
+        # second review, finding 4: out of time mid-turn, the finished failing layout is still the record
+        homes = ({"LUCode": "101"}, ts.wgs(box(0, 900, 900, 1100)))
+        calls = {"n": 0}
+        real = sp.finish
+
+        def finish(p_, ctx, others=None):
+            calls["n"] += 1
+            if calls["n"] == 2:                     # the first turn of the first layout
+                ctx.search.exceeded = True
+                raise sp._BudgetExceeded()
+            return real(p_, ctx, others)
+        with ts.mock.patch.object(sp, "finish", finish), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(ts.site(900, 900, neighbours=[homes]))
+        self.assertTrue(rec["fits"])                 # a drawn plan, not a no-fit
+        self.assertIn("PLAN_BUDGET_EXCEEDED", ts.names(rec, 1))
+        self.assertIs(rec["feasible"], False)
+        self.assertEqual(rec["assessment"]["status"], "incomplete")
 
     def test_fairburn_buffer_flag_covers_rear_lines(self):
         # review 38/04, finding 5: shops on both sides and industry behind
@@ -664,6 +698,18 @@ class TightenedRules(ts.Offline):
         row = [r for r in rec["compliance"]["rows"] if r["item"] == "Truck spaces"][0]
         self.assertEqual(int(row["required"].split()[0]), -(-rec["building"]["sf"] // 5000))
         self.assertEqual(int(row["provided"].split()[0]), rec["trailers"]["total"])
+        # second review, finding 3: the read-out gives the real reason a larger layout ranks lower
+        flat, _ = ts.planned("fair_flat", lambda: ts.site(700, 500, jur="Fairburn"))
+        up = flat["selection"]["upside"]
+        self.assertIsNotNone(up)
+        self.assertIn("truck spaces the draft code asks for", " ".join(up["reasons"]))
+        self.assertNotIn("steep ground and relief", flat["selection"]["basis"])
+        self.assertGreaterEqual(flat["trailers"]["total"], flat["alternatives"][0]["code_trailers"])
+        self.assertGreater(flat["alternatives"][0]["code_trailers"], 0)
+        self.assertEqual(ts.planned("basic", lambda: ts.site(600, 700))[0]["alternatives"][0]["code_trailers"], 0)
+        # the unit: the sentence about the ranking names the code minimum where there is one
+        s2 = assess.selection([dict(alt(68000, trailers=14, target=20), code_trailers=14)], sp.RANKING)
+        self.assertIn("beyond the draft code minimum of truck spaces (14 here)", s2["basis"])
 
     def test_corridor_on_a_shorter_frontage(self):
         # review 38/04, finding 7: the state route is not the longest frontage

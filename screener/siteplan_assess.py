@@ -534,6 +534,11 @@ def _reasons(a: dict[str, Any], chosen: dict[str, Any], w: dict[str, Any]) -> li
     drawn: the mark-downs it carries beyond the plan's own."""
     mine, theirs = _marks(a, w), _marks(chosen, w)
     out = []
+    code = a.get("code_trailers") or 0
+    if code and (a.get("trailers") or 0) < code and (chosen.get("trailers") or 0) >= (chosen.get("code_trailers") or 0):
+        # the one trailer count that still steers the choice: a draft code minimum
+        out.append(f"it has {a.get('trailers') or 0} of the {code} truck spaces the draft code asks for, and a layout that "
+                   "meets that minimum is drawn first")
     if mine["trailer"] - theirs["trailer"] >= MARK_MIN_SF:
         target, got = a.get("trailers_target") or 0, a.get("trailers") or 0
         out.append((f"it has none of its {target} target trailer stalls" if not got
@@ -597,7 +602,8 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
         if why:
             text += " because " + _listed(why)
         else:
-            text += " on the ranking's marks for steep ground and relief, by a small margin"
+            text += " on the ranking's marks for steep ground and relief, by a small margin" if not (
+                (up.get("code_trailers") or 0) > (up.get("trailers") or 0)) else " for its truck spaces"
         text += "."
         if trailer:
             text += " If the tenant does not need that trailer storage, it is the higher-yield scheme."
@@ -610,7 +616,13 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
         # decision), so say what meeting the target would cost.
         full = [a for a in alts[1:] if a.get("geometry_ok") and (a.get("trailers") or 0) >= (a.get("trailers_target") or 0)]
         text = f"It has {chosen.get('trailers') or 0} of its {chosen.get('trailers_target')} target trailer stalls"
-        text += ("; the ranking does not trade floor area for trailer stalls." if not weights.get("trailer_sf") else ".")
+        if weights.get("trailer_sf"):
+            text += "."
+        elif chosen.get("code_trailers"):
+            text += (f"; the ranking does not trade floor area for trailer stalls beyond the draft code minimum of truck "
+                     f"spaces ({chosen['code_trailers']} here).")
+        else:
+            text += "; the ranking does not trade floor area for trailer stalls."
         if full:
             wt = max(full, key=lambda a: a.get("sf") or 0)
             loss = (wt.get("sf") or 0) - (chosen.get("sf") or 0)

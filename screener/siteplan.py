@@ -305,6 +305,7 @@ JUR_TIGHTENED: dict[str, dict[str, Any]] = {
                      "why": ["a reported 2024 moratorium on warehouse applications is flagged"]},
 }
 EDGE_KINDS = ("ROW", "RES_SIDE", "RES_REAR", "COMM", "OTHER_REAR", "OTHER")
+EDGE_STUB_FT = 25.0     # a side or rear stub up to this long joins the run beside it (a neighbour is read 20 ft round a corner)
 # County tax classes (Georgia digest) read off a neighbour's record.
 RES_CLASS, AG_CLASSES, COMM_CLASSES = "R", ("A", "P", "V", "J", "W"), ("C", "E")
 DEFAULT_JURISDICTION = "south fulton"
@@ -755,8 +756,15 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
                 seg = LineString([q0, q1])
                 if seg.length > 0:
                     (rear if row.distance(seg.interpolate(0.5, normalized=True)) > 0.5 * dmax else side).append(seg)
-        merged = [linemerge(unary_union(x)) if len(x) > 1 else (x[0] if x else LineString()) for x in (side, rear)]
-        return merged[0], merged[1]
+        # A neighbour is read 20 ft round a corner (the buffer above). That
+        # stub is not a rear (or side) line of its own: it joins the run
+        # beside it, so a 21 ft "rear" stub does not ask for the rear buffer.
+        if side and rear:
+            if sum(x.length for x in rear) <= EDGE_STUB_FT:
+                side, rear = side + rear, []
+            elif sum(x.length for x in side) <= EDGE_STUB_FT:
+                side, rear = [], rear + side
+        return _merged(side), _merged(rear)
 
     if res_u is not None:
         res = rest.intersection(res_u)
@@ -783,7 +791,7 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
             comm = unary_union(_lines_of(rest.intersection(comm_u)))
             rest = rest.difference(comm_u)
             if not comm.is_empty:
-                out.append(("COMM", linemerge(comm) if comm.geom_type == "MultiLineString" else comm))
+                out.append(("COMM", _merged(_lines_of(comm))))
         if dmax is not None:
             rest, rear = side_and_rear(rest)
             if not rear.is_empty:
@@ -791,6 +799,15 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
     if not rest.is_empty:
         out.append(("OTHER", rest))
     return out
+
+
+def _merged(lines: list) -> BaseGeometry:
+    """Line pieces joined into runs (so an offset keeps its corners); an
+    empty line for none. linemerge takes only a multi-part line."""
+    if not lines:
+        return LineString()
+    u = unary_union(lines)
+    return linemerge(u) if u.geom_type == "MultiLineString" else u
 
 
 def envelope(parcel_ft, edges, offsets):
@@ -2116,17 +2133,22 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     if (not o["pond_ok"] and not o["route_problem"] and not o["violations"]
                             and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
                         pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
-                    if o["route_problem"] and not shorten_routes:
-                        if opts.fixes:
-                            # Turn the same fit round before giving it up. The
-                            # first turn keeps docks away from homes and the
-                            # street; with homes behind, that puts the court
-                            # on the street and the cars at the back, where no
-                            # car route reaches them. Default behaviour only.
+                    if o["route_problem"] and opts.fixes:
+                        # Turn the same fit round before giving it up or
+                        # shortening it. The first turn keeps docks away
+                        # from homes and the street; with homes behind, that
+                        # puts the court on the street and the cars at the
+                        # back, where no car route reaches them. Default
+                        # behaviour only, in the first pass and the rescue.
+                        try:
                             turned = next(((alt, o2) for alt in cur.flips for o2 in [finish(alt, ctx)] if o2["ok"]), None)
-                            if turned is not None:
-                                results.append(turned)
-                                break
+                        except _BudgetExceeded:
+                            results.append((cur, o))        # out of time mid-turn: the finished layout is kept
+                            raise
+                        if turned is not None:
+                            results.append(turned)
+                            break
+                    if o["route_problem"] and not shorten_routes:
                         results.append((cur, o))
                         break
                     if opts.fixes and not o["route_problem"] and not (
@@ -2276,6 +2298,7 @@ def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
     return {"variant": q.v["name"], "operator": q.v["operator"], "sf": rnd(q.sf, 1000), "L": q.L, "D": q.v["D"],
             "geometry_ok": o["ok"], "route_problem": o["route_problem"],
             "doors": q.doors, "trailers": o["trailers"], "trailers_target": q.trailers_target,
+            "code_trailers": q.code_trailers,
             "sf_per_gross_ac": rnd(q.sf / gross_ac, 100) if gross_ac else None,
             "detention_acft": round(o["v_det"], 1), "pond_fits": o["pond_ok"],
             "relief_ft": round(o["relief"]) if o["relief"] else None, "steep_pct": round(o["steep_module_pct"]),

@@ -44,6 +44,35 @@ Left for the operator, from that review:
 ## Second review (of the fixes)
 
 Narrow: turning a layout round, the open yard as one cut, the edge
-split, and the ranking key. Its report and what was done follow.
+split, and the ranking key (commit `0899615`). It ran the cases itself.
 
-(Running when this file was first committed; see the next commit.)
+| # | Finding | Done |
+|---|---|---|
+| 1 (high) | The turn-round was skipped in the rescue pass, so five sites with homes behind (1000 x 700, 800 x 600, 1200 x 500, 700 x 500 ft) still read infeasible. | A layout is turned on any route failure, in the first pass and the rescue. All five now plan (65,000 to 202,000 SF). Test on 800 x 600 ft. |
+| 2 | With homes along a whole side, the plan's own check read "short" on a residential rear line: the 21 ft read round the back corner was its own rear line, asking for 110 ft. | A side or rear stub up to 25 ft joins the run beside it. Test. |
+| 3 | The read-out gave a false reason where a larger Fairburn layout ranked lower ("steep ground and relief" on flat ground; the real reason was 0 of 48 code truck spaces). | Each layout carries its draft code minimum; the read-out states it. Test. |
+| 4 (read) | A time-budget stop during a turn dropped the finished failing layout (a no-fit record instead of the best so far). | The layout is kept before the stop is passed on. Test. |
+| 5 | An unguarded `linemerge` could raise on a single line. | One guarded helper. |
+
+Found sound: the open-yard row read "meets" on every plan drawn (L,
+notched front and rear, triangle, flag lot, holed, partial frontage,
+corner, landlocked, frontage not checked, and a 144-site grid; with the
+test angle list only); boundary length conserved with no overlaps; every
+flip inside the building envelope with the same car capacity;
+`LOADING_FACES_RES` follows the turned plan; no failing layout ranked
+above a passing one; the prototype behaviour identical on 7 sites.
+
+After these fixes: 959 tests pass; the prototype behaviour has 0
+differences from the original code on 8 synthetic sites; the two
+reference sites plan as in `03`. These last fixes were not reviewed a
+third time: they are the reviewer's own suggested fixes, each with a
+test that failed before and passes after.
+
+## Still open
+
+- The 33-site replay of `reviews/37` under the new rules (`03`).
+- An exact tie in the ranking, and truck spaces on a two-building plan,
+  have no test.
+- The open yard was checked with the test angle list (0 and 90
+  degrees) on synthetic shapes, and with the real angles on the two
+  reference sites only.

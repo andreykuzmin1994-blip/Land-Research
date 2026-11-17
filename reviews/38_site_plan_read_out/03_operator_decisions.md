@@ -78,7 +78,7 @@ Neighbours are told apart by county tax class, a stand-in for zoning.
 |---|---|---|
 | Reference #21 (Atlanta, 8.7 ac) | 58,000 SF, 6 of 6 trailer stalls | 68,000 SF, 0 of 7 (`TRAILER_SHORT`); the 58,000 SF layout is named as the one that meets the target |
 | Reference #25 (South Fulton, 9.4 ac) | 67,000 SF, 7 of 7 | 67,000 SF, 7 of 7 (the 77,000 SF court-only layout no longer passes with the 60 ft yard) |
-| 600 x 700 ft rectangle, South Fulton | 106,000 SF | 80,000 SF (the open yard) |
+| 600 x 700 ft rectangle, South Fulton | 106,000 SF | 103,000 SF (the open yard takes floor area; a layout turned round gives most of it back) |
 | 600 x 700 ft, East Point I-1 (gated) | 106,000 SF | 109,000 SF |
 | 900 x 800 ft, Fairburn | 211,000 SF | 211,000 SF |
 | 800 x 900 ft, College Park | 205,000 SF, blocked by the height cap | 200,000 SF, blocked |
@@ -86,12 +86,14 @@ Neighbours are told apart by county tax class, a stand-in for zoning.
 | 900 x 900 ft, South Fulton, a farm behind | 242,000 SF, no buffer | 242,000 SF, 110 ft from the farm's line |
 | 900 x 900 ft, South Fulton, homes behind | not feasible (`CAR_ROUTE_NONE`) | 242,000 SF |
 
-The open yard is the change that costs floor area on tight sites; the
-trailer decision is the one that adds it.
+The open yard costs floor area on tight sites; the trailer decision and
+turning a layout round add it. Sites where a layout is turned take
+longer to plan (4 to 13 s against under 2 s on the synthetic sites
+tried), well inside the 900 s budget.
 
 ## What was verified
 
-- Offline suite: 957 tests, OK. New tests cover each decision and each
+- Offline suite: 959 tests, OK. New tests cover each decision and each
   review finding (`TightenedRules`, `Selection`, `ReferenceSite` in
   `test_siteplan_assess.py`). Two existing tests were re-pointed, not
   weakened (the reviewer checked): the drop-yard test uses a site whose
