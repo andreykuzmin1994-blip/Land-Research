@@ -11,6 +11,7 @@ import io
 import json
 import re
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ET
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -546,7 +547,14 @@ class TightenedRules(ts.Offline):
         proto, _ = ts.planned("basic", lambda: ts.site(600, 700), sp.PlanOptions(behaviour="prototype"))
         self.assertIsNone(proto["operator_decisions"]["open_yard_ft"])
         self.assertNotIn("tightened", proto["zoning"])
-        self.assertGreater(proto["building"]["sf"], ts.planned("basic", lambda: ts.site(600, 700))[0]["building"]["sf"])
+        # the yard binds: without it the same plan stands closer than 60 ft to
+        # a lot line. (It no longer costs floor area here: since the
+        # room-for-the-pond search, reviews/40, the building moves instead;
+        # the default plan is now larger than the prototype's.)
+        with mock.patch.object(sp, "OPEN_YARD_RULE_FT", 0):
+            _, d0 = ts.planned("basic_no_yard", lambda: ts.site(600, 700))
+        lines0 = sp.unary_union([ln for k, ln in d0.edges if k != "ROW"])
+        self.assertLess(d0.p.building.distance(lines0), sp.OPEN_YARD_RULE_FT - 1)
 
     def test_fairburn_truck_space_minimum(self):
         rec, _ = ts.planned("fair_yard", lambda: ts.site(900, 800, jur="Fairburn"))
@@ -699,7 +707,9 @@ class TightenedRules(ts.Offline):
         self.assertEqual(int(row["required"].split()[0]), -(-rec["building"]["sf"] // 5000))
         self.assertEqual(int(row["provided"].split()[0]), rec["trailers"]["total"])
         # second review, finding 3: the read-out gives the real reason a larger layout ranks lower
-        flat, _ = ts.planned("fair_flat", lambda: ts.site(700, 500, jur="Fairburn"))
+        # (700 x 500 ft until reviews/40: the pond search now passes the
+        # 68,000 SF layout there, which meets the code minimum itself)
+        flat, _ = ts.planned("fair_flat", lambda: ts.site(650, 500, jur="Fairburn"))
         up = flat["selection"]["upside"]
         self.assertIsNotNone(up)
         self.assertIn("truck spaces the draft code asks for", " ".join(up["reasons"]))

@@ -623,7 +623,11 @@ class Plans(Offline):
         def blocking(o):
             t[0] = 1e9                 # _blocking is asked only when the rescue pass is considered
             return real(o)
-        with mock.patch.object(sp, "_blocking", blocking):
+        # This site needs the rescue pass only without the room-for-the-pond
+        # search (a 4:1 pond fits it at 151,000 SF on the first pass,
+        # reviews/40): both are switched off here, as this tests the pass.
+        with mock.patch.object(sp, "_blocking", blocking), mock.patch.object(sp, "POND_FALLBACK_RATIOS", ()), \
+                mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
             rec, _ = sp.plan_site(site(700, 700), sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
         self.assertIn("SMALLER_LAYOUTS_NOT_ALL_TRIED", names(rec, 2))
         self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))

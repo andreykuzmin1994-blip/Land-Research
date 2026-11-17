@@ -2281,7 +2281,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     if (not o["pond_ok"] and not o["route_problem"] and not o["violations"]
                             and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
                         pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
-                    if (opts.fixes and floor is None and _blocking(o) == {"POND_DOES_NOT_FIT"} and not o["route_problem"]
+                    sev1 = {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS
+                    if (opts.fixes and floor is None and sev1 == {"POND_DOES_NOT_FIT"} and not o["route_problem"]
                             and not reloc.spent):
                         # Blocked by its pond alone: the same building moved
                         # to leave the pond room. Kept as a result; shorter
