@@ -716,6 +716,16 @@ def steep_cells(dem: Dem, threshold: float = STEEP_PCT, float_keys: bool = False
 # ---------------------------------------------------------------------------
 # Edge classification and envelopes
 # ---------------------------------------------------------------------------
+def residential_neighbour(a: dict[str, Any], rules: dict[str, Any] | None) -> bool:
+    """Whether a county neighbour record counts as residential: a
+    residential land-use or tax class, or, where the rules say
+    ``ag_buffer``, an agricultural one. The one test both the edges and
+    the sheet's neighbour shading use."""
+    lu, cls = str(a.get("LUCode") or ""), str(a.get("ClassCode") or "")
+    ag = bool(rules and rules.get("ag_buffer"))
+    return lu.startswith("1") or cls.startswith(RES_CLASS) or (ag and cls.startswith(AG_CLASSES))
+
+
 def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any] | None = None):
     """Boundary pieces labelled ROW / RES_SIDE / RES_REAR / OTHER.
 
@@ -733,12 +743,10 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
         out.append(("ROW", row))
     rest = edge.difference(front_ft.buffer(5)) if not row.is_empty else edge
     res_zone, comm_zone = [], []
-    ag = bool(rules and rules.get("ag_buffer"))
     for a, s in neighbours:
-        lu, cls = str(a.get("LUCode") or ""), str(a.get("ClassCode") or "")
-        if lu.startswith("1") or cls.startswith(RES_CLASS) or (ag and cls.startswith(AG_CLASSES)):
+        if residential_neighbour(a, rules):
             res_zone.append(plane.ft(s).buffer(20))
-        elif rules is not None and cls.startswith(COMM_CLASSES):
+        elif rules is not None and str(a.get("ClassCode") or "").startswith(COMM_CLASSES):
             comm_zone.append(plane.ft(s).buffer(20))
     res_u = unary_union(res_zone) if res_zone else None
     dmax = (max(row.distance(Point(c)) for q in sitefit.polygon_parts(parcel_ft) for c in q.exterior.coords)
@@ -1639,6 +1647,11 @@ class Drawing:
     second: tuple | None
     B: BaseGeometry | None = None          # building envelope (draft building setbacks)
     edges: list = field(default_factory=list)   # [(ROW | RES_SIDE | RES_REAR | OTHER, line)]
+    # Drawing only (nothing in the record reads them): the lidar samples,
+    # for the sheet's contour lines, and the neighbouring county parcels,
+    # [(RES | OTHER, feet shape)], drawn as context around the site.
+    dem: Dem | None = None
+    context: list = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -2288,7 +2301,9 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     if second is not None:
         q = second[0]
         second = (build(q.v, q.L, q.r, q.frame, prog), second[1])
-    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second, B=B, edges=edges)
+    context = [("RES" if residential_neighbour(a, rules if opts.fixes else None) else "OTHER", plane.ft(s)) for a, s in neigh]
+    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second, B=B, edges=edges,
+                      dem=dem, context=context)
     return rec, drawing
 
 

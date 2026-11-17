@@ -899,6 +899,13 @@ How to read the sheet:
   pond, it says so; underground detention is not offered in this market.
 - **Takeoff.** Paving by duty, earthwork for one level pad (with the pad
   elevation and the deepest cut and fill), disturbed area. No prices.
+- **Context on the plan** (since 2026-11-17). The neighbouring county
+  parcels in outline, residential ones tinted by the same land-use test
+  as the residential edges, and contour lines of the existing ground,
+  traced from the planner's lidar samples (a 40 ft grid, smoothed; the
+  interval and the index contours are in the legend). Both are drawn
+  from inputs the planner already reads and change nothing in the
+  record. The contours are indicative, not a topographic survey.
 
 How to read a plan:
 

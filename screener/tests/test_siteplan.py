@@ -823,7 +823,10 @@ class Plans(Offline):
         self.assertNotIn("href", low)
         self.assertIsNone(re.search(r"\son[a-z]+\s*=", low))
         self.assertNotIn("<style", low)
-        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)) - {"#tx", "#sx", "#cx", "#wx"}, set())
+        refs = set(re.findall(r"url\(([^)]*)\)", svg))
+        self.assertEqual(refs - {"#tx", "#sx", "#cx", "#wx", "#gx"}, set())
+        # every pattern referenced is defined in the file itself
+        self.assertLessEqual({r[1:] for r in refs}, {e.get("id") for e in root.iter() if e.tag.endswith("pattern")})
         self.assertIn("DRAFT", svg)
         tags = {e.tag.split("}")[-1] for e in root.iter()}
         self.assertLessEqual(tags, {"svg", "title", "rect", "defs", "pattern", "line", "path", "circle", "text"})
