@@ -272,18 +272,25 @@ plan and changes no layout, flag, feasibility or floor area.
   Driveways and routes are left out of the paving rows: a driveway has
   to cross the road setback. Every row is against `JUR_DRAFT`.
 - **Why this layout.** The search ranks finished layouts by floor area,
-  marked down for steep ground under the pad (60% of the steep share),
-  for relief past 25 ft (400 SF per ft) and for each trailer stall short
-  of the target (2,000 SF). Those numbers were in the code; they are now
-  named (`RANKING`) and printed. When a larger layout passed its checks
-  but ranks lower, the read-out names it, the gain, and only the
-  mark-downs it carries beyond the plan drawn.
-- **What the surface pond costs.** When a layout passes every check but
-  the pond, the search shortens it until a pond fits. The read-out keeps
-  the layout as first tried and reports it (`selection.without_pond`):
-  the floor area underground or off-site detention would add, and the
-  storage that would have to move. On reference site #21 the plan drawn
-  is 58,000 SF and a 96,000 SF layout passed all but the pond.
+  marked down for steep ground under the pad (60% of the steep share)
+  and for relief past 25 ft (400 SF per ft). Those numbers were in the
+  code; they are now named (`RANKING`) and printed. Until 2026-11-17 a
+  trailer stall short of the target also cost 2,000 SF; the operator
+  took that out (decision 9 below), so the largest layout that passes is
+  drawn and a shortfall is flagged (`TRAILER_SHORT`). When the plan
+  drawn is short of its trailer target, the read-out names the largest
+  layout tried that meets it and what it costs in floor area
+  (`selection.with_trailers`). When a larger layout passed its checks
+  but ranks lower, it names that one and the mark-downs it carries.
+- **What the surface pond costs.** When a layout passes every layout
+  check but the pond, the search shortens it until a pond fits. The
+  read-out keeps the layout as first tried and reports it
+  (`selection.without_pond`) when it is at least 5% larger than the plan
+  drawn. What it says depends on the market (decision 7 below): here,
+  that underground detention is not used and the plan drawn stands; in a
+  market run with `--underground-detention`, to price a vault against
+  the floor area. On reference site #21 the plan drawn is 68,000 SF and
+  a 95,000 SF layout passed all but the pond.
 - **Takeoff.** Heavy paving (truck courts, roads and routes, trailer
   stalls, drop yards), light paving (car parking and drives), earthwork
   for one level pad with its elevation and deepest cut and fill, the
@@ -296,6 +303,52 @@ plan and changes no layout, flag, feasibility or floor area.
 What the read-out is not: a second feasibility rule, a cost estimate, or
 a zoning opinion. The search itself is unchanged (see the open items in
 the review note for what the read-out shows about it).
+
+## Tightened draft values (2026-11-17)
+
+The operator asked for every value that read looser than the codes to be
+tightened (`reviews/38_site_plan_read_out/02_draft_offsets_check.md` has
+the comparison and its sources; `03_operator_decisions.md` the change).
+They are in `JUR_TIGHTENED` in `siteplan.py`, laid over the draft table
+in the default behaviour only. `--prototype-behaviour` reads the draft
+table as it was. **They are still draft**: several rest on a 2013 or a
+2019 text, and none is verified against the adopted code. Each plan
+lists what was applied under `zoning.tightened`.
+
+- **The open yard.** The building stands 60 ft (`OPEN_YARD_RULE_FT`)
+  from every lot line that is not a road: the building code's
+  unlimited-area rule. Applied to every building, whatever its size. A
+  smaller building may not need it, and 40 ft is allowed with 3-hour
+  walls; set the constant to 40 to plan that way.
+- **Rear lot lines.** A rear line that is not residential is its own
+  kind (`OTHER_REAR`): a stretch of boundary further from the road than
+  half the parcel's depth. Fairburn 30 ft, East Point 30 ft (2019 text).
+  Fairburn's side stays at the draft 25 ft (the code says 20).
+- **Commercial and institutional neighbours** (`COMM`: county tax class
+  C or E). East Point: the 50 ft landscaped strip toward any
+  non-industrial parcel. Fairburn: the 50 ft buffer to other districts
+  (the flag `DISTRICT_BUFFER_NOT_DRAWN` stays for the other lot lines,
+  where the wording is unclear). Palmetto: 20 ft.
+- **Agricultural neighbours** (tax class A, P, V, J or W) count as
+  residential ones in South Fulton, unincorporated Fulton and Union
+  City, where an agricultural district triggers the buffer.
+- **Atlanta.** 31 ft from a residential line: the 20 ft transitional
+  yard plus 11 ft for the 45-degree height plane at a 46 ft building.
+- **Fairburn truck spaces.** One per 5,000 SF of warehouse is a floor
+  under the trailer target; the check has a "Truck spaces" row.
+- **East Point B-P.** Front yard 45 ft.
+- **Palmetto corridor overlay.** 95 ft building and 35 ft paving at the
+  road when the frontage reads as SR 14 (US 29) or SR 154. The other
+  three overlay roads are county roads, which carry no name in the GDOT
+  layer, so every other Palmetto plan carries `CORRIDOR_OVERLAY`: check
+  the road.
+- **College Park.** Nothing dimensional was found. A reported 2024
+  moratorium on warehouse applications is flagged
+  (`USE_RESTRICTION_REPORTED`).
+
+Neighbours are told apart by county tax class, the only thing the county
+record gives. It is a stand-in for their zoning: a farm taxed as
+residential, or a shop on industrial land, reads by its tax class.
 
 ## Draft zoning values
 
@@ -370,8 +423,9 @@ information.
     `RESIDENTIAL_EDGE`.
   - Code and data: `ZONING_DRAFT` (on every plan),
     `JURISDICTION_DEFAULTED`, `ATL_PARKING_CODE`, `COLLECTOR_FRONTAGE`
-    and `DISTRICT_BUFFER_NOT_DRAWN` (Fairburn), `ACREAGE_MISMATCH`,
-    `STREAMS_PIPELINES`.
+    and `DISTRICT_BUFFER_NOT_DRAWN` (Fairburn), `CORRIDOR_OVERLAY`
+    (Palmetto), `USE_RESTRICTION_REPORTED` (College Park),
+    `ACREAGE_MISMATCH`, `STREAMS_PIPELINES`.
   - Search: `SECOND_BUILDING_NOT_SEARCHED`,
     `SMALLER_LAYOUTS_NOT_ALL_TRIED`.
   - Second building: each of the second building's own flags appears
@@ -487,25 +541,30 @@ questions stand for you to answer.
    above allow it. This matters most on 5 to 15 acre parcels.
 7. **Detention.** Soil group from SSURGO (the current default) or B
    everywhere? Full 100-year attenuation, or the 25-year storm with safe
-   conveyance? Is underground detention acceptable at screening? The
-   read-out now puts a number on that last question for each site: the
-   layout that passed every check but the surface pond
-   (`selection.without_pond`, the `without_pond_sf` column of
-   `plans.csv`).
+   conveyance? **Underground detention: decided 2026-11-17.** Not in a
+   market where land is cheap (Atlanta); yes where it is dear (infill
+   Chicago, New Jersey). `UNDERGROUND_DETENTION = False` for this
+   county; `--underground-detention` is for a market that uses it. The
+   switch changes what the read-out says when the surface pond holds the
+   building, and nothing in the layout: the planner draws surface ponds
+   only. Counting floor area on a vault is not built; it belongs with
+   the first market that needs it.
 8. **What counts as built.** The built check's thresholds (10,000 SF in
    the outline, 2,500 SF in a hole, $250,000 of improvements) are
    placeholders. Should the built check become a screen? A screen change
    is in human-owned `screens.py` and needs a new baseline.
 
-9. **How layouts are ranked.** `RANKING` in `siteplan.py`: floor area,
-   less 60% of the steep share, 400 SF per ft of relief past 25 ft, and
-   2,000 SF per trailer stall short of the target. The trailer mark
-   decides many small sites: on both reference fixtures a court-only
-   layout 10,000 SF larger passed its checks and ranks below the plan
-   drawn. Is a
-   trailer stall worth 2,000 SF of building to you? Changing the numbers
-   changes which plan is drawn, so it is a planner change with its own
-   review, not something the read-out does.
+9. **How layouts are ranked. Decided 2026-11-17: a trailer stall is not
+   worth floor area.** `RANKING` in `siteplan.py` is floor area, less
+   60% of the steep share and 400 SF per ft of relief past 25 ft. The
+   2,000 SF per missing trailer stall is gone from the default behaviour
+   (the prototype behaviour keeps it, for parity). The largest layout
+   that passes is drawn; a shortfall is flagged, and the read-out names
+   the largest layout that meets the target. On reference site #21 the
+   plan drawn went from 58,000 SF with 6 trailer stalls to 68,000 SF
+   with none.
+10. **The looser draft values. Decided 2026-11-17: tighten all of them.**
+   See "Tightened draft values" above.
 
 The research spec listed further questions (court depth, door ratio,
 gated courts, fire assumptions, the number of buildings per parcel,

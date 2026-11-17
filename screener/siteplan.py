@@ -64,6 +64,16 @@ the prototype set, market depths and edge strip are constants only):
   comps (operator=False) that fill the 166k-312k SF gap.
 - ``OTHER_EDGE_MIN_PAVE_FT`` = 10: a landscape strip on other lot lines.
 
+DECIDED by the operator on 2026-11-17 (default behaviour only; reviews/38):
+
+- ``RANKING``: no floor area for trailer stalls. The largest layout that
+  passes is drawn; a shortfall is flagged ``TRAILER_SHORT``.
+- ``UNDERGROUND_DETENTION`` = False: not in a market where land is cheap
+  (``--underground-detention`` for one where it is dear).
+- ``JUR_TIGHTENED`` and ``OPEN_YARD_RULE_FT`` = 60: every value that read
+  looser than the codes, tightened, and the building-code open yard at
+  the building. Still draft.
+
 BEHAVIOUR. ``--prototype-behaviour`` reproduces the v4 prototype's numbers
 (the parity proof; the draft labels, the input states and a search cut by
 the time budget are reported the same way in both modes). The default adds the reviewed fixes, each a listed

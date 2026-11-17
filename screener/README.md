@@ -836,6 +836,10 @@ feasibility or floor area.
 - `--parking`, `--atlanta-parking` and `--trailer-ratio` are the
   operator's open decisions (`SITE_PLANNING.md`). Every plan records the
   values it used.
+- `--underground-detention` is for a market where land is dear enough
+  for a vault (the operator's decision: not Atlanta). It changes what
+  the read-out says when the surface pond holds the building. The layout
+  still draws surface ponds only.
 - `--max-seconds-per-site` is the search budget, 900 s by default (above
   0, up to 86,400; anything else is refused). Most
   sites take under a minute; a 78-acre assemblage took 14 minutes. A
@@ -888,10 +892,11 @@ How to read the sheet:
   How the draft values compare with the codes read so far is in
   `reviews/38_site_plan_read_out/02_draft_offsets_check.md`.
 - **Layouts compared.** The plan drawn first, then the others tried,
-  with why the plan ranks first. When a larger layout passed its checks
-  but ranks lower (often for trailer stalls), the sheet says how much
-  larger and why. When a layout passed every check but the surface
-  pond, it says what underground or off-site detention would add.
+  with why the plan ranks first. The ranking gives no floor area for
+  trailer stalls (the operator's decision), so when the plan drawn is
+  short of its trailer target the sheet names the largest layout that
+  meets it. When a layout passed every layout check but the surface
+  pond, it says so; underground detention is not offered in this market.
 - **Takeoff.** Paving by duty, earthwork for one level pad (with the pad
   elevation and the deepest cut and fill), disturbed area. No prices.
 
@@ -941,8 +946,10 @@ Routes, fire access and grading are indicative.
 
 **Zoning values are DRAFT.** Every setback, buffer, parking code,
 coverage cap and height cap is a draft screening value (`JUR_DRAFT` in
-`siteplan.py`), mostly from code mirrors, not checked against the
-adopted codes. Every record carries `zoning.status: draft` and the
+`siteplan.py`, with `JUR_TIGHTENED` laid over it since 2026-11-17: the
+values that read looser than the codes, tightened at the operator's
+request, and a 60 ft open yard at the building), mostly from code
+mirrors, not checked against the adopted codes. Every record carries `zoning.status: draft` and the
 `ZONING_DRAFT` flag, and every drawing says DRAFT. A jurisdiction with no
 draft rules gets South Fulton's, flagged `JURISDICTION_DEFAULTED`. The
 root system's human-owned `zoning_rules.json` is the authority, and

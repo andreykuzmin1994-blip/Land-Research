@@ -221,8 +221,8 @@ either section were not checked.
 
 ## What would change if the looser values were tightened
 
-Not done here; each is a planner change that moves yields and needs its
-own review and the replay of `reviews/37`.
+**Done on 2026-11-17 at the operator's word ("all of them"):
+`03_operator_decisions.md`.** The list as it stood:
 
 - Fairburn: a 30 ft rear offset, and a truck-space minimum of 1 per
   5,000 SF beside the trailer target.
