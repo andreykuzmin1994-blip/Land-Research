@@ -156,11 +156,13 @@ fit.
   used.
 - **Pond geometry.** 6 ft deep, 4:1 side slopes, length twice the width,
   1 ft freeboard and a 15 ft rim. One pond up to 10 acre-feet, two up to
-  20, three above that. In the default behaviour, when no 2:1 pond fits
-  at the lidar samples, the same volume is tried 20 ft off them, then
-  with the bottom 1.5, 1, 3 and 4 times as long as it is wide
-  (`POND_FALLBACK_RATIOS`; reviews/40); the detention basis then names
-  the proportions used. Not tried for a layout a route already fails.
+  20, three above that. In the room-for-the-pond pass (below), when no
+  2:1 pond fits at the lidar samples, the same volume is tried with the
+  bottom 1.5, 3 and 4 times as long as it is wide, then each (2:1 too)
+  20 ft off the samples (`POND_FALLBACK_SHAPES`; never below 1.5:1, and a
+  design manual's minimum length-to-width was not checked); the
+  detention basis then names the proportions used. Not tried for a
+  layout a route already fails.
 - Ponds go on low lidar ground near the building, on its side of any
   mapped wetland, outside water buffers and transmission corridors.
 - The impervious area, and so the pond, is worked out again after the
@@ -235,21 +237,36 @@ fit.
   feasible 600 × 700 ft).
 - **Room for the pond (default behaviour; operator request of
   2026-11-17, reviews/40).** Each layout is fitted as long as it goes
-  wherever it fits longest, and its pond is placed after. When the pond
-  alone then blocks it, the search no longer only shortens the building
-  where it stands: it reserves each of the 6 lowest open spots a pond
-  could use (`RELOCATE_SPOTS`), fits the same cross-section around it no
-  longer than before, re-sizes the reserved pond for the building that
-  fits and fits again (up to 3 rounds), and checks each fit in full. The
-  largest that passes is kept, and the shorter lengths where the building
-  stood are still tried down to it. At most 48 such checks per site
-  (`RELOCATE_MAX_CHECKS`, a count, so the same site gives the same plan);
-  the record's `inputs.pond_relocation` says how many were used. The
-  docks keep the planner's orientation rule (away from the street and
-  homes). Reference site #21: 68,000 SF before, 84,000 SF now, the
-  largest layout an exhaustive check of every 3° and a 20 ft position
-  grid found. Reference site #25 keeps its plan: the only larger layout
-  turns its truck court to the arterial and loses its trailer stalls.
+  wherever it fits longest, and its pond is placed after; when the pond
+  has no room, the search shortens the building where it stands. After
+  the search and its rescue, a pass that only adds layouts takes the
+  layouts the pond alone blocked (up to 6, largest first, only those
+  that would rank above the best plan so far). Each is tried with the
+  other pond shapes (above), then moved: each of the 6 lowest open spots
+  a pond could use (`RELOCATE_SPOTS`) is reserved in turn, the same
+  cross-section is fitted around it no longer than before, the reserved
+  pond is re-sized for the building that fits and the fit tried again
+  (up to 3 rounds), and each fit is checked in full. The plan drawn is
+  then the best of everything by the usual ranking, so no site ranks
+  worse than without the pass. A layout the pass adds is refused when
+  its truck court or trailer row comes within 100 ft of the street
+  (the `STREET_FACING_DOCKS` test) and the best plan before it did not.
+  The pass has 60 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
+  checks, a count, so the same site gives the same plan) and half of
+  the search time left after the main search (`POND_ROOM_TIME_SHARE`;
+  the rest stays for the second building); cut by the time, it keeps
+  what it found and the plan is not flagged. It does not run at all when
+  less than half the site's budget is left after the search
+  (`POND_ROOM_MIN_LEFT`): a slow site plans exactly as before. The record's
+  `inputs.pond_room` gives the layouts, tries, plans found, whether the
+  plan drawn came from the pass, and whether it was cut short. The
+  ranking gives trailer stalls no floor area (operator decision of
+  2026-11-17), so a plan the pass adds may have fewer trailer stalls
+  than the plan it replaces (`TRAILER_SHORT` says so). Reference site
+  #21: 68,000 SF before, 84,000 SF now, the largest layout an exhaustive
+  check of every 3° and a 20 ft position grid found. Reference site #25
+  keeps its plan: the only larger layout found turns its truck court to
+  the arterial and has no trailer stalls.
 - The alternatives' `geometry_ok` is the layout's own check (routes,
   pond, plan checks, coverage cap), not the site's feasibility.
 - An assemblage is planned under its best-ranked member's draft rules.
@@ -318,8 +335,9 @@ plan and changes no layout, flag, feasibility or floor area.
   (`selection.with_trailers`). When a larger layout passed its checks
   but ranks lower, it names that one and the mark-downs it carries.
 - **What the surface pond costs.** When a layout passes every layout
-  check but the pond, the search moves it to leave the pond room and
-  shortens it until a pond fits (above). The
+  check but the pond, the search shortens it until a pond fits, and the
+  room-for-the-pond pass tries it moved and with other pond shapes
+  (above). The
   read-out keeps the layout as first tried and reports it
   (`selection.without_pond`) when it is at least 5% larger than the plan
   drawn. What it says depends on the market (decision 7 below): here,

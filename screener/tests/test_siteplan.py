@@ -623,11 +623,7 @@ class Plans(Offline):
         def blocking(o):
             t[0] = 1e9                 # _blocking is asked only when the rescue pass is considered
             return real(o)
-        # This site needs the rescue pass only without the room-for-the-pond
-        # search (a 4:1 pond fits it at 151,000 SF on the first pass,
-        # reviews/40): both are switched off here, as this tests the pass.
-        with mock.patch.object(sp, "_blocking", blocking), mock.patch.object(sp, "POND_FALLBACK_RATIOS", ()), \
-                mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
+        with mock.patch.object(sp, "_blocking", blocking):
             rec, _ = sp.plan_site(site(700, 700), sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
         self.assertIn("SMALLER_LAYOUTS_NOT_ALL_TRIED", names(rec, 2))
         self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
@@ -1403,13 +1399,13 @@ class PondRoom(Offline):
         self.assertIs(rec["feasible"], True)
         self.assertEqual((rec["building"]["L_ft"], rec["building"]["D_ft"], rec["building"]["sf"]), (440.0, 190, 84000))
         self.assertEqual(rec["configuration"], "rear-load 190 deep, court only, cars along office wall")
-        self.assertGreaterEqual(rec["inputs"]["pond_relocation"]["moved"], 1)
+        self.assertIs(rec["inputs"]["pond_room"]["drawn"], True)
         self.assertEqual(rec["detention"]["ponds"], 1)
-        # without the move, the old plan
-        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
+        # without the pass, the old plan
+        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
             old, _ = sp.plan_site(inp)
         self.assertEqual(old["building"]["sf"], 68000)
-        self.assertEqual(old["inputs"]["pond_relocation"]["checks"], 0)
+        self.assertEqual(old["inputs"]["pond_room"]["tries"], 0)
 
     def test_a_move_does_not_turn_the_docks_to_the_street(self):
         # reference site #25: a 72,000 SF layout exists with its truck court
@@ -1423,16 +1419,72 @@ class PondRoom(Offline):
         inp, exp = load_fixture("rank21")
         rec, _ = sp.plan_site(inp, sp.PlanOptions(behaviour="prototype"))
         self.assertEqual(rec["building"]["sf"], exp["sf"])
-        self.assertNotIn("pond_relocation", rec["inputs"])
+        self.assertNotIn("pond_room", rec["inputs"])
 
     def test_the_allowance_is_a_count(self):
         inp, _ = load_fixture("rank21")
-        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 3):
+        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 5):
             rec, _ = sp.plan_site(inp)
-        self.assertLessEqual(rec["inputs"]["pond_relocation"]["checks"], 3)
-        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 3):
             again, _ = sp.plan_site(inp)
+        self.assertLessEqual(rec["inputs"]["pond_room"]["tries"], 5)
         self.assertEqual(json.dumps(rec, sort_keys=True, default=str), json.dumps(again, sort_keys=True, default=str))
+
+
+    def test_a_slow_site_plans_as_before(self):
+        # under half the budget left after the search: no pass at all
+        inp, _ = load_fixture("rank21")
+        t = [0.0]
+        real = sp.fit_variant
+
+        def slow(*a, **k):
+            t[0] += 2.0                 # each fit "takes" 2 s of a 100 s budget
+            return real(*a, **k)
+        with mock.patch.object(sp, "fit_variant", slow):
+            rec, _ = sp.plan_site(inp, sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
+        self.assertEqual(rec["building"]["sf"], 68000)
+        self.assertIs(rec["inputs"]["pond_room"]["skipped_for_time"], True)
+        self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
+
+    def test_a_cut_pass_is_not_a_flag(self):
+        # the pass out of its own time at once: the search's plan, no flag
+        inp, _ = load_fixture("rank21")
+        with mock.patch.object(sp, "POND_ROOM_TIME_SHARE", 0.0):
+            rec, _ = sp.plan_site(inp)
+        self.assertIs(rec["inputs"]["pond_room"]["cut_short"], True)
+        self.assertEqual(rec["building"]["sf"], 68000)
+        self.assertIs(rec["feasible"], True)
+        self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
+        self.assertNotIn("SECOND_BUILDING_NOT_SEARCHED", names(rec))
+
+
+class PondRoomOnlyAdds(Offline):
+    """The pass runs after the search and its rescue and only adds layouts
+    (reviews/40): with it, a site never ranks worse than without it, and a
+    plan it adds never turns the docks to the street where the plan
+    without it did not. Sites from the review that found the first version
+    losing floor area: an assemblage (179,000 -> 157,000 SF) and a 520 x
+    640 ft site (76,000 -> 68,000 SF)."""
+
+    SITES = {"assem": lambda: site(shapes=[box(0, 0, 400, 700), box(400, 0, 900, 700)], front=LineString([(0, 0), (900, 0)]),
+                                   assembled=True),
+             "520x640": lambda: site(520, 640),
+             "600x700": lambda: site(600, 700),
+             "fairburn": lambda: site(650, 750, jur="Fairburn", z=lambda x, y: 900 + 0.02 * x),
+             "low560": lambda: site(560, 600, z=lambda x, y: 900 - 0.03 * y)}
+
+    def test_never_worse_and_no_new_street_docks(self):
+        for name, mk in self.SITES.items():
+            with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+                off, _ = planned(f"{name}-off", mk)
+            on, _ = planned(f"{name}-on", mk)
+            self.assertEqual(off["feasible"], on["feasible"], name)
+            if on["building"]["sf"] < off["building"]["sf"]:
+                # only for a plan that ranks higher (the code truck spaces first)
+                self.assertGreater(on["trailers"]["total"], off["trailers"]["total"], name)
+            if "STREET_FACING_DOCKS" not in names(off):
+                self.assertNotIn("STREET_FACING_DOCKS", names(on), name)
+            if not on["inputs"]["pond_room"]["drawn"]:
+                self.assertEqual(on["building"], off["building"], name)
 
 # ---------------------------------------------------------------------------
 # Static guards

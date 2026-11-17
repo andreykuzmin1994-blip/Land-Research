@@ -121,7 +121,7 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as dataclass_replace
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -327,17 +327,25 @@ BLOCKING_RULE = "no severity-1 flag outside GATE_FLAGS"
 RESCUE_FLAGS = frozenset({"POND_DOES_NOT_FIT", "ROUTE_INFEASIBLE", "CAR_ROUTE_NONE", "ROUTE_OUTSIDE_ENVELOPE",
                           "PLAN_GEOMETRY_CONFLICT"})
 RESCUE_MAX_FITS = 12
-# Default behaviour: a layout blocked only by its pond is moved to leave the
-# pond room before it is shortened (relocate_for_pond, reviews/40). Each
-# move reserves one of the RELOCATE_SPOTS lowest pond spots and is checked
-# in full; RELOCATE_MAX_CHECKS full checks per site at most (a count, so the
-# same site always gives the same plan).
+# Default behaviour: after the search (and its rescue), a pass that only
+# adds layouts (reviews/40). Each layout the pond alone blocked is tried
+# again with other pond shapes, then moved to leave its pond room
+# (relocate_for_pond: one of the RELOCATE_SPOTS lowest pond spots reserved
+# at a time). The plan drawn is the best of everything by the usual
+# ranking, so no site reads worse than without the pass.
 RELOCATE_SPOTS = 6
 RELOCATE_ROUNDS = 3        # re-sizing the reserved pond for the building that fits around it
-# Default behaviour: when no 2:1 pond fits, the same volume is tried at 20 ft
-# offsets from the lidar samples, 2:1 first, then these bottom proportions.
-POND_FALLBACK_RATIOS = (2.0, 1.5, 1.0, 3.0, 4.0)
-RELOCATE_MAX_CHECKS = 48
+# The room-for-the-pond pass: when no 2:1 pond fits, the same volume as
+# (bottom length / width, finer positions): the other proportions at the
+# lidar samples first, then each at 20 ft offsets from them. Not below
+# 1.5:1 (a short flow path; a design manual's minimum length-to-width is
+# for the civil engineer, not checked here).
+POND_FALLBACK_SHAPES = ((1.5, False), (3.0, False), (4.0, False), (2.0, True), (1.5, True), (3.0, True), (4.0, True))
+POND_FALLBACK_RATIOS = tuple(sorted({k for k, _ in POND_FALLBACK_SHAPES}))
+POND_ROOM_MAX_TRIES = 60          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
+POND_ROOM_MAX_LAYOUTS = 6         # pond-blocked layouts the pass starts from, largest first
+POND_ROOM_TIME_SHARE = 0.5        # of the time left after the search: the rest stays for the second building
+POND_ROOM_MIN_LEFT = 0.5          # the pass runs only with this share of the site's budget still left (a slow site plans as before)
 # Severity-1 flags no other layout of the same site can clear. The default
 # rule makes them block feasibility (decide()), but they stay out of the
 # layout's own check (o["ok"], geometry_ok), the ranking, the rescue pass and
@@ -1152,19 +1160,40 @@ def fit_variant(v, P, B, prog: Program, row_line, res_line, search: Search, leng
     return None
 
 
-class Relocation:
-    """The default search's allowance for moving a building to make room
-    for its pond (operator request of 2026-11-17, reviews/40): a count of
-    layout checks, not seconds, so the same site gives the same plan."""
+class PondRoom:
+    """The room-for-the-pond pass's allowance (reviews/40): a count of
+    tries (each fit around a reserved pond spot and each full check), so
+    the same site gives the same plan, and its own deadline, so the pass
+    never costs building 1 or the second-building search their time."""
 
-    def __init__(self, max_checks: int | None = None):
-        self.max_checks = RELOCATE_MAX_CHECKS if max_checks is None else max_checks
-        self.checks = 0
-        self.moved = 0
+    def __init__(self, search: "Search", max_tries: int | None = None, share: float | None = None):
+        self.max_tries = POND_ROOM_MAX_TRIES if max_tries is None else max_tries
+        self.tries = 0
+        self.layouts = 0
+        self.found = 0
+        self.cut_short = False
+        left = search.deadline - search.clock()
+        own = Search(0.0, search.clock)
+        own.deadline = search.clock() + max(0.0, left - (1.0 - (POND_ROOM_TIME_SHARE if share is None else share)) * left)
+        own.memo = search.memo            # the same fits, memoised once
+        self.search = own
 
     @property
     def spent(self) -> bool:
-        return self.checks >= self.max_checks
+        return self.tries >= self.max_tries
+
+    def take(self) -> bool:
+        """Count one try; False once the allowance is spent."""
+        if self.spent:
+            return False
+        self.tries += 1
+        return True
+
+
+def faces_street(p: "Plan", row_line) -> bool:
+    """A truck court or trailer row within 100 ft of the street frontage
+    (the planner's STREET_FACING_DOCKS test)."""
+    return row_line is not None and any(c.distance(row_line) < 100 for c in p.courts + p.rows)
 
 
 def pond_rect(x: float, y: float, angle: float, v_acft: float) -> Polygon:
@@ -1203,51 +1232,51 @@ def pond_spots(ctx: "Ctx", P: BaseGeometry, near_angle: float, v_acft: float) ->
     return out
 
 
-def relocate_for_pond(cur: Plan, o: dict[str, Any], P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
-                      search: "Search", budget: Relocation) -> tuple[Plan, dict[str, Any]] | None:
-    """The same layout, moved to leave room for its pond.
+def relocate_for_pond(cur: "Plan", o: dict[str, Any], P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
+                      room: PondRoom, keep: Callable[["Plan"], bool], out: list) -> None:
+    """The same layout, moved to leave room for its pond; every plan found
+    is appended to `out` as it is found (a cut keeps what was found).
 
     The search fits each layout as long as it goes wherever it fits
     longest, and checks the pond only after; when the pond then has no
-    room it used to shorten the building where it stood, while the same
-    building elsewhere on the parcel left room for it (reference site #21:
-    68,000 SF drawn, 84,000 SF with the pond moved; reviews/40). Here each
-    low spot a pond could use (pond_spots) is reserved in turn, the
-    variant is fitted around it no longer than now (the planner's own fit,
-    fit_variant), and each distinct fit is checked in full (finish). The
-    pond reserved is first sized for the building that failed; a shorter
-    building needs a smaller one, so the spot is reserved again at the
-    size the last fit needs and fitted again, up to RELOCATE_ROUNDS times
-    while that frees room. The largest plan that passes is returned (the
-    first of equals); None when none does or the allowance is spent."""
+    room it shortens the building where it stands, while the same
+    building elsewhere on the parcel may leave room for it (reference site
+    #21: 68,000 SF drawn, 84,000 SF with the pond moved; reviews/40). Here
+    each low spot a pond could use (pond_spots) is reserved in turn, the
+    variant is fitted around it no longer than `cur` (the planner's own
+    fit), and each distinct fit is checked in full (finish). The pond
+    reserved is first sized for `cur`; a shorter building needs a smaller
+    one, so the spot is reserved again at the size the last fit needs and
+    fitted again, up to RELOCATE_ROUNDS times while that frees room. A fit
+    `keep` refuses (one that turns its docks to the street) is not
+    checked."""
     count = max(pond_count(o["v_det"]), 1)
     v_each = o["v_det"] / count
-    best, seen = None, set()
+    seen = set()
     for x, y, a in pond_spots(ctx, P, cur.frame.pl.angle_deg, v_each):
         v_try = v_each
         for _round in range(RELOCATE_ROUNDS):
-            if budget.spent:
-                break
+            if not room.take():
+                return
             hold = pond_rect(x, y, a, v_try).buffer(25)
             P2, B2 = clean(P.difference(hold)), clean(B.difference(hold))
-            q = fit_variant(cur.v, P2, B2, ctx.prog, row_line, res_line, search, length_cap=int(cur.L))
+            q = fit_variant(cur.v, P2, B2, ctx.prog, row_line, res_line, room.search, length_cap=int(cur.L))
             if q is None:
                 break
             key = (q.L, q.r, tuple(round(c, 1) for c in q.module.bounds))
-            if key in seen:
+            if key in seen or not keep(q):
                 break
             seen.add(key)
-            budget.checks += 1
+            if not room.take():
+                return
             o2 = finish(q, ctx)
-            if o2["ok"] and (best is None or q.sf > best[0].sf):
-                best = (q, o2)
+            if o2["ok"]:
+                out.append((q, o2))
+                room.found += 1
             v_next = o2["v_det"] / count
             if v_next >= v_try - 0.01:
                 break
             v_try = v_next
-    if best is not None:
-        budget.moved += 1
-    return best
 
 
 # ---------------------------------------------------------------------------
@@ -1467,8 +1496,8 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
     detention.place_pond, which places the screener's fixed pond.
     `fine` also tries each centre moved half a sample step (20 ft) each
     way, at that sample's elevation: a tight piece of ground often holds
-    the pond only between two samples. The positions tried stay at
-    max_pts, the lowest samples' first."""
+    the pond only between two samples (the lowest max_pts samples, nine
+    positions each)."""
     if region.is_empty:
         return None
     base = box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2)
@@ -1484,7 +1513,7 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
     pts = pts[:max_pts]
     if fine:
         h = dem.step / 2
-        pts = [(z, (x + dx, y + dy)) for z, (x, y) in pts for dx in (0.0, -h, h) for dy in (0.0, -h, h)][:max_pts]
+        pts = [(z, (x + dx, y + dy)) for z, (x, y) in pts for dx in (0.0, -h, h) for dy in (0.0, -h, h)]
     best = None
     for z, (x, y) in pts:
         for rb in turned:
@@ -1747,6 +1776,7 @@ class Ctx:
     prog: Program
     search: Search
     route_steps: dict = field(default_factory=dict)
+    pond_room: bool = False      # the room-for-the-pond pass (reviews/40): other pond shapes when no 2:1 pond fits
 
 
 @dataclass
@@ -1923,30 +1953,30 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         region0 = region0.difference(others["blocked"])
     angles = [0, 90, 45, 135, p.frame.pl.angle_deg, p.frame.pl.angle_deg + 90]
 
-    shape_of: dict[int, float] = {}       # id(pond) -> bottom length / width, where not 2
-
     def site_ponds(region, n, Lf_, Wf_, v_each):
+        """[(pond, bottom length / width)]."""
         out = []
         for _k in range(n):
             ctx.search.check()
-            r = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints)
-            if r is None and fixes and not problem:
-                # No 2:1 pond fits at the samples: the same volume at a
-                # finer spacing, then in other proportions (reviews/40).
-                # Not for a layout a route already fails.
-                for k in POND_FALLBACK_RATIOS:
+            r, k_used = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints), 2.0
+            if r is None and ctx.pond_room and not problem:
+                # The room-for-the-pond pass only (reviews/40): no 2:1 pond
+                # fits at the samples, so the same volume in other
+                # proportions, then at a finer spacing. Not for a layout a
+                # route already fails.
+                for k, fine in POND_FALLBACK_SHAPES:
                     _, Lk, Wk, _ = pond_dims(v_each, ratio=k)
-                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=True)
+                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=fine)
                     if r is not None:
-                        if k != 2.0:
-                            shape_of[id(r)] = k
+                        k_used = k
                         break
             if r is None:
                 break
-            out.append(r)
+            out.append((r, k_used))
             region = region.difference(r.buffer(20))
         return out
-    ponds = site_ponds(region0, npd, Lf, Wf, v / npd)
+    placed = site_ponds(region0, npd, Lf, Wf, v / npd)
+    ponds = [r for r, _ in placed]
     pond_ok = len(ponds) == npd
     # drop yard near the court, counted only with a truck route
     drops, trailers = [], p.court_stalls
@@ -1991,9 +2021,10 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             region = region0.difference(all_rp.buffer(10))
             for d in drops:
                 region = region.difference(d.buffer(20))
-            ponds2 = site_ponds(region, npd2, Lf2, Wf2, v / npd2)
+            placed2 = site_ponds(region, npd2, Lf2, Wf2, v / npd2)
+            ponds2 = [r for r, _ in placed2]
             if v > v_sized or len(ponds2) == npd2:
-                ponds, npd, v_sized = ponds2, npd2, v
+                ponds, placed, npd, v_sized = ponds2, placed2, npd2, v
                 pond_ok = len(ponds) == npd
             # else: smaller ponds did not fit where the larger ones are
             # (the yard links took the room); keep the larger ponds and
@@ -2025,7 +2056,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
          # read-outs for siteplan_assess; no decision reads them
          "pad_elev": pad_elev, "max_cut": max_cut, "max_fill": max_fill, "disturbed_ac": disturbed}
     if fixes:
-        o["pond_ratios"] = [shape_of.get(id(r), 2.0) for r in ponds]
+        o["pond_ratios"] = [k for _, k in placed]
     o["violations"] = check_plan(p, o, ctx, others)
     if fixes:
         for viol in o["violations"]:
@@ -2243,7 +2274,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     small = [q for q in parts(P) if q.area <= MIN_PART_SF]
     ctx = Ctx(parcel, P, B, wet_buf, trans, cut, steep, dem, meta, rules, runs, jname, constraints, fr.road, hsg, prog, search)
     VARIANTS = variants()
-    reloc = Relocation()
     results, excluded = [], Polygon()
     # Layouts that passed every check but the surface pond, at the length
     # first tried (the search goes on to shorten them). Kept for the
@@ -2272,7 +2302,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     break
             def explore(q, Pe=Pe, Be=Be, shorten_routes=False):
                 cur = q
-                floor = None         # the length a moved layout reached: a shorter one where it stands cannot beat it
                 for _i in range(10):
                     o = finish(cur, ctx)
                     if o["ok"]:
@@ -2281,16 +2310,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     if (not o["pond_ok"] and not o["route_problem"] and not o["violations"]
                             and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
                         pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
-                    sev1 = {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS
-                    if (opts.fixes and floor is None and sev1 == {"POND_DOES_NOT_FIT"} and not o["route_problem"]
-                            and not reloc.spent):
-                        # Blocked by its pond alone: the same building moved
-                        # to leave the pond room. Kept as a result; shorter
-                        # lengths where it stands are still tried down to it.
-                        moved = relocate_for_pond(cur, o, Pe, Be, ctx, row_line, res_line, search, reloc)
-                        if moved is not None:
-                            results.append(moved)
-                            floor = moved[0].L
                     if o["route_problem"] and opts.fixes:
                         # Turn the same fit round before giving it up or
                         # shortening it. The first turn keeps docks away
@@ -2322,7 +2341,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                         # meet it, not 40 ft at a time (R4; default only).
                         cap_len = min(cap_len, int(cur.L * o["cover_ratio"]) // 20 * 20)
                     nxt = fit_variant(cur.v, Pe, Be, prog, row_line, res_line, search, length_cap=cap_len)
-                    if nxt is None or (floor is not None and nxt.L <= floor):
+                    if nxt is None:
                         results.append((cur, o))
                         break
                     cur = nxt
@@ -2392,6 +2411,47 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # against the market target comes last: it only settles a tie.
         return (o["ok"], not o["route_problem"], o["trailers"] >= q.code_trailers, rank_sf(q, o, st, rel),
                 -max(0, q.trailers_target - o["trailers"]))
+    room = None
+    added: list[tuple[Plan, dict[str, Any]]] = []
+    room_skipped = bool(opts.fixes and first is not None and not search.exceeded
+                        and search.deadline - search.clock() < POND_ROOM_MIN_LEFT * opts.max_seconds)
+    if opts.fixes and first is not None and not search.exceeded and not room_skipped:
+        # Room for the pond (reviews/40): a pass that only adds layouts. The
+        # layouts the pond alone blocked, largest first, are tried again
+        # with other pond shapes, then moved to leave their pond room. One
+        # that turns its docks to the street, where the best plan so far
+        # does not, is not taken. The plan drawn is then the best of all by
+        # the same ranking, so the pass can only add floor area.
+        room = PondRoom(search)
+        best0 = max(results, key=score)
+        street_ok = (lambda q: True) if faces_street(best0[0], row_line) else (lambda q: not faces_street(q, row_line))
+        ctx_room = dataclass_replace(ctx, pond_room=True, search=room.search)
+        P0, B0 = first[0], first[1]
+
+        def pond_only(o):
+            return ({f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS == {"POND_DOES_NOT_FIT"}
+                    and not o["route_problem"])
+        start, seen_l = [], set()
+        for q, o in sorted(pond_limited + [t for t in results if pond_only(t[1])], key=lambda t: -t[0].sf):
+            key = (q.v["name"], q.L, q.r, tuple(round(c, 1) for c in q.module.bounds))
+            if pond_only(o) and key not in seen_l and score((q, {**o, "ok": True})) > score(best0):
+                seen_l.add(key)
+                start.append((q, o))
+        try:
+            for q, o in start[:POND_ROOM_MAX_LAYOUTS]:
+                if room.spent:
+                    break
+                room.layouts += 1
+                if street_ok(q) and room.take():
+                    o2 = finish(q, ctx_room)            # the same layout, another pond shape
+                    if o2["ok"]:
+                        added.append((q, o2))
+                        room.found += 1
+                        continue
+                relocate_for_pond(q, o, P0, B0, ctx_room, row_line, res_line, room, street_ok, added)
+        except _BudgetExceeded:
+            room.cut_short = True                       # what was found stands; building 1's search was complete
+        results += added
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
     second = None
@@ -2433,7 +2493,10 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
     if opts.fixes:
-        rec["inputs"]["pond_relocation"] = {"checks": reloc.checks, "moved": reloc.moved, "max_checks": reloc.max_checks}
+        rec["inputs"]["pond_room"] = ({"layouts": room.layouts, "tries": room.tries, "max_tries": room.max_tries, "found": room.found,
+                                       "drawn": any(best_p is q for q, _ in added), "cut_short": room.cut_short, "skipped_for_time": False}
+                                      if room is not None else {"layouts": 0, "tries": 0, "max_tries": POND_ROOM_MAX_TRIES, "found": 0,
+                                                                "drawn": False, "cut_short": False, "skipped_for_time": room_skipped})
     try:
         _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
                   [_alternative(q, o, gross_ac) for q, o in pond_limited], opts)
@@ -2457,9 +2520,10 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
 def _pond_shape_text(o: dict[str, Any], second: tuple | None) -> str:
     """'L=2W', or the proportions used where a 2:1 pond did not fit."""
     ratios = list(o.get("pond_ratios") or []) + (list(second[1].get("pond_ratios") or []) if second else [])
-    if all(k == 2.0 for k in ratios):
+    other = sorted({k for k in ratios if k != 2.0})
+    if not other:
         return "L=2W"
-    return "L=2W where it fits, else " + ", ".join(f"L={k:g}W" for k in ratios if k != 2.0) + " (a 2:1 pond did not fit)"
+    return "L=2W where it fits, else " + ", ".join(f"L={k:g}W" for k in other) + " (a 2:1 pond did not fit)"
 
 
 def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:

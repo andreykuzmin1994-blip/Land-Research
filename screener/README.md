@@ -937,12 +937,16 @@ How to read a plan:
 - When the pond or a route blocks every plan the search tried first, it
   also tries shorter lengths and the shallower layouts it left out, so a
   larger parcel does not read worse than a smaller one inside it.
-- When the pond alone blocks a layout, the search first moves the
-  building to leave the pond room (the lowest open spots, at most 48
-  full checks per site), then shortens it; where no 2:1 pond fits, it
-  also tries other pond proportions (since 2026-11-17, reviews/40;
-  default behaviour only). Reference site #21 went from 68,000 to 84,000
-  SF. `inputs.pond_relocation` in `plans.json` counts the checks.
+- After the search, a pass takes the layouts the pond alone blocked and
+  tries them with other pond proportions and moved to leave the pond
+  room (since 2026-11-17, reviews/40; default behaviour only). It only
+  adds layouts: the plan drawn is the best of all by the usual ranking.
+  It refuses a layout that newly turns its docks to the street, has 60
+  tries and half the remaining time, keeps what it found when cut, and
+  is skipped when less than half the site's budget is left.
+  Reference site #21 went from 68,000 to 84,000 SF. A plan it adds may
+  have fewer trailer stalls (the ranking gives them no floor area).
+  `inputs.pond_room` in `plans.json` says what it did.
 - **The planner does not check whether a parcel is built.** Run the built
   check first and plan only parcels it reads as `raw_land` or
   `partly_usable`; the viewer shows both side by side.
