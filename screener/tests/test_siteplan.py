@@ -821,7 +821,7 @@ class Plans(Offline):
         self.assertNotIn("href", low)
         self.assertIsNone(re.search(r"\son[a-z]+\s*=", low))
         self.assertNotIn("<style", low)
-        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)) - {"#tx", "#sx", "#cx"}, set())
+        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)) - {"#tx", "#sx", "#cx", "#wx"}, set())
         self.assertIn("DRAFT", svg)
         tags = {e.tag.split("}")[-1] for e in root.iter()}
         self.assertLessEqual(tags, {"svg", "title", "rect", "defs", "pattern", "line", "path", "circle", "text"})

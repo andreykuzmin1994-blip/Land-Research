@@ -35,7 +35,7 @@ from __future__ import annotations
 import csv
 from typing import Any, Callable, Iterable
 
-from shapely.geometry import Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
@@ -94,21 +94,26 @@ _GUARD = (W_DATA, "desk", "The planner's own layout check failed. Do not rely on
 # flag -> (workstream, stage, action, what closes it)
 PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
     # access
-    "ACCESS_NONE": (W_ACCESS, "offer", "Find the access: an easement of record, a strip to a road, or a neighbour to buy from. "
-                    "Carry no floor area for this site until access is in hand.",
-                    "a recorded access easement, or a contract on the access parcel"),
-    "ACCESS_CONSTRAINED": (W_ACCESS, "offer", "Measure the frontage on the plat. A truck driveway needs about 190 ft of curb; if the "
-                           "frontage is short, look for a shared driveway or a second frontage.",
-                           "frontage length from a plat or survey, and a driveway concept the road authority accepts"),
-    "ROUTE_INFEASIBLE": (W_PROGRAM, "desk", "No truck route reaches the court inside the paving area. Look at the drawing, then try "
-                         "a test cut, another driveway point or an assemblage.", "a layout with a truck route"),
+    "ACCESS_NONE": (W_ACCESS, "desk", "Check the road map by hand first: the frontage check reads GDOT's road layer, which can "
+                    "miss a road. If there is none, look for an easement of record, a strip to a road, or a neighbour to buy "
+                    "from, and carry no floor area until access is in hand.",
+                    "a road on the plat, a recorded access easement, or a contract on the access parcel"),
+    "ACCESS_CONSTRAINED": (W_ACCESS, "offer", "Measure the frontage on the plat. The planner allows about 190 ft of curb for a "
+                           "truck driveway (its own assumption); ask the road authority what it requires, and look for a "
+                           "shared driveway or a second frontage.",
+                           "frontage length from a plat or survey, and the road authority's driveway requirements"),
+    "ROUTE_INFEASIBLE": (W_PROGRAM, "desk", "No truck route reaches the court inside the paving area. Look at the drawing, then "
+                         "plan it again with a test cut (--cut-parcel) or as an assemblage (--assemble).",
+                         "a layout with a truck route"),
     "CAR_ROUTE_NONE": (W_PROGRAM, "desk", "Cars cannot reach the car field without crossing truck pavement. Look at the drawing, "
-                       "then try another driveway point or an assemblage.", "a layout with a separate car route"),
+                       "then plan it again with a test cut (--cut-parcel) or as an assemblage (--assemble).",
+                       "a layout with a separate car route"),
     "ROUTE_OUTSIDE_ENVELOPE": _GUARD,
     "PLAN_GEOMETRY_CONFLICT": _GUARD,
     "NOT_FEASIBLE_REASON": _GUARD,
-    "FIRE_SECOND_ACCESS": (W_FIRE, "diligence", "Show the fire marshal the access plan and ask whether a second, emergency-only "
-                           "access is required and where it could go.", "the fire marshal's comment on the concept"),
+    "FIRE_SECOND_ACCESS": (W_FIRE, "offer", "Ask the fire marshal whether a second, emergency-only access is required and where "
+                           "it could go. It can need land or an easement, so ask before an offer.",
+                           "the fire marshal's comment on the concept"),
     "DEAD_END_ACCESS": (W_FIRE, "diligence", "Ask the fire marshal about the dead-end length and the turnaround it needs.",
                         "the fire marshal's comment on the concept"),
     "SHORT_THROAT": (W_ACCESS, "diligence", "Have the civil engineer check truck stacking between the street and the court; move "
@@ -125,13 +130,12 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                             "in this district, and how long a permit takes. Make any offer conditional on it.",
                             "pre-application meeting notes, then the use permit"),
     "HEIGHT_CAP": (W_ZONING, "desk", "Check the height limit in the adopted code, and whether a variance or another district "
-                   "lifts it. The clear height drawn is lowered to fit the draft limit.",
-                   "the code section, or a zoning verification letter"),
+                   "lifts it. The clear height drawn is lowered to fit the draft limit.", "the code section"),
     "COVERAGE_OVER_CAP": (W_ZONING, "desk", "Check the coverage limit in the adopted code. If it stands, the limit sets the yield.",
-                          "the code section, or a zoning verification letter"),
+                          "the code section"),
     "ZONING_DRAFT": (W_ZONING, "desk", "Check the setbacks, buffers, parking, coverage and height used here against the adopted "
-                     "code, or ask the jurisdiction for a zoning verification letter.",
-                     "the code sections, or a zoning verification letter"),
+                     "code, and ask the jurisdiction whether the parcel carries conditions from an earlier rezoning.",
+                     "the code sections, and a zoning verification letter for the district, the use and any conditions"),
     "JURISDICTION_DEFAULTED": (W_ZONING, "desk", "The planner has no draft rules for this place and used South Fulton's. Read the "
                                "district's standards before relying on the layout.", "the district standards"),
     "ATL_PARKING_CODE": (W_ZONING, "desk", "Confirm Atlanta's current parking minimum for this use. At 1 per 600 SF the car field "
@@ -140,8 +144,8 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                                   "again with it: the yield falls.", "the code section"),
     "RESIDENTIAL_EDGE": (W_ZONING, "desk", "Confirm the neighbours' zoning (the edge is read from county land-use codes) and the "
                          "buffer the code requires toward it.", "the zoning map and the buffer section of the code"),
-    "LOADING_FACES_RES": (W_ZONING, "offer", "Docks sit within 150 ft of homes. Check the code's loading rules toward residential "
-                          "land, and expect a wider buffer, a wall or berm, and neighbours at any hearing.",
+    "LOADING_FACES_RES": (W_ZONING, "offer", "A truck court or trailer row sits within 150 ft of land coded residential. Check "
+                          "what is there and the code's loading rules toward it; a wider buffer, a wall or berm may be asked for.",
                           "the code section and planning staff's view"),
     "STREET_FACING_DOCKS": (W_ZONING, "desk", "Check whether the code allows dock doors facing the street and what screening it "
                             "asks for.", "the code section"),
@@ -153,11 +157,11 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                           "whether a regional or off-site pond serves the site.",
                           "a detention concept sized under the local ordinance"),
     "POND_SITE_FROM_LIDAR": (W_STORM, "diligence", "Have the civil engineer confirm the pond location, outfall and volume under "
-                             "the local ordinance. The size here is good to about 30% either way.", "a stormwater concept"),
+                             "the local ordinance. The size here is a screening estimate.", "a stormwater concept"),
     "HSG_ASSUMED": (W_STORM, "diligence", "The soil group behind the pond size was assumed. Run the soil check for this parcel, "
                     "then confirm with borings.", "the soil survey reading, then a geotechnical report"),
     "GRADING_RISK": (W_GRADING, "diligence", "Order a topographic survey and a mass-grading estimate. Steep ground under the pad "
-                     "means walls, rock risk and soil hauled in or out.", "a grading concept with cut, fill and wall quantities"),
+                     "can mean walls, rock and soil hauled in or out.", "a grading concept with cut, fill and wall quantities"),
     "RELIEF": (W_GRADING, "diligence", "Have the civil engineer test a stepped pad or retaining walls and price the earthwork; "
                "ask the geotechnical engineer about rock.", "a grading concept with cut, fill and wall quantities"),
     "STREAMS_PIPELINES": (W_ENV, "desk", "Check for streams and petroleum pipelines, which the planner does not map: the county "
@@ -193,21 +197,33 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
     "ASSEMBLAGE_MEMBER_NOT_RANKED": (W_DATA, "desk", "A member is outside the run's ranked list. Check its jurisdiction, zoning "
                                      "and soils by hand.", "the member's zoning and soil group"),
     # planner inputs
-    "FRONTAGE_NOT_CHECKED": _RERUN, "FRONTAGE_GEOMETRY": _RERUN, "DEM_NOT_CHECKED": _RERUN, "DEM_PARTIAL": _RERUN,
+    "FRONTAGE_NOT_CHECKED": _RERUN, "DEM_NOT_CHECKED": _RERUN,
+    # Two that a second run may not clear: the cause can be in the data.
+    "FRONTAGE_GEOMETRY": (W_DATA, "desk", "The frontage line could not be read as one run, so access was not checked. Run the "
+                          "planner again; if it repeats, check the frontage on the plat by hand.",
+                          "a complete plan, or the frontage read from the plat"),
+    "DEM_PARTIAL": (W_DATA, "desk", "Part of the site has no lidar ground values. Run the planner again; if the gap repeats it is "
+                    "in the lidar, and slope, relief and the pond location are unknown for that part.",
+                    "a complete plan, or a topographic survey of the gap"),
     "NEIGHBOURS_NOT_CHECKED": _RERUN, "TRANSMISSION_NOT_CHECKED": _RERUN, "LAYERS_NOT_CHECKED": _RERUN,
     "PLAN_BUDGET_EXCEEDED": _BUDGET, "SECOND_BUILDING_NOT_SEARCHED": _BUDGET, "SMALLER_LAYOUTS_NOT_ALL_TRIED": _BUDGET,
 }
 _UNKNOWN = (W_DATA, "desk", "Read this flag against the drawing.", "")
+# A flag raised at two severities for two different facts.
+PLAYBOOK_AT_SEVERITY: dict[tuple[str, int], tuple[str, str, str, str]] = {
+    ("ASSEMBLAGE_MIXED_RULES", 2): (W_ZONING, "desk", "The members are zoned differently within one jurisdiction, and the draft "
+                                    "rules used are the jurisdiction's. Read each district's standards before relying on "
+                                    "the layout.", "the district standards of each member"),
+}
 
 
-def playbook_for(flag: str) -> tuple[str, str, str, str]:
+def playbook_for(flag: str, severity: int | None = None) -> tuple[str, str, str, str]:
     """The playbook entry of a flag. A second building's flag
     (``SECOND_<flag>``) takes the entry of the flag it repeats."""
-    if flag in PLAYBOOK:
-        return PLAYBOOK[flag]
-    if flag.startswith("SECOND_") and flag[7:] in PLAYBOOK:
-        return PLAYBOOK[flag[7:]]
-    return _UNKNOWN
+    base = flag[7:] if flag.startswith("SECOND_") and flag[7:] in PLAYBOOK else flag
+    if (base, severity) in PLAYBOOK_AT_SEVERITY:
+        return PLAYBOOK_AT_SEVERITY[(base, severity)]
+    return PLAYBOOK.get(base, _UNKNOWN)
 
 
 # ---------------------------------------------------------------------------
@@ -297,13 +313,59 @@ def land_budget(parcel: BaseGeometry, P: BaseGeometry, envelope0_sf: float,
 
 EDGE_LABELS = (("ROW", "road"), ("RES_SIDE", "residential side"), ("RES_REAR", "residential rear"), ("OTHER", "other lot lines"))
 SETBACK_TOL_FT = 1.0
+SETBACK_REACH_FT = 1600.0     # past this a shape is not in front of the lot line at all
+
+
+def _line_parts(g: BaseGeometry) -> list[BaseGeometry]:
+    if g is None or g.is_empty:
+        return []
+    if g.geom_type in ("LineString", "LinearRing"):
+        return [g]
+    return [q for x in getattr(g, "geoms", []) for q in _line_parts(x)]
+
+
+def band_clearance(shape: BaseGeometry, line: BaseGeometry, reach: float = SETBACK_REACH_FT) -> float | None:
+    """How far `shape` stands off the lot line `line`, measured square to
+    the line: the distance from each stretch of the line to the part of
+    the shape that lies in front of it, and to the line's bends. Along
+    the line and at its bends that is the plain distance; past an end of
+    the line it is not counted. None when no part of the shape is in
+    front of the line within `reach`.
+
+    Plain distance alone would be wrong at the end of a line: a
+    residential edge is read 20 ft past the corner, and a module 115 ft
+    off the rear line is under 100 ft from that stub's end without being
+    behind it. The planner's envelope is square at the ends too
+    (``siteplan.envelope``), so a plan it placed does not read short here
+    for that reason. (The envelope is mitred at bends, which pushes a
+    plan further back than this measure asks.)"""
+    best: float | None = None
+    for part in _line_parts(line):
+        pts = [(c[0], c[1]) for c in part.coords]
+        closed = len(pts) > 2 and pts[0] == pts[-1]
+        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+            n = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
+            if n < 1e-9:
+                continue
+            nx, ny = -(by - ay) / n * reach, (bx - ax) / n * reach
+            strip = Polygon([(ax + nx, ay + ny), (bx + nx, by + ny), (bx - nx, by - ny), (ax - nx, ay - ny)])
+            front = shape.intersection(strip)
+            if not front.is_empty:
+                d = front.distance(LineString([(ax, ay), (bx, by)]))
+                best = d if best is None else min(best, d)
+        for x, y in (pts[:-1] if closed else pts[1:-1]):          # the bends: plain distance
+            d = shape.distance(Point(x, y))
+            if d <= reach:
+                best = d if best is None else min(best, d)
+    return best
 
 
 def setback_rows(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], buildings: BaseGeometry,
                  paving: BaseGeometry) -> list[dict[str, Any]]:
     """The building and the module's paving measured to each kind of lot
-    line, against the draft offsets. Driveways and routes are left out: a
-    driveway has to cross the road setback."""
+    line, against the draft offsets, the way the envelope applied them
+    (``band_clearance``). Driveways and routes are left out: a driveway
+    has to cross the road setback."""
     rows = []
     for kind, label in EDGE_LABELS:
         line = _union(ln for k, ln in edges if k == kind)
@@ -313,10 +375,43 @@ def setback_rows(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], b
             if shape.is_empty:
                 continue
             need = float(table.get(kind, 0) or 0)
-            got = shape.distance(line)
+            got = band_clearance(shape, line)
+            if got is None:
+                rows.append({"item": f"{what} setback, {label}", "required": f"{need:.0f} ft", "provided": "well clear of this line",
+                             "margin_ft": None, "status": "meets"})
+                continue
             rows.append({"item": f"{what} setback, {label}", "required": f"{need:.0f} ft", "provided": f"{got:.0f} ft",
                          "margin_ft": round(got - need), "status": "meets" if got >= need - SETBACK_TOL_FT else "short"})
     return rows
+
+
+# Building code, not zoning: a one-storey sprinklered warehouse larger than
+# the code's tabular area is built under the unlimited-area rule, which
+# wants open space (a yard or a public way) 60 ft wide all round it; 40 ft
+# is allowed along part of the perimeter with 3-hour walls. From the
+# International Building Code, Section 507, as this repository's
+# human-owned facts file reads it (medium confidence there: verify with
+# the building official). A street counts as open space, so the row
+# measures to the lot lines that are not a road.
+OPEN_YARD_FT = 60.0
+OPEN_YARD_REDUCED_FT = 40.0
+
+
+def open_yard_row(edges: list[tuple[str, BaseGeometry]], buildings: BaseGeometry) -> dict[str, Any] | None:
+    """The narrowest yard between a building and a lot line that is not a
+    road, against the building code's unlimited-area open space."""
+    lines = _union(ln for k, ln in edges if k != "ROW")
+    if lines.is_empty or buildings.is_empty:
+        return None
+    got = buildings.distance(lines)
+    status = "meets" if got >= OPEN_YARD_FT - SETBACK_TOL_FT else ("limited" if got >= OPEN_YARD_REDUCED_FT else "short")
+    row = {"item": "Open yard at the building (building code)",
+           "required": f"{OPEN_YARD_FT:.0f} ft ({OPEN_YARD_REDUCED_FT:.0f} ft with 3-hour walls)",
+           "provided": f"{got:.0f} ft to the nearest lot line", "margin_ft": round(got - OPEN_YARD_FT), "status": status}
+    if status != "meets":
+        row["note"] = ("under the unlimited-area rule a yard this narrow needs rated walls" if status == "limited"
+                       else "under the unlimited-area rule this yard is too narrow: a smaller or area-limited building")
+    return row
 
 
 def compliance(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], layouts: list[tuple[Any, dict[str, Any]]],
@@ -326,22 +421,28 @@ def compliance(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], lay
     """The plan against the DRAFT zoning values it was drawn under, one row
     per rule: item, the draft value, what the plan provides, the margin and
     a status (meets, short, over, limited, gate, verify, no draft value).
+    One row is building code, not zoning: the open yard round the building
+    (``open_yard_row``).
 
     cover: (kind, cap, value) when the draft table has a coverage cap."""
     buildings = _union(p.building for p, _ in layouts)
     paving = _union([p.module for p, _ in layouts] + [g for _, o in layouts for g in o["drops"]])
     rows = setback_rows(rules, edges, buildings, paving)
+    yard = open_yard_row(edges, buildings)
+    if yard:
+        rows.append(yard)
+    one = " (building 1)" if len(layouts) > 1 else ""
     cap = rules.get("height")
     height = clear_ft + roof_allowance_ft
     if cap:
         lowered = clear_ft < clear_assumed_ft
-        rows.append({"item": "Building height", "required": f"{cap} ft max",
+        rows.append({"item": "Building height" + one, "required": f"{cap} ft max",
                      "provided": f"{height} ft ({clear_ft} ft clear + {roof_allowance_ft} ft roof)",
                      "margin_ft": round(cap - height),
                      "status": "limited" if lowered else ("meets" if height <= cap else "over"),
                      **({"note": f"clear height lowered from {clear_assumed_ft} ft to fit the draft limit"} if lowered else {})})
     else:
-        rows.append({"item": "Building height", "required": "no limit in the draft table",
+        rows.append({"item": "Building height" + one, "required": "no limit in the draft table",
                      "provided": f"{height} ft ({clear_ft} ft clear + {roof_allowance_ft} ft roof)", "status": "no draft value"})
     if cover:
         kind, capv, val = cover
@@ -350,7 +451,7 @@ def compliance(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], lay
     else:
         rows.append({"item": "Coverage", "required": "no limit in the draft table",
                      "provided": f"building {building_pct:.0f}%, impervious {impervious_pct:.0f}%", "status": "no draft value"})
-    rows.append({"item": "Car parking", "required": f"{cars_required} stalls", "provided": f"{cars_provided} stalls",
+    rows.append({"item": "Car parking" + one, "required": f"{cars_required} stalls", "provided": f"{cars_provided} stalls",
                  "status": "meets" if cars_provided >= cars_required else "short", "note": cars_basis})
     if gated:
         rows.append({"item": "Use", "required": "use permit (draft reading)", "provided": "not in hand", "status": "gate"})
@@ -361,7 +462,7 @@ def compliance(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], lay
 
 
 def quantities(shapes: dict[str, BaseGeometry], layouts: list[tuple[Any, dict[str, Any]]], *, building_sf: int,
-               frontage_ft: Any, residential_edge_ft: float, round_to: int = 1000) -> dict[str, Any]:
+               frontage_ft: Any, residential_edge_ft: float, net_ac: float, round_to: int = 1000) -> dict[str, Any]:
     """A takeoff of the drawn plan for a first budget: areas by paving
     duty, earthwork, detention and route lengths. No prices."""
     def rnd(x: float, base: int = round_to) -> int:
@@ -377,12 +478,13 @@ def quantities(shapes: dict[str, BaseGeometry], layouts: list[tuple[Any, dict[st
         "detention_acft": round(sum(o["v_det"] for _, o in layouts), 1),
         "ponds": sum(len(o["ponds"]) for _, o in layouts),
         "earthwork_cy": rnd(earth) if earth else None,
-        "disturbed_ac": round(sum(o.get("disturbed_ac") or 0.0 for _, o in layouts), 1),
+        # each building's figure is capped at the net area; so is their sum
+        "disturbed_ac": round(min(sum(o.get("disturbed_ac") or 0.0 for _, o in layouts), net_ac), 1),
         "driveways": sum((o["tpt"] is not None) + (o["cpt"] is not None) for _, o in layouts if not o.get("shared_access")),
         "truck_route_lf": round(sum(ln.length for _, o in layouts for k, ln in o["routes"] if k == "truck")),
         "car_route_lf": round(sum(ln.length for _, o in layouts for k, ln in o["routes"] if k == "car")),
         "frontage_ft": frontage_ft, "residential_edge_lf": round(residential_edge_ft),
-        "basis": ("takeoff of the drawn test fit, no prices: heavy paving is truck courts, truck roads and routes, trailer "
+        "basis": ("measured off the drawn test fit, no prices: heavy paving is truck courts, truck roads and routes, trailer "
                   "stalls and drop yards; light paving is car parking and car drives; earthwork is one balanced pad under "
                   "building 1 and its paving, without pond excavation, walls or rock"),
     }
@@ -488,7 +590,7 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
                                "trailers_target": np_.get("trailers_target")}
         short = (np_.get("trailers_target") or 0) - (np_.get("trailers") or 0)
         parts.append(f"The surface pond is what holds the building: {np_.get('variant')} at {np_['sf']:,} SF ({gain:+,} SF, "
-                     f"{pct:+.0f}%) passed every check but the pond"
+                     f"{pct:+.0f}%) passed every layout check but the pond"
                      + (f", with {np_.get('trailers') or 0} of its {np_.get('trailers_target')} target trailer stalls" if short > 0 else "")
                      + f". Its {np_.get('detention_acft')} ac-ft would have to go underground or off site.")
     out["basis"] = " ".join(parts)
@@ -510,7 +612,8 @@ def status_of(rec: dict[str, Any]) -> str:
     if rec.get("fits") is False:
         return "not_planned" if "PLAN_BUDGET_EXCEEDED" in first else "no_fit"
     feasible = rec.get("feasible")
-    if feasible is None:
+    if feasible is None or "PLAN_BUDGET_EXCEEDED" in first:
+        # an input was not read, or the search was cut short: not a result
         return "incomplete"
     if rec.get("hypothetical"):
         return "hypothetical"
@@ -527,12 +630,18 @@ def conditions(rec: dict[str, Any]) -> list[dict[str, Any]]:
     is, when it is dealt with, what to do and what closes it. Blocking
     flags first, then by stage, then by severity."""
     out = []
+    # The record's own verdict decides what blocks: under the prototype
+    # behaviour a severity-1 flag does not always make a plan infeasible,
+    # and a plan the record counts has no blocking condition.
+    counted = rec.get("feasible") is True
     for level in (1, 2, 3):
         for f in _sev(rec, level):
             name = f["flag"]
-            ws, stage, action, closes = playbook_for(name)
-            kind = ("gate" if name in GATE_FLAGS else "blocking") if level == 1 else (
-                "standing" if name in STANDING_FLAGS else ("site" if level == 2 else "information"))
+            ws, stage, action, closes = playbook_for(name, level)
+            if level == 1:
+                kind = "gate" if name in GATE_FLAGS else ("site" if counted else "blocking")
+            else:
+                kind = "standing" if name in STANDING_FLAGS else ("site" if level == 2 else "information")
             out.append({"flag": name, "severity": level, "kind": kind, "workstream": ws, "stage": stage,
                         "stage_label": STAGE_LABEL[stage], "finding": f.get("note") or "", "action": action,
                         "closes_with": closes})
@@ -576,6 +685,9 @@ def next_steps(conds: list[dict[str, Any]], status: str) -> list[dict[str, Any]]
     return out
 
 
+NOTE_MIN_AC = 0.05     # a loss smaller than this is not named (slivers)
+
+
 def yield_notes(rec: dict[str, Any], comp_band: tuple[int, int]) -> dict[str, Any]:
     """Where the yield stands against the comp band, and what holds it."""
     cov = rec.get("coverage") or {}
@@ -586,28 +698,32 @@ def yield_notes(rec: dict[str, Any], comp_band: tuple[int, int]) -> dict[str, An
     position = None if sfa is None else ("below" if sfa < lo else "above" if sfa > hi else "within")
     notes = []
     gross, net = land.get("gross_ac"), land.get("net_ac")
+    drawn = rec.get("fits") is not False
     if gross and net is not None and gross - net >= 0.1 * gross:
         bits = []
-        if land.get("setbacks_buffers_ac"):
+        if (land.get("setbacks_buffers_ac") or 0) >= NOTE_MIN_AC:
             bits.append(f"draft setbacks and buffers {land['setbacks_buffers_ac']:.1f} ac")
-        if land.get("constraints_ac"):
+        if (land.get("constraints_ac") or 0) >= NOTE_MIN_AC:
             bits.append(f"mapped constraints and any test cut {land['constraints_ac']:.1f} ac")
         notes.append(f"{gross - net:.1f} ac ({100 * (gross - net) / gross:.0f}%) of the site is outside the paving envelope"
                      + (": " + ", ".join(bits) if bits else "") + ".")
     unused, largest = land.get("unused_net_ac") or 0.0, land.get("largest_unused_ac") or 0.0
-    if net and (unused >= 1.0 or unused >= 0.15 * net):
-        notes.append(f"{unused:.1f} ac inside the paving envelope is left unused ({100 * unused / net:.0f}% of it; the largest "
-                     f"piece is {largest:.1f} ac): the parcel's shape limits the building more than its area does.")
+    if drawn and net and (unused >= 1.0 or unused >= 0.15 * net):
+        notes.append(f"{unused:.1f} ac inside the paving envelope is left unused ({100 * unused / net:.0f}% of it); the largest "
+                     f"piece is {largest:.1f} ac.")
     gr = rec.get("grading") or {}
     if gr.get("max_cut_ft") is not None and gr.get("max_fill_ft") is not None and (gr.get("relief_ft") or 0) > 10:
         notes.append(f"One level pad needs up to {gr['max_cut_ft']:.0f} ft of cut and {gr['max_fill_ft']:.0f} ft of fill.")
-    up = (rec.get("selection") or {}).get("upside")
-    if up:
-        notes.append(f"A {up['sf']:,} SF layout ({up['gain_sf']:+,} SF) passed its checks but ranks lower.")
-    np_ = (rec.get("selection") or {}).get("without_pond")
-    if np_:
-        notes.append(f"Without a surface pond, {np_['sf']:,} SF ({np_['gain_sf']:+,} SF) passed every other check: price "
-                     "underground or off-site detention against that floor area.")
+    # What another layout would add is said only of a plan that is a
+    # result and has road access.
+    if rec.get("feasible") is not None and not rec.get("hypothetical"):
+        up = (rec.get("selection") or {}).get("upside")
+        if up:
+            notes.append(f"A {up['sf']:,} SF layout ({up['gain_sf']:+,} SF) passed its checks but ranks lower.")
+        np_ = (rec.get("selection") or {}).get("without_pond")
+        if np_:
+            notes.append(f"Without a surface pond, {np_['sf']:,} SF ({np_['gain_sf']:+,} SF) passed every other layout check: "
+                         "price underground or off-site detention against that floor area.")
     return {"sf_per_gross_ac": sfa, "comp_band": [lo, hi], "position": position, "notes": notes}
 
 
@@ -624,7 +740,9 @@ def headline(rec: dict[str, Any], status: str, conds: list[dict[str, Any]]) -> s
     n_site = sum(c["kind"] == "site" for c in conds)
     first_block = next((c for c in conds if c["kind"] == "blocking"), None)
     if status == "no_fit":
-        return "No tested building fits the paving envelope with its truck court, parking and pond."
+        unread = any(f["flag"] in RERUN_FLAGS for f in _sev(rec, 1))
+        return ("No tested building fits the paving envelope with its truck court, parking and pond."
+                + (" An input was not read, which can only make the envelope larger, so the no-fit stands." if unread else ""))
     if status == "not_planned":
         return "The search ran out of time before a plan was finished. This says nothing about fit."
     drawn = rec.get("total_sf_if_access") or b.get("sf") or 0
@@ -634,14 +752,16 @@ def headline(rec: dict[str, Any], status: str, conds: list[dict[str, Any]]) -> s
             f"({int(b.get('L_ft') or 0)} x {int(b.get('D_ft') or 0)} ft)")
     where = f"on {cov.get('gross_ac')} ac: {cov.get('sf_per_gross_ac') or 0:,} SF per gross acre, FAR {cov.get('gross_far')}"
     if status == "incomplete":
-        return (f"{what} {where}, but an input was not read, so this is not a result. Run it again before using any "
-                "number here.")
+        return (f"{what} {where}, but an input was not read or the search was cut short, so this is not a result. Run it "
+                "again before using any number here.")
     if status == "hypothetical":
         return f"{what} would fit {where}, but the site has no road frontage. No floor area is counted."
     if status == "blocked":
+        if not n_block:
+            # the prototype behaviour: not feasible by the layout's own check, with no severity-1 flag to name
+            return f"{what} was drawn {where}, but the layout failed its own checks (see the flags). No floor area is counted."
         return (f"{what} was drawn {where}, but {_plural(n_block, 'blocking item')} stand"
-                f"{'s' if n_block == 1 else ''}" + (f", first: {first_block['finding']}" if first_block else "")
-                + ". No floor area is counted.")
+                f"{'s' if n_block == 1 else ''}, first: {first_block['finding']}. No floor area is counted.")
     if status == "gated":
         counted = bool(rec.get("total_sf"))
         return (f"{what} fits {where}. The use needs a permit ({', '.join(rec.get('gated') or [])}), so the floor area is "

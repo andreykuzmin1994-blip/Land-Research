@@ -70,6 +70,8 @@ class Playbook(unittest.TestCase):
 
     def test_second_building_flag_takes_the_base_entry(self):
         self.assertEqual(assess.playbook_for("SECOND_DROP_YARD_UNREACHABLE"), assess.PLAYBOOK["DROP_YARD_UNREACHABLE"])
+        for flag, sev in assess.PLAYBOOK_AT_SEVERITY:
+            self.assertIn(flag, assess.PLAYBOOK)
         self.assertEqual(assess.playbook_for("SOMETHING_NEW")[0], assess.W_DATA)
 
     def test_gate_and_rerun_sets_match_the_planner(self):
@@ -144,10 +146,25 @@ class Status(unittest.TestCase):
         rec = flags_rec(sev1=["FRONTAGE_NOT_CHECKED", "DEM_PARTIAL"], sev2=["RELIEF", "ZONING_DRAFT"], feasible=None, total_sf=0)
         a = assess.assessment(rec)
         self.assertEqual(a["status"], "incomplete")
-        self.assertEqual(len(a["next_steps"]), 1)
+        self.assertEqual(len(a["next_steps"]), 2)                           # the two not-read inputs, nothing else
         self.assertIn("again", a["next_steps"][0]["action"])
-        self.assertEqual(a["next_steps"][0]["flags"], ["FRONTAGE_NOT_CHECKED", "DEM_PARTIAL"])
+        self.assertEqual(a["next_steps"][1]["flags"], ["DEM_PARTIAL"])
+        self.assertEqual(a["next_steps"][0]["flags"], ["FRONTAGE_NOT_CHECKED"])
         self.assertIn("not a result", a["headline"])
+        # a plan drawn by a search that was cut short is not a result either
+        cut = assess.assessment(flags_rec(sev1=["PLAN_BUDGET_EXCEEDED"], total_sf=0))
+        self.assertEqual(cut["status"], "incomplete")
+        self.assertIn("--max-seconds-per-site", cut["next_steps"][0]["action"])
+
+    def test_same_flag_two_severities_two_actions(self):
+        self.assertIn("annexation", assess.playbook_for("ASSEMBLAGE_MIXED_RULES", 1)[2])
+        self.assertNotIn("annexation", assess.playbook_for("ASSEMBLAGE_MIXED_RULES", 2)[2])
+        self.assertEqual(assess.playbook_for("SECOND_HEIGHT_CAP", 2), assess.PLAYBOOK["HEIGHT_CAP"])
+
+    def test_no_fit_with_an_unread_input_says_so(self):
+        a = assess.assessment(flags_rec(sev1=["NO_FIT", "LAYERS_NOT_CHECKED"], fits=False, feasible=False, total_sf=0))
+        self.assertEqual(a["status"], "no_fit")
+        self.assertIn("can only make the envelope larger", a["headline"])
 
     def test_yield_position(self):
         lo, hi = sp.COMP_BAND_SF_PER_AC
@@ -192,7 +209,7 @@ class Selection(unittest.TestCase):
     def test_without_pond(self):
         s = assess.selection([alt(58000), alt(68000, trailers=0)], sp.RANKING, [alt(96000, ok=False, trailers=0), alt(60000, ok=False)])
         self.assertEqual((s["without_pond"]["sf"], s["without_pond"]["gain_sf"]), (96000, 38000))
-        self.assertIn("passed every check but the pond", s["basis"])
+        self.assertIn("passed every layout check but the pond", s["basis"])
         self.assertIn("0 of its 10 target trailer stalls", s["basis"])
         # a pond-limited layout no larger than a passing one is not an unlock
         self.assertIsNone(assess.selection([alt(58000), alt(68000)], sp.RANKING, [alt(66000, ok=False)])["without_pond"])
@@ -217,6 +234,35 @@ class Geometry(unittest.TestCase):
         self.assertEqual(rows["Paving setback, other lot lines"]["status"], "short")       # 8 ft against 10
         self.assertEqual(rows["Paving setback, other lot lines"]["margin_ft"], -2)
         self.assertNotIn("Building setback, residential side", rows)                       # no such edge on this site
+
+    def test_band_clearance_is_square_at_the_ends(self):
+        # a lot line that stops at x = 100: a shape beside its end is not behind it
+        line = LineString([(0, 0), (100, 0)])
+        self.assertAlmostEqual(assess.band_clearance(box(20, 40, 60, 80), line), 40, delta=0.1)
+        beside = box(130, 10, 170, 50)                       # 31.6 ft from the line's end by plain distance
+        self.assertLess(beside.distance(line), 32)
+        self.assertIsNone(assess.band_clearance(beside, line))
+        # far off, in front of one stretch: square to that stretch, not to the far end of the line
+        bent = LineString([(0, 0), (500, 0), (520, 400)])
+        far = box(100, 900, 200, 1000)
+        self.assertAlmostEqual(assess.band_clearance(far, bent), 900, delta=0.1)
+        self.assertLess(far.distance(bent), 600)
+        # at a bend it is the plain distance
+        corner = box(560, -80, 600, -40)
+        self.assertAlmostEqual(assess.band_clearance(corner, bent), corner.distance(bent), delta=0.1)
+        # a closed line has no ends; two parts are each measured
+        ring = box(0, 0, 100, 100).exterior
+        self.assertAlmostEqual(assess.band_clearance(box(130, 130, 150, 150), ring), 30 * 2 ** 0.5, delta=0.1)
+        two = LineString([(0, 0), (100, 0)]).union(LineString([(0, 300), (100, 300)]))
+        self.assertAlmostEqual(assess.band_clearance(box(20, 200, 60, 240), two), 60, delta=0.1)
+
+    def test_open_yard_row(self):
+        edges = [("ROW", LineString([(0, 0), (500, 0)])), ("OTHER", LineString([(0, 0), (0, 500)]))]
+        for x0, want in ((70, "meets"), (59.5, "meets"), (45, "limited"), (30, "short")):
+            row = assess.open_yard_row(edges, box(x0, 5, 300, 300))        # 5 ft from the road: a road is open space
+            self.assertEqual(row["status"], want, x0)
+            self.assertEqual("note" in row, want != "meets")
+        self.assertIsNone(assess.open_yard_row([("ROW", LineString([(0, 0), (500, 0)]))], box(70, 5, 300, 300)))
 
     def test_land_budget_adds_up_without_a_plan(self):
         parcel, P = box(0, 0, 1000, 1000), box(50, 50, 950, 950)
@@ -273,6 +319,56 @@ class PlannedSite(ts.Offline):
         self.assertEqual(rows["Car parking"]["status"], "meets")
         self.assertEqual(rows["Use"]["status"], "verify")
         self.assertIn("Building setback, road", rows)
+
+    def test_residential_rear_edge_does_not_read_short(self):
+        # review 38, finding 1: homes along the whole rear line; the edge is
+        # read 20 ft down each side line, and plain distance to that stub's
+        # end made a feasible plan read "short" on the residential rear
+        homes = ts.wgs(box(0, 900, 700, 1100))
+        rec, _ = ts.planned("res_rear", lambda: ts.site(700, 900, neighbours=[({"LUCode": "101"}, homes)]))
+        self.assertIs(rec["feasible"], True)
+        self.assertIn("RESIDENTIAL_EDGE", ts.names(rec))
+        rows = {r["item"]: r for r in rec["compliance"]["rows"]}
+        res = [r for item, r in rows.items() if "residential" in item]
+        self.assertTrue(res)
+        for item, r in rows.items():
+            if "setback" in item:
+                self.assertEqual(r["status"], "meets", (item, r))
+        self.assertIn("Open yard at the building (building code)", rows)
+        self.assertGreater(rec["quantities"]["residential_edge_lf"], 600)
+
+    def test_read_out_failure_keeps_the_plan(self):
+        def boom(*a, **k):
+            raise ValueError("planted")
+        with ts.mock.patch.object(assess, "land_budget", boom), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(ts.site(600, 700))
+        self.assertIs(rec["feasible"], True)
+        self.assertGreater(rec["total_sf"], 0)
+        self.assertEqual(rec["read_out"], {"complete": False, "reason": "ValueError: planted"})
+        self.assertIn(rec["assessment"]["status"], ("fits", "fits_with_conditions"))
+        self.assertNotIn("site_data", rec)
+        ET.fromstring(sr.render(d, rec))                                      # the sheet still draws
+
+    def test_prototype_behaviour_agrees_with_its_record(self):
+        # review 38, finding 2: under the prototype rule a severity-1 flag
+        # does not always block, and a pond that does not fit is severity 2
+        proto = sp.PlanOptions(behaviour="prototype")
+        cp, _ = ts.planned("cp_proto", lambda: ts.site(800, 900, jur="College Park"), proto)
+        self.assertIs(cp["feasible"], True)
+        self.assertIn("HEIGHT_CAP", ts.names(cp, 1))
+        a = cp["assessment"]
+        self.assertEqual(a["status"], "fits_with_conditions")
+        self.assertEqual(a["counts"]["blocking"], 0)
+        self.assertEqual(assess.pipeline_row(cp)["blocking"], "")
+
+        def nopond(*a_, **k):
+            return None
+        with ts.mock.patch.object(sp, "place_sized_pond", nopond), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, _ = sp.plan_site(ts.site(600, 700), proto)
+        self.assertIs(rec["feasible"], False)
+        self.assertEqual(rec["assessment"]["status"], "blocked")
+        self.assertNotIn("0 blocking", rec["assessment"]["headline"])
+        self.assertIn("failed its own checks", rec["assessment"]["headline"])
 
     def test_grading_and_takeoff(self):
         def z(x, y):
@@ -335,6 +431,28 @@ class PlannedSite(ts.Offline):
         self.assertIn("No layout passed", rec["selection"]["basis"])
 
 
+@unittest.skipUnless(ts.FIXTURES.is_dir(), "no reference fixtures")
+class ReferenceSite(ts.Offline):
+    angles = False          # the real search angles, as in test_siteplan.ReferenceSites
+
+    def test_reference_site_reports_the_larger_layouts(self):
+        # reference site #21 (a real parcel shape): a court-only layout that
+        # passed ranks below the plan drawn, and one passed all but the pond
+        inp, _ = ts.load_fixture("rank21")
+        rec, d = sp.plan_site(inp)
+        sel = rec["selection"]
+        self.assertGreater(sel["upside"]["sf"], rec["building"]["sf"])
+        self.assertTrue(any("trailer stalls" in r for r in sel["upside"]["reasons"]))
+        self.assertGreater(sel["without_pond"]["sf"], sel["upside"]["sf"])
+        self.assertEqual(rec["total_sf"], rec["building"]["sf"])              # neither is counted
+        self.assertIn("Without a surface pond", " ".join(rec["assessment"]["yield"]["notes"]))
+        svg = sr.render(d, rec)
+        self.assertIn("passed every layout check but the pond", sel["basis"])
+        self.assertIn("surface pond", svg)
+        self.assertIn("RESIDENTIAL EDGE", svg)
+        self.assertIn("DROP YARD", svg)
+
+
 # ---------------------------------------------------------------------------
 # The sheet
 # ---------------------------------------------------------------------------
@@ -346,7 +464,9 @@ class Sheet(ts.Offline):
         a = rec["assessment"]
         for must in (a["label"], "KEY NUMBERS", "NEXT STEPS", "WHERE THE LAND GOES", "PLAN AGAINST THE DRAFT ZONING VALUES",
                      "NOT THE ADOPTED CODE", "LAYOUTS COMPARED", "CONDITIONS", "LEGEND", "DRAFT", "NOT FOR CONSTRUCTION",
-                     "TRUCK COURT", "ZONING_DRAFT", "zoning verification letter", sr.DISCLAIMER[:40]):
+                     "TRUCK COURT", "DOCK DOORS", "CAR STALLS", "DETENTION POND", "TRUCK ENTRY", "FT FRONTAGE",
+                     "Open yard at the building (building code)", "ZONING_DRAFT", "zoning verification letter",
+                     sr.DISCLAIMER[:40]):
             self.assertIn(must, svg, must)
         root = ET.fromstring(svg)
         tags = {e.tag.split("}")[-1] for e in root.iter()}
@@ -354,6 +474,14 @@ class Sheet(ts.Offline):
         self.assertNotIn("href", svg.lower())
         self.assertEqual(float(root.get("width")), sr.W)
         self.assertEqual(sr.render(d, rec), svg)                            # the same plan, the same bytes
+        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)), {"#sx", "#tx", "#cx", "#wx"} & set(re.findall(r"url\(([^)]*)\)", svg)))
+        # the building's length and depth are dimension strings on the plan
+        b = rec["building"]
+        self.assertIn(f">{int(b['L_ft'])}&#x27;<", svg.replace("&apos;", "&#x27;").replace("&#39;", "&#x27;"))
+        self.assertIn(f">{int(b['D_ft'])}&#x27;<", svg.replace("&apos;", "&#x27;").replace("&#39;", "&#x27;"))
+        # what is what: the main uses do not share a colour
+        fills = [sr.C[k] for k in ("parcel", "bldg", "court", "trailer", "car", "pond", "street", "office")]
+        self.assertEqual(len(set(fills)), len(fills))
         viewer.sanitise_svg(svg)                                            # the viewer's allow-list takes it
 
     def test_sheet_scale_matches_the_drawing(self):
@@ -397,11 +525,17 @@ class Sheet(ts.Offline):
         self.assertGreater(sr.text_width("WWWW", 10), sr.text_width("iiii", 10) * 3)
 
     def test_second_building_and_no_assessment_key(self):
-        rec, d = ts.planned("big_two", lambda: ts.site(1300, 1500))
-        if rec.get("second_building"):
-            svg = sr.render(d, rec)
-            self.assertIn("BUILDING 2", svg)
-            self.assertEqual(rec["site_data"]["buildings"], 2)
+        rec, d = ts.planned("second", lambda: ts.site(1600, 1000, front=ts.TWO_FRONTS))
+        self.assertIn("second_building", rec)                              # the site below does hold two
+        svg = sr.render(d, rec)
+        self.assertIn("BUILDING 2", svg)
+        self.assertEqual(rec["site_data"]["buildings"], 2)
+        rows = {r["item"] for r in rec["compliance"]["rows"]}
+        self.assertIn("Car parking (building 1)", rows)
+        self.assertLessEqual(rec["quantities"]["disturbed_ac"], rec["site_data"]["land"]["net_ac"] + 0.05)
+        land = rec["site_data"]["land"]
+        self.assertAlmostEqual(sum(u["ac"] for u in land["uses"]) + land["unused_net_ac"] + land["outside_net_unused_ac"],
+                               land["gross_ac"], delta=0.1)
         # a record without the stored read-out still draws (the sheet derives the assessment)
         bare = {k: v for k, v in rec.items() if k not in ("assessment", "site_data", "compliance", "quantities", "selection")}
         svg = sr.render(d, bare)

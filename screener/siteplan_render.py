@@ -3,9 +3,13 @@
 A sheet a reviewer can read without the JSON beside it:
 
 - a header with the site, the layout and one status;
-- the plan, labelled (building size and dimensions, truck court depth,
-  stall counts, pond storage, driveways, frontage, residential edges,
-  both setback lines), with a north arrow and a scale bar;
+- the plan, drawn as published industrial site plans are (open ground
+  green, the building one warm solid, truck paving grey, car paving
+  blue-grey, trailer stalls dark, water blue, the street a dark band,
+  dimension strings in red) and labelled: building size, length and
+  depth, truck court depth, dock doors, stall counts, pond storage,
+  driveways, frontage, residential edges and both setback lines, with
+  a north arrow and a scale bar;
 - key numbers, the next steps in order, where the land goes, the plan
   against its DRAFT zoning values, and the layouts compared;
 - a register of conditions: each flag with its workstream, when it is
@@ -22,7 +26,7 @@ Safe output (R3): every text goes through ``plan._esc`` (XML-escaped,
 quotes included, characters XML cannot hold replaced), and the drawing
 uses only plain shapes: no script, no href / xlink:href, no event
 attributes, no style element, and ``url()`` only as ``url(#id)`` for the
-three hatch patterns defined in the file itself. Numbers have one fixed
+four hatch patterns defined in the file itself. Numbers have one fixed
 format, so the same plan gives the same bytes.
 
 Every sheet says DRAFT (the zoning values are draft) and, when an input
@@ -35,18 +39,24 @@ import math
 from typing import Any
 
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import unary_union
+from shapely.ops import substring, unary_union
 
 from . import sitefit
 from . import siteplan_assess as assess
 from .plan import _esc
 from .siteplan import COMP_BAND_SF_PER_AC, COURT, RIM, TRAILER_ROW, Drawing, rnd
 
-C = {"bg": "#ffffff", "parcel": "#f4f1ea", "ink": "#1f2a30", "env": "#7a8a94", "cons": "#9cc3e0", "trans": "#e8b04b", "cut": "#c92a2a",
-     "steep": "#b07d4f", "bldg": "#e9e4da", "bldg_s": "#4a3f35", "office": "#c9b8a0", "court": "#c4c9cd", "apron": "#b8bec3",
-     "trailer": "#a7adb3", "car": "#dfe3f1", "road": "#bfc5ca", "pond": "#8ccfc4", "pond_s": "#2a7f74", "drive": "#d9480f", "row": "#d9480f",
-     "mute": "#5d676e", "rule": "#c9ced2", "band": "#f3f5f6", "benv": "#a05a2c", "res": "#7b3fa0",
+# The plan's colours follow published industrial site plans: open ground
+# green, the building one warm solid, truck paving grey, car paving
+# blue-grey, trailer stalls dark, water blue.
+C = {"bg": "#ffffff", "parcel": "#d3e4c3", "ink": "#1f2a30", "env": "#4d5b63", "cons": "#dcebf8", "cons_s": "#3f7fb8",
+     "trans": "#d9942b", "cut": "#c92a2a", "steep": "#8a5a2b", "bldg": "#dcbd8f", "bldg_s": "#4a3a28", "office": "#f5ead6",
+     "court": "#9fa6ad", "road": "#9fa6ad", "trailer": "#56616d", "car": "#b4c2d9", "pond": "#6fb1d6", "pond_s": "#1c5f88",
+     "pond_rim": "#b9d6a3", "street": "#5f666d", "drive": "#d9480f", "dim": "#b3261e",
+     "mute": "#5d676e", "rule": "#c9ced2", "band": "#f3f5f6", "benv": "#a0421f", "res": "#7b3fa0",
      "good": "#1f7a4d", "warn": "#8a6d00", "bad": "#b3261e"}
+STREET_FT = 34.0               # width of the street band drawn outside the frontage
+STREET_TRIM_FT = 36.0          # cut from each end of a frontage run before the band is drawn
 W, PLAN, M = 1600, 820, 24
 PAD = 40                       # room inside the plan box for labels at the parcel's edge
 COL_X = M + PLAN + 24
@@ -175,8 +185,9 @@ def render(d: Drawing, rec: dict) -> str:
         dd = path(g)
         return f'<path d="{dd}" fill="{fill}" fill-opacity="{op}" stroke="{stroke}" stroke-width="{sw}" fill-rule="evenodd" {extra}/>' if dd else ""
 
-    def text(x, y, txt, size=11.0, weight="normal", fill=C["ink"], anchor="start", rot=None, spacing=None, style=None):
-        tf = f' transform="rotate({rot:.1f} {x:.1f} {y:.1f})"' if rot else ""
+    def text(x, y, txt, size=11.0, weight="normal", fill=C["ink"], anchor="start", rot=None, spacing=None, style=None,
+             pivot_dy=0.0):
+        tf = f' transform="rotate({rot:.1f} {x:.1f} {y + pivot_dy:.1f})"' if rot else ""
         sp = f' letter-spacing="{spacing}"' if spacing else ""
         st = f' font-style="{style}"' if style else ""
         an = f' text-anchor="{anchor}"' if anchor != "start" else ""
@@ -227,7 +238,11 @@ def render(d: Drawing, rec: dict) -> str:
     head.append(text(M, hy + 6, "INDUSTRIAL TEST FIT  /  CONCEPT ONLY, NOT FOR CONSTRUCTION  /  DRAFT ZONING VALUES", 10,
                      fill=C["mute"], spacing="0.8"))
     ty = hy + 6
-    for seg_ in _wrap(title, W - 2 * M - pill_w - 20, 20, True)[:2]:
+    title_lines = _wrap(title, W - 2 * M - pill_w - 20, 20, True)
+    if len(title_lines) > 2:
+        # a title longer than two lines is cut, and says so
+        title_lines = [title_lines[0], _wrap(title_lines[1] + " " + title_lines[2], W - 2 * M - pill_w - 60, 20, True)[0] + " ..."]
+    for seg_ in title_lines:
         ty += 24
         head.append(text(M, ty, seg_, 20, "bold"))
     ty += 18
@@ -236,8 +251,7 @@ def render(d: Drawing, rec: dict) -> str:
     px = W - M - pill_w
     head.append(f'<rect x="{px}" y="{hy + 2:.1f}" width="{pill_w}" height="30" rx="4" fill="{STATUS_FILL[status]}"/>')
     head.append(text(px + pill_w / 2, hy + 22, a["label"], 13.5, "bold", "#ffffff", "middle", spacing="0.5"))
-    head.append(text(W - M, hy + 48, f"Sheet SP-{rec.get('key', '')}  /  draft rules, {rec['zoning']['name']}", 10.5,
-                     fill=C["mute"], anchor="end"))
+    head.append(text(W - M, hy + 48, f"draft rules: {str(rec['zoning']['name'])[:40]}", 10.5, fill=C["mute"], anchor="end"))
     ty += 12
     head.append(f'<path d="M{M},{ty:.1f} L{W - M},{ty:.1f}" stroke="{C["ink"]}" stroke-width="1.2"/>')
     # the headline, and what holds the floor area back
@@ -261,48 +275,84 @@ def render(d: Drawing, rec: dict) -> str:
 
 
     # ----------------------------------------------------------------- plan
+    # Drawn the way published industrial site plans are: open ground green,
+    # the building one warm solid, truck paving grey, car paving blue-grey,
+    # trailer stalls dark with white stripes, water blue, the property line
+    # heavy, the street a dark band, dimension strings in red.
     out = [f'<defs><pattern id="tx" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="{C["trans"]}" stroke-width="3"/></pattern>'
-           f'<pattern id="sx" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2="6" stroke="{C["steep"]}" stroke-width="1.2"/></pattern>'
-           f'<pattern id="cx" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="{C["cut"]}" stroke-width="2"/></pattern></defs>']
+           f'<pattern id="sx" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2="6" stroke="{C["steep"]}" stroke-width="1.3"/></pattern>'
+           f'<pattern id="cx" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="{C["cut"]}" stroke-width="2"/></pattern>'
+           f'<pattern id="wx" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect x="0" y="0" width="7" height="7" fill="{C["cons"]}"/><line x1="0" y1="0" x2="0" y2="7" stroke="{C["cons_s"]}" stroke-width="2"/></pattern></defs>']
     out.append(f'<rect x="{M}" y="{top:.1f}" width="{PLAN}" height="{PLAN}" fill="#ffffff" stroke="{C["rule"]}" stroke-width="1"/>')
-    out += [poly(parcel, C["parcel"]), poly(constraints.intersection(parcel), C["cons"], op=0.85), poly(steep, "url(#sx)", op=0.9),
-            poly(trans, "url(#tx)", op=0.9), poly(cut, "url(#cx)", op=0.8), poly(P, "none", C["env"], 1, extra='stroke-dasharray="6 4"'),
-            poly(d.B, "none", C["benv"], 0.9, extra='stroke-dasharray="10 3 2 3"')]
+    marks = [q for q in (o["tpt"], o["cpt"]) if q is not None]
+    pc = parcel.centroid
+    # the street: a dark band outside the parcel along the frontage
+    runs = ([ln for ln in getattr(front_ft, "geoms", [front_ft]) if ln.geom_type == "LineString" and ln.length > 1]
+            if front_ft is not None and not front_ft.is_empty else [])
+    # (each run less its ends: a frontage line hooks round the corner by a few feet)
+    body = [substring(ln, STREET_TRIM_FT, ln.length - STREET_TRIM_FT) for ln in runs if ln.length > 4 * STREET_TRIM_FT]
+    street = (unary_union(body).buffer(STREET_FT, cap_style=2, join_style=2).difference(parcel.buffer(0.5)) if body else None)
+    out.append(poly(street, C["street"]))
+    out += [poly(parcel, C["parcel"]), poly(constraints.intersection(parcel), "url(#wx)", C["cons_s"], 0.6),
+            poly(steep, "url(#sx)", op=0.95), poly(trans, "url(#tx)", op=0.9), poly(cut, "url(#cx)", op=0.85)]
     plans = [(p, o)] + ([second] if second else [])
     for kind, rp in o["route_polys"] + ([] if not second else second[1]["route_polys"]):
         out.append(poly(rp, C["road"] if kind == "truck" else C["car"]))
     for pp, oo in plans:
-        for g in oo["drops"]:
-            out.append(poly(g, C["trailer"], C["ink"], 0.5))
         for g in pp.roads:
             out.append(poly(g, C["road"]))
         for g in pp.courts:
             out.append(poly(g, C["court"]))
-        for g in pp.rows:
-            out.append(poly(g, C["trailer"]))
         for g in pp.cars:
             out.append(poly(g, C["car"]))
+        for g in oo["drops"]:
+            out.append(poly(g, C["trailer"], C["ink"], 0.6))
+        for g in pp.rows:
+            out.append(poly(g, C["trailer"]))
         if pp.ticks:
-            out.append(f'<path d="{lpath(unary_union(pp.ticks))}" stroke="#ffffff" stroke-width="0.8" fill="none"/>')
-        out.append(poly(pp.building, C["bldg"], C["bldg_s"], 1.6))
+            out.append(f'<path d="{lpath(unary_union(pp.ticks))}" stroke="#ffffff" stroke-width="1" fill="none"/>')
+        out.append(poly(pp.building, C["bldg"], C["bldg_s"], 2.2))
         for g in pp.offices:
-            out.append(poly(g, C["office"], C["bldg_s"], 0.6))
+            out.append(poly(g, C["office"], C["bldg_s"], 0.8))
         if pp.doors_geom:
-            out.append(f'<path d="{lpath(unary_union(pp.doors_geom))}" stroke="{C["bldg_s"]}" stroke-width="1.4" fill="none"/>')
+            out.append(f'<path d="{lpath(unary_union(pp.doors_geom))}" stroke="{C["bldg_s"]}" stroke-width="2" fill="none"/>')
         for g in oo["ponds"]:
-            out.append(poly(g, "#d7ece8", C["pond_s"], 0.8))
-            out.append(poly(g.buffer(-RIM), C["pond"], C["pond_s"], 1.2))
+            out.append(poly(g, C["pond_rim"], C["pond_s"], 0.8))
+            out.append(poly(g.buffer(-RIM), C["pond"], C["pond_s"], 1.4))
+    # the two setback lines, over the paving so they read everywhere
+    out += [poly(P, "none", C["env"], 1.1, extra='stroke-dasharray="6 4"'),
+            poly(d.B, "none", C["benv"], 1.1, extra='stroke-dasharray="10 3 2 3"')]
     res_lines = [ln for k, ln in d.edges if k.startswith("RES") and not ln.is_empty]
     if res_lines:
-        out.append(f'<path d="{lpath(unary_union(res_lines))}" stroke="{C["res"]}" stroke-width="3.5" fill="none" '
+        out.append(f'<path d="{lpath(unary_union(res_lines))}" stroke="{C["res"]}" stroke-width="4.5" fill="none" '
                    f'stroke-dasharray="9 5"/>')
-    if front_ft is not None and not front_ft.is_empty:
-        out.append(f'<path d="{lpath(front_ft)}" stroke="{C["row"]}" stroke-width="4" fill="none" stroke-linecap="round"/>')
-    out.append(poly(parcel, "none", C["ink"], 1.6))
+    # the property line: heavy, long dash and two short
+    out.append(poly(parcel, "none", "#ffffff", 3.4))
+    out.append(poly(parcel, "none", C["ink"], 2.2, extra='stroke-dasharray="20 4 3 4 3 4"'))
 
-    # -- labels on the plan (each only where its shape is large enough to hold it)
-    pc = parcel.centroid
+    # -- labels and dimension strings (each only where its shape is large enough to hold it)
     labels: list[str] = []
+
+    def dim(q0, q1, txt, at=0.5):
+        """A dimension string between two feet-plane points: a line with
+        an arrowhead at each end and the figure on it (`at`: how far
+        along, so it can stand clear of a label at the middle)."""
+        x0, y0, x1, y1 = X(q0[0]), Y(q0[1]), X(q1[0]), Y(q1[1])
+        n = math.hypot(x1 - x0, y1 - y0)
+        if n < 46:
+            return ""
+        ux, uy = (x1 - x0) / n, (y1 - y0) / n
+        heads = ""
+        for (hx, hy_), sg in (((x0, y0), 1.0), ((x1, y1), -1.0)):
+            bx_, by_ = hx + sg * ux * 7, hy_ + sg * uy * 7
+            heads += (f'<path d="M{hx:.1f},{hy_:.1f} L{bx_ - uy * 2.6:.1f},{by_ + ux * 2.6:.1f} L{bx_ + uy * 2.6:.1f},{by_ - ux * 2.6:.1f} Z" '
+                      f'fill="{C["dim"]}"/>')
+        line = f'<path d="M{x0:.1f},{y0:.1f} L{x1:.1f},{y1:.1f}" stroke="{C["dim"]}" stroke-width="1.1" fill="none"/>'
+        return line + heads + label(x0 + (x1 - x0) * at, y0 + (y1 - y0) * at, [(txt, 10, "bold")], edge_angle(q0, q1), C["dim"])
+
+    def lerp(q0, q1, t):
+        return (q0[0] + (q1[0] - q0[0]) * t, q0[1] + (q1[1] - q0[1]) * t)
+
     for i, (pp, oo) in enumerate(plans, 1):
         cb = list(pp.building.exterior.coords)
         long_px, short_px = pp.L * s, pp.v["D"] * s
@@ -311,53 +361,62 @@ def render(d: Drawing, rec: dict) -> str:
         name = f"BUILDING {i}" if len(plans) > 1 else "BUILDING"
         clear = (rec.get("building") or {}).get("clear_height_ft") if i == 1 else None
         if long_px >= 120 and short_px >= 58:
-            lines = [(name, 9.5, "normal"), (f"{rnd(pp.sf, 1000):,} SF", 15, "bold")]
+            lines = [(name, 10, "bold"), (f"{rnd(pp.sf, 1000):,} SF", 16, "bold")]
             if clear:
                 lines.append((f"{clear} FT CLEAR", 9.5, "normal"))
             labels.append(label(X(bc.x), Y(bc.y), lines, 0.0 if short_px >= 104 else ang))
         else:
             labels.append(label(X(bc.x), Y(bc.y), [(f"{rnd(pp.sf, 1000):,} SF", 12, "bold")], ang if long_px >= 70 else 0.0))
         if long_px >= 150 and short_px >= 80:
-            # dimension strings just inside the long wall and an end wall
-            for (q0, q1), val in (((cb[0], cb[1]), pp.L), ((cb[1], cb[2]), pp.v["D"])):
-                mx, my = (q0[0] + q1[0]) / 2, (q0[1] + q1[1]) / 2
-                dx, dy = bc.x - mx, bc.y - my
-                n = math.hypot(dx, dy) or 1.0
-                off = 11 / s
-                labels.append(label(X(mx + dx / n * off), Y(my + dy / n * off), [(f"{val:.0f} ft", 9.5, "normal")],
-                                    edge_angle(q0, q1), C["bldg_s"]))
-        for g in pp.courts:
+            # the building's length and depth, as dimension strings across it
+            labels.append(dim(lerp(cb[0], cb[3], 0.8), lerp(cb[1], cb[2], 0.8), f"{pp.L:.0f}'", at=0.27))
+            labels.append(dim(lerp(cb[0], cb[1], 0.1), lerp(cb[3], cb[2], 0.1), f"{pp.v['D']:.0f}'"))
+        per_wall = [pp.doors // len(pp.courts) + (1 if k < pp.doors % len(pp.courts) else 0) for k in range(len(pp.courts))]
+        for g, n_doors in zip(pp.courts, per_wall):
+            cc = list(g.exterior.coords)
             lp, sp_, an = box_axes(g)
-            if lp >= 130 and sp_ >= 18:
-                cc = g.centroid
-                labels.append(label(X(cc.x), Y(cc.y), [(f"TRUCK COURT {COURT} FT", 9.5, "normal")], an))
+            cen = g.centroid
+            if lp >= 130 and sp_ >= 26:
+                labels.append(label(X(cen.x), Y(cen.y), [("TRUCK COURT", 9.5, "bold")], an))
+            if lp >= 150 and sp_ >= 46:
+                # its depth, dock wall to the far edge, near one end
+                labels.append(dim(lerp(cc[0], cc[1], 0.07), lerp(cc[3], cc[2], 0.07), f"{COURT}'"))
+            if lp >= 150 and sp_ >= 50 and n_doors:
+                # the door count, along the long edge that is the dock wall
+                e = min(((cc[0], cc[1]), (cc[3], cc[2])), key=lambda t: bc.distance(_mid(t)))
+                mx, my = (e[0][0] + e[1][0]) / 2, (e[0][1] + e[1][1]) / 2
+                dx, dy = cen.x - mx, cen.y - my
+                n = math.hypot(dx, dy) or 1.0
+                labels.append(label(X(mx + dx / n * 20 / s), Y(my + dy / n * 20 / s),
+                                    [(f"{n_doors} DOCK DOORS", 8.5, "normal")], an))
         if pp.rows and pp.court_stalls:
             per = pp.court_stalls // len(pp.rows)
             for g in pp.rows:
                 lp, sp_, an = box_axes(g)
-                if lp >= 80 and sp_ >= 13:
+                if lp >= 86 and sp_ >= 13:
                     cc = g.centroid
-                    labels.append(label(X(cc.x), Y(cc.y), [(f"{per} TRAILERS", 9, "normal")], an))
-        cars_n = ((rec.get("cars") or {}).get("provided") if i == 1 else (rec.get("second_building") or {}).get("cars_capacity"))
+                    labels.append(label(X(cc.x), Y(cc.y), [(f"{per} TRAILER STALLS", 9, "bold")], an))
+        # building 1's stalls as the record states them; a second building's by the same rule
+        cars_n = (rec.get("cars") or {}).get("provided") if i == 1 else _cars_provided(pp)
         for g in pp.cars:
             lp, sp_, an = box_axes(g)
-            if cars_n and lp >= 70 and sp_ >= 14:
+            if cars_n and lp >= 80 and sp_ >= 14:
                 cc = g.centroid
-                labels.append(label(X(cc.x), Y(cc.y), [(f"{cars_n} CARS", 9.5, "normal")], an))
+                labels.append(label(X(cc.x), Y(cc.y), [(f"{cars_n} CAR STALLS", 9.5, "bold")], an))
         n_drop = oo["trailers"] - pp.court_stalls
         for g in oo["drops"]:
             lp, sp_, an = box_axes(g)
             cc = g.centroid
-            if lp >= 70 and sp_ >= 22:
-                labels.append(label(X(cc.x), Y(cc.y), [("DROP YARD", 9, "normal"), (f"{n_drop} TRAILERS", 9, "normal")], an))
+            if lp >= 70 and sp_ >= 26:
+                labels.append(label(X(cc.x), Y(cc.y), [("DROP YARD", 9, "bold"), (f"{n_drop} TRAILER STALLS", 9, "normal")], an))
         for g in oo["ponds"]:
             lp, sp_, an = box_axes(g)
             cc = g.centroid
             each = oo["v_det"] / max(len(oo["ponds"]), 1)
             if lp >= 80 and sp_ >= 34:
-                labels.append(label(X(cc.x), Y(cc.y), [("DETENTION", 9, "normal"), (f"{each:.1f} AC-FT", 10.5, "bold")], an, C["pond_s"]))
+                labels.append(label(X(cc.x), Y(cc.y), [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")], an, C["pond_s"]))
             elif lp >= 40:
-                labels.append(label(X(cc.x), Y(cc.y), [("POND", 9, "normal")], an, C["pond_s"]))
+                labels.append(label(X(cc.x), Y(cc.y), [("POND", 9, "bold")], an, C["pond_s"]))
     if res_lines:
         longest = max((ln for g in res_lines for ln in getattr(g, "geoms", [g]) if ln.geom_type == "LineString"),
                       key=lambda ln: ln.length, default=None)
@@ -366,30 +425,38 @@ def render(d: Drawing, rec: dict) -> str:
             mid = longest.interpolate(0.5, normalized=True)
             dx, dy = pc.x - mid.x, pc.y - mid.y
             n = math.hypot(dx, dy) or 1.0
-            labels.append(label(X(mid.x + dx / n * 13 / s), Y(mid.y + dy / n * 13 / s), [("RESIDENTIAL EDGE", 9, "bold")],
+            labels.append(label(X(mid.x + dx / n * 14 / s), Y(mid.y + dy / n * 14 / s), [("RESIDENTIAL EDGE", 9, "bold")],
                                 edge_angle((m0.x, m0.y), (m1.x, m1.y)), C["res"]))
-    if front_ft is not None and not front_ft.is_empty:
-        runs = [ln for ln in getattr(front_ft, "geoms", [front_ft]) if ln.geom_type == "LineString" and ln.length > 1]
-        run = max(runs, key=lambda ln: ln.length, default=None)
-        if run is not None and run.length * s >= 150:
-            marks = [q for q in (o["tpt"], o["cpt"]) if q is not None]
-            # the point of the run farthest from the driveway markers (the middle first)
-            at = max((0.5, 0.3, 0.7, 0.2, 0.8), key=lambda f: min(
-                (run.interpolate(f, normalized=True).distance(q) for q in marks), default=0.0))
-            m0, m1 = run.interpolate(at - 0.05, normalized=True), run.interpolate(at + 0.05, normalized=True)
+    acc = rec.get("access") or {}
+    run = max(runs, key=lambda ln: ln.length, default=None)
+    if run is not None and run.length * s >= 150:
+        # the street's class and the frontage, in white on its band: where
+        # the words fit on the band, as far from the driveway markers as they can be
+        road = str(acc.get("road") or "").split(",")[0].strip().upper()
+        for txt in ((road or "ROAD") + f"  /  {acc.get('frontage_ft') or 0:,} FT FRONTAGE", road or "ROAD"):
+            need_ft = (text_width(txt, 9, True) + len(txt) + 16) / s          # the words, their letter-spacing, a margin
+            edge = (STREET_TRIM_FT + need_ft / 2) / run.length
+            if edge <= 0.5:
+                break
+        else:
+            txt = ""
+        if txt:
+            spots = [min(max(f, edge), 1 - edge) for f in (0.5, 0.3, 0.7, 0.2, 0.8)]
+            at = max(spots, key=lambda f: min((run.interpolate(f, normalized=True).distance(q) for q in marks), default=0.0))
+            m0, m1 = run.interpolate(at - 0.02, normalized=True), run.interpolate(at + 0.02, normalized=True)
             mid = run.interpolate(at, normalized=True)
             dx, dy = mid.x - pc.x, mid.y - pc.y
             n = math.hypot(dx, dy) or 1.0
-            road = str(acc.get("road") or "").split(",")[0].strip().upper()
-            txt = f"ROAD FRONTAGE {acc.get('frontage_ft') or 0:,} FT" + (f" ({road})" if road else "")
-            labels.append(label(X(mid.x + dx / n * 15 / s), Y(mid.y + dy / n * 15 / s), [(txt, 9.5, "bold")],
-                                edge_angle((m0.x, m0.y), (m1.x, m1.y)), C["row"]))
-    for pt, lab, word in ((o["tpt"], "T", "TRUCKS"), (o["cpt"], "C", "CARS")):
+            off = STREET_FT / 2
+            labels.append(text(X(mid.x + dx / n * off), Y(mid.y + dy / n * off) + 3, txt, 9, "bold", "#ffffff", "middle",
+                               rot=edge_angle((m0.x, m0.y), (m1.x, m1.y)), spacing="1", pivot_dy=-3))
+    for pt, lab, word in ((o["tpt"], "T", "TRUCK ENTRY"), (o["cpt"], "C", "CAR ENTRY")):
         if pt is not None:
-            out.append(f'<circle cx="{X(pt.x):.1f}" cy="{Y(pt.y):.1f}" r="9" fill="{C["drive"]}"/><text x="{X(pt.x):.1f}" y="{Y(pt.y)+4:.1f}" font-size="11" font-weight="bold" fill="#fff" text-anchor="middle">{lab}</text>')
-            dx, dy = pt.x - pc.x, pt.y - pc.y
+            out.append(f'<circle cx="{X(pt.x):.1f}" cy="{Y(pt.y):.1f}" r="10" fill="{C["drive"]}" stroke="#ffffff" stroke-width="1.6"/><text x="{X(pt.x):.1f}" y="{Y(pt.y)+4:.1f}" font-size="11" font-weight="bold" fill="#fff" text-anchor="middle">{lab}</text>')
+            # the word sits inside the site, toward its middle (the street band is outside)
+            dx, dy = pc.x - pt.x, pc.y - pt.y
             n = math.hypot(dx, dy) or 1.0
-            labels.append(label(X(pt.x) + dx / n * 30, Y(pt.y) - dy / n * 30 + 3, [(word, 9, "bold")], 0.0, C["drive"]))
+            labels.append(label(X(pt.x) + dx / n * 34, Y(pt.y) - dy / n * 34 + 3, [(word, 8.5, "bold")], 0.0, C["drive"]))
     out += labels
     # north arrow and scale bar, inside the plan box
     ax, ay = M + PLAN - 26, top + 14
@@ -637,11 +704,15 @@ def render(d: Drawing, rec: dict) -> str:
     hd, yy = heading(M, yy, "LEGEND", W - 2 * M)
     foot.append(hd)
     yy += 8
-    legend = [(C["bldg"], "building, office pods, dock doors"), (C["court"], "truck court"), (C["road"], "truck roads and truck route"), (C["trailer"], "trailer stalls / drop yard"),
-              (C["car"], "car parking and car route"), (C["pond"], "detention pond (rim around)"), (C["cons"], "floodplain, wetlands, easements, protected"),
-              ("url(#tx)", "transmission corridor (assumed width)"), ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
-              ("dash", "paving envelope (draft setbacks/buffers, 25 ft from water)"), ("dashdot", "building envelope (draft building setbacks)"),
-              (C["row"], "GDOT road frontage; T/C driveways"), ("res", "boundary toward residential parcels (county land-use codes)")]
+    legend = [(C["bldg"], "building; dock doors are the ticks on its wall"), (C["office"], "office"),
+              (C["court"], "truck court, truck roads and truck route"), (C["trailer"], "trailer stalls / drop yard"),
+              (C["car"], "car parking and car route"), (C["pond"], "detention pond (grassed rim around)"),
+              (C["parcel"], "open ground"), (C["street"], "street along the GDOT road frontage; T/C driveways"),
+              ("url(#wx)", "floodplain, wetlands, easements, protected land"), ("url(#tx)", "transmission corridor (assumed width)"),
+              ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
+              ("prop", "property line (county parcel map)"), ("dash", "paving setback line (draft; 25 ft from water)"),
+              ("dashdot", "building setback line (draft)"), ("res", "boundary toward residential parcels (county land-use codes)"),
+              ("dim", "dimension, ft")]
     lw = (W - 2 * M) / 4
     for k, (fill, txt) in enumerate(legend):
         x, y = M + (k % 4) * lw, yy + (k // 4) * 17
@@ -651,13 +722,20 @@ def render(d: Drawing, rec: dict) -> str:
             foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["benv"]}" stroke-dasharray="10 3 2 3" stroke-width="1.5"/>')
         elif fill == "res":
             foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["res"]}" stroke-dasharray="9 5" stroke-width="3"/>')
+        elif fill == "prop":
+            foot.append(f'<path d="M{x - 6:.1f},{y - 4:.1f} L{x + 22:.1f},{y - 4:.1f}" stroke="{C["ink"]}" stroke-dasharray="20 4 3 4 3 4" stroke-width="2.2"/>')
+        elif fill == "dim":
+            foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["dim"]}" stroke-width="1.1"/>'
+                        f'<path d="M{x:.1f},{y - 4:.1f} L{x + 6:.1f},{y - 6.6:.1f} L{x + 6:.1f},{y - 1.4:.1f} Z" fill="{C["dim"]}"/>'
+                        f'<path d="M{x + 18:.1f},{y - 4:.1f} L{x + 12:.1f},{y - 6.6:.1f} L{x + 12:.1f},{y - 1.4:.1f} Z" fill="{C["dim"]}"/>')
         else:
             foot.append(f'<rect x="{x:.1f}" y="{y - 10:.1f}" width="18" height="10" fill="{fill}" stroke="{C["ink"]}" stroke-width="0.6"/>')
         foot.append(text(x + 26, y - 1, txt, 10.5))
     yy += ((len(legend) + 3) // 4) * 17 + 8
     # the basis of the estimates, then the disclaimer
     basis_lines = [f"Detention: {de.get('basis')}" if de.get("basis") else "", f"Grading: {gr.get('basis')}" if gr.get("basis") else "",
-                   f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}", DISCLAIMER]
+                   f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}", DISCLAIMER,
+                   f"Sheet SP-{rec.get('key', '')}"]
     for line in basis_lines:
         for seg_ in _wrap(line, W - 2 * M, 10) if line else []:
             yy += 13
@@ -669,7 +747,22 @@ def render(d: Drawing, rec: dict) -> str:
     return head_el + "".join(head) + plan_el + "".join(col) + "".join(foot) + "</svg>"
 
 
+def _mid(edge) -> Any:
+    """The midpoint of a feet-plane edge, as a shapely point."""
+    from shapely.geometry import Point
+    return Point((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2)
+
+
 def _lowered(rec: dict) -> bool:
     """Whether a draft height cap lowered the clear height."""
     flags = rec.get("flags") or {}
     return any(f.get("flag") == "HEIGHT_CAP" for lvl in (1, 2, "1", "2") for f in flags.get(lvl) or [])
+
+
+def _cars_provided(pp: Any) -> int:
+    """Car stalls a layout provides, by the rule the record uses for
+    building 1: the requirement rounded up to five, within the rows'
+    capacity."""
+    if pp.car_cap < pp.cars_required:
+        return pp.car_cap
+    return max(min(pp.car_cap, math.ceil(pp.cars_required / 5) * 5), pp.cars_required)

@@ -1912,7 +1912,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
 
             def prelim(q):
                 st = q.module.intersection(steep).area / q.module.area if not steep.is_empty else 0.0
-                return q.sf * (1 - 0.6 * st)
+                return q.sf * (1 - RANKING["steep_share"] * st)
             fits.sort(key=prelim, reverse=True)
             picked, seen = [], set()
             for q in fits:
@@ -2051,8 +2051,14 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     gross_ac = parcel.area / SQFT_PER_AC
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
-    _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
-              [_alternative(q, o, gross_ac) for q, o in pond_limited])
+    try:
+        _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
+                  [_alternative(q, o, gross_ac) for q, o in pond_limited])
+    except Exception as exc:        # noqa: BLE001 - the read-out is advisory: it must never cost a plan
+        # The plan above is complete without it. Say what is missing, and
+        # keep the part of the read-out that needs only the record.
+        rec["read_out"] = {"complete": False, "reason": f"{type(exc).__name__}: {str(exc)[:160]}"}
+        rec["assessment"] = assess.assessment(rec, COMP_BAND_SF_PER_AC)
     # The search keeps undrawn plans (build(draw=False)); only the plans
     # shown are rebuilt with their stall ticks and door marks.
     shown = build(best_p.v, best_p.L, best_p.r, best_p.frame, prog)
@@ -2111,7 +2117,7 @@ def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], p
             impervious_pct=rec["coverage"]["impervious_pct"], cars_required=rec["cars"]["required"],
             cars_provided=rec["cars"]["provided"], cars_basis=rec["cars"]["basis"], gated=rec["gated"])}
     rec["quantities"] = assess.quantities(shapes, layouts, building_sf=rec["total_sf_if_access"], frontage_ft=fr.feet,
-                                          residential_edge_ft=res_line.length if res_line is not None else 0.0)
+                                          residential_edge_ft=res_line.length if res_line is not None else 0.0, net_ac=net_ac)
     rec["selection"] = assess.selection(rec["alternatives"], RANKING, pond_limited)
     rec["assessment"] = assess.assessment(rec, COMP_BAND_SF_PER_AC)
 

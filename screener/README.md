@@ -861,10 +861,13 @@ How to read the sheet:
 - **Status** (top right; `assessment.status`). `fits` (only the checks
   every site gets remain), `fits_with_conditions` (the site has its own
   severity-2 flags), `gated` (a use permit), `hypothetical` (no road
-  frontage), `blocked` (a severity-1 flag), `incomplete` (an input was
-  not read: run it again), `no_fit`, `not_planned` (the search ran out
-  of time). It restates `feasible`, `gated` and `hypothetical`; it is
-  not a second verdict.
+  frontage), `blocked` (not feasible), `incomplete` (an input was not
+  read, or the search was cut short with a plan drawn: run it again),
+  `no_fit`, `not_planned` (the search ran out of time before any plan).
+  It restates `feasible`, `gated` and `hypothetical`; it is not a second
+  verdict. A condition "blocks the plan" only when the record itself
+  says the plan is not feasible, so the read-out agrees with the record
+  under `--prototype-behaviour` too.
 - **Next steps, in order.** What blocks the plan first, then the rest by
   stage: desk checks, before an offer, due diligence. The cheap checks
   come first, since a desk check that kills the site saves the survey.
@@ -875,8 +878,15 @@ How to read the sheet:
   is left unused inside the envelope. The lines add up to the gross.
 - **Plan against the draft zoning values.** The building and the paving
   measured to each kind of lot line, the height, coverage, parking and
-  use, with the margin on each. "Meets" says the drawing honours the
-  draft value. It is not a check against the adopted code.
+  use, with the margin on each. A setback is measured off the lot line
+  itself, not past its ends (the planner's envelope is square at the
+  ends of a line too).
+  "Meets" says the drawing honours the draft value. It is not a check
+  against the adopted code. One row is building code, not zoning: the
+  open yard between the building and the nearest lot line that is not a
+  road (60 ft under the unlimited-area rule, 40 ft with rated walls).
+  How the draft values compare with the codes read so far is in
+  `reviews/38_site_plan_read_out/02_draft_offsets_check.md`.
 - **Layouts compared.** The plan drawn first, then the others tried,
   with why the plan ranks first. When a larger layout passed its checks
   but ranks lower (often for trailer stalls), the sheet says how much

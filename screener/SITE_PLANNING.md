@@ -241,7 +241,9 @@ plan and changes no layout, flag, feasibility or floor area.
   blocked, incomplete, no fit, not planned. Three flags stand on every
   plan (`ZONING_DRAFT`, `STREAMS_PIPELINES`, `POND_SITE_FROM_LIDAR`):
   they are the limits of the method, so a plan with only those reads
-  "fits: standard checks only".
+  "fits: standard checks only". A condition blocks the plan only when
+  the record says the plan is not feasible, so the read-out agrees with
+  the record in both behaviours.
 - **Conditions.** Each flag becomes a condition with a workstream
   (zoning, access, fire, grading, stormwater, environmental, utilities,
   program, title, planner inputs), a stage (desk check, before an offer,
@@ -259,7 +261,13 @@ plan and changes no layout, flag, feasibility or floor area.
   once, in the order above, so the lines add up to the gross.
 - **Draft zoning check.** The building and the module's paving are
   measured to each kind of lot line and set against the draft offsets,
-  with the margin. Height (clear height plus the 10 ft roof allowance
+  with the margin. The measure is the distance off the lot line itself,
+  not past its ends (plain distance reads short at the end of a line,
+  where a residential edge is read 20 ft past the corner; the planner's
+  envelope is square at the ends too). A row marked building code is
+  not zoning: the open yard round the building under the building
+  code's unlimited-area rule (60 ft, or 40 ft with rated walls), which
+  most buildings here would be built under. Height (clear height plus the 10 ft roof allowance
   the height cap already used), coverage, parking and use follow.
   Driveways and routes are left out of the paving rows: a driveway has
   to cross the road setback. Every row is against `JUR_DRAFT`.
