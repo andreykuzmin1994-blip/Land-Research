@@ -21,6 +21,20 @@ fixtures still pass.
 | 2 | `RANKING["trailer_sf"] = 0` (`PROTOTYPE_RANKING` keeps 2,000) | The largest layout that passes its checks is drawn. A trailer shortfall is flagged (`TRAILER_SHORT`, severity 2) and only settles a tie. The read-out names the largest layout that meets its trailer target (`selection.with_trailers`, `meets_trailer_target_sf` in `plans.csv`). |
 | 3 | `JUR_TIGHTENED`, `OPEN_YARD_RULE_FT = 60`, two edge kinds (`OTHER_REAR`, `COMM`), two flags (`CORRIDOR_OVERLAY`, `USE_RESTRICTION_REPORTED`) | See `SITE_PLANNING.md` § "Tightened draft values". |
 
+Two changes to the search came out of the review of these decisions
+(`04_review_of_decisions.md`), both in the default behaviour only:
+
+- **A layout is turned round before it is given up.** With homes behind
+  a site every layout failed on its car route: the first turn keeps the
+  courts away from homes, which put the court on the street and the cars
+  at the back. Decision 3 made farms count as homes in three
+  jurisdictions, so the failure would have spread. The planner now tries
+  the other ways round the same fit.
+- **A draft code minimum of truck spaces is met before floor area**,
+  among layouts that pass. Only Fairburn has one. It is a code minimum,
+  not the market target that decision 2 took out of the ranking; say so
+  if you read decision 2 as covering it, and it comes out with one line.
+
 What decision 3 covers, item by item (the "looser" rows of
 `02_draft_offsets_check.md`):
 
@@ -36,7 +50,9 @@ What decision 3 covers, item by item (the "looser" rows of
 - Palmetto corridor overlay: 95 ft and 35 ft on SR 14 and SR 154;
   flagged on every other Palmetto frontage.
 - College Park: the reported moratorium, flagged.
-- Everywhere: the building 60 ft from every lot line that is not a road.
+- Everywhere: the building 60 ft from every lot line that is not a road,
+  cut as one band so an inside corner of the parcel is held too. The
+  zoning table keeps the codes' own numbers; the yard has its own row.
 
 Not tightened, and why:
 
@@ -65,23 +81,26 @@ Neighbours are told apart by county tax class, a stand-in for zoning.
 | 600 x 700 ft rectangle, South Fulton | 106,000 SF | 80,000 SF (the open yard) |
 | 600 x 700 ft, East Point I-1 (gated) | 106,000 SF | 109,000 SF |
 | 900 x 800 ft, Fairburn | 211,000 SF | 211,000 SF |
-| 800 x 900 ft, College Park | 205,000 SF, blocked by the height cap | 192,000 SF, blocked |
-| 1300 x 1500 ft, South Fulton | 372,000 SF | 372,000 SF |
+| 800 x 900 ft, College Park | 205,000 SF, blocked by the height cap | 200,000 SF, blocked |
+| 1300 x 1500 ft, South Fulton | 372,000 SF | 415,000 SF (a larger layout passes once turned round) |
+| 900 x 900 ft, South Fulton, a farm behind | 242,000 SF, no buffer | 242,000 SF, 110 ft from the farm's line |
+| 900 x 900 ft, South Fulton, homes behind | not feasible (`CAR_ROUTE_NONE`) | 242,000 SF |
 
 The open yard is the change that costs floor area on tight sites; the
 trailer decision is the one that adds it.
 
 ## What was verified
 
-- Offline suite: 951 tests, OK. New tests cover each decision
-  (`TightenedRules`, `Selection`, `ReferenceSite` in
+- Offline suite: 957 tests, OK. New tests cover each decision and each
+  review finding (`TightenedRules`, `Selection`, `ReferenceSite` in
   `test_siteplan_assess.py`). Two existing tests were re-pointed, not
-  weakened: the drop-yard test uses a site whose plan has a drop yard
-  under the new ranking, and the two-piece parcel is compared with its
-  own piece on the same road side.
+  weakened (the reviewer checked): the drop-yard test uses a site whose
+  plan has a drop yard under the new ranking, and the two-piece parcel
+  is compared with its own piece on the same road side.
 - The prototype behaviour: 0 differences from the original code on 8
-  synthetic sites, every original key.
-- An independent review of this change: see `04_review_of_decisions.md`.
+  synthetic sites, every original key; the reviewer found the same on
+  22 sites for every key outside the read-out.
+- Two independent reviews of this change: `04_review_of_decisions.md`.
 
 ## What was NOT verified
 
