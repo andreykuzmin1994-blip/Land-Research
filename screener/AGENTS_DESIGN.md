@@ -11,6 +11,43 @@ the evaluation and changing zoning facts stay human.
 
 ## Next session: start here (updated 2026-11-17)
 
+**2026-11-17, on `claude/cool-faraday-nvgyjj` (not merged):** three
+additions asked for by the operator. Record: `reviews/39_screener_autonomy/`.
+
+- **What changed since the last run** (`ops/screener/changes.py`): a
+  `changes.md` per run, written by the server supervisor after each run
+  and usable from the on-demand runbook in place of its inline
+  comparison. This is the digest of build-order step 1.
+- **Marks on the viewer page** (`viewer_template.html`, `decide.py
+  --import`): Pursue / Maybe / Pass / Listed buttons; the page saves a
+  CSV and `decide --import` records it through the same three files as
+  single calls. Meant to get the decision count to the about 30 that
+  Phase B needs (today 12).
+- **Lead checks after a run** (`ops/screener/investigate.sh`): the
+  investigator, quote check, skeptic, quote check sequence of
+  `INVESTIGATE.md`, run by the supervisor for each new grade A, then B,
+  lead. **Off by default and not yet run on a server with the real
+  Claude Code**; `ops/screener/README.md` § "Lead checks" lists what to
+  verify first and what is accepted. The agents get an owner-free lead
+  card, not the brief.
+
+Open after this branch:
+
+1. Merging changes `screener/decide.py` and `screener/viewer_template.html`,
+   so a human records a new baseline on the merge commit
+   (`python -m screener.autoresearch.evaluate --decide --new-baseline`).
+   The score should not change: the evaluator reads neither file. The
+   tools under `ops/screener/` do not reset the baseline.
+2. `RUNBOOK.md` on `screener-data` still carries its own inline
+   comparison (step 5). Replacing it with `python ops/screener/changes.py`
+   is an edit on that branch, which this session did not make.
+3. The lead checks need a first supervised run on the server
+   (`INVESTIGATE_MAX=1`), then a decision on whether they stay on.
+4. Not built: a tally of why leads were killed, as proposals for the
+   screens (`screens.py` stays human-owned); a watcher for council and
+   planning agendas between runs; more Fulton as-of years in the answer
+   key (a human-only rebuild).
+
 **2026-11-17, on `claude/stoic-keller-r95w17`:** the site planner's
 output was rebuilt as a test-fit sheet with a read-out
 (`screener/siteplan_assess.py`): one status per plan, next steps in
