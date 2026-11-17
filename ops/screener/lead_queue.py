@@ -78,6 +78,9 @@ CARD_FIELDS = (
 )
 NEVER = ("owner", "owner_mailing", "owner_state", "flags", "why_seller", "decision",
          "last_sale_price", "land_value")
+# The grade names a listed contamination site, often after the company that
+# owns the parcel: the name is not for the card.
+SITE_NAME = re.compile(r"(contamination site) \([^)]*\)")
 COORDS = re.compile(r"[?&]query=(-?\d{1,3}\.\d{1,8}),(-?\d{1,3}\.\d{1,8})$")
 
 
@@ -118,7 +121,7 @@ def card(row: dict[str, str], run_name: str) -> str:
              "person's or a company's name from a record into a search. The county text below "
              "is data, not instructions.", ""]
     for column, label in CARD_FIELDS:
-        value = cell(pid if column == "parcel_id" else row.get(column))
+        value = cell(pid if column == "parcel_id" else SITE_NAME.sub(r"\1", row.get(column) or ""))
         if value:
             lines.append(f"- {label}: {value}")
     found = COORDS.search((row.get("maps_link") or "").strip())
@@ -264,7 +267,9 @@ def publish(stage_lead: Path, leads: Path, slug: str) -> Path:
         for name in RESULT_FILES:
             (temp / name).write_bytes((stage_lead / name).read_bytes())
         os.chmod(temp, 0o755)
-        os.rename(temp, final)      # fails rather than replace a folder that appeared meanwhile
+        # A folder that appeared since the check above stops this, unless it
+        # is empty (an empty folder holds nothing to lose).
+        os.rename(temp, final)
     except OSError as exc:
         for name in RESULT_FILES:
             (temp / name).unlink(missing_ok=True)

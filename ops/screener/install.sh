@@ -97,7 +97,8 @@ if [ "$LEAD_CHECKS" = 1 ]; then
     >/etc/sudoers.d/screener-lead-checks
   chmod 440 /etc/sudoers.d/screener-lead-checks
   visudo -cf /etc/sudoers.d/screener-lead-checks >/dev/null
-  command -v pdftotext >/dev/null 2>&1 || apt-get install -y poppler-utils
+  command -v pdftotext >/dev/null 2>&1 || apt-get install -y poppler-utils ||
+    echo "could not install poppler-utils (pdftotext): install it by hand, the lead checks need it"
   echo "lead-check accounts ready: $LEAD_USER (agents), $CHECK_USER (quote check)."
   if [ ! -x "/home/$LEAD_USER/.local/bin/claude" ]; then
     echo "Next: install and log in to Claude Code as $LEAD_USER (README.md, Lead checks):"

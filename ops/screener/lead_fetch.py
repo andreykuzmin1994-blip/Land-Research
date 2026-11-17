@@ -32,16 +32,31 @@ Exit codes: 0 text printed; 1 not fetched (the reason is printed);
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import quotecheck  # noqa: E402  (the copy beside this file; stdlib only)
+
+def _load_quotecheck():
+    """The quotecheck.py beside this file, loaded by its path. The folder is
+    never put on sys.path: a file named like a standard module that turned
+    up beside the tool must not be imported in its place."""
+    spec = importlib.util.spec_from_file_location(
+        "quotecheck", Path(__file__).resolve().with_name("quotecheck.py"))
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["quotecheck"] = module      # its dataclasses look themselves up by name
+    spec.loader.exec_module(module)
+    return module
+
+
+quotecheck = _load_quotecheck()
 
 MAX_CHARS = 30_000
 HARD_MAX_CHARS = 120_000
@@ -73,9 +88,34 @@ def count_request() -> str:
     return ""
 
 
+def pin_names() -> None:
+    """Make every look-up of a host name in this process give the addresses
+    its first look-up gave. The fetcher checks that a host's addresses are
+    public and the connection then looks the name up again: without this, a
+    name that answers differently the second time (first a public address,
+    then 127.0.0.1 or a cloud metadata address) would have its local page
+    printed to the agent."""
+    real = socket.getaddrinfo
+    first: dict[str, list[str]] = {}
+
+    def pinned(host, port, *args, **kwargs):
+        key = host.decode("ascii", "replace").lower() if isinstance(host, bytes) else str(host).lower()
+        if key not in first:
+            first[key] = sorted({info[4][0] for info in real(host, None)})
+        answers = []
+        for address in first[key]:
+            answers += real(address, port, *args, **kwargs)
+        return answers
+
+    socket.getaddrinfo = pinned
+
+
 def page_units(url: str) -> tuple[list[tuple[int, str]], str, str]:
     """([(pdf page or 0, text)], a one-line description, problem)."""
     fetcher = quotecheck.Fetcher()
+    # Each call is its own process, so the fetcher's pace between requests
+    # to a site starts anew: wait the usual gap first.
+    time.sleep(quotecheck.HOST_DELAY_S)
     try:
         got = fetcher.fetch(url, cap=PAGE_BYTES)
     except quotecheck.FetchError as exc:
@@ -131,6 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     if why:
         print(why)
         return 1
+    pin_names()
     units, about, problem = page_units(args.url)
     if problem:
         print(problem)

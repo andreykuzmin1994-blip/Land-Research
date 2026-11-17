@@ -25,6 +25,8 @@ cat >"$ROOT/fakepy" <<FAKE
 case "\${2:-}" in
   pip) exit 0 ;;
   screener.run)
+    [ "\${FAKE_RUN:-ok}" = fail ] && { echo "  ! the county parcel layer is unavailable (HTTP 404)."; exit 1; }
+    [ "\${FAKE_RUN:-ok}" = nowrite ] && exit 0      # finished, but wrote no new folder
     n=\$(( \$(cat "\$FAKE_STATE/count" 2>/dev/null || echo 0) + 1 )); echo "\$n" >"\$FAKE_STATE/count"
     out="screener/output/fake-2026-11-\$(printf %02d \$((10 + n)))"
     mkdir -p "\$out"
@@ -44,6 +46,13 @@ esac
 exec "$REAL_PY" "\$@"
 FAKE
 
+# The "system Python" of the tests: the real one, with its arguments noted.
+cat >"$ROOT/syspy" <<FAKE
+#!/usr/bin/env bash
+echo "\$PWD :: \$*" >>"\$FAKE_STATE/syspy-args"
+exec "$REAL_PY" "\$@"
+FAKE
+
 # Fake agent: acts in its working directory (the sandbox copy) per
 # $FAKE_LEAD (investigator) and $FAKE_SKEPTIC (skeptic).
 cat >"$ROOT/fakeclaude" <<'FAKE'
@@ -52,6 +61,7 @@ cat >"$ROOT/fakeclaude" <<'FAKE'
 role=investigator; [[ "$*" == *"You are the skeptic"* ]] && role=skeptic
 echo "$*" >"$FAKE_STATE/args-$role"
 echo "${LEAD_FETCH_MAX:-unset}" >"$FAKE_STATE/fetchmax-$role"
+pwd >"$FAKE_STATE/cwd-$role"; umask >"$FAKE_STATE/umask-$role"
 leaf="$(ls -d screener/leads/*/ | head -1)"; leaf="${leaf%/}"
 card=screener/lead-card/card.md
 pid="$(sed -n 's/^# Lead card: parcel \(.*\), run .*/\1/p' "$card")"
@@ -79,6 +89,14 @@ if [ "$role" = investigator ]; then
     extrafield)  printf '{"schema":1,"parcel_id":"%s","run":"%s","headline":"x",%s}' "$pid" "$run" "$sections" >"$leaf/findings.json" ;;
     settings)    good "$pid" "$run" >"$leaf/findings.json"
                  mkdir -p "$LEAD_HOME/.claude" && echo '{"hooks":{}}' >"$LEAD_HOME/.claude/settings.json" ;;
+    binary)      good "$pid" "$run" >"$leaf/findings.json"
+                 mkdir -p "$LEAD_HOME/.local/bin" && echo '#!/bin/sh' >"$LEAD_HOME/.local/bin/claude" ;;
+    zerolink)    good "$pid" "$run" >"$leaf/findings.json"
+                 mkdir -p "$LEAD_HOME/.ssh" && ln -s /dev/zero "$LEAD_HOME/.ssh/k" ;;
+    locked)      good "$pid" "$run" >"$leaf/findings.json"
+                 mkdir -p "$leaf/shut/in" && echo x >"$leaf/shut/in/f" && chmod 000 "$leaf/shut" ;;
+    crash)       echo "Invalid API key · Please run /login"; exit 1 ;;
+    timeout)     exit 124 ;;
     none)        ;;
   esac
 else
@@ -95,7 +113,7 @@ else
 fi
 exit 0
 FAKE
-chmod +x "$ROOT/fakepy" "$ROOT/fakeclaude"
+chmod +x "$ROOT/fakepy" "$ROOT/fakeclaude" "$ROOT/syspy"
 
 # new_case NAME: fresh repo + state; exports the supervisor's config.
 new_case() {
@@ -109,8 +127,8 @@ new_case() {
          PYTHON="$ROOT/fakepy" FAKE_STATE="$d/fake" PULL=0 SOILS_QUIET=0 SLEEP=true RETRY_WAITS="5 5" \
          NTFY_URL="" CLAUDE_FIX=0 FIX_USER="" \
          INVESTIGATE=1 LEAD_USER="" CHECK_USER="" LEAD_DIR="$d/leaddir" CHECK_DIR="$d/checkdir" \
-         LEAD_HOME="$d/leadhome" LEAD_CLAUDE_BIN="$ROOT/fakeclaude" SYS_PYTHON="$REAL_PY" \
-         LEAD_MIN_FREE_MB=0 INVESTIGATE_MAX=5 INVESTIGATE_GRADES="A B" INVESTIGATE_MAX_TRIES=2
+         LEAD_HOME="$d/leadhome" LEAD_CLAUDE_BIN="$ROOT/fakeclaude" SYS_PYTHON="$ROOT/syspy" \
+         INVESTIGATE_SAME_USER_OK=1 LEAD_MIN_FREE_MB=0 INVESTIGATE_MAX=5 INVESTIGATE_GRADES="A B" INVESTIGATE_MAX_TRIES=2
   unset LEADS_DIR FAKE_RUN FAKE_LEAD FAKE_SKEPTIC
   CASE="$d"
 }
@@ -130,14 +148,19 @@ check "the checked file carries the skeptic verdict" 'grep -q "\"verdict\": \"ki
 check "alert has the counts" 'alerts | grep -q "3 lead(s) checked against public documents: 3 where the skeptic found a document that kills the lead"'
 check "alert names no parcel, address or owner" '! alerts | grep -A3 "lead checks" | grep -q -e "14F" -e "TEST RD" -e "QUARTERMAINE" -e "A2"'
 check "the agents ran in dontAsk mode without session persistence" 'grep -q -- "--permission-mode dontAsk --no-session-persistence" $CASE/fake/args-investigator'
-check "no curl, WebFetch or quotecheck tool for the agents" '! grep -q -e "curl" -e "screener.quotecheck" $CASE/fake/args-investigator && grep -q -- "--disallowedTools WebFetch" $CASE/fake/args-skeptic'
-check "one fetch command, by the system python in isolated mode" 'grep -q "Bash($REAL_PY -I $CASE/leaddir/lead\.[A-Za-z0-9]*/tools/lead_fetch.py:\*)" $CASE/fake/args-investigator'
+tools() { sed -n 's/.*--allowedTools \(.*\) --disallowedTools \(.*\)$/\1 || \2/p' "$CASE/fake/args-$1" | sed "s#$CASE/leaddir/[a-z]*\.[A-Za-z0-9]*#COPY#"; }
+check "the investigator's tools are exactly these" '[ "$(tools investigator)" = "Read Glob Grep Write WebSearch Bash($ROOT/syspy -I COPY/tools/lead_fetch.py:*) || WebFetch" ]'
+check "the skeptic's tools are exactly these" '[ "$(tools skeptic)" = "Read Glob Grep Write WebSearch Bash($ROOT/syspy -I COPY/tools/lead_fetch.py:*) || WebFetch" ]'
+check "the quote check ran isolated, from its own copy, twice per lead" '[ "$(grep -c -- " :: -I $CASE/checkdir/check[12]\.[A-Za-z0-9]*/quotecheck.py $CASE/checkdir/check[12]\.[A-Za-z0-9]*/[A-Za-z0-9_]*/findings.json" $CASE/fake/syspy-args)" = 6 ]'
+check "the second pass got the hash of the staged findings" 'grep -q -- "--with-skeptic --findings-sha256 [0-9a-f]\{64\}$" $CASE/fake/syspy-args'
+check "never from the checkout's own quotecheck.py" '! grep -q "$CASE/repo/screener/quotecheck.py" $CASE/fake/syspy-args'
 check "the request allowance reaches the agent" '[ "$(cat $CASE/fake/fetchmax-investigator)" = 40 ]'
 check "no owner name or mailing address in the investigator's folder" '[ ! -s $CASE/fake/owner-seen-investigator ]'
 check "none in the skeptic's folder" '[ ! -s $CASE/fake/owner-seen-skeptic ]'
 check "the investigator has the card, the rules and the fetch tool only" '[ "$(tr "\n" " " <$CASE/fake/files-investigator)" = "./screener/INVESTIGATE.md ./screener/lead-card/card.md ./tools/lead_fetch.py ./tools/quotecheck.py " ]'
 check "the skeptic also has the checked file, and not lead.md or findings.json" 'grep -q "lead-card/findings.checked.json" $CASE/fake/files-skeptic && ! grep -q -e "lead.md" -e "findings.json$" $CASE/fake/files-skeptic'
 check "no git directory in the sandbox" '[ ! -f $CASE/fake/saw-git ]'
+check "the agent starts in its own folder with a closed umask" 'grep -q "^$CASE/leaddir/investigator\." $CASE/fake/cwd-investigator && [ "$(cat $CASE/fake/umask-investigator)" = 0027 ]'
 check "only the lead's own folder is writable" '[ "$(awk "{print \$1}" $CASE/fake/modes-investigator | tr "\n" " ")" = "2750 2750 2750 640 640 2770 " ]'
 check "one sandbox folder at a time" '[ "$(cat $CASE/fake/copies-investigator)" = 1 ] && [ "$(cat $CASE/fake/copies-skeptic)" = 1 ]'
 check "both sandbox folders are empty afterwards" '[ "$(leftovers)" = 0 ]'
@@ -174,8 +197,38 @@ check "exit 0" '[ $rc -eq 0 ]'
 check "alert says why" 'alerts | grep -q "lead checks not run" && alerts | grep -q "install.sh --lead-checks"'
 check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
 new_case sameuser; LEAD_USER="$(id -un)" CHECK_USER="$(id -un)" LEAD_HOME="" "$SUP" 2>/dev/null
-check "one account for the agents and the check is refused" 'alerts | grep -q "must differ" || alerts | grep -q "cannot run commands as"'
+check "one account for the agents and the check is refused" 'alerts | grep -q "must differ from each other, from this user"'
 check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+new_case nousers; INVESTIGATE_SAME_USER_OK=0 "$SUP" 2>/dev/null
+check "empty account names are refused outside the tests" 'alerts | grep -q "must name the two lead-check accounts"'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+new_case nowatch; LEAD_HOME="$CASE/no-such-home" "$SUP" 2>/dev/null
+check "a watch that cannot look is not taken for unchanged" 'alerts | grep -q "settings cannot be read for the watch"'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+
+echo "a failed county: exit 1, and the lead checks do not change that"
+new_case failed; FAKE_RUN=fail "$SUP" 2>/dev/null; rc=$?
+check "exit 1" '[ $rc -eq 1 ]'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+
+echo "an output folder from before this run is never checked"
+new_case stalerun; "$SUP" 2>/dev/null; rm -rf "$CASE/repo/screener/leads" "$CASE"/fake/*
+touch -d "2 hours ago" "$CASE"/repo/screener/output/fake-2026-11-11/ranked.csv
+FAKE_RUN=nowrite "$SUP" 2>/dev/null; rc=$?
+check "exit 0" '[ $rc -eq 0 ]'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+check "no lead folder" '[ -z "$(leads)" ]'
+
+echo "a list of leads that cannot be made is said, not passed over"
+new_case badgrades; INVESTIGATE_GRADES="A,B" "$SUP" 2>/dev/null; rc=$?
+check "exit 0" '[ $rc -eq 0 ]'
+check "alert" 'alerts | grep -q "For 1 county(ies) the list of leads could not be made"'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+
+echo "a loose umask of the caller does not open the sandbox"
+new_case umask; (umask 002; INVESTIGATE_MAX=1 "$SUP" 2>/dev/null)
+check "only the lead's own folder is writable" '[ "$(awk "{print \$1}" $CASE/fake/modes-investigator | tr "\n" " ")" = "2750 2750 2750 640 640 2770 " ]'
+check "published" '[ "$(leads)" = "14F_1" ]'
 
 for kind in symlink fifo hardlink big wrongparcel wrongrun notjson extrafield none; do
   echo "the investigator leaves a bad findings.json ($kind)"
@@ -194,6 +247,7 @@ INVESTIGATE_MAX=1 FAKE_LEAD=none "$SUP" 2>/dev/null
 INVESTIGATE_MAX=1 FAKE_LEAD=ok "$SUP" 2>/dev/null
 check "the third run moved on to the next lead" '[ "$(tr "\n" "," <$CASE/fake/pids-investigator)" = "14F 1,14F 1,A2," ]'
 check "and published it" '[ "$(leads)" = "A2" ]'
+check "the alert counts the lead that is no longer tried" 'alerts | tail -6 | grep -q "1 lead(s) are no longer tried after 2 failed tries"'
 
 for kind in none badverdict wrongparcel; do
   echo "the skeptic leaves nothing usable ($kind): no half result"
@@ -234,6 +288,31 @@ check "the next run checks nothing" '[ ! -f $CASE/fake/args-investigator ]'
 check "and says it is on hold" 'alerts | grep -q "lead checks are on hold"'
 new_case hold2; INVESTIGATE_MAX=1 FAKE_SKEPTIC=settings "$SUP" 2>/dev/null
 check "the skeptic doing it holds too, with nothing published" '[ -f $CASE/state/investigate/HOLD ] && [ -z "$(leads)" ]'
+
+for kind in binary zerolink; do
+  echo "the watch also sees the account's copy of Claude Code and a link in .ssh ($kind)"
+  new_case "hold-$kind"; INVESTIGATE_MAX=1 FAKE_LEAD=$kind timeout 120 "$SUP" 2>/dev/null; rc=$?
+  check "finished, exit 0" '[ $rc -eq 0 ]'
+  check "HOLD, nothing published" '[ -f $CASE/state/investigate/HOLD ] && [ -z "$(leads)" ]'
+done
+
+echo "an agent that cannot start stops the stage and costs no try"
+new_case crash; FAKE_LEAD=crash "$SUP" 2>/dev/null; rc=$?
+check "exit 0" '[ $rc -eq 0 ]'
+check "only the first lead was started" '[ "$(wc -l <$CASE/fake/pids-investigator)" = 1 ]'
+check "urgent alert names the login" 'grep -q "\[urgent\] Screener: lead checks" $CASE/state/logs/alerts.log && alerts | grep -q "STOPPED: the agent ended with an error"'
+check "no try counted" '[ -z "$(ls -A $CASE/state/investigate/attempts)" ]'
+check "the agent's own words are in its log, not in the alert" 'grep -q "Invalid API key" $CASE/state/logs/lead-*.log && ! alerts | grep -q "Invalid API key"'
+
+echo "an agent stopped at its time limit is a try of that lead"
+new_case timelimit; INVESTIGATE_MAX=1 FAKE_LEAD=timeout "$SUP" 2>/dev/null
+check "the try is counted" '[ "$(cat $CASE/state/investigate/attempts/14F_1)" = 1 ]'
+check "not an agent error" '! alerts | grep -q "STOPPED"'
+
+echo "a folder the agent closed to itself is still removed"
+new_case locked; INVESTIGATE_MAX=1 FAKE_LEAD=locked "$SUP" 2>/dev/null
+check "published" '[ "$(leads)" = "14F_1" ]'
+check "sandbox folders empty" '[ "$(leftovers)" = 0 ]'
 
 echo "a time budget of zero starts no agent"
 new_case budget; INVESTIGATE_BUDGET=0 "$SUP" 2>/dev/null

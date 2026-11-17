@@ -10,6 +10,9 @@ import csv
 import io
 import json
 import os
+import shutil
+import socket
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,11 +21,21 @@ from pathlib import Path
 from unittest import mock
 
 HERE = Path(__file__).resolve().parent
+# lead_fetch.py loads the quotecheck.py beside it, as in the agent's tools/
+# folder: make that folder, with both files, and import the tool from it.
+TOOLS = Path(tempfile.mkdtemp(prefix="lead-tools-"))
+shutil.copy(HERE / "lead_fetch.py", TOOLS / "lead_fetch.py")
+shutil.copy(HERE.parent.parent / "screener" / "quotecheck.py", TOOLS / "quotecheck.py")
 sys.path.insert(0, str(HERE))
-sys.path.insert(1, str(HERE.parent.parent / "screener"))   # quotecheck.py, as in the agent's tools/ folder
+sys.path.insert(0, str(TOOLS))      # first: lead_fetch is the copy beside quotecheck.py
 import lead_fetch  # noqa: E402
 import lead_queue  # noqa: E402
-import quotecheck  # noqa: E402
+
+quotecheck = lead_fetch.quotecheck
+
+
+def tearDownModule():
+    shutil.rmtree(TOOLS, ignore_errors=True)
 
 OWNER = "ZEBULON QUARTERMAINE HOLDINGS LLC"
 MAILING = "77 SECRET MAILING LN"
@@ -121,11 +134,12 @@ class QueueTests(Base):
         self.assertEqual(call(lead_queue, "tried", attempts, "../x")[0], 2)
 
     def test_the_card_has_no_owner_mailing_decision_or_price(self):
-        self.make_run([row(1, "14F0063  LL0219", "A", lead_found="no pond room")])
+        self.make_run([row(1, "14F0063  LL0219", "A", lead_found="no pond room; a bordering parcel "
+                           "holds a listed contamination site (ACME SOLVENTS INC)")])
         self.assertEqual(self.queue()[0], 0)
         card = (self.stage / "14F0063__LL0219" / "card.md").read_text()
         for secret in (OWNER, "QUARTERMAINE", MAILING, "987654", "55555", "maybe", "TX",
-                       "Same owner", "out-of-state"):
+                       "Same owner", "out-of-state", "ACME SOLVENTS"):
             self.assertNotIn(secret, card, secret)
         for shown in ("14F0063 LL0219", "1 TEST RD", "M-1", "by right" if False else "by_right",
                       "no pond room", "33.6, -84.5", "run fulton-2026-11-15", "entity"):
@@ -301,6 +315,10 @@ class FetchTests(unittest.TestCase):
         env = mock.patch.dict(os.environ, {"LEAD_FETCH_COUNT_FILE": str(self.count), "LEAD_FETCH_MAX": "3"})
         env.start()
         self.addCleanup(env.stop)
+        for patch in (mock.patch.object(lead_fetch.time, "sleep"),           # no real pause in tests
+                      mock.patch.object(socket, "getaddrinfo", socket.getaddrinfo)):   # undo pin_names
+            patch.start()
+            self.addCleanup(patch.stop)
 
     def fetched(self, body: bytes, ctype="text/html; charset=utf-8", status=200):
         got = quotecheck.Fetched(body, ctype, "https://city.example/page", status, ["https://city.example/page"])
@@ -339,15 +357,71 @@ class FetchTests(unittest.TestCase):
             self.assertEqual(rc, 1)
             self.assertIn(why, out)
 
-    def test_the_real_fetcher_refuses_the_named_sites_and_private_addresses_unasked(self):
-        for url in ("https://www.loopnet.com/Listing/1", "https://web.archive.org/web/2024/https://www.crexi.com/x",
-                    "file:///etc/passwd", "http://127.0.0.1:8080/", "http://169.254.169.254/latest/meta-data/"):
-            with mock.patch.object(quotecheck.Fetcher, "open_once", side_effect=AssertionError("asked the network")), \
-                    mock.patch.object(quotecheck.Fetcher, "resolve", return_value=["127.0.0.1"]), \
-                    mock.patch.dict(os.environ, {"LEAD_FETCH_MAX": "99"}):
-                rc, out, _ = call(lead_fetch, url)
+    def run_real(self, url, addresses):
+        """The real fetcher, with name look-ups answered from `addresses` and
+        any request to the network an error."""
+        with mock.patch.object(quotecheck.Fetcher, "open_once", side_effect=AssertionError("asked the network")), \
+                mock.patch.object(quotecheck.Fetcher, "resolve", return_value=addresses), \
+                mock.patch.dict(os.environ, {"LEAD_FETCH_MAX": "99"}):
+            return call(lead_fetch, url)
+
+    def test_the_named_sites_are_refused_for_their_name_alone(self):
+        # The names resolve to a public address here, so only the rule
+        # against the names can stop these.
+        for url in ("https://www.loopnet.com/Listing/1", "https://costar.com/x", "https://www.crexi.com/properties/1",
+                    "https://web.archive.org/web/2024/https://www.crexi.com/x",
+                    "https://city.example/redirect?to=loopnet.com"):
+            rc, out, _ = self.run_real(url, ["93.184.216.34"])
             self.assertEqual(rc, 1, url)
             self.assertIn("not fetched", out)
+        self.assertEqual(quotecheck.REFUSED_NAMES, ("costar", "loopnet", "crexi"))
+
+    def test_local_files_and_private_addresses_are_refused(self):
+        for url, addresses in (("file:///etc/passwd", ["93.184.216.34"]),
+                               ("http://127.0.0.1:8080/", ["127.0.0.1"]),
+                               ("http://169.254.169.254/latest/meta-data/", ["169.254.169.254"]),
+                               ("https://intranet.example/x", ["10.0.0.7"]),
+                               ("https://mixed.example/x", ["93.184.216.34", "127.0.0.1"])):
+            rc, out, _ = self.run_real(url, addresses)
+            self.assertEqual(rc, 1, url)
+            self.assertIn("not fetched", out)
+
+    def test_a_name_that_answers_differently_the_second_time_is_pinned(self):
+        """reviews/39 finding 5: the address that was checked is the one the
+        connection is made to."""
+        asked = []
+
+        def real(host, port, *args, **kwargs):
+            asked.append(host)
+            # The name: public the first time, loopback ever after.
+            answer = host if host[0].isdigit() else ("93.184.216.34" if asked.count(host) == 1 else "127.0.0.1")
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (answer, port or 0))]
+        with mock.patch.object(socket, "getaddrinfo", real):
+            lead_fetch.pin_names()
+            first = socket.getaddrinfo("rebind.example", None)
+            again = socket.getaddrinfo("rebind.example", 443, 0, socket.SOCK_STREAM)
+            other = socket.getaddrinfo("REBIND.example", 80)
+        for answers in (first, again, other):
+            self.assertEqual({a[4][0] for a in answers}, {"93.184.216.34"})
+        self.assertEqual(again[0][4][1], 443)
+        self.assertEqual(asked.count("rebind.example"), 1)           # the name was looked up once
+
+    def test_a_file_named_like_a_standard_module_beside_the_tool_is_not_imported(self):
+        tools = self.tmp / "tools"
+        tools.mkdir()
+        for name in ("lead_fetch.py", "quotecheck.py"):
+            shutil.copy(TOOLS / name, tools / name)
+        for name in ("json.py", "socket.py", "html.py", "hashlib.py", "argparse.py"):
+            (tools / name).write_text("raise SystemExit(99)\n")
+        done = subprocess.run([sys.executable, "-I", str(tools / "lead_fetch.py"), "--help"],
+                              capture_output=True, text=True, timeout=60, cwd=str(self.tmp))
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("--find", done.stdout)
+
+    def test_each_call_waits_the_usual_gap_first(self):
+        with self.fetched(b"<p>some text</p>"):
+            self.assertEqual(call(lead_fetch, "https://city.example/page")[0], 0)
+        lead_fetch.time.sleep.assert_called_once_with(quotecheck.HOST_DELAY_S)
 
     def test_an_error_page_is_not_text(self):
         with self.fetched(b"<p>Not here</p>", status=404):
@@ -383,7 +457,7 @@ class FetchTests(unittest.TestCase):
             tree = ast.parse((HERE / name).read_text())
             mods = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
             mods |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
-            self.assertLessEqual(mods - {"quotecheck", "__future__"}, set(sys.stdlib_module_names), name)
+            self.assertLessEqual(mods - {"__future__"}, set(sys.stdlib_module_names), name)
 
 
 if __name__ == "__main__":

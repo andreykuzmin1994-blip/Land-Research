@@ -60,7 +60,7 @@ MAIN_LOG="$LOG_DIR/supervise-$STAMP.log"
 RESULTS=()
 RUN_DIRS=()   # "county<TAB>output folder" of each clean, plain run (for the lead checks)
 PLAIN_RUN=1   # 0 when extra screener arguments were given (a trial: no lead checks)
-START_MARK="$STATE_DIR/.start-$STAMP"
+START_MARK="$STATE_DIR/.run-start"   # one file, rewritten by each run
 FIX_AS=()
 [ -n "$FIX_USER" ] && FIX_AS=(sudo -n -u "$FIX_USER" -H --)
 # git in a worktree whose files came from the fixer: no hooks, no fsmonitor.
@@ -253,6 +253,10 @@ fix_ready() {  # prints why the hand-off can't run, if it can't
 
 escalate() {
   local county="$1" settings="$2" alog="$3" attempts="$4"
+  # A command run as the fixer inherits this shell's working folder, and a
+  # folder it is already in is readable whatever its parents' modes say.
+  # Leave the private checkout before the first such command (reviews/39).
+  cd / || return
   local tail_txt; tail_txt="$(tail -40 "$alog")"
   local why=""
   if [ "$CLAUDE_FIX" != 1 ]; then why="the Claude hand-off is off (CLAUDE_FIX=0)"
@@ -463,7 +467,7 @@ main() {
   exec 9>"$STATE_DIR/supervise.lock"
   if ! flock -n 9; then log "another supervisor run is active; exiting"; exit 0; fi
   [ "$#" -gt 0 ] && PLAIN_RUN=0
-  : >"$START_MARK"
+  : >"$START_MARK"   # after the lock: only the running supervisor writes it
   find "$LOG_DIR" -type f -mtime +"$LOG_KEEP_DAYS" -delete 2>/dev/null
   log "supervisor start; counties: $COUNTIES; args: ${*:-none}"
   update_code
@@ -475,7 +479,6 @@ main() {
   # After every county and the summary: a long lead check never delays a
   # county's run or its alert, and never changes the exit code.
   investigate_stage
-  rm -f "$START_MARK"
   log "supervisor done"
   [ "$failed" -eq 0 ]
 }
