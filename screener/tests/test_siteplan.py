@@ -1684,8 +1684,10 @@ class DetentionAndSoils(Offline):
         if rec["detention"]["fits"]:
             n = len(d.o["ponds"])
             self.assertEqual(n, sp.pond_count(v))
-            _, Lf, Wf, _ = sp.pond_dims(v / n)
-            for pond in d.o["ponds"]:
+            # each pond in the shape it was placed in (2:1, or another where
+            # the room-for-the-pond pass placed it; reviews/40)
+            for pond, k in zip(d.o["ponds"], d.o.get("pond_ratios") or [2.0] * n):
+                _, Lf, Wf, _ = sp.pond_dims(v / n, ratio=k)
                 self.assertAlmostEqual(pond.area, Lf * Wf, delta=0.01 * Lf * Wf)
 
     def test_assemblage_rules_are_compared(self):

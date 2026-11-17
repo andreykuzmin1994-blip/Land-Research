@@ -2437,20 +2437,27 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             if pond_only(o) and key not in seen_l and score((q, {**o, "ok": True})) > score(best0):
                 seen_l.add(key)
                 start.append((q, o))
+        found_by: list[list[tuple[Plan, dict[str, Any]]]] = []
         try:
             for q, o in start[:POND_ROOM_MAX_LAYOUTS]:
                 if room.spent:
                     break
                 room.layouts += 1
+                mine: list[tuple[Plan, dict[str, Any]]] = []
+                found_by.append(mine)
                 if street_ok(q) and room.take():
                     o2 = finish(q, ctx_room)            # the same layout, another pond shape
                     if o2["ok"]:
-                        added.append((q, o2))
+                        mine.append((q, o2))
                         room.found += 1
                         continue
-                relocate_for_pond(q, o, P0, B0, ctx_room, row_line, res_line, room, street_ok, added)
+                relocate_for_pond(q, o, P0, B0, ctx_room, row_line, res_line, room, street_ok, mine)
         except _BudgetExceeded:
             room.cut_short = True                       # what was found stands; building 1's search was complete
+        # One plan per layout the pass started from, its best: the others
+        # are the same layout a little moved, and would crowd the layouts
+        # compared (the first ten results) out of the read-out.
+        added = [max(mine, key=score) for mine in found_by if mine]
         results += added
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
