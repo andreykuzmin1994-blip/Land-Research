@@ -976,6 +976,15 @@ def contour_lines(svg):
     return re.findall(rf'<path d="[^"]+" stroke="{sr.C["contour"]}" stroke-width="[\d.]+" fill="none"', svg)
 
 
+class Decimalish:
+    """A number type that is not int or float (as numpy's float32 is not)."""
+    def __init__(self, v):
+        self.v = v
+
+    def __float__(self):
+        return float(self.v)
+
+
 def filled(svg, colour):
     """The plan shapes filled with `colour` (not the legend's swatches, which are rects)."""
     return re.findall(rf'<path d="[^"]+" fill="{colour}"', svg)
@@ -1041,6 +1050,9 @@ class Contours(unittest.TestCase):
         nan = grid_dem(5, 5, lambda x, y: 900 + 0.2 * x)
         nan.elev[(2, 2)] = float("nan")
         self.assertTrue(sr.contours(nan, box(0, 0, 200, 200))[1])                  # a bad sample is skipped, not fatal
+        odd = grid_dem(5, 5, lambda x, y: 900 + 0.2 * x)
+        odd.elev = {k: Decimalish(v) for k, v in odd.elev.items()}
+        self.assertTrue(sr.contours(odd, box(0, 0, 200, 200))[1])                  # any number type float() takes
 
 
 class PlanContext(ts.Offline):
@@ -1081,7 +1093,12 @@ class PlanContext(ts.Offline):
         self.assertEqual(contour_lines(svg), [])
         self.assertNotIn("Contours:", svg)
         self.assertIn("none drawn (no lidar samples)", svg)
-        self.assertNotIn("neighbouring parcel buffered as residential", svg)     # no context, no legend entry for it
+        self.assertNotIn("neighbouring parcel", svg)                             # no context, no legend entry for it
+        # only the kinds drawn are in the legend
+        d3 = sp.Drawing(**{**d2.__dict__, "context": [("OTHER", box(300, -350, 600, 350))]})
+        svg3 = sr.render(d3, rec)
+        self.assertIn("neighbouring parcel (county parcel map)", svg3)
+        self.assertNotIn("classed residential", svg3)
         viewer.sanitise_svg(svg)
 
     def test_the_tint_follows_the_edge_rule_in_each_behaviour(self):
@@ -1110,11 +1127,14 @@ class PlanContext(ts.Offline):
         svg = sr.render(d, rec)
         paths = re.findall(rf'<path d="([^"]+)" stroke="{sr.C["centre"]}"', svg)
         self.assertEqual(len(paths), 1)
-        s_, ox, oy, minx, maxy = sr._scale(d)
-        # the frontage is the parcel's south side (y = -350 ft): the line runs
-        # parallel to it, half a street out, with no hook back toward the parcel
+        px_per_ft = sr._scale(d)[0]
+        # the frontage is the parcel's south side: the line runs parallel to
+        # it, half a street outside it, with no hook back toward the parcel
         ys = {round(float(y), 1) for y in re.findall(r"[ML]\s*[\d.]+,([\d.]+)", paths[0])}
         self.assertEqual(len(ys), 1)
+        ground = re.search(r'<path d="([^"]+)" fill="url\(#gx\)"', svg).group(1)
+        south = max(float(y) for y in re.findall(r"[ML]\s*[\d.]+,([\d.]+)", ground))       # the parcel's south side, px
+        self.assertAlmostEqual(ys.pop(), south + sr.STREET_FT / 2 * px_per_ft, delta=1.0)
 
     def test_plan_site_passes_the_neighbours_to_the_drawing(self):
         inp, _ = ts.load_fixture("rank21")

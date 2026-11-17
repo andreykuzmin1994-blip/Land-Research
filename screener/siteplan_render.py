@@ -190,8 +190,14 @@ def contours(dem: Any, region: BaseGeometry, chaikin: int = 2) -> tuple[int, lis
     if dem is None or not getattr(dem, "elev", None) or region is None or region.is_empty:
         return 0, []
     pts = {(int(round(i)), int(round(j))): p for (i, j), p in dem.points.items()}
-    z = {(int(round(i)), int(round(j))): float(v) for (i, j), v in dem.elev.items()
-         if isinstance(v, (int, float)) and math.isfinite(v)}
+    z = {}
+    for (i, j), v in dem.elev.items():
+        try:
+            zf = float(v)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(zf):
+            z[(int(round(i)), int(round(j)))] = zf
     inside = [v for k, v in z.items() if k in pts and region.contains(Point(pts[k]))]
     if len(inside) < 4:
         return 0, []
@@ -433,7 +439,7 @@ def render(d: Drawing, rec: dict) -> str:
     marks = [q for q in (o["tpt"], o["cpt"]) if q is not None]
     pc = parcel.centroid
     # the neighbouring county parcels, in outline (residential ones tinted)
-    drawn_ctx = 0
+    drawn_ctx: set[str] = set()
     for kind, g in sorted(d.context or [], key=lambda t: t[0]):
         if g is None or g.is_empty:
             continue
@@ -444,7 +450,7 @@ def render(d: Drawing, rec: dict) -> str:
         piece = poly(shown_g, C["ctx_res"] if kind == "RES" else C["ctx"], C["ctx_s"], 0.7, extra='stroke-linejoin="round"')
         if piece:
             out.append(piece)
-            drawn_ctx += 1
+            drawn_ctx.add("RES" if kind == "RES" else "OTHER")
     # the street: an asphalt band outside the parcel along the frontage
     runs = ([ln for ln in getattr(front_ft, "geoms", [front_ft]) if ln.geom_type == "LineString" and ln.length > 1]
             if front_ft is not None and not front_ft.is_empty else [])
@@ -922,12 +928,12 @@ def render(d: Drawing, rec: dict) -> str:
               (C["court"], "truck court, truck roads and truck route"), (C["trailer"], "trailer stalls / drop yard"),
               (C["car"], "car parking and car route"), (C["pond"], "detention pond (grassed rim around)"),
               ("url(#gx)", "open ground"), (C["street"], "street along the GDOT road frontage; T/C driveways"),
-              *([(C["ctx"], "neighbouring parcel (county parcel map)"),
-                 (C["ctx_res"], "neighbouring parcel buffered as residential (county land-use / tax class)")] if drawn_ctx else []),
+              *([(C["ctx"], "neighbouring parcel (county parcel map)")] if "OTHER" in drawn_ctx else []),
+              *([(C["ctx_res"], "neighbouring parcel classed residential (county land-use / tax class)")] if "RES" in drawn_ctx else []),
               ("contour", f"existing ground contour (lidar, every {every} ft; index labelled)" if every
                else "existing ground contour: none drawn (" + ("lidar incomplete" if dem_state in ("partial", "not_checked")
                                                                else "no lidar samples" if not getattr(d.dem, "elev", None)
-                                                               else "ground level within one interval") + ")"),
+                                                               else "level ground, or too few samples on the site") + ")"),
               ("url(#wx)", "floodplain, wetlands, easements, protected land"), ("url(#tx)", "transmission corridor (assumed width)"),
               ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
               ("prop", "property line (county parcel map)"), ("dash", "paving setback line (draft; 25 ft from water)"),
@@ -959,7 +965,7 @@ def render(d: Drawing, rec: dict) -> str:
     basis_lines = [f"Detention: {de.get('basis')}" if de.get("basis") else "", f"Grading: {gr.get('basis')}" if gr.get("basis") else "",
                    f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}",
                    (f"Contours: existing ground every {every} ft, traced from the lidar samples on a {d.dem.step:.0f} ft grid and "
-                    "smoothed, stopping about half a grid step inside the property line (indicative; not a topographic survey)")
+                    "smoothed, stopping up to one grid step inside the property line (indicative; not a topographic survey)")
                    if every else "",
                    ("Neighbours: county parcel map; the tint is the planner's residential-edge test (residential land-use or tax "
                     "class, and agricultural where the draft rules buffer it), not zoning") if drawn_ctx else "", DISCLAIMER,

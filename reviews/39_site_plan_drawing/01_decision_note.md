@@ -72,7 +72,7 @@ viewer allow-list, imagery licence), not a drawing change.
 |---|---|---|---|
 | 1 | An invalid context shape raised `GEOSException` out of `render()` (not reachable from `plan_site`) | should fix | `make_valid` per shape; a shape GEOS still cannot cut is left out, never the sheet. Tested. |
 | 2 | A partial lidar answer drew contours on half the site, the rest reading as level | should fix | Contours only when the lidar state is `checked`; the legend says "none drawn (lidar incomplete)". Tested. |
-| 3 | Legend called the tint "residential land-use code"; it also covers tax class R and, where the rules buffer it, agricultural | should fix | Legend: "buffered as residential (county land-use / tax class)"; footer line spells out the rule and that it is not zoning. |
+| 3 | Legend called the tint "residential land-use code"; it also covers tax class R and, where the rules buffer it, agricultural | should fix | Legend: "classed residential (county land-use / tax class)" (the re-check's wording, A); footer line spells out the rule and that it is not zoning. |
 | 4 | The context test did not test the agricultural × behaviour matrix | should fix | `test_the_tint_follows_the_edge_rule_in_each_behaviour`, checked against `Drawing.edges`. |
 | 5 | The saddle test passed with the rule inverted | should fix | Now asserts which corners are cut off, for a mean above and below the level. |
 | 6 | The centre line kept an 8.5 ft hook at each end, and a second line in the gap of a split assemblage | should fix | Rebuilt as an offset of each frontage run on the side away from the parcel, clipped to the street band. Tested. |
