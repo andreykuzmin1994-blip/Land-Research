@@ -1190,6 +1190,12 @@ class PondRoom:
         return True
 
 
+def loading_faces_homes(p: "Plan", res_line) -> bool:
+    """A truck court or trailer row within 150 ft of a residential edge
+    (the planner's LOADING_FACES_RES test)."""
+    return res_line is not None and any(c.distance(res_line) < 150 for c in p.courts + p.rows)
+
+
 def faces_street(p: "Plan", row_line) -> bool:
     """A truck court or trailer row within 100 ft of the street frontage
     (the planner's STREET_FACING_DOCKS test)."""
@@ -2419,12 +2425,20 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # Room for the pond (reviews/40): a pass that only adds layouts. The
         # layouts the pond alone blocked, largest first, are tried again
         # with other pond shapes, then moved to leave their pond room. One
-        # that turns its docks to the street, where the best plan so far
-        # does not, is not taken. The plan drawn is then the best of all by
-        # the same ranking, so the pass can only add floor area.
+        # that turns its docks to the street or its loading to homes, where
+        # the best plan so far does not, is not taken; nor one with no more
+        # floor area that has fewer trailer stalls (a small relief or
+        # steep-ground mark alone does not trade them away). The plan drawn
+        # is then the best of all by the same ranking: never below the
+        # plan without the pass.
         room = PondRoom(search)
         best0 = max(results, key=score)
-        street_ok = (lambda q: True) if faces_street(best0[0], row_line) else (lambda q: not faces_street(q, row_line))
+        b0_street, b0_homes = faces_street(best0[0], row_line), loading_faces_homes(best0[0], res_line)
+        street_ok = lambda q: (b0_street or not faces_street(q, row_line)) and (b0_homes or not loading_faces_homes(q, res_line))
+
+        def gains(t):
+            q, o = t
+            return q.sf > best0[0].sf or (q.sf == best0[0].sf and o["trailers"] >= best0[1]["trailers"])
         ctx_room = dataclass_replace(ctx, pond_room=True, search=room.search)
         P0, B0 = first[0], first[1]
 
@@ -2457,7 +2471,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # One plan per layout the pass started from, its best: the others
         # are the same layout a little moved, and would crowd the layouts
         # compared (the first ten results) out of the read-out.
-        added = [max(mine, key=score) for mine in found_by if mine]
+        added = [max(ok, key=score) for mine in found_by for ok in [[t for t in mine if gains(t)]] if ok]
         results += added
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
@@ -2500,6 +2514,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
     if opts.fixes:
+        if room is not None:
+            rec["inputs"]["fit_searches"] = rec["inputs"].get("fit_searches", 0) + room.search.fit_calls
         rec["inputs"]["pond_room"] = ({"layouts": room.layouts, "tries": room.tries, "max_tries": room.max_tries, "found": room.found,
                                        "drawn": any(best_p is q for q, _ in added), "cut_short": room.cut_short, "skipped_for_time": False}
                                       if room is not None else {"layouts": 0, "tries": 0, "max_tries": POND_ROOM_MAX_TRIES, "found": 0,

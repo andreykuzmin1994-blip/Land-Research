@@ -249,15 +249,22 @@ fit.
   (up to 3 rounds), and each fit is checked in full. The plan drawn is
   then the best of everything by the usual ranking, so no site ranks
   worse than without the pass. A layout the pass adds is refused when
-  its truck court or trailer row comes within 100 ft of the street
-  (the `STREET_FACING_DOCKS` test) and the best plan before it did not.
-  The pass has 60 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
-  checks, a count, so the same site gives the same plan) and half of
-  the search time left after the main search (`POND_ROOM_TIME_SHARE`;
-  the rest stays for the second building); cut by the time, it keeps
-  what it found and the plan is not flagged. It does not run at all when
-  less than half the site's budget is left after the search
-  (`POND_ROOM_MIN_LEFT`): a slow site plans exactly as before. The record's
+  its truck court or trailer row comes within 100 ft of the street (the
+  `STREET_FACING_DOCKS` test) or within 150 ft of homes
+  (`LOADING_FACES_RES`) and the best plan before it did not; and when it
+  has no more floor area than that plan and fewer trailer stalls (a
+  1 ft relief difference alone does not trade the stalls away). The
+  pass has 60 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
+  checks, a count) and half of the search time left after the main
+  search (`POND_ROOM_TIME_SHARE`; the rest stays for the second
+  building, which can therefore have less time than before); cut by the
+  time, it keeps what it found and the plan is not flagged. It does not
+  run at all when less than half the site's budget is left after the
+  search (`POND_ROOM_MIN_LEFT`): a slow site plans exactly as before.
+  Those two limits are wall-clock time, so a site close to either can
+  plan differently on a slower machine; `inputs.pond_room.cut_short`
+  and `skipped_for_time` say when it happened. Away from them, the same
+  site gives the same plan. The record's
   `inputs.pond_room` gives the layouts, tries, plans found, whether the
   plan drawn came from the pass, and whether it was cut short. The
   ranking gives trailer stalls no floor area (operator decision of

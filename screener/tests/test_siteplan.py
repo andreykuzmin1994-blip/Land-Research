@@ -1457,6 +1457,20 @@ class PondRoom(Offline):
         self.assertNotIn("SECOND_BUILDING_NOT_SEARCHED", names(rec))
 
 
+    def test_no_stalls_traded_for_nothing(self):
+        # review 40/02, re-check finding 1: a 211,000 SF plan with 21/21
+        # stalls was replaced by a moved 211,000 SF plan with none, on a
+        # 1 ft relief difference. A plan the pass adds needs more floor
+        # area, or the same with as many stalls.
+        mk = lambda: site(800, 900, z=lambda x, y: 900 + 0.02 * x + 0.03 * y)
+        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+            off, _ = sp.plan_site(mk())
+        on, _ = sp.plan_site(mk())
+        self.assertEqual((off["building"]["sf"], off["trailers"]["total"]), (211000, 21))
+        self.assertTrue(on["building"]["sf"] > off["building"]["sf"]
+                        or on["trailers"]["total"] >= off["trailers"]["total"])
+
+
 class PondRoomOnlyAdds(Offline):
     """The pass runs after the search and its rescue and only adds layouts
     (reviews/40): with it, a site never ranks worse than without it, and a

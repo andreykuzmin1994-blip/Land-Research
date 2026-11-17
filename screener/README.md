@@ -941,9 +941,12 @@ How to read a plan:
   tries them with other pond proportions and moved to leave the pond
   room (since 2026-11-17, reviews/40; default behaviour only). It only
   adds layouts: the plan drawn is the best of all by the usual ranking.
-  It refuses a layout that newly turns its docks to the street, has 60
-  tries and half the remaining time, keeps what it found when cut, and
-  is skipped when less than half the site's budget is left.
+  It refuses a layout that newly turns its docks to the street or its
+  loading to homes, or that has no more floor area and fewer trailer
+  stalls. It has 60 tries and half the remaining time, keeps what it
+  found when cut, and is skipped when less than half the site's budget
+  is left (time limits: a site near them can plan differently on a
+  slower machine; `inputs.pond_room` says so).
   Reference site #21 went from 68,000 to 84,000 SF. A plan it adds may
   have fewer trailer stalls (the ranking gives them no floor area).
   `inputs.pond_room` in `plans.json` says what it did.
