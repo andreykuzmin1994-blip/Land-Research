@@ -225,15 +225,28 @@ clearance. Read `lead.md` before acting on a lead.
 - An agent has no shell command but the fetch tool, no `curl`, no
   `WebFetch`, no `quotecheck`. Its file is taken back only if it is one
   regular file of at most 1 MB that names this parcel and this run.
-- The skeptic starts in a new folder after the investigator's is deleted.
-  It gets the card and the checked findings, nothing else.
+- The skeptic starts in a new folder after the investigator's is deleted,
+  and what the agents' account left in `/tmp`, `/var/tmp` and `/dev/shm`
+  is deleted between them. It gets the card and the checked findings.
+- Before any command runs as a sandbox account, the supervisor leaves the
+  checkout (a folder a process is already in stays readable whatever its
+  parents' modes say) and sets its own umask; every mode in a sandbox
+  folder is set by path.
 - Each quote check has a time limit, the whole stage a budget
-  (`INVESTIGATE_BUDGET`), and a lead that fails twice is left alone.
-- If an agent changes its own account's Claude settings, shell start-up
-  files or SSH folder, the stage stops, nothing of that lead is kept, an
-  urgent alert goes out, and lead checks stay on hold until you remove
+  (`INVESTIGATE_BUDGET`), and a lead that fails twice is left alone (the
+  alert counts those; delete a lead's counter in
+  `~/screener-ops/investigate/attempts/` to have it tried again).
+- If an agent changes its own account's Claude settings, plugins or
+  rules, its copy of Claude Code, its shell start-up files or its SSH
+  folder, the stage stops, nothing of that lead is kept, an urgent alert
+  goes out, and lead checks stay on hold until you remove
   `~/screener-ops/investigate/HOLD`. Look at `/home/screener-lead` first;
-  when in doubt delete that user and make it again.
+  when in doubt delete that user and make it again. A watch that cannot
+  look counts as a change.
+- The stage also stops, with an urgent alert and without counting a try,
+  when a sandbox folder cannot be emptied or a sandbox process cannot be
+  stopped, and when the agent ends with an error before writing anything
+  (an expired login, an option Claude Code no longer accepts).
 
 ### Turning it on
 
@@ -261,16 +274,40 @@ on the first run, with `INVESTIGATE_MAX=1`:
   `--allowedTools` with one `Bash(...)` rule, `--disallowedTools`), and
   that the agent can run the fetch tool and nothing else. The agent's log
   shows a refused tool call;
+- that the one `Bash(...)` rule does not also let through a command
+  with `$(...)`, a redirection, a second line or a leading `VAR=value`.
+  Claude Code documents that such a rule does not cover `cmd && other`;
+  the rest was not verified. If any of them passes, the fetch rule is a
+  shell: leave lead checks off;
 - that `screener-lead` cannot write outside its lead folder in
-  `/srv/screener-lead` (try it by hand as that user);
-- that a normal run does not trip the settings watch.
+  `/srv/screener-lead` (try it by hand as that user), and what the
+  `Write` tool can reach beyond the working folder (its own home, at
+  least);
+- that a normal run does not trip the settings watch (Claude Code
+  updating itself would: the stage sets `DISABLE_AUTOUPDATER=1`);
+- the sandbox itself with three real accounts. The offline tests run
+  everything as one user; an independent reviewer ran the scripts with
+  three accounts and real `sudo` in a container, not on a server.
 
 Accepted, because closing them needs more than this script:
 
 - `screener-lead` owns its Claude login and its own copy of Claude Code.
   An agent that a web page takes over could misuse that login or change
-  that copy. Nothing else on the server is within its reach, and the
-  settings watch catches the plain routes, not every one.
+  that copy. The settings watch catches a change to the files it lists,
+  not every route (`~/.claude.json`, which Claude Code rewrites on every
+  run, is not watched).
+- Both agents are one account. An investigator set on it could leave a
+  note for the skeptic somewhere in that account's home. The skeptic's
+  independence rests on its fresh folder and context and on the quote
+  check of its own claims, not on separate accounts.
+- The quote checker keeps a copy of every page it fetches until its
+  folder is removed, up to 200 MB a page. A free-disk floor
+  (`LEAD_MIN_FREE_MB`, 5000) is asked before each agent and each check;
+  there is no cap on one check's total.
+- The quote checker looks a host name up twice (once to check that its
+  addresses are public, once to connect). The agents' fetch tool pins
+  the name to the addresses it checked; the checker itself
+  (`screener/quotecheck.py`, also used by hand) does not yet.
 - The request counter of the fetch tool sits in the agent's own folder: it
   stops drift, not an agent set on cheating. The time limit bounds that.
 - The search tool is the provider's: it can show a snippet of any site,
