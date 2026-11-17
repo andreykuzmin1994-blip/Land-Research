@@ -798,6 +798,14 @@ sized from the impervious area, a drop-trailer yard, a second building
 where the land allows, grading, and a list of flags. The search tries the
 operator's prototypes and market depths and keeps the best feasible plan.
 
+Each plan then gets a read-out (`siteplan_assess.py`), printed on the
+sheet and kept in the record: one status, the next steps in order, where
+every acre goes, the plan measured against its draft zoning values, the
+layouts compared, a takeoff with no prices, and each flag as a condition
+with a workstream, a stage, an action and what closes it. The read-out
+is derived from the finished plan and changes no layout, flag,
+feasibility or floor area.
+
 - `--assemble NAME=PID,PID` plans several parcels as one site. The ids
   are typed out; nothing picks parcels by owner. At most 12 ids. A name
   made only of ranks (`2`, `115+170`) must list exactly those ranks'
@@ -844,8 +852,38 @@ operator's prototypes and market depths and keeps the best feasible plan.
 
 | File | What it is |
 |---|---|
-| `plans.json` | One record per site: the configuration, `feasible`, floor area, doors, trailers, cars, coverage, detention, access, grading, flags by severity, `gated` (a use permit), the alternatives tried, the draft zoning values used, the operator decisions used, and the state of each input. The header names the run (`ranked.csv`'s SHA-256) and the code. |
-| `plan-<site>.svg` | The drawing, with a side panel of the numbers and flags. |
+| `plans.json` | One record per site: the configuration, `feasible`, floor area, doors, trailers, cars, coverage, detention, access, grading, flags by severity, `gated` (a use permit), the alternatives tried, the draft zoning values used, the operator decisions used, and the state of each input; then the read-out (`assessment`, `site_data`, `compliance`, `quantities`, `selection`). The header names the run (`ranked.csv`'s SHA-256) and the code. |
+| `plan-<site>.svg` | The test-fit sheet: the labelled plan, key numbers, next steps, where the land goes, the draft zoning check, the layouts compared and the conditions. |
+| `plans.csv` | The planned sites side by side, one row each: status, counted and drawn floor area, yield, detention, grading, a larger layout that passed (if any), the layout that passed all but the pond (if any), the blocking flags and the first step. Parcel ids and numbers only, no address. |
+
+How to read the sheet:
+
+- **Status** (top right; `assessment.status`). `fits` (only the checks
+  every site gets remain), `fits_with_conditions` (the site has its own
+  severity-2 flags), `gated` (a use permit), `hypothetical` (no road
+  frontage), `blocked` (a severity-1 flag), `incomplete` (an input was
+  not read: run it again), `no_fit`, `not_planned` (the search ran out
+  of time). It restates `feasible`, `gated` and `hypothetical`; it is
+  not a second verdict.
+- **Next steps, in order.** What blocks the plan first, then the rest by
+  stage: desk checks, before an offer, due diligence. The cheap checks
+  come first, since a desk check that kills the site saves the survey.
+  The actions are the usual next step for each flag (`PLAYBOOK` in
+  `siteplan_assess.py`). None of them was checked against a document.
+- **Where the land goes.** Gross acres, what the draft setbacks and the
+  mapped constraints take, the net paving envelope, each use, and what
+  is left unused inside the envelope. The lines add up to the gross.
+- **Plan against the draft zoning values.** The building and the paving
+  measured to each kind of lot line, the height, coverage, parking and
+  use, with the margin on each. "Meets" says the drawing honours the
+  draft value. It is not a check against the adopted code.
+- **Layouts compared.** The plan drawn first, then the others tried,
+  with why the plan ranks first. When a larger layout passed its checks
+  but ranks lower (often for trailer stalls), the sheet says how much
+  larger and why. When a layout passed every check but the surface
+  pond, it says what underground or off-site detention would add.
+- **Takeoff.** Paving by duty, earthwork for one level pad (with the pad
+  elevation and the deepest cut and fill), disturbed area. No prices.
 
 How to read a plan:
 
@@ -935,7 +973,14 @@ python -m screener.viewer RUN_DIR --out screener/output/site-plan-viewer-<date>.
 ```
 
 One self-contained HTML page: the run's briefs and the site plans, with
-filters by decision, building fit, land today and plan feasibility. It reads no network.
+filters by decision, building fit, land today and plan feasibility, and
+sorts by rank, floor area, SF per gross acre and acres. For a site plan
+the panel beside the drawing shows the planner's read-out: the status
+and headline, the next steps, the key numbers, what holds the yield,
+where the land goes, the draft zoning check, the layouts compared and the
+conditions (the flags as recorded are one click below). A plan made
+before the read-out existed shows its numbers and flags as before. It
+reads no network.
 
 - Every input is joined by parcel id, and an input that names its run
   must name this one. A plans file with no run fingerprint (the
@@ -969,7 +1014,8 @@ They add files under `screener/`, so `evaluate.py --decide` refuses
 until a human records a new baseline on the merge commit:
 `python -m screener.autoresearch.evaluate --decide --new-baseline`. The
 score is expected to be unchanged: the evaluator reads none of the new
-modules.
+modules. The same holds for any later change to them (the read-out and
+sheet of 2026-11-17, `reviews/38_site_plan_read_out/`).
 
 ## AutoResearch
 

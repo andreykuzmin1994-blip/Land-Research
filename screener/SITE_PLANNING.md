@@ -1,8 +1,9 @@
 # Site planning: how the test fits are drawn, and what is still open
 
 Written 2026-11-16 for the Fulton land screen. This covers
-`screener.siteplan` (the planner), `screener.builtcheck` (is it land
-today?) and the decisions the operator still has to make. How to run the
+`screener.siteplan` (the planner), its read-out (`siteplan_assess`, added
+2026-11-17), `screener.builtcheck` (is it land today?) and the decisions
+the operator still has to make. How to run the
 tools is in `README.md` § "Site plans and the built check".
 
 **A plan is a screening test fit from public data.** It is not a survey,
@@ -228,6 +229,66 @@ fit.
   (`SECOND_BUILDING_NOT_SEARCHED`); cut only in the extra search for
   smaller layouts, the plan stays as found (`SMALLER_LAYOUTS_NOT_ALL_TRIED`).
 
+## The read-out
+
+Added 2026-11-17 (`siteplan_assess.py`, `reviews/38_site_plan_read_out/`).
+A plan used to end in a list of flag names. The read-out says what the
+plan means and what to do about it. It is worked out from the finished
+plan and changes no layout, flag, feasibility or floor area.
+
+- **Status.** One word per plan, from `feasible`, `gated` and
+  `hypothetical`: fits, fits with conditions, gated, hypothetical,
+  blocked, incomplete, no fit, not planned. Three flags stand on every
+  plan (`ZONING_DRAFT`, `STREAMS_PIPELINES`, `POND_SITE_FROM_LIDAR`):
+  they are the limits of the method, so a plan with only those reads
+  "fits: standard checks only".
+- **Conditions.** Each flag becomes a condition with a workstream
+  (zoning, access, fire, grading, stormwater, environmental, utilities,
+  program, title, planner inputs), a stage (desk check, before an offer,
+  due diligence), an action and what closes it. The table is `PLAYBOOK`.
+  A test fails when the planner gains a flag with no entry. The actions
+  are the usual next step, written once per flag. They are prompts for
+  a person: none was checked against a code or a document.
+- **Next steps.** What blocks the plan, then the gate, then the rest by
+  stage. An incomplete plan has one step: run it again.
+- **Where the land goes.** Gross acres; what the draft setbacks and
+  buffers take; what mapped constraints and any test cut take; the net
+  paving envelope; the building, truck paving, trailer and car parking
+  and ponds; and what is left unused inside the envelope, with its
+  largest piece (at least 40 ft wide). An area in two uses is counted
+  once, in the order above, so the lines add up to the gross.
+- **Draft zoning check.** The building and the module's paving are
+  measured to each kind of lot line and set against the draft offsets,
+  with the margin. Height (clear height plus the 10 ft roof allowance
+  the height cap already used), coverage, parking and use follow.
+  Driveways and routes are left out of the paving rows: a driveway has
+  to cross the road setback. Every row is against `JUR_DRAFT`.
+- **Why this layout.** The search ranks finished layouts by floor area,
+  marked down for steep ground under the pad (60% of the steep share),
+  for relief past 25 ft (400 SF per ft) and for each trailer stall short
+  of the target (2,000 SF). Those numbers were in the code; they are now
+  named (`RANKING`) and printed. When a larger layout passed its checks
+  but ranks lower, the read-out names it, the gain, and only the
+  mark-downs it carries beyond the plan drawn.
+- **What the surface pond costs.** When a layout passes every check but
+  the pond, the search shortens it until a pond fits. The read-out keeps
+  the layout as first tried and reports it (`selection.without_pond`):
+  the floor area underground or off-site detention would add, and the
+  storage that would have to move. On reference site #21 the plan drawn
+  is 58,000 SF and a 96,000 SF layout passed all but the pond.
+- **Takeoff.** Heavy paving (truck courts, roads and routes, trailer
+  stalls, drop yards), light paving (car parking and drives), earthwork
+  for one level pad with its elevation and deepest cut and fill, the
+  disturbed area, pond footprint and route lengths. No prices: unit
+  costs are the operator's.
+- **The pipeline table** (`plans.csv`). One row per site, for sorting
+  and for a pipeline total. Count floor area only from rows whose
+  status is `fits` or `fits_with_conditions`.
+
+What the read-out is not: a second feasibility rule, a cost estimate, or
+a zoning opinion. The search itself is unchanged (see the open items in
+the review note for what the read-out shows about it).
+
 ## Draft zoning values
 
 Derived from the code mirrors in the research spec (§1.10), with the
@@ -418,11 +479,25 @@ questions stand for you to answer.
    above allow it. This matters most on 5 to 15 acre parcels.
 7. **Detention.** Soil group from SSURGO (the current default) or B
    everywhere? Full 100-year attenuation, or the 25-year storm with safe
-   conveyance? Is underground detention acceptable at screening?
+   conveyance? Is underground detention acceptable at screening? The
+   read-out now puts a number on that last question for each site: the
+   layout that passed every check but the surface pond
+   (`selection.without_pond`, the `without_pond_sf` column of
+   `plans.csv`).
 8. **What counts as built.** The built check's thresholds (10,000 SF in
    the outline, 2,500 SF in a hole, $250,000 of improvements) are
    placeholders. Should the built check become a screen? A screen change
    is in human-owned `screens.py` and needs a new baseline.
+
+9. **How layouts are ranked.** `RANKING` in `siteplan.py`: floor area,
+   less 60% of the steep share, 400 SF per ft of relief past 25 ft, and
+   2,000 SF per trailer stall short of the target. The trailer mark
+   decides many small sites: on both reference fixtures a court-only
+   layout 10,000 SF larger passed its checks and ranks below the plan
+   drawn. Is a
+   trailer stall worth 2,000 SF of building to you? Changing the numbers
+   changes which plan is drawn, so it is a planner change with its own
+   review, not something the read-out does.
 
 The research spec listed further questions (court depth, door ratio,
 gated courts, fire assumptions, the number of buildings per parcel,

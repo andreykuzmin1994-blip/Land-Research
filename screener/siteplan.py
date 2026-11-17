@@ -22,7 +22,11 @@ Layout of the code (so the core is testable offline):
 - ``siteplan_inputs`` does every fetch (county parcels and neighbours,
   HIFLD transmission lines, USGS 3DEP elevation, GDOT frontage, the map
   layers) and says for each input whether it was checked.
-- ``siteplan_render`` draws the SVG.
+- ``siteplan_assess`` reads a finished plan out (pure, like this module):
+  one status, the next steps, where the land goes, the plan against its
+  draft zoning values, a takeoff, why this layout. It changes no layout,
+  flag, feasibility or floor area.
+- ``siteplan_render`` draws the test-fit sheet (SVG).
 
 A plan is one cross-section placed with ``sitefit.fit_lengths`` (the
 rectangle search copied from the root site fit):
@@ -120,10 +124,14 @@ from shapely.ops import linemerge, nearest_points, snap, unary_union
 from shapely.prepared import prep
 
 from . import sitefit
+from . import siteplan_assess as assess
 from .geo import FT_PER_M, LocalProjection
-from .viewer import OwnerGuard, markup_text
+from .viewer import OwnerGuard, csv_cell, markup_text
 
-SCHEMA_VERSION = 1
+# 2: every record adds the read-out of siteplan_assess (assessment,
+# site_data, compliance, quantities, selection), richer alternatives, the
+# pad elevation and its cut and fill, and the sheet's scale.
+SCHEMA_VERSION = 2
 SQFT_PER_AC = 43560.0
 
 # ---------------------------------------------------------------------------
@@ -155,6 +163,13 @@ MIN_PART_SF = 40000    # paving parts smaller than this are not fitted
 WATER_BUFFER_FT = 25.0
 SECOND_MIN_AC = 3.5
 SECOND_MIN_SF = 50000
+ROOF_ALLOWANCE_FT = 10  # building height read as clear height + 10 ft against a draft height cap
+CLEAR_BELOW_MARKET_FT = 28
+COMP_BAND_SF_PER_AC = (10500, 15400)   # Georgia comps, SF per gross acre
+# The ranking of finished layouts (plan_site's score): floor area, marked
+# down for steep ground under the pad, for relief past a free allowance
+# and for each trailer stall short of the target.
+RANKING = {"steep_share": 0.6, "relief_free_ft": 25, "relief_sf_per_ft": 400, "trailer_sf": 2000}
 # Per-site search budget (R19). The offline replay of the 33 reference sites
 # needs up to 193 s (#48) and 848 s (the 77.6 ac 115+170 assemblage) on this
 # container; at 120 s #48 would come out with no plan. 900 s lets every
@@ -1255,9 +1270,9 @@ def cap_flags(clear: int, rules: dict[str, Any], bldg_area: float, cars_area: fl
     """(clear height after a draft height cap, cap flags). `ratio`, when
     given, receives cap / value for a coverage cap that is exceeded."""
     flags = []
-    if rules.get("height") and clear + 10 > rules["height"]:
-        clear = rules["height"] - 10
-        sev = 1 if clear < 28 else 2
+    if rules.get("height") and clear + ROOF_ALLOWANCE_FT > rules["height"]:
+        clear = rules["height"] - ROOF_ALLOWANCE_FT
+        sev = 1 if clear < CLEAR_BELOW_MARKET_FT else 2
         flags.append(("HEIGHT_CAP", sev, f"draft height cap {rules['height']} ft: clear height lowered to {clear} ft" + (" - below market for distribution" if sev == 1 else "")))
     cov = rules.get("cover")
     if cov:
@@ -1457,6 +1472,8 @@ class Drawing:
     p: Plan
     o: dict
     second: tuple | None
+    B: BaseGeometry | None = None          # building envelope (draft building setbacks)
+    edges: list = field(default_factory=list)   # [(ROW | RES_SIDE | RES_REAR | OTHER, line)]
 
 
 # ---------------------------------------------------------------------------
@@ -1678,9 +1695,12 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     mod_pts = pad
     relief = (max(mod_pts) - min(mod_pts)) if len(mod_pts) > 3 else None
     cutfill = None
+    pad_elev = max_cut = max_fill = None
     if len(mod_pts) > 3:
         mean = sum(mod_pts) / len(mod_pts)
         cutfill = p.module.area * (sum(abs(z - mean) for z in mod_pts) / len(mod_pts)) / 2 / 27
+        # One level pad at the mean ground: the deepest cut and fill it needs.
+        pad_elev, max_cut, max_fill = mean, max(mod_pts) - mean, mean - min(mod_pts)
     steep_mod = (p.module.intersection(steep).area / p.module.area * 100) if not steep.is_empty else 0.0
     # The layout's own check. In the default behaviour a frontage too short
     # for any truck driveway (ACCESS_CONSTRAINED, the same for every layout)
@@ -1690,7 +1710,9 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
          "routes": routes, "route_polys": route_polys, "route_outside": route_outside, "n_main_routes": n_main_routes,
          "drops": drops, "trailers": trailers, "imp_ac": imp_ac, "v_det": v_sized if fixes else v, "ponds": ponds, "relief": relief,
          "cutfill_cy": cutfill, "steep_module_pct": steep_mod, "dem_points_module": len(mod_pts), "flags": flags,
-         "clear": p.clear}
+         "clear": p.clear,
+         # read-outs for siteplan_assess; no decision reads them
+         "pad_elev": pad_elev, "max_cut": max_cut, "max_fill": max_fill, "disturbed_ac": disturbed}
     o["violations"] = check_plan(p, o, ctx, others)
     if fixes:
         for viol in o["violations"]:
@@ -1876,6 +1898,10 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     ctx = Ctx(parcel, P, B, wet_buf, trans, cut, steep, dem, meta, rules, runs, jname, constraints, fr.road, hsg, prog, search)
     VARIANTS = variants()
     results, excluded = [], Polygon()
+    # Layouts that passed every check but the surface pond, at the length
+    # first tried (the search goes on to shorten them). Kept for the
+    # read-out only: what underground or off-site detention would add.
+    pond_limited: list[tuple[Plan, dict[str, Any]]] = []
     first: tuple | None = None          # (Pe, Be, fits, picked, explore) of the first attempt, for the rescue pass
     try:
         for attempt in range(3):
@@ -1904,6 +1930,9 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     if o["ok"]:
                         results.append((cur, o))
                         break
+                    if (not o["pond_ok"] and not o["route_problem"] and not o["violations"]
+                            and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
+                        pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
                     if o["route_problem"] and not shorten_routes:
                         results.append((cur, o))
                         break
@@ -1973,11 +2002,15 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         return _no_fit(inp, jname, rules, flags + late, opts, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small,
                        cut_short=search.exceeded), None
 
+    def rank_sf(q, o, st, rel):
+        return (q.sf * (1 - RANKING["steep_share"] * st) - RANKING["relief_sf_per_ft"] * max(rel - RANKING["relief_free_ft"], 0)
+                - RANKING["trailer_sf"] * max(0, q.trailers_target - o["trailers"]))
+
     def score(t):
         q, o = t
         st = o["steep_module_pct"] / 100
         rel = (o["relief"] or 0)
-        return (o["ok"], not o["route_problem"], q.sf * (1 - 0.6 * st) - 400 * max(rel - 25, 0) - 2000 * max(0, q.trailers_target - o["trailers"]))
+        return (o["ok"], not o["route_problem"], rank_sf(q, o, st, rel))
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
     second = None
@@ -2015,17 +2048,72 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     elif search.exceeded:
         late.append(budget_flag)
     rec = report(inp, best_p, best_o, second, parcel, P, B, rules, jname, flags, late, fr, hypothetical, res_line, row_line, opts)
-    rec["alternatives"] = [{"variant": q.v["name"], "operator": q.v["operator"], "sf": rnd(q.sf, 1000), "L": q.L, "D": q.v["D"],
-                            "geometry_ok": o["ok"], "route_problem": o["route_problem"]} for q, o in results[:10]]
+    gross_ac = parcel.area / SQFT_PER_AC
+    rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
+    _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
+              [_alternative(q, o, gross_ac) for q, o in pond_limited])
     # The search keeps undrawn plans (build(draw=False)); only the plans
     # shown are rebuilt with their stall ticks and door marks.
     shown = build(best_p.v, best_p.L, best_p.r, best_p.frame, prog)
     if second is not None:
         q = second[0]
         second = (build(q.v, q.L, q.r, q.frame, prog), second[1])
-    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second)
+    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second, B=B, edges=edges)
     return rec, drawing
+
+
+def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
+    """One finished layout of the search, with what it holds and what
+    blocks it (the plan drawn is the first of the list)."""
+    return {"variant": q.v["name"], "operator": q.v["operator"], "sf": rnd(q.sf, 1000), "L": q.L, "D": q.v["D"],
+            "geometry_ok": o["ok"], "route_problem": o["route_problem"],
+            "doors": q.doors, "trailers": o["trailers"], "trailers_target": q.trailers_target,
+            "sf_per_gross_ac": rnd(q.sf / gross_ac, 100) if gross_ac else None,
+            "detention_acft": round(o["v_det"], 1), "pond_fits": o["pond_ok"],
+            "relief_ft": round(o["relief"]) if o["relief"] else None, "steep_pct": round(o["steep_module_pct"]),
+            "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
+            "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1})}
+
+
+def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], parcel, P, edges, rules: dict[str, Any],
+              res_line, fr: FrontageInput, pond_limited: list[dict[str, Any]]) -> None:
+    """Add the read-out of siteplan_assess to a drawn plan's record: where
+    the land goes, the plan against its draft rules, a takeoff, why this
+    layout, and the assessment. Derived from the finished plan only; it
+    changes no flag, feasibility or floor area."""
+    p, o = layouts[0]
+    shapes = assess.use_shapes(layouts, parcel)
+    land = assess.land_budget(parcel, P, envelope(parcel, edges, rules["pave"]).area, shapes)
+    total = sum(q.sf for q, _ in layouts)
+    doors = sum(q.doors for q, _ in layouts)
+    trailers = sum(oo["trailers"] for _, oo in layouts)
+    net_ac = P.area / SQFT_PER_AC
+    bldg_area = sum(q.building.area for q, _ in layouts)
+    rec["site_data"] = {
+        "land": land, "buildings": len(layouts),
+        "building_coverage_pct": round(100 * bldg_area / parcel.area, 1),
+        "sf_per_net_ac": rnd(total / net_ac, 100) if net_ac else None,
+        "doors_per_10k_sf": round(doors * 10000 / total, 2) if total else None,
+        "trailers_per_door": round(trailers / doors, 2) if doors else None,
+        "court_depth_ft": COURT, "trailer_row_ft": TRAILER_ROW, "truck_road_ft": TRUCK_ROAD,
+    }
+    cover = None
+    if rules.get("cover"):
+        kind, capv = rules["cover"]
+        cover = (kind, capv, coverage_value(kind, bldg_area, sum(c.area for q, _ in layouts for c in q.cars),
+                                            sum(oo["imp_ac"] for _, oo in layouts), parcel.area))
+    rec["compliance"] = {
+        "status": "draft", "source": rules.get("source"),
+        "rows": assess.compliance(
+            rules, edges, layouts, clear_ft=rec["building"]["clear_height_ft"], clear_assumed_ft=p.clear,
+            roof_allowance_ft=ROOF_ALLOWANCE_FT, cover=cover, building_pct=100 * bldg_area / parcel.area,
+            impervious_pct=rec["coverage"]["impervious_pct"], cars_required=rec["cars"]["required"],
+            cars_provided=rec["cars"]["provided"], cars_basis=rec["cars"]["basis"], gated=rec["gated"])}
+    rec["quantities"] = assess.quantities(shapes, layouts, building_sf=rec["total_sf_if_access"], frontage_ft=fr.feet,
+                                          residential_edge_ft=res_line.length if res_line is not None else 0.0)
+    rec["selection"] = assess.selection(rec["alternatives"], RANKING, pond_limited)
+    rec["assessment"] = assess.assessment(rec, COMP_BAND_SF_PER_AC)
 
 
 def _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search=None, ctx=None):
@@ -2071,6 +2159,11 @@ def _no_fit(inp, jname, rules, flags, opts, parcel, P, B, constraints, trans, cu
     rec.update({"fits": False, "feasible": False, "hypothetical": None, "jurisdiction_rules": jname, "total_sf": 0,
                 "gated": [], "flags": sev,
                 "inputs": _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, list(small))})
+    if not parcel.is_empty:
+        # Where the land goes even with no plan: it often says why nothing fits.
+        rec["site_data"] = {"land": assess.land_budget(parcel, P, envelope(parcel, edges, rules["pave"]).area,
+                                                       assess.use_shapes([], parcel)), "buildings": 0}
+    rec["assessment"] = assess.assessment(rec, COMP_BAND_SF_PER_AC)
     return rec
 
 
@@ -2118,8 +2211,8 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
     if o["relief"] and o["relief"] > 25:
         flags.append(("RELIEF", 2, f"about {o['relief']:.0f} ft of relief across the graded area: terraces or retaining walls likely"))
     sfa = total / gross
-    if sfa < 10500:
-        flags.append(("BELOW_COMP_BAND", 3, f"{sfa:,.0f} SF per gross acre; Georgia comps run about 10,500-15,400"))
+    if sfa < COMP_BAND_SF_PER_AC[0]:
+        flags.append(("BELOW_COMP_BAND", 3, f"{sfa:,.0f} SF per gross acre; Georgia comps run about {COMP_BAND_SF_PER_AC[0]:,}-{COMP_BAND_SF_PER_AC[1]:,}"))
     ld = p.L / p.v["D"]
     if ld < 2.0 or ld > 3.8:
         flags.append(("LD_OUT_OF_BAND", 3, f"length/depth {ld:.1f} (comps 2.0-3.8)"))
@@ -2164,6 +2257,9 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
                    "truck_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "truck")), "car_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "car"))},
         "grading": {"relief_ft": round(o["relief"]) if o["relief"] else None, "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
                     "steep_share_pct": round(o["steep_module_pct"]), "dem_points": o["dem_points_module"],
+                    "pad_elev_ft": round(o["pad_elev"]) if o.get("pad_elev") is not None else None,
+                    "max_cut_ft": round(o["max_cut"]) if o.get("max_cut") is not None else None,
+                    "max_fill_ft": round(o["max_fill"]) if o.get("max_fill") is not None else None,
                     "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"},
         "flags": sevd,
         "plan_checks": o["violations"] + ([dict(v, building=2) for v in second[1]["violations"]] if second else []),
@@ -2213,6 +2309,7 @@ NAME = re.compile(r"^[A-Za-z0-9_+-]{1,64}$")
 PID = re.compile(r"^[A-Z0-9][A-Z0-9 ]{0,30}[A-Z0-9]$")
 SVG_NAME = re.compile(r"^plan-[A-Za-z0-9_-]+\.svg$")
 PLANS_FILE = "plans.json"
+PIPELINE_FILE = "plans.csv"      # one row per site: status, yield, first step
 
 
 def slug(name: str) -> str:
@@ -2500,6 +2597,11 @@ def main(argv: list[str] | None = None) -> int:
         body = dict(header, generated=time.strftime("%Y-%m-%d"), plans=recs)
         return (json.dumps(body, indent=1, default=str) + "\n").encode("utf-8")
 
+    def table_of(recs_: list[dict[str, Any]]) -> bytes:
+        """plans.csv: the planned sites side by side (parcel ids and
+        numbers; no title or address)."""
+        return assess.pipeline_csv(recs_, csv_cell).encode("utf-8")
+
     def published(recs_: list[dict[str, Any]]) -> list[str]:
         """The site addresses the files write: a single ranked parcel's title
         holds its own site address."""
@@ -2527,20 +2629,24 @@ def main(argv: list[str] | None = None) -> int:
             rec, drawing = plan_site(inp, opts)
             rec["site_definition"] = defs[slug(name)]
             if drawing is not None:
+                rec["sheet"] = sr.sheet_info(drawing)
                 svg_bytes = sr.render(drawing, rec).encode("utf-8")
                 fname = svg_name(inp.key)
                 rec["svg"] = fname
             new_recs = [r for r in recs if r.get("key") != rec.get("key")] + [rec]
             body = body_of(new_recs)
+            table = table_of(new_recs)
             # Every artifact of this site is guarded before any is written
             # (R1): a refusal leaves --out as it was before this site.
             pub_site, pub_all = published([rec]), published(new_recs)
             if svg_bytes is not None:
                 refuse(svg_bytes, fname, pub_site)
             refuse(body, PLANS_FILE, pub_all)
+            refuse(table, PIPELINE_FILE, pub_all)
             if svg_bytes is not None:
                 write_atomic(out / fname, svg_bytes, out, terms, pub_site)
             write_atomic(plans_path, body, out, terms, pub_all)
+            write_atomic(out / PIPELINE_FILE, table, out, terms, pub_all)
         except (si.ArcGISError, GEOSException) as exc:
             failed += 1
             print(f"siteplan: {name}: input failed ({type(exc).__name__}: {str(exc)[:160]})", file=sys.stderr)
@@ -2560,6 +2666,7 @@ def main(argv: list[str] | None = None) -> int:
               "trailers", (rec.get("trailers") or {}).get("total"), "cars", (rec.get("cars") or {}).get("provided"), flush=True)
     if not recs:
         write_atomic(plans_path, body_of([]), out, terms)
+        write_atomic(out / PIPELINE_FILE, table_of([]), out, terms)
     keep = {r.get("svg") for r in recs if r.get("svg")}
     for f in out.glob("plan-*.svg"):
         if SVG_NAME.match(f.name) and f.name not in keep:

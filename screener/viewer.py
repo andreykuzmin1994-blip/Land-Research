@@ -812,6 +812,14 @@ def _sub(d: Any, spec: dict[str, str]) -> dict[str, Any] | None:
     return out
 
 
+PLAN_STATUSES = ("fits", "fits_with_conditions", "gated", "hypothetical", "blocked", "incomplete", "no_fit",
+                 "not_planned")      # siteplan_assess.STATUS_LABELS
+CONDITION_KINDS = ("blocking", "gate", "site", "standing", "information")
+ROW_STATUSES = ("meets", "short", "over", "limited", "gate", "verify", "no draft value")
+MAX_CONDITIONS = 60
+MAX_STEPS = 8
+MAX_ROWS = 30
+
 PLAN_FACTS = {
     "building": {"L_ft": "n", "D_ft": "n", "sf": "n", "office_sf": "n", "clear_height_ft": "n"},
     "trailers": {"court_rows": "n", "drop_yards": "n", "total": "n", "target": "n"},
@@ -822,9 +830,66 @@ PLAN_FACTS = {
     "detention": {"storage_acft": "n", "ponds": "n", "fits": "b", "basis": "s"},
     "access": {"truck_driveway": "b", "car_driveway": "b", "frontage_ft": "n", "road": "s",
                "truck_route_ft": "n", "car_route_ft": "n"},
-    "grading": {"relief_ft": "n", "cut_fill_cy": "n", "steep_share_pct": "n", "basis": "s"},
+    "grading": {"relief_ft": "n", "cut_fill_cy": "n", "steep_share_pct": "n", "basis": "s",
+                "pad_elev_ft": "n", "max_cut_ft": "n", "max_fill_ft": "n"},
     "second_building": {"configuration": "s", "sf": "n", "own_driveways": "b"},
+    "quantities": {"heavy_paving_sf": "n", "light_paving_sf": "n", "pond_footprint_ac": "n", "disturbed_ac": "n",
+                   "earthwork_cy": "n", "driveways": "n", "residential_edge_lf": "n", "basis": "s"},
 }
+LAND_FACTS = {"gross_ac": "n", "net_ac": "n", "net_pct": "n", "setbacks_buffers_ac": "n", "constraints_ac": "n",
+              "unused_net_ac": "n", "largest_unused_ac": "n", "outside_net_unused_ac": "n"}
+SITE_FACTS = {"building_coverage_pct": "n", "sf_per_net_ac": "n", "doors_per_10k_sf": "n", "trailers_per_door": "n",
+              "buildings": "n"}
+
+
+def _dicts(x: Any, limit: int) -> list[dict[str, Any]]:
+    return [d for d in (x if isinstance(x, list) else []) if isinstance(d, dict)][:limit]
+
+
+def _choice(x: Any, allowed: tuple[str, ...]) -> str | None:
+    return x if isinstance(x, str) and x in allowed else None
+
+
+def plan_assessment(t: dict[str, Any]) -> dict[str, Any] | None:
+    """The planner's read-out of a plan (screener.siteplan_assess), copied
+    field by field: a status from the known list, short texts, numbers.
+    None for a plan made before the read-out existed (the prototype's)."""
+    a = t.get("assessment")
+    if not isinstance(a, dict) or _choice(a.get("status"), PLAN_STATUSES) is None:
+        return None
+    y = a.get("yield") if isinstance(a.get("yield"), dict) else {}
+    band = y.get("comp_band") if isinstance(y.get("comp_band"), list) else []
+    out = {
+        "status": a["status"], "label": text(a.get("label"), 60), "headline": text(a.get("headline"), TEXT_CAP),
+        "counted": bool(a.get("counted")),
+        "position": _choice(y.get("position"), ("below", "within", "above")),
+        "band": [num(v) for v in band[:2]],
+        "yieldNotes": [text(n, NOTE_CAP) for n in (y.get("notes") if isinstance(y.get("notes"), list) else [])[:8]],
+        "steps": [{"stage": text(st.get("stage_label"), 40), "workstream": text(st.get("workstream"), 60),
+                   "action": text(st.get("action"), NOTE_CAP), "closes": text(st.get("closes_with"), 200)}
+                  for st in _dicts(a.get("next_steps"), MAX_STEPS)],
+        "conditions": [{"n": num(c.get("n")), "flag": text(c.get("flag"), 80) or "",
+                        "kind": _choice(c.get("kind"), CONDITION_KINDS) or "information",
+                        "stage": text(c.get("stage_label"), 40), "workstream": text(c.get("workstream"), 60),
+                        "finding": text(c.get("finding"), NOTE_CAP), "action": text(c.get("action"), NOTE_CAP),
+                        "closes": text(c.get("closes_with"), 200)}
+                       for c in _dicts(a.get("conditions"), MAX_CONDITIONS)],
+    }
+    sd = t.get("site_data") if isinstance(t.get("site_data"), dict) else {}
+    land = sd.get("land") if isinstance(sd.get("land"), dict) else None
+    if land is not None:
+        out["land"] = _sub(land, LAND_FACTS)
+        out["land"]["uses"] = [{"label": text(u.get("label"), 60), "ac": num(u.get("ac")), "pct": num(u.get("pct_gross"))}
+                               for u in _dicts(land.get("uses"), 12)]
+        out["site"] = _sub(sd, SITE_FACTS)
+    comp = t.get("compliance") if isinstance(t.get("compliance"), dict) else {}
+    out["compliance"] = [{"item": text(r.get("item"), 80), "required": text(r.get("required"), 80),
+                          "provided": text(r.get("provided"), 80), "margin": num(r.get("margin_ft")),
+                          "status": _choice(r.get("status"), ROW_STATUSES) or "verify", "note": text(r.get("note"), 200)}
+                         for r in _dicts(comp.get("rows"), MAX_ROWS)]
+    sel = t.get("selection") if isinstance(t.get("selection"), dict) else {}
+    out["selection"] = text(sel.get("basis"), 900)
+    return out
 
 
 def build_plans(inp: Inputs) -> list[dict[str, Any]]:
@@ -970,6 +1035,12 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
         raise Refused(f"plan {key}: {t['svg']} is named in the plans file but is not in {inp.plans_dir}")
     svg = sanitise_svg(svg_path.read_text(encoding="utf-8"))
     _, fpp = svg_meta(svg)
+    # The planner's sheet states its own scale (the sheet's scale bar is
+    # drawn in segments, which svg_meta's older pattern does not read).
+    sheet = t.get("sheet") if isinstance(t.get("sheet"), dict) else {}
+    stated = num(sheet.get("ft_per_px"))
+    if stated is not None and 0 < stated < 1000:
+        fpp = float(stated)
     sev = t.get("flags") if isinstance(t.get("flags"), dict) else {}
     zoning = t.get("zoning") if isinstance(t.get("zoning"), dict) else {}
     zoning_name = text(zoning.get("name") or t.get("jurisdiction_rules"), 80)
@@ -995,7 +1066,11 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
             ok = a.get("geometry_ok", a.get("feasible"))
             alts.append({"variant": text(a.get("variant"), 120), "sf": num(a.get("sf")),
                          "geometryOk": ok if ok in (True, False) else None,
-                         "route_problem": bool(a.get("route_problem"))})
+                         "route_problem": bool(a.get("route_problem")),
+                         "doors": num(a.get("doors")), "trailers": num(a.get("trailers")),
+                         "trailersTarget": num(a.get("trailers_target")), "sfPerAc": num(a.get("sf_per_gross_ac")),
+                         "blocking": [f for f in (a.get("blocking") if isinstance(a.get("blocking"), list) else [])
+                                      if isinstance(f, str) and FLAG_NAME_RE.match(f)][:8]})
     main_rank = ranks[0] if ranks else (sort_rank if r else None)
     rec = {
         "id": plan_id, "kind": "plan", "rank": sort_rank, "key": key, "pid": pid,
@@ -1017,6 +1092,7 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
         "flags1": _flag_list(sev.get("1", sev.get(1))), "flags2": _flag_list(sev.get("2", sev.get(2))),
         "flags3": _flag_list(sev.get("3", sev.get(3))),
         "alternatives": alts,
+        "assessment": plan_assessment(t),
         # Entitlement gates (a use permit): named flags, kept apart from feasibility.
         "gated": gated,
         "related": f"run-{main_rank}" if main_rank in brief_ranks else None,

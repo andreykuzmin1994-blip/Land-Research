@@ -36,7 +36,7 @@ main{display:grid;grid-template-rows:auto 1fr;min-width:0;min-height:0}
 #cmpsel{width:auto;max-width:320px;flex:0 1 320px}
 .bar label{font-size:13px;display:flex;gap:4px;align-items:center}
 .bar .sp{flex:1}
-.stage{display:grid;grid-template-columns:1fr 360px;min-height:0}
+.stage{display:grid;grid-template-columns:1fr minmax(360px,34%);min-height:0}
 .stage.cmp{grid-template-columns:1fr 1fr}
 .view{position:relative;overflow:hidden;background:var(--bg);touch-action:none;min-height:0}
 .view .canvas{position:absolute;left:0;top:0;transform-origin:0 0;background:var(--plan);box-shadow:0 1px 4px rgba(0,0,0,.2)}
@@ -53,6 +53,14 @@ dl{display:grid;grid-template-columns:minmax(6em,9.5em) 1fr;gap:3px 10px;margin:
 .lbl{color:var(--mute);font-size:12px}
 table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0}td,th{border-bottom:1px solid var(--line);padding:3px 4px;text-align:left;vertical-align:top}
 .empty{padding:30px;color:var(--mute)}
+.verdict{border-left:4px solid var(--mute);background:var(--bg);border-radius:0 6px 6px 0;padding:8px 10px;margin:6px 0 10px;font-size:13.5px;font-weight:600}
+.facts h3{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:16px 0 4px;border-bottom:1px solid var(--line);padding-bottom:3px}
+ol.steps{margin:6px 0;padding-left:20px;font-size:13px}ol.steps li{margin:0 0 7px}ol.steps .lead{font-weight:600}
+td.r,th.r{text-align:right;white-space:nowrap}
+.ok{color:var(--open);font-weight:600}.bad{color:var(--drop);font-weight:600}.warn{color:var(--doubt);font-weight:600}
+.cond{border-left:3px solid var(--line);padding:2px 0 2px 8px;margin:0 0 9px;font-size:13px}.cond.k-blocking{border-color:var(--drop)}.cond.k-gate,.cond.k-site{border-color:var(--doubt)}
+.cond .code{font-size:11.5px;color:var(--mute);overflow-wrap:anywhere}
+details{margin:10px 0;font-size:13px}summary{cursor:pointer;color:var(--accent)}
 .facts button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer}
 @media (max-width:860px){.app{grid-template-columns:1fr;height:auto}aside{max-height:46vh}main{min-height:80vh}.stage,.stage.cmp{grid-template-columns:1fr}.view{height:55vh}.view.fitted{touch-action:pan-y}.facts{border-left:0;border-top:1px solid var(--line)}}
 </style></head><body>
@@ -62,12 +70,12 @@ table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0}td,th{bo
  <div class="controls">
   <input id="q" type="search" placeholder="Search address, parcel, rank…" aria-label="Search">
   <div class="row2">
-   <select id="sort" aria-label="Sort"><option value="rank">Sort: rank</option><option value="sf">Sort: building SF</option><option value="acres">Sort: county-map acres</option></select>
+   <select id="sort" aria-label="Sort"><option value="rank">Sort: rank</option><option value="sf">Sort: building SF</option><option value="yield">Sort: SF per gross acre</option><option value="acres">Sort: county-map acres</option></select>
    <select id="fitf" aria-label="Building fit"><option value="">Any fit</option><option value="fits">Operator prototypes fit</option><option value="none">Operator prototypes don't fit</option><option value="cross">Cross-dock</option></select>
   </div>
   <div class="row2">
    <select id="landf" aria-label="Land today"><option value="">Land today: any</option><option value="raw_land">Raw land</option><option value="partly_usable">Partly usable</option><option value="not_raw_land">Not raw land</option><option value="unclear">Unclear</option><option value="none">Not reviewed</option></select>
-   <select id="feasf" aria-label="Plan feasibility"><option value="">Any plan</option><option value="yes">Site plan: feasible</option><option value="no">Site plan: not feasible / hypothetical</option><option value="incomplete">Site plan: incomplete (inputs not checked)</option></select>
+   <select id="feasf" aria-label="Plan feasibility"><option value="">Any plan</option><option value="yes">Site plan: feasible</option><option value="clean">Site plan: fits, standard checks only</option><option value="no">Site plan: not feasible / hypothetical</option><option value="incomplete">Site plan: incomplete (inputs not checked)</option></select>
   </div>
   <div class="chips" id="chips"></div>
   <div class="count" id="count" aria-live="polite"></div>
@@ -106,6 +114,10 @@ let uid=0; const svgOf=p=>{const u="u"+(++uid)+"-";return p.svg.replace(/ id="([
 // A feasible plan held only by an entitlement gate sorts by its drawn floor area.
 const sortSf = p => p.sf || (p.kind==="plan" && p.feasible===true && p.gated && p.gated.length ? p.sfIfAccess : 0);
 const feasText = p => p.feasible===true?"feasible":p.feasible===null?"incomplete":(p.hypothetical?"no road access":"not feasible");
+// The planner's read-out (screener.siteplan_assess): one status per plan.
+const PS = {fits:"Fits: standard checks only",fits_with_conditions:"Fits with conditions",gated:"Fits: entitlement gate",hypothetical:"No road access",blocked:"Blocked as tested",incomplete:"Incomplete: run again",no_fit:"No building fits",not_planned:"Not planned"};
+const PCOL = {fits:"var(--open)",fits_with_conditions:"var(--doubt)",gated:"var(--doubt)",hypothetical:"var(--drop)",blocked:"var(--drop)",incomplete:"var(--unchecked)",no_fit:"var(--drop)",not_planned:"var(--unchecked)"};
+const yieldOf = p => (p.kind==="plan" && p.v4 && p.v4.coverage && p.v4.coverage.sf_per_gross_ac) || 0;
 const filt = {status:new Set(), kind:new Set()};
 let shown = [], cur = 0, cmpId = null;
 function store(k,v){try{localStorage.setItem("spv:"+k,v)}catch(e){}}
@@ -135,7 +147,7 @@ function match(p){
   if(f==="none" && p.stdFits!==false) return false;
   if(f==="cross" && !/cross-dock/.test(p.fit)) return false;
   const lf=$("#landf").value; if(lf==="none" ? p.land : (lf && p.land!==lf)) return false;
-  const ff=$("#feasf").value; if(ff==="yes" && !(p.kind==="plan" && p.feasible===true)) return false; if(ff==="no" && !(p.kind==="plan" && p.feasible===false)) return false; if(ff==="incomplete" && !(p.kind==="plan" && p.feasible===null)) return false;
+  const ff=$("#feasf").value; if(ff==="yes" && !(p.kind==="plan" && p.feasible===true)) return false; if(ff==="clean" && !(p.kind==="plan" && p.assessment && p.assessment.status==="fits")) return false; if(ff==="no" && !(p.kind==="plan" && p.feasible===false)) return false; if(ff==="incomplete" && !(p.kind==="plan" && p.feasible===null)) return false;
   return true;
 }
 function clearFilters(){
@@ -147,7 +159,7 @@ const thumbs = ("IntersectionObserver" in window) ? new IntersectionObserver(es=
 function render(){
   const s=$("#sort").value;
   const curId = shown[cur]?.id || load("cur");
-  shown = PLANS.filter(match).sort((a,b)=> s==="sf"? sortSf(b)-sortSf(a) || a.rank-b.rank : s==="acres"? (b.mapAc||0)-(a.mapAc||0) : a.rank-b.rank || (a.kind==="run"?-1:1));
+  shown = PLANS.filter(match).sort((a,b)=> s==="sf"? sortSf(b)-sortSf(a) || a.rank-b.rank : s==="yield"? yieldOf(b)-yieldOf(a) || a.rank-b.rank : s==="acres"? (b.mapAc||0)-(a.mapAc||0) : a.rank-b.rank || (a.kind==="run"?-1:1));
   const active = $("#q").value || $("#fitf").value || $("#landf").value || $("#feasf").value || filt.status.size || filt.kind.size;
   $("#count").innerHTML=`Showing ${shown.length} of ${PLANS.length} plans`+(active?' · <button type="button" id="clr">clear filters</button>':"");
   if(active) $("#clr").onclick=clearFilters;
@@ -155,7 +167,7 @@ function render(){
   if(!shown.length){L.innerHTML='<div class="empty">No plans match.</div>';}
   shown.forEach((p,i)=>{
     const b=document.createElement("button");b.className="item";b.type="button";
-    b.innerHTML=`<div class="thumb" aria-hidden="true"></div><div><div class="it-t">${esc(p.title)}${p.kind==="plan"?'<span class="tag">plan</span>':""}${p.kind==="plan"&&p.feasible!==true?'<span class="tag" style="background:var(--drop)">'+esc(feasText(p))+'</span>':""}</div>
+    b.innerHTML=`<div class="thumb" aria-hidden="true"></div><div><div class="it-t">${esc(p.title)}${p.kind==="plan"?'<span class="tag">plan</span>':""}${p.kind==="plan"&&p.feasible!==true?'<span class="tag" style="background:var(--drop)">'+esc(feasText(p))+'</span>':""}${p.kind==="plan"&&p.feasible===true&&p.assessment&&p.assessment.status!=="fits"?'<span class="tag" style="background:var(--doubt)">'+esc(p.assessment.status==="gated"?"gated":"conditions")+'</span>':""}</div>
       <div class="it-s"><span class="dot s-${p.status}"></span>${esc(ST[p.status])} · ${esc(p.place)}</div>
       <div class="it-s">${esc(p.sfText)} · ${esc(p.mapAc??p.taxAc)} ac${p.land?" · "+esc(LANDL[p.land]||p.land):""}</div></div>`;
     b.onclick=()=>show(i); b.dataset.i=i;
@@ -179,28 +191,45 @@ function show(i){
   if(cmpId!==null) fillCmp(p);
 }
 function factsPlan(p){
-  const v=p.v4, b=v.building, tr=v.trailers, ca=v.cars, cv=v.coverage, de=v.detention, ac=v.access, gr=v.grading;
+  const v=p.v4, b=v.building, tr=v.trailers, ca=v.cars, cv=v.coverage, de=v.detention, ac=v.access, gr=v.grading, q=v.quantities, A=p.assessment;
+  const n1=x=>(x===null||x===undefined)?"?":Number(x).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
   const rows=[["Parcel",(p.pids&&p.pids.length>1)?p.pids.join(", "):p.pid],["Land today",(LANDL[p.land]||"not reviewed")+(p.landWhat?": "+p.landWhat:"")],["Zoning",p.zoning],["Zoning rules used",`${p.zoningRules||"default"} (DRAFT screening values, not a zoning determination)`],
     ["Layout",p.fit],["Building",b?`${fmt(b.sf)} SF · ${b.L_ft} x ${b.D_ft} ft · ${b.clear_height_ft} ft clear (assumed)`:"none"]];
   if(v.second_building) rows.push(["Second building",`${v.second_building.configuration}: ${fmt(v.second_building.sf)} SF${v.second_building.own_driveways?" (own driveways)":" (shares driveways)"}`]);
   if(tr&&ca&&cv&&de&&ac&&gr) rows.push(["Total",p.sfText],
-    ["Dock doors",fmt(v.doors)],["Trailer stalls",`${tr.total} (court rows ${tr.court_rows}, drop yard ${tr.drop_yards}) vs target ${tr.target}`],
+    ["Yield",`${fmt(cv.sf_per_gross_ac)} SF/gross ac`+(A&&A.position&&A.band&&A.band.length===2?` · ${A.position} the comp band ${fmt(A.band[0])}-${fmt(A.band[1])}`:"")+` · FAR ${cv.gross_far}`],
+    ["Dock doors",fmt(v.doors)+(A&&A.site&&A.site.doors_per_10k_sf!=null?` (${A.site.doors_per_10k_sf} per 10,000 SF)`:"")],["Trailer stalls",`${tr.total} (court rows ${tr.court_rows}, drop yard ${tr.drop_yards}) vs target ${tr.target}`],
     ["Car stalls",`${ca.provided} (required ${ca.required}; ADA ${ca.ada}; ${ca.stall}) — ${ca.basis}`],
-    ["Coverage",`${cv.gross_ac} ac county map · ${fmt(cv.sf_per_gross_ac)} SF/gross ac · FAR ${cv.gross_far} · impervious ${cv.impervious_ac} ac (${cv.impervious_pct}%)`],
+    ["Coverage",`${cv.gross_ac} ac county map · impervious ${cv.impervious_ac} ac (${cv.impervious_pct}%)`+(A&&A.site&&A.site.building_coverage_pct!=null?` · building ${A.site.building_coverage_pct}%`:"")],
     ["Detention",`${de.storage_acft} ac-ft in ${de.ponds} pond(s) · ${de.fits?"fits":"does not fit"} · ${de.basis}`],
     ["Access",`${ac.truck_driveway?"truck":"no truck"}${ac.car_driveway?" + car":""} driveway(s) on ${ac.road||"no road"} · frontage ${fmt(ac.frontage_ft||0)} ft · truck route ${fmt(ac.truck_route_ft)} ft · car route ${fmt(ac.car_route_ft)} ft`],
-    ["Grading",gr.relief_ft!=null?`relief ~${gr.relief_ft} ft · cut/fill ~${fmt(gr.cut_fill_cy||0)} CY · steep ${gr.steep_share_pct}% — ${gr.basis}`:"no lidar"]);
+    ["Grading",gr.relief_ft!=null?`relief ~${gr.relief_ft} ft · cut/fill ~${fmt(gr.cut_fill_cy||0)} CY · steep ${gr.steep_share_pct}%`+(gr.pad_elev_ft!=null?` · level pad at ${fmt(gr.pad_elev_ft)} ft: cut to ${gr.max_cut_ft} ft, fill to ${gr.max_fill_ft} ft`:"")+` — ${gr.basis}`:"no lidar"]);
+  if(q) rows.push(["Takeoff (no prices)",`heavy paving ${fmt(q.heavy_paving_sf)} SF · light paving ${fmt(q.light_paving_sf)} SF · disturbed ${q.disturbed_ac} ac · pond footprint ${q.pond_footprint_ac} ac — ${q.basis}`]);
   if(p.gated&&p.gated.length) rows.push(["Entitlement gate",p.gated.join(", ")+(p.sf?" (the layout is feasible and its floor area is counted; check the gate before pursuing)":" (the layout is feasible, but its floor area is not counted until the gate is cleared)")]);
-  for(const [k,x] of (v.operator_decisions||[])) rows.push(["Operator decision: "+k,x]);
+  const st=A?A.status:null;
   let h=`<h2>${esc(p.title)}</h2><div class="place">${esc(p.place)}</div>
-   <span class="badge" style="background:${COL[p.status]}">${esc(ST[p.status])}</span><span class="badge" style="background:var(--test)">Site plan</span><span class="badge" style="background:${p.feasible===true?"var(--open)":p.feasible===null?"var(--doubt)":"var(--drop)"}">${esc(feasText(p))}</span><span class="draft">DRAFT zoning</span>
-   <dl>${rows.map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl>`;
+   <span class="badge" style="background:${COL[p.status]}">${esc(ST[p.status])}</span><span class="badge" style="background:var(--test)">Site plan</span><span class="badge" style="background:${st?PCOL[st]:(p.feasible===true?"var(--open)":p.feasible===null?"var(--doubt)":"var(--drop)")}">${esc(st?PS[st]:feasText(p))}</span><span class="draft">DRAFT zoning</span>`;
+  if(A&&A.headline) h+=`<div class="verdict" style="border-color:${PCOL[st]}">${esc(A.headline)}</div>`;
+  if(A&&A.steps&&A.steps.length) h+=`<h3>Next steps, in order</h3><ol class="steps">${A.steps.map(x=>`<li><span class="lead">${esc(x.stage)} · ${esc(x.workstream)}</span><br>${esc(x.action)}${x.closes?`<br><span class="lbl">Closes with: ${esc(x.closes)}</span>`:""}</li>`).join("")}</ol>`;
+  h+=`<h3>Key numbers</h3><dl>${rows.map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl>`;
+  if(A&&A.yieldNotes&&A.yieldNotes.length) h+=`<h3>What holds the yield</h3><ul style="margin:4px 0;padding-left:18px;font-size:13px">${A.yieldNotes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
+  if(A&&A.land){const L=A.land, g=L.gross_ac||0, pc=x=>(g&&x!=null)?` (${Math.round(100*x/g)}%)`:"";
+    const lr=[["Gross site, county map",L.gross_ac,1],["Draft setbacks and buffers",L.setbacks_buffers_ac,0],["Mapped constraints, test cut",L.constraints_ac,0],["Net: inside the paving envelope",L.net_ac,1],...(L.uses||[]).map(u=>[u.label,u.ac,0]),["Left unused inside the envelope",L.unused_net_ac,1],["Largest unused piece",L.largest_unused_ac,0]];
+    h+=`<h3>Where the land goes</h3><table><tr><th>Use</th><th class="r">Acres (% of gross)</th></tr>${lr.map(([k,x,s])=>`<tr><td>${s?"<b>":""}${esc(k)}${s?"</b>":""}</td><td class="r">${esc(n1(x))}${esc(pc(x))}</td></tr>`).join("")}</table>`;}
+  if(A&&A.compliance&&A.compliance.length){const cls=x=>x==="meets"?"ok":(x==="short"||x==="over")?"bad":x==="no draft value"?"lbl":"warn";
+    h+=`<h3>Plan against the draft zoning values</h3><table><tr><th>Item</th><th>Draft value</th><th>Plan</th><th class="r">Margin</th><th>Status</th></tr>${A.compliance.map(r=>`<tr><td>${esc(r.item)}</td><td>${esc(r.required)}</td><td>${esc(r.provided)}${r.note?`<br><span class="lbl">${esc(r.note)}</span>`:""}</td><td class="r">${r.margin!=null?(r.margin>=0?"+":"")+esc(r.margin)+" ft":""}</td><td class="${cls(r.status)}">${esc(r.status)}</td></tr>`).join("")}</table><p class="lbl">Draft screening values, not the adopted code: "meets" says the drawing honours the draft value.</p>`;}
+  if(p.alternatives&&p.alternatives.length){const res=a=>a.geometryOk===true?'<span class="ok">passes</span>':a.geometryOk===null?"?":`<span class="bad">${esc((a.blocking&&a.blocking.length)?a.blocking.map(f=>f.replace(/_/g," ").toLowerCase()).join(", "):(a.route_problem?"no route":"fail"))}</span>`;
+    h+=`<h3>Layouts compared</h3><table><tr><th>Layout (the plan drawn is first)</th><th class="r">SF</th><th class="r">Docks</th><th class="r">Trailers</th><th>Layout checks (not site feasibility)</th></tr>${p.alternatives.map(a=>`<tr><td>${esc(a.variant)}</td><td class="r">${fmt(a.sf)}</td><td class="r">${a.doors!=null?fmt(a.doors):""}</td><td class="r">${a.trailers!=null?esc(a.trailers)+" / "+esc(a.trailersTarget):""}</td><td>${res(a)}</td></tr>`).join("")}</table>`;
+    if(A&&A.selection) h+=`<p style="font-size:13px;margin:4px 0">${esc(A.selection)}</p>`;}
+  if(A&&A.conditions&&A.conditions.length){const KL={blocking:"blocks the plan",gate:"entitlement gate",site:"",standing:"every site",information:"for information"};
+    h+=`<h3>Conditions: what to check, when, what closes it</h3>${A.conditions.map(c=>`<div class="cond k-${esc(c.kind)}"><b>${esc(c.n)}. ${esc(c.stage)} · ${esc(c.workstream)}</b>${KL[c.kind]?` <span class="lbl">(${esc(KL[c.kind])})</span>`:""}<br>${esc(c.action)}${c.closes?`<br><span class="lbl">Closes with: ${esc(c.closes)}</span>`:""}<div class="code">${esc(c.flag)}: ${esc(c.finding)}</div></div>`).join("")}`;}
   const fl=(arr,lab,col)=>arr&&arr.length?`<div class="note"><span class="lbl" style="color:${col}">${lab}</span><ul style="margin:4px 0 0;padding-left:18px">${arr.map(f=>`<li><b>${esc(f.flag)}</b>: ${esc(f.note)}</li>`).join("")}</ul></div>`:"";
-  h+=fl(p.flags1,"Severity 1 (likely kills or cuts the yield)","#b3261e")+fl(p.flags2,"Severity 2 (verify)","#8a5a00")+fl(p.flags3,"For information","#5d676e");
-  if(p.alternatives&&p.alternatives.length) h+=`<table><tr><th>Layouts tried</th><th>SF</th><th>Layout checks (not site feasibility)</th></tr>${p.alternatives.map(a=>`<tr><td>${esc(a.variant)}</td><td>${fmt(a.sf)}</td><td>${a.geometryOk===true?"pass":a.geometryOk===null?"?":(a.route_problem?"no route":"fail")}</td></tr>`).join("")}</table>`;
+  const flags=fl(p.flags1,"Severity 1 (likely kills or cuts the yield)","#b3261e")+fl(p.flags2,"Severity 2 (verify)","#8a5a00")+fl(p.flags3,"For information","#5d676e");
+  h+=A?`<details><summary>Flags as the planner recorded them</summary>${flags}</details>`:flags;
+  if((v.operator_decisions||[]).length) h+=`<details><summary>Operator decisions used for this plan</summary><dl>${v.operator_decisions.map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl></details>`;
   if(p.related){const r=PLANS.find(x=>x.id===p.related); if(r) h+=`<p><button type="button" id="sbs">Compare with the screener's plan</button></p>`;}
   if(p.note) h+=`<div class="note"><span class="lbl">Mark in decisions.csv:</span> ${esc(p.note)}</div>`;
-  h+=`<p class="lbl">Screening test fit from public data: not a survey, civil design or zoning determination. Zoning values are DRAFT; detention ±30%; routes, fire access and grading are indicative.</p>`;
+  h+=`<p class="lbl">Screening test fit from public data: not a survey, civil design or zoning determination. Zoning values are DRAFT; detention ±30%; routes, fire access and grading are indicative. The actions are the usual next step for each flag; none was checked against a document.</p>`;
   $("#facts").innerHTML=h;
   const sb=$("#sbs"); if(sb) sb.onclick=()=>{cmpId=p.related;openCmp();};
 }

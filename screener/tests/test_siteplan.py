@@ -1344,7 +1344,7 @@ class ReferenceSites(Offline):
 # ---------------------------------------------------------------------------
 # Static guards
 # ---------------------------------------------------------------------------
-NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py")
+NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py", "siteplan_assess.py")
 
 
 class Static(unittest.TestCase):
@@ -1372,7 +1372,7 @@ class Static(unittest.TestCase):
         return out
 
     def test_pure_modules_do_not_import_the_network(self):
-        for name in ("siteplan.py", "siteplan_render.py"):
+        for name in ("siteplan.py", "siteplan_render.py", "siteplan_assess.py"):
             imps = self.module_level_imports(name)
             for bad in ("requests", ".:arcgis", ".:layers", ".:frontage", ".:checks", ".:siteplan_inputs", ".frontage:check_parcel"):
                 self.assertNotIn(bad, imps, name)
