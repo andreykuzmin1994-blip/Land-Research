@@ -11,7 +11,8 @@ name: Offline test suite
 # enough that path-filtering it would save nothing.
 #
 # The separate screener/ tool has its own offline suite and requirements
-# (shapely); it runs as its own step so a failure names the suite.
+# (shapely); it runs as its own step so a failure names the suite. So do
+# the unattended-run tools in ops/screener/.
 
 on:
   push:
@@ -39,3 +40,12 @@ jobs:
 
       - name: Run the screener offline suite
         run: python -m unittest discover -s screener/tests -t . -v
+
+      # ops/screener: the unattended-run tools. Offline (fake screener, fake
+      # agents, a throwaway git repository); the lead-check test needs
+      # nothing installed beyond bash, git and python.
+      - name: Run the ops/screener offline tests
+        run: |
+          python -m unittest discover -s ops/screener -p 'test_*.py' -v
+          bash ops/screener/test_supervise.sh
+          bash ops/screener/test_investigate.sh

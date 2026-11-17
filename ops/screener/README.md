@@ -50,6 +50,12 @@ does not reset the screener AutoResearch baseline.
    review of every fix before merging is the real control. Merge nothing
    you don't understand.
 5. Other counties carry on regardless. A summary alert ends the run.
+6. Each run that finished gets a `changes.md` in its output folder: what
+   is new, gone or moved since the run before (see "What changed since
+   the last run"). Its one line of counts goes in the summary alert.
+7. With `INVESTIGATE=1` (off by default), the new grade A and B leads of
+   each clean run are then checked against public documents (see "Lead
+   checks").
 
 After you merge a fix: any change under `screener/` other than `rank.py`
 means re-recording the AutoResearch baseline
@@ -140,6 +146,136 @@ before the next experiment.
    journalctl -u screener-supervise -f
    ```
 
+## What changed since the last run
+
+`changes.py` compares a finished run folder with the run before it and
+writes `changes.md` beside `leads.md`:
+
+```bash
+python ops/screener/changes.py screener/output/fulton-2026-11-17 --leads screener/leads
+```
+
+It lists the grade A and B leads that are new and the ones that are gone
+(with what became of each), parcels that entered, left or moved 10 or
+more places in the top 50, ranked parcels with a new deed or a new owner
+on the tax roll, what happened to the parcels you marked pursue or maybe,
+and the failed-check notes of `summary.md`. With `--leads`, each lead
+shows its document check (killed, weakened or survives).
+
+- The run before is the newest earlier run folder of the same county
+  beside the run (`--previous DIR` names another). A trial run (`--limit`)
+  is never taken as the run before a full run.
+- It says so at the top when the code or the settings file differ between
+  the two runs: a difference may then come from that, not from new data.
+- `changes.md` holds site addresses and parcel ids, never an owner's name
+  or mailing address. The line it prints holds counts only.
+- It reads files only, and changes no score, grade, rank or decision. The
+  supervisor runs it after every run that finished; the on-demand runbook
+  can run the same command in place of its own comparison.
+
+## Lead checks (off by default)
+
+After a clean scheduled run, the supervisor can have each new grade A
+lead, then each new grade B lead, checked the way
+`screener/INVESTIGATE.md` describes: an investigator agent reads public
+documents (ordinances, staff reports, plans, county GIS), the quote
+checker re-fetches every page it cites and keeps only claims whose quote
+is on the page, a skeptic agent in a fresh folder looks for the strongest
+reason the lead fails, and the quote checker runs once more. The four
+result files land in `screener/leads/<parcel>/` (kept out of git), where
+`changes.md` and the viewer read the verdict. A lead that already has a
+folder there is never checked again or overwritten.
+
+A result is a reading aid. It changes no score, grade, rank or decision,
+and "the skeptic raised no objection" is an agent's reading, not a
+clearance. Read `lead.md` before acting on a lead.
+
+### What leaves the server
+
+- **To Anthropic (Claude):** the lead card of one parcel at a time: parcel
+  id, site address, city, acres, zoning, the screener's map facts and the
+  lead grade. Never the owner's name or mailing address, the flags, the
+  seller notes or your decision: the card is built from an allow-list
+  (`lead_queue.py`). The agents may still read an owner's name in a public
+  document, as a person would.
+- **To the web:** page requests to public sites, made only through
+  `lead_fetch.py`, which applies the quote checker's rules for the agents
+  (robots.txt, at least a second between requests to a site, public
+  addresses only, never CoStar, LoopNet or Crexi), and web searches (at
+  most 10 per agent by its instructions; the search tool itself has no
+  counter).
+- **In alerts:** fixed words and counts. No parcel, address, owner or
+  agent text.
+
+### How the parts are kept apart
+
+| Account | Runs | Can reach |
+|---|---|---|
+| `screener` | the screener, `lead_queue.py`, `changes.py`, the copying in and out | everything of the runs |
+| `screener-lead` | the two agents | one lead card, the rules, the fetch tool (all read-only) and one folder to write its one file in |
+| `screener-check` | `quotecheck.py` with the system Python | the file being checked; it owns nothing and no agent ever runs as it |
+
+- The agents do not run as `screener-fix`, so an agent that a web page
+  talked into something cannot reach the code-fix hand-off.
+- An agent has no shell command but the fetch tool, no `curl`, no
+  `WebFetch`, no `quotecheck`. Its file is taken back only if it is one
+  regular file of at most 1 MB that names this parcel and this run.
+- The skeptic starts in a new folder after the investigator's is deleted.
+  It gets the card and the checked findings, nothing else.
+- Each quote check has a time limit, the whole stage a budget
+  (`INVESTIGATE_BUDGET`), and a lead that fails twice is left alone.
+- If an agent changes its own account's Claude settings, shell start-up
+  files or SSH folder, the stage stops, nothing of that lead is kept, an
+  urgent alert goes out, and lead checks stay on hold until you remove
+  `~/screener-ops/investigate/HOLD`. Look at `/home/screener-lead` first;
+  when in doubt delete that user and make it again.
+
+### Turning it on
+
+1. As root: `ops/screener/install.sh --lead-checks`. It creates the two
+   accounts and their handover folders and installs `pdftotext`.
+2. Install Claude Code as `screener-lead` and log in, as for the fixer
+   (step 6 above): `sudo -iu screener-lead`.
+3. Put `INVESTIGATE=1` in `~/.config/screener-ops.env`. Start with
+   `INVESTIGATE_MAX=1` and `INVESTIGATE_GRADES="A"`.
+4. Run the supervisor once and read `~/screener-ops/logs/lead-*.log` (the
+   agents' own output and the quote checker's) and the lead's `lead.md`.
+
+Lead checks are skipped for a run given extra arguments (a `--limit`
+trial), a run that finished with warnings, and when a part is missing
+(an alert says which).
+
+### Not verified, and what is accepted
+
+This was built and tested offline with stand-in agents
+(`test_investigate.sh`); the quote checker in those tests is the real one.
+**It has not been run on a server with the real Claude Code.** Check these
+on the first run, with `INVESTIGATE_MAX=1`:
+
+- that Claude Code accepts the options used (`--permission-mode dontAsk`,
+  `--allowedTools` with one `Bash(...)` rule, `--disallowedTools`), and
+  that the agent can run the fetch tool and nothing else. The agent's log
+  shows a refused tool call;
+- that `screener-lead` cannot write outside its lead folder in
+  `/srv/screener-lead` (try it by hand as that user);
+- that a normal run does not trip the settings watch.
+
+Accepted, because closing them needs more than this script:
+
+- `screener-lead` owns its Claude login and its own copy of Claude Code.
+  An agent that a web page takes over could misuse that login or change
+  that copy. Nothing else on the server is within its reach, and the
+  settings watch catches the plain routes, not every one.
+- The request counter of the fetch tool sits in the agent's own folder: it
+  stops drift, not an agent set on cheating. The time limit bounds that.
+- The search tool is the provider's: it can show a snippet of any site,
+  and the rule against CoStar, LoopNet and Crexi there rests on the
+  agent's instructions. The fetch tool and the quote checker refuse those
+  sites themselves.
+- A PDF the agents cite is read by `pdftotext` as `screener-check`. That
+  account owns nothing, but a flaw in `pdftotext` would still run code on
+  the server.
+
 ## Pushing fix branches to GitHub (optional)
 
 By default a proposed fix stays on the server (`git -C ~/Land-Research
@@ -162,9 +298,30 @@ pushed so you can review it on GitHub:
 | `screener-supervise.service`, `.timer` | systemd units: weekly, no timeout |
 | `install.sh` | Creates the `screener-fix` sandbox user and installs the units (root) |
 | `test_supervise.sh` | Offline tests with a fake screener and fake Claude |
+| `changes.py` | `changes.md`: what changed since the run before |
+| `investigate.sh` | The lead checks, sourced by `supervise.sh` (off unless `INVESTIGATE=1`) |
+| `lead_queue.py` | Picks the leads, writes their cards, takes files out of a sandbox, publishes a result |
+| `lead_fetch.py` | The agents' one way to read a page, under the quote checker's rules |
+| `test_investigate.sh` | Offline tests of the lead checks: fake agents, the real quote checker |
+| `test_changes.py`, `test_lead_tools.py` | Offline tests of the three Python tools |
+
+Tests (offline, from the repository root):
+
+```bash
+ops/screener/test_supervise.sh
+```
+
+```bash
+ops/screener/test_investigate.sh
+```
+
+```bash
+python -m unittest discover -s ops/screener -p 'test_*.py'
+```
 
 Logs: `~/screener-ops/logs/` (one file per run and attempt, Claude's
-output and diagnosis per hand-off, `alerts.log`), kept 90 days.
+output and diagnosis per hand-off, one `lead-*.log` per lead check,
+`alerts.log`), kept 90 days.
 Screener outputs stay in `screener/output/` as usual.
 
 Adding a county later: give it a settings file (e.g.

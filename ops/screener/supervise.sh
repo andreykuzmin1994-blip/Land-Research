@@ -11,6 +11,11 @@
 # committed to a new screener-fix/* branch for a human to review. Nothing
 # here merges, edits the running checkout, or touches main.
 #
+# After a run that finished, changes.py writes changes.md into its output
+# folder: what is new, gone or moved since the run before. With
+# INVESTIGATE=1 (off by default), investigate.sh then has the new grade A
+# and B leads of each clean, plain run checked against public documents.
+#
 # Usage: ops/screener/supervise.sh [extra screener.run args, e.g. --limit 300]
 # Config: ~/.config/screener-ops.env (see screener-ops.env.example), or the
 # file named by SCREENER_OPS_CONFIG. See ops/screener/README.md.
@@ -53,6 +58,9 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 MAIN_LOG="$LOG_DIR/supervise-$STAMP.log"
 RESULTS=()
+RUN_DIRS=()   # "county<TAB>output folder" of each clean, plain run (for the lead checks)
+PLAIN_RUN=1   # 0 when extra screener arguments were given (a trial: no lead checks)
+START_MARK="$STATE_DIR/.start-$STAMP"
 FIX_AS=()
 [ -n "$FIX_USER" ] && FIX_AS=(sudo -n -u "$FIX_USER" -H --)
 # git in a worktree whose files came from the fixer: no hooks, no fsmonitor.
@@ -166,13 +174,29 @@ report_success() {
     warn="$(grep -E 'FAILURES|FAILED|re-run' "$summary" | head -5)"
   fi
   log "$county: done on attempt $attempt -> ${out:-unknown output folder}"
+  # What changed since the run before: written beside the run's own files.
+  # Its one-line summary holds counts only, so it can go in the alert.
+  local changed=""
+  if [ -n "$out" ] && [ -f "$out/ranked.csv" ] && [ -f "$HERE/changes.py" ]; then
+    local lead_args=()
+    [ -d "${LEADS_DIR:-}" ] && lead_args=(--leads "$LEADS_DIR")
+    changed="$("$PYTHON" "$HERE/changes.py" "$out" "${lead_args[@]}" 2>>"$MAIN_LOG" | head -1 | cut -c1-600)" ||
+      changed=""
+    [ -n "$changed" ] || log "$county: no changes.md written (see the log)"
+    # Lead checks only for a run that is plain (no extra arguments), clean
+    # (no warnings) and made by this supervisor run.
+    if [ "$PLAIN_RUN" = 1 ] && [ -z "$warn" ] && [ "$out/ranked.csv" -nt "$START_MARK" ]; then
+      RUN_DIRS+=("$county"$'\t'"$out")
+    fi
+  fi
   # A clean run is only in the end-of-run summary; warnings get their own alert.
   if [ -n "$warn" ]; then
     notify "Screener: $county done with warnings" "Output: ${out:-unknown}
 From summary.md:
 $warn" high
   fi
-  RESULTS+=("$county: ok${warn:+, with warnings} (attempt $attempt) ${out:+-> $out}")
+  RESULTS+=("$county: ok${warn:+, with warnings} (attempt $attempt) ${out:+-> $out}${changed:+
+  $changed}")
 }
 
 # Paths a fix may never touch: the score, the screens, every settings file,
@@ -430,9 +454,16 @@ cleanup() {  # WORKTREE BRANCH FIXER_COPY keep|delete
   return 0
 }
 
+# The lead checks (off unless INVESTIGATE=1). Sourced here, after the
+# helpers it uses.
+# shellcheck source=investigate.sh
+. "$HERE/investigate.sh"
+
 main() {
   exec 9>"$STATE_DIR/supervise.lock"
   if ! flock -n 9; then log "another supervisor run is active; exiting"; exit 0; fi
+  [ "$#" -gt 0 ] && PLAIN_RUN=0
+  : >"$START_MARK"
   find "$LOG_DIR" -type f -mtime +"$LOG_KEEP_DAYS" -delete 2>/dev/null
   log "supervisor start; counties: $COUNTIES; args: ${*:-none}"
   update_code
@@ -441,6 +472,10 @@ main() {
   local report; report="$(printf '%s\n' "${RESULTS[@]}")"
   notify "Screener run: $((${#RESULTS[@]} - failed)) ok, $failed failed" "$report" \
     "$( [ "$failed" -gt 0 ] && echo high || echo low )"
+  # After every county and the summary: a long lead check never delays a
+  # county's run or its alert, and never changes the exit code.
+  investigate_stage
+  rm -f "$START_MARK"
   log "supervisor done"
   [ "$failed" -eq 0 ]
 }

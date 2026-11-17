@@ -999,6 +999,22 @@ conditions (the flags as recorded are one click below). A plan made
 before the read-out existed shows its numbers and flags as before. It
 reads no network.
 
+- **Marking parcels on the page.** Each plan has Pursue, Maybe, Pass and
+  Listed buttons (keys `p`, `m`, `x`, `l`) and a note field; pressing a
+  button again takes the mark back. A plan of several parcels has one
+  row of buttons per parcel. The "Marked here" and "Not marked here"
+  chips filter the list. The page writes no file and asks no server:
+  marks stay in that browser, for that run, until **Save my marks**
+  downloads `decisions-<run>.csv`. Record them with
+
+  ```bash
+  python -m screener.decide --import decisions-fulton-2026-11-17.csv
+  ```
+
+  which checks every row first and records all or none, through the same
+  three files as one `decide` call per mark (see `inputs/README.md`). A
+  mark on the page changes nothing until it is imported: the status dot
+  still shows what `decisions.csv` held when the page was built.
 - Every input is joined by parcel id, and an input that names its run
   must name this one. A plans file with no run fingerprint (the
   prototype's `plans4.json`) needs `--join-by-rank`.

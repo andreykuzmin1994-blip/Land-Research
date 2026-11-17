@@ -49,6 +49,33 @@ what its row showed) into `decision_facts.jsonl` here, a separate file
 that is never an evaluation input; a run without `facts.json` records
 the decision anyway and says so. It is offline.
 
+## Recording the marks made on the viewer page
+
+The Site Plan Viewer page (`python -m screener.viewer`, see the main
+README) has Pursue, Maybe, Pass and Listed buttons. **Save my marks**
+downloads them as `decisions-<run>.csv`; this records them:
+
+```bash
+python -m screener.decide --import decisions-fulton-2026-11-17.csv
+```
+
+```bash
+python -m screener.decide --import decisions-fulton-2026-11-17.csv --run screener/output/fulton-2026-11-17
+```
+
+- The file names the run its page was built from. That run's folder must
+  be the one used (the newest under `screener/output/`, or `--run`), so
+  the features kept with each decision are that run's.
+- Every row is checked before anything is written: an unknown parcel id,
+  a value that is not `pursue`, `pass`, `maybe` or `listed`, a date that
+  is not `YYYY-MM-DD` or lies in the future, or a parcel with no features
+  (without `--no-features`) and nothing is recorded.
+- Each mark is then recorded exactly as one call above would: a row
+  appended here, its features and its report facts copied. The date is
+  the day the mark was made on the page.
+- A mark that is already the parcel's last row (same decision, date and
+  note) is skipped, so importing the same file twice adds nothing.
+
 ## Editing the file by hand
 
 Spreadsheets are fine: a UTF-8 byte-order mark, Windows line endings, a

@@ -256,6 +256,8 @@ def compare(run_dir: Path, prev_dir: Path | None, leads: Path | None, top: int =
         lines = [title + f" — {cell(run_dir.name)}", "",
                  "There is no earlier run of this county beside this one, so nothing is compared. "
                  "The leads as they stand:", ""]
+        if leads is not None:
+            lines += [_checked_line(checked, sum(len(by_grade[g]) for g in GRADES)), ""]
         for g in GRADES:
             lines += [f"## Grade {g} ({len(by_grade[g]):,})", ""]
             lines += (table(lead_head, [lead_row(p, new[p]) for p in by_grade[g]])
@@ -312,11 +314,7 @@ def compare(run_dir: Path, prev_dir: Path | None, leads: Path | None, top: int =
     if marked:
         lines.append(f"- {len(marked):,} of the parcels you marked pursue or maybe changed.")
     if leads is not None:
-        lines.append("- Document checks of this run's grade A and B leads: "
-                     + ", ".join(f"{checked[v]:,} {v}" for v in SKEPTIC_VERDICTS)
-                     + (f", {checked['checked, no skeptic']:,} checked without a skeptic"
-                        if checked["checked, no skeptic"] else "")
-                     + f"; {sum(len(by_grade[g]) for g in GRADES) - sum(checked.values()):,} not checked yet.")
+        lines.append("- " + _checked_line(checked, sum(len(by_grade[g]) for g in GRADES)))
     if not_run:
         lines.append(f"- {len(not_run):,} notes in summary.md about a check that failed or did not run (below).")
     lines.append("")
@@ -496,6 +494,14 @@ def _not_run_section(notes: list[str]) -> list[str]:
     lines = [f"## Checks that failed or did not run ({len(notes):,})", ""]
     lines += [f"- {n}" for n in notes] if notes else ["summary.md names none."]
     return lines + [""]
+
+
+def _checked_line(checked: dict[str, int], graded: int) -> str:
+    return ("Document checks of this run's grade A and B leads: "
+            + ", ".join(f"{checked[v]:,} {v}" for v in SKEPTIC_VERDICTS)
+            + (f", {checked['checked, no skeptic']:,} checked without a skeptic"
+               if checked["checked, no skeptic"] else "")
+            + f"; {graded - sum(checked.values()):,} not checked yet.")
 
 
 def _checked_summary(checked: dict[str, int], leads: Path | None) -> str:
