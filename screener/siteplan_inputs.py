@@ -12,15 +12,29 @@ not_checked (or partial for the lidar), with a reason. A failed, truncated
 or malformed answer is never read as "nothing there": the planner turns a
 not-checked input into a named flag and ``feasible = None``.
 
-Polite (R14): this module never assigns ``arcgis`` globals. Each request
-passes its own ``max_age_days``. Uncached requests to one host are spaced
-at least ``MIN_INTERVAL_S`` apart, a host that fails
-``STOP_AFTER_FAILURES`` times in a row is not asked again in this process,
-and nothing runs in a thread pool. The existing USER_AGENT is kept.
+Polite (R14): this module never assigns ``arcgis`` globals and nothing
+runs in a thread pool; the existing USER_AGENT is kept. The requests this
+module makes itself (``Fetcher.call``: county parcels and neighbours,
+HIFLD transmission lines, 3DEP elevation) each pass their own
+``max_age_days``, uncached ones to one host are spaced at least
+``MIN_INTERVAL_S`` apart, and a host that fails ``STOP_AFTER_FAILURES``
+times in a row is not asked again in this process (its young cached
+answers are still used). The lidar answers use the fixed
+``DEM_CACHE_DAYS``; ``--cache-days`` applies to the county and HIFLD
+requests. Two inputs go through
+existing screener code instead and keep its behaviour: the GDOT frontage
+(``frontage.check_parcel``; ``Fetcher.frontage`` counts its failures and
+stops asking a failing host, but does not space the calls) and the
+constraint layers (``layers.fetch``, with arcgis's own cache lifetime and
+retries; ``--cache-days`` does not apply to them). A layer that fails is
+read as not checked, never as "nothing there".
 
-No owner data (SR-8): every outFields value is a constant on
-``OUT_FIELDS_ALLOWED``; none names an owner or mailing field, and
-assemblages are explicit parcel-id lists, never selected by owner.
+No owner data (SR-8): every outFields value this module sends itself is
+a constant on ``OUT_FIELDS_ALLOWED``; none names an owner or mailing
+field, and assemblages are explicit parcel-id lists, never selected by
+owner. (The constraint layers keep the field lists of ``layers.LAYERS``:
+the easement holder and the protected land's owner type and manager, all
+public bodies; only their shapes are used.)
 Parcel ids go into where clauses only after ``siteplan.check_pid``
 (upper-case letters, digits and spaces; inner spaces kept exactly).
 
@@ -39,7 +53,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
-from shapely.geometry import Point, box, shape
+from shapely.errors import GEOSException
+from shapely.geometry import MultiPolygon, Point, Polygon, box, shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
@@ -121,12 +136,14 @@ class Fetcher:
     def call(self, url: str, params: dict[str, Any], *, check: Callable[[dict[str, Any]], str | None],
              max_age_days: float | None = None) -> dict[str, Any]:
         host = self._host(url)
-        if host in self.down:
-            raise HostDown(f"{host}: {self.stop_after} failures in a row; not asked again")
         age = self.cache_days if max_age_days is None else max_age_days
+        # A young cached answer costs the host nothing: it is used even
+        # after the host was marked down (as builtcheck.Fetcher does).
         hit = arcgis.cached_json(url, params, max_age_days=age if age is not None else arcgis.cache_days, check=check)
         if hit is not None:
             return hit[0]
+        if host in self.down:
+            raise HostDown(f"{host}: {self.stop_after} failures in a row; not asked again")
         wait = self.last.get(host, -math.inf) + self.min_interval - self.clock()
         if wait > 0:
             self.sleep(wait)
@@ -144,6 +161,10 @@ class Fetcher:
     def frontage(self, g: BaseGeometry) -> frontage.Frontage:
         host = self._host(frontage.IDENTIFY_URL)
         if host in self.down:
+            # As in call(): a young cached answer costs the host nothing.
+            kept = self._cached_frontage(g)
+            if kept is not None:
+                return kept
             return frontage.not_checked(f"{frontage.SERVICE_FAILED} ({self.stop_after} failures in a row)")
         fr = frontage.check_parcel(g)
         if fr.state == frontage.NOT_CHECKED and fr.reason.startswith(frontage.SERVICE_FAILED):
@@ -151,6 +172,23 @@ class Fetcher:
         else:
             self.failures[host] = 0
         return fr
+
+
+    @staticmethod
+    def _cached_frontage(g: BaseGeometry) -> frontage.Frontage | None:
+        """The frontage check_parcel would measure from a kept GDOT answer
+        (the same request, the same age limit, arcgis.cache_days, and the
+        same answer check), or None when there is none. Asks nothing."""
+        if not isinstance(g, (Polygon, MultiPolygon)) or g.is_empty:
+            return None
+        hit = arcgis.cached_json(frontage.IDENTIFY_URL, frontage._params(g), max_age_days=arcgis.cache_days,
+                                 check=frontage._answer_problem)
+        if hit is None:
+            return None
+        try:
+            return frontage.measure(g, hit[0]["results"])
+        except (GEOSException, ValueError) as exc:
+            return frontage.not_checked(f"could not measure the road answer ({str(exc)[:80]})")
 
 
 # ---------------------------------------------------------------------------
@@ -178,8 +216,11 @@ def county_near(g: BaseGeometry, fetch: Fetcher) -> tuple[list, sp.InputState]:
             continue
         a = f.get("attributes") or {}
         out.append(({k: a.get(k) for k in ("ParcelID", "LUCode", "ClassCode")}, s))
-    reason = f"{missing} record(s) without a shape ignored" if missing else ""
-    return out, sp.InputState("checked", reason)
+    if missing:
+        # A neighbour we cannot draw could be the residential one whose
+        # buffer is then lost (an overstated envelope): fail closed (R2).
+        return out, sp.InputState("partial", f"{missing} county record(s) came back without a shape")
+    return out, sp.InputState("checked")
 
 
 def transmission(g: BaseGeometry, fetch: Fetcher) -> tuple[list, sp.InputState]:
@@ -231,7 +272,7 @@ def dem(plane: sp.Plane, parcel_ft: BaseGeometry, fetch: Fetcher, step: float = 
     """USGS 3DEP samples on the planner's grid (same requests as the
     prototype: 400 points a chunk, 7 decimals, first value only)."""
     grid = sp.dem_points(parcel_ft, step)
-    out = sp.Dem(step=step, points={ij: p for ij, p in grid})
+    out = sp.Dem(step=step, points={ij: p for ij, p in grid}, state="checked")
     if not grid:
         return out
     keys = [ij for ij, _ in grid]
@@ -252,7 +293,10 @@ def dem(plane: sp.Plane, parcel_ft: BaseGeometry, fetch: Fetcher, step: float = 
                 loc = int(s["locationId"])
                 if not 0 <= loc < len(chunk):
                     continue
-                out.elev[keys[i + loc]] = float(s["value"]) * sp.FT_PER_M
+                z = float(s["value"])
+                if not math.isfinite(z):
+                    continue    # "NaN" / "Infinity" is NoData too
+                out.elev[keys[i + loc]] = z * sp.FT_PER_M
             except (ValueError, KeyError, TypeError):
                 pass            # NoData
     chunks = math.ceil(len(wg) / DEM_CHUNK)
@@ -280,9 +324,13 @@ def constraints(g: BaseGeometry) -> tuple[list, list, sp.InputState]:
     constraints) and the raw shapes within about 150 ft (for R21)."""
     pj = LocalProjection.around(g)
     tot = pj(g).area or 1
-    tiles = tile_envelopes([g.bounds])
+    # The tiles of the widened box, so a water shape just across a tile
+    # edge from the parcel is fetched for the 25 ft buffer too (R21). It is
+    # normally the parcel's own tiles, so cached answers are shared.
+    near_bounds = expand(g.bounds, NEAR_PAD_DEG)
+    tiles = tile_envelopes([near_bounds])
     region = expand(g.bounds, 0.02)
-    near_box = box(*expand(g.bounds, NEAR_PAD_DEG))
+    near_box = box(*near_bounds)
     clipped, near, bad = [], [], []
     for key in CONSTRAINT_LAYERS:
         try:
@@ -353,7 +401,9 @@ def _acres(v: Any) -> float | None:
 
 def _meta(r: dict[str, Any]) -> dict[str, Any]:
     # Only these three fields of a ranked row reach the planner.
-    return {"jurisdiction": r.get("jurisdiction") or "", "hsg": r.get("soil_hsg") or "B", "zoning": r.get("zoning") or ""}
+    # The soil value is passed as it is (blank or "not checked: ..." too):
+    # siteplan.hsg_letter says when B is assumed (HSG_ASSUMED).
+    return {"jurisdiction": r.get("jurisdiction") or "", "hsg": r.get("soil_hsg") or "", "zoning": r.get("zoning") or ""}
 
 
 def site_spec(run: RunData, name: str, assemble: list[str] | None, cut: tuple[str, float] | None,
@@ -387,7 +437,12 @@ def site_spec(run: RunData, name: str, assemble: list[str] | None, cut: tuple[st
             shapes.update(county_parcels(missing, fetch))
         g = unary_union([shapes[p] for p in pids])
         rows = sorted((run.rows[rk] for rk in ranks if rk in run.rows), key=lambda r: int(r["rank"]))
-        meta = _meta(rows[0]) if rows else {"jurisdiction": "", "hsg": "B", "zoning": ""}
+        meta = _meta(rows[0]) if rows else {"jurisdiction": "", "hsg": "", "zoning": ""}
+        # Every member's rules, so the planner can compare them, carry every
+        # member's gates and flag a mix (ASSEMBLAGE_MIXED_RULES); members not
+        # in ranked.csv are counted (their rules are unknown here).
+        meta["members"] = [dict(_meta(r), rank=str(r["rank"])) for r in rows]
+        meta["members_unranked"] = len(pids) - len(rows)
         tax = sum(_acres(r.get("acres")) or 0 for r in rows) if len(rows) == len(pids) else None
         listed = ", ".join(f"#{rk}" for rk in sorted(ranks, key=int))
         title = (f"{name}: {len(pids)} parcels assembled ({listed or 'none ranked'}"

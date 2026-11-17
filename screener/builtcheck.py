@@ -1,7 +1,8 @@
 """Built check: is a ranked parcel really land today?
 
     python -m screener.builtcheck RUN_DIR --out DIR [--top N]
-        [--visual visual.json] [--visual-by-rank] [--decisions CSV]
+        [--visual visual.json] [--visual-by-rank]
+        [--second-looks-from land_today.json] [--decisions CSV]
         [--cache-days D]
 
 The screen drops parcels whose own tax record shows buildings. It cannot
@@ -61,6 +62,7 @@ import argparse
 import csv
 import io
 import json
+import math
 import re
 import sys
 import time
@@ -125,6 +127,9 @@ EVIDENCE_CAP = 600
 
 SOURCE_AGREES = "aerial review (agrees with footprints)"
 SOURCE_SECOND = "second look"
+# A second look whose raw_land was held back because an input of the check
+# failed: not carried by --second-looks-from as a reviewer's verdict.
+SOURCE_SECOND_HELD = "second look (held: an input failed)"
 SOURCE_PENDING = "needs a second look"
 SOURCE_NONE = "none"
 
@@ -136,6 +141,7 @@ BUILT_COLUMNS = ["rank", "parcel_id", "address", "jurisdiction", "acres", "lead_
 BUILT_JSON_EXTRA = ["occupancy", "imagery_dates", "records_inside", "records_note",
                     "footprint_note"]
 RECORD_KEYS = ["parcel_id", "address", "class", "land_use", "improvements", "land", "acres_map"]
+ADDRESS_WITHHELD = "(withheld)"
 LAND_COLUMNS = ["rank", "parcel_id", "address", "jurisdiction", "acres", "lead_grade",
                 "listed_lead", "decision", "land_today", "what_is_there", "why", "confidence",
                 "source", "aerial_state", "footprint_check", "footprint_note"]
@@ -198,7 +204,11 @@ def _ids_problem(data: dict[str, Any]) -> str | None:
     return None
 
 
-def _features_problem(want: int | None) -> Callable[[dict[str, Any]], str | None]:
+def _features_problem(want: int | None, wgs84: bool = False) -> Callable[[dict[str, Any]], str | None]:
+    """want: the number of features asked for (by id). wgs84: check the
+    answer's spatial reference even when no count is known (the county
+    records query: shapes in State Plane feet would never fall inside the
+    outline)."""
     def problem(data: dict[str, Any]) -> str | None:
         feats = data.get("features")
         if not isinstance(feats, list):
@@ -207,6 +217,11 @@ def _features_problem(want: int | None) -> Callable[[dict[str, Any]], str | None
             return "the server cut the answer short"
         if want is not None and len(feats) < want:
             return f"{len(feats)} of {want} features came back"
+        if (want is not None or wgs84) and feats:
+            # As arcgis.fetch_by_ids checks: shapes must come back in WGS84.
+            sr = data.get("spatialReference") if isinstance(data.get("spatialReference"), dict) else {}
+            if 4326 not in (sr.get("wkid"), sr.get("latestWkid")):
+                return "the features did not come back in WGS84"
         return None
     return problem
 
@@ -245,6 +260,7 @@ def fetch_footprints(fetcher: Fetcher, geoms: dict[str, BaseGeometry]) -> Footpr
     all_ids = sorted(set().union(*ids_of.values())) if ids_of else []
     items: list[tuple[BaseGeometry, dict[str, Any]]] = []
     failed_ids: set[int] = set()
+    shapeless_ids: set[int] = set()
     for i in range(0, len(all_ids), ID_CHUNK):
         part = all_ids[i:i + ID_CHUNK]
         params = {"objectIds": ",".join(map(str, part)), "outFields": STRUCTURE_FIELDS,
@@ -258,9 +274,20 @@ def fetch_footprints(fetcher: Fetcher, geoms: dict[str, BaseGeometry]) -> Footpr
             s = esri_to_shape(f.get("geometry"))
             if s is not None and not s.is_empty:
                 items.append((s, f.get("attributes") or {}))
+            else:
+                # A footprint without a usable shape could be the building on
+                # the parcel: its parcels read not checked, never "no
+                # building". The answer names no object id (STRUCTURE_FIELDS
+                # is the prototype's, for a shared cache), so every id of
+                # the chunk counts.
+                a = f.get("attributes") or {}
+                oid = next((a[k] for k in ("OBJECTID", "objectid", "FID") if isinstance(a.get(k), int)), None)
+                shapeless_ids.update([oid] if oid is not None else part)
     for pid, ids in ids_of.items():
         if ids & failed_ids:
             state[pid], note[pid] = FAILED, "a footprint request failed"
+        elif ids & shapeless_ids:
+            state[pid], note[pid] = FAILED, "a footprint came back without a shape"
         else:
             state[pid] = CHECKED
     return Footprints(items, state, note)
@@ -278,7 +305,7 @@ def records_params(outline_geom: BaseGeometry) -> dict[str, Any]:
 
 def fetch_records(fetcher: Fetcher, outline_geom: BaseGeometry) -> list[dict[str, Any]]:
     """County parcel features touching the outline (raises ArcGISError)."""
-    d = fetcher.get(f"{PARCELS_URL}/query", records_params(outline_geom), _features_problem(None))
+    d = fetcher.get(f"{PARCELS_URL}/query", records_params(outline_geom), _features_problem(None, wgs84=True))
     return d["features"]
 
 
@@ -352,10 +379,12 @@ def records_inside(pid: str, g: BaseGeometry, feats: list[dict[str, Any]]
     o = outline(g)
     pj = LocalProjection.around(g)
     inside, own, problems = [], None, []
+    seen_own = False
     for f in feats:
         a = f.get("attributes") or {}
         if a.get("ParcelID") == pid:
             own = a.get("ImprAppr")
+            seen_own = True
             continue
         s = esri_to_shape(f.get("geometry"))
         if s is None or s.is_empty:
@@ -369,6 +398,10 @@ def records_inside(pid: str, g: BaseGeometry, feats: list[dict[str, Any]]
                            "class": a.get("ClassCode"), "land_use": a.get("LUCode"),
                            "improvements": a.get("ImprAppr"), "land": a.get("LandAppr"),
                            "acres_map": round(acres(pj(s)), 2)})
+    if not seen_own:
+        # The parcel's own record always touches its outline: an answer
+        # without it is a broken query, not "nothing inside".
+        problems.append("the parcel's own county record did not come back")
     return inside, own, ("; ".join(sorted(set(problems))) or None)
 
 
@@ -504,28 +537,46 @@ def needs_second_look(footprint_check: str, v: dict[str, Any]) -> bool:
     return False
 
 
+def inputs_complete(x: dict[str, Any]) -> bool:
+    """Every input of the built check ran (no failed footprint or records
+    fetch, no degraded records answer). A verdict made with an input
+    missing can still say built or check; it can never support raw_land."""
+    return not (x.get("footprint_state") == FAILED or x.get("records_state") in (FAILED, DEGRADED))
+
+
 def classify_land(footprint_check: str, v: dict[str, Any] | None,
-                  second: dict[str, Any] | None) -> dict[str, str]:
+                  second: dict[str, Any] | None, complete: bool = True) -> dict[str, str]:
     """land_today, what is there, why, confidence, source.
 
     raw_land only from a photo review: the first look when it agrees with
     a completed footprint check that is not "built", or a second look
     (which saw the footprints) when the check ran. Anything else that
-    would be raw_land is "unclear"."""
+    would be raw_land is "unclear". `complete` False (an input of the
+    built check failed, whatever the verdict) is read like a check that
+    did not run: a missing records or footprint answer could have made
+    the parcel built."""
     if v is None and second is None:
         return {"land_today": "unclear", "what_is_there": "no aerial review", "why": "",
                 "confidence": "", "source": SOURCE_NONE, "aerial_state": ""}
     state = v["state"] if v else ""
-    if footprint_check == NOT_CHECKED:
+    if footprint_check == NOT_CHECKED or not complete:
         # The footprints could not be compared: keep a negative photo finding,
-        # never a positive one.
+        # never a positive one. Without a second look, a first look that
+        # reads raw_land or partly_usable is "unclear" (a completed check
+        # could have sent it to a second look); only not_raw_land is kept,
+        # so a failed fetch never reads better than a completed check.
         base = second["land_today"] if second else USABLE[v["usable"]]
-        land = "unclear" if base == "raw_land" else base
+        if second:
+            land = "unclear" if base == "raw_land" else base
+        else:
+            land = base if base == "not_raw_land" else "unclear"
         what = second["what_is_there"] if second else v["evidence"]
+        why = "footprint check not completed" if footprint_check == NOT_CHECKED else "an input of the built check failed"
         return {"land_today": land, "what_is_there": what,
-                "why": "footprint check not completed" + ("" if land == base else ": raw land not confirmed"),
+                "why": why + ("" if land == base else f": {base.replace('_', ' ')} not confirmed"),
                 "confidence": (second or v)["confidence"],
-                "source": SOURCE_SECOND if second else SOURCE_PENDING, "aerial_state": state}
+                "source": (SOURCE_SECOND if land == base else SOURCE_SECOND_HELD) if second else SOURCE_PENDING,
+                "aerial_state": state}
     if second is not None:
         return {"land_today": second["land_today"], "what_is_there": second["what_is_there"],
                 "why": second["why"], "confidence": second["confidence"],
@@ -630,14 +681,19 @@ def run_check(run_dir: Path, *, top: int = DEFAULT_TOP, visual: Any = None,
     for x in built:
         pid = x["parcel_id"]
         r = by_pid[pid]
-        c = classify_land(x["built_check"], first.get(pid), second.get(pid))
+        complete = inputs_complete(x)
+        c = classify_land(x["built_check"], first.get(pid), second.get(pid), complete)
+        note = x["why"]
+        if not complete:
+            # the failure shows in land_today too, not only in builtcheck.json
+            note = "; ".join(n for n in (note, x.get("footprint_note"), x.get("records_note")) if n)
         dec = (decisions or {}).get(pid) or r.get("decision") or ""
         land.append({"rank": x["rank"], "parcel_id": pid, "address": x["address"],
                      "jurisdiction": x["jurisdiction"], "acres": x["acres"],
                      "lead_grade": x["lead_grade"], "listed_lead": r["rank"] in listed,
                      "decision": dec, **{k: c[k] for k in ("land_today", "what_is_there", "why",
                                                            "confidence", "source", "aerial_state")},
-                     "footprint_check": x["built_check"], "footprint_note": x["why"]})
+                     "footprint_check": x["built_check"], "footprint_note": note})
     meta = {"checked": date.today().isoformat(), "top": top,
             "sources": {"structures": STRUCTURES_URL, "structure_fields": STRUCTURE_FIELDS,
                         "parcels": PARCELS_URL, "parcel_fields": PARCEL_FIELDS},
@@ -660,11 +716,23 @@ def _rows_csv(columns: list[str], records: Iterable[dict[str, Any]]) -> str:
     return buf.getvalue()
 
 
-def artifacts(result: Result, identity: dict[str, str]) -> dict[str, str]:
+def _record_out(r: dict[str, Any], guard: OwnerGuard | None) -> dict[str, Any]:
+    out = {k: r.get(k) for k in RECORD_KEYS}
+    # The site address of a record inside the outline is public county data,
+    # but when it reads as an owner's mailing address (an owner-occupied
+    # house) it is withheld: no output carries an owner mailing string, even
+    # one that is also a site address (reviews/37 R1). The parcel id stays.
+    if guard is not None and isinstance(out.get("address"), str) and guard.hits(out["address"]):
+        out["address"] = ADDRESS_WITHHELD
+    return out
+
+
+def artifacts(result: Result, identity: dict[str, str],
+              guard: OwnerGuard | None = None) -> dict[str, str]:
     """The four output files' text, from allow-listed fields only."""
     head = {"schema_version": SCHEMA_VERSION, "run": identity, "meta": result.meta}
     built = [{**{c: x.get(c) for c in BUILT_COLUMNS + BUILT_JSON_EXTRA},
-              "records_inside": ([{k: r.get(k) for k in RECORD_KEYS} for r in x["records_inside"]]
+              "records_inside": ([_record_out(r, guard) for r in x["records_inside"]]
                                  if isinstance(x.get("records_inside"), list) else None)}
              for x in result.built]
     land = [{c: x.get(c) for c in LAND_COLUMNS} for x in result.land]
@@ -679,12 +747,10 @@ def artifacts(result: Result, identity: dict[str, str]) -> dict[str, str]:
 def write_outputs(result: Result, run_dir: Path, out: Path) -> list[Path]:
     """Guard every file for owner data first, then write them all atomically;
     a refusal writes nothing. A re-run replaces the four files."""
-    files = artifacts(result, run_identity(run_dir))
     guard = OwnerGuard.from_run(run_dir)
-    # County site addresses of the records inside an outline are public
-    # data; an owner-occupied house's address equals its owner's mailing.
-    public = [r.get("address") or "" for x in result.built
-              for r in (x.get("records_inside") or []) if isinstance(r, dict)]
+    files = artifacts(result, run_identity(run_dir), guard)
+    # The checked parcels' own site addresses are written in every file.
+    public = [x.get("address") or "" for x in result.built]
     for name, body in files.items():
         guard.check(body, name, public)
     out.mkdir(parents=True, exist_ok=True)
@@ -693,6 +759,51 @@ def write_outputs(result: Result, run_dir: Path, out: Path) -> list[Path]:
         atomic_write(out / name, body)
         paths.append(out / name)
     return paths
+
+
+def second_looks_from(data: Any, path: str = "land_today file") -> dict[str, dict[str, Any]]:
+    """The second-look verdicts of an earlier land_today (this tool's
+    land_today.json, or the 2026-11-16 one, a bare list), as a visual
+    file's ``second_look`` section keyed by rank with parcel ids. Only rows
+    whose source is SOURCE_SECOND are taken (a SOURCE_SECOND_HELD row, held
+    back because an input failed, is not a reviewer's verdict: carry it from
+    the original file); load_visual then checks each rank and parcel id
+    against this run (a file that names another run is refused there and
+    here)."""
+    items = data.get("parcels") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        raise Refused(f"{path}: no list of parcels")
+    out: dict[str, dict[str, Any]] = {}
+    for x in items:
+        if not isinstance(x, dict) or x.get("source") != SOURCE_SECOND:
+            continue
+        if not isinstance(x.get("parcel_id"), str) or x.get("rank") is None:
+            raise Refused(f"{path}: a second look without rank and parcel id")
+        out[str(x["rank"])] = {"rank": x["rank"], "parcel_id": x["parcel_id"],
+                               **{k: x.get(k) for k in ("land_today", "what_is_there", "why", "confidence")}}
+    return out
+
+
+def with_second_looks(visual: Any, earlier: Any, identity: dict[str, str], path: str) -> dict[str, Any]:
+    """visual.json with the second looks of an earlier land_today added
+    (an entry already in visual.json's own second_look wins)."""
+    if not isinstance(visual, dict):
+        raise Refused("--second-looks-from needs --visual (the first looks it goes with)")
+    if isinstance(earlier, dict):
+        run = earlier.get("run")
+        if isinstance(run, dict) and run.get("ranked_csv_sha256") not in (None, identity["ranked_csv_sha256"]):
+            raise Refused(f"{path} was made from another run (ranked.csv differs)")
+    carried = second_looks_from(earlier, path)
+    if not carried:
+        raise Refused(f"{path}: no 'second look' rows to carry (is it a land_today.json?)")
+    items = earlier.get("parcels") if isinstance(earlier, dict) else earlier
+    held = sum(1 for x in items if isinstance(x, dict) and x.get("source") == SOURCE_SECOND_HELD)
+    if held:
+        print(f"builtcheck: note: {held} second look(s) in {path} were held back by a failed input and are "
+              "not carried; carry them from the file they were first recorded in", file=sys.stderr)
+    merged = dict(visual)
+    merged["second_look"] = {**carried, **(visual.get("second_look") or {})}
+    return merged
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -705,18 +816,38 @@ def main(argv: list[str] | None = None) -> int:
                     "no parcel reads raw_land")
     ap.add_argument("--visual-by-rank", action="store_true",
                     help="accept a visual file with no run and no parcel ids, joined by rank")
+    ap.add_argument("--second-looks-from", type=Path,
+                    help="an earlier land_today.json whose 'second look' rows are carried into this check "
+                         "(joined by rank and parcel id; refused when it names another run)")
     ap.add_argument("--decisions", type=Path, help="decisions.csv (only the decision value is used)")
     ap.add_argument("--cache-days", type=float, default=DEFAULT_CACHE_DAYS,
                     help="reuse cached map answers up to this age")
     args = ap.parse_args(argv)
     try:
+        if args.top < 1:
+            raise Refused("--top must be 1 or more")
+        if not (math.isfinite(args.cache_days) and args.cache_days >= 0):
+            # nan would keep every cached answer forever (no age check passes).
+            raise Refused("--cache-days must be a number of days, 0 or more")
         out = check_out_path(args.out, args.run_dir)
-        visual = json.loads(args.visual.read_text(encoding="utf-8")) if args.visual else None
-        decisions = None
-        if args.decisions:
-            with open(args.decisions, encoding="utf-8-sig", newline="") as fh:
-                decisions = {r["parcel_id"]: (r.get("decision") or "").strip()
-                             for r in csv.DictReader(fh) if r.get("parcel_id")}
+        try:
+            # Every input is read before any fetch or write.
+            identity = run_identity(args.run_dir)
+            read_ranked(args.run_dir)
+            load_geoms(args.run_dir)
+            visual = json.loads(args.visual.read_text(encoding="utf-8")) if args.visual else None
+            if args.second_looks_from:
+                earlier = json.loads(args.second_looks_from.read_text(encoding="utf-8"))
+                visual = with_second_looks(visual, earlier, identity, str(args.second_looks_from))
+            decisions = None
+            if args.decisions:
+                with open(args.decisions, encoding="utf-8-sig", newline="") as fh:
+                    decisions = {r["parcel_id"]: (r.get("decision") or "").strip()
+                                 for r in csv.DictReader(fh) if r.get("parcel_id")}
+        except (OSError, ValueError, KeyError, csv.Error) as exc:
+            # A missing or unreadable input (no ranked.csv, a --visual or
+            # --decisions file that is not there or not valid JSON / CSV).
+            raise Refused(f"cannot read an input ({type(exc).__name__}: {str(exc)[:200]})") from None
         result = run_check(args.run_dir, top=args.top, visual=visual,
                            visual_by_rank=args.visual_by_rank, decisions=decisions,
                            fetcher=Fetcher(cache_days=args.cache_days))
@@ -728,9 +859,10 @@ def main(argv: list[str] | None = None) -> int:
     land = Counter(x["land_today"] for x in result.land)
     print(f"{out}: {len(result.built)} parcels; built check {dict(counts)}; land today {dict(land)}")
     not_checked = counts.get(NOT_CHECKED, 0)
-    if not_checked:
-        print(f"builtcheck: {not_checked} parcel(s) not checked (a fetch failed); "
-              "re-run later", file=sys.stderr)
+    partial = sum(1 for x in result.built if x["built_check"] != NOT_CHECKED and not inputs_complete(x))
+    if not_checked or partial:
+        print(f"builtcheck: {not_checked} parcel(s) not checked and {partial} checked with an input missing "
+              "(a fetch failed; none of them reads raw_land); re-run later", file=sys.stderr)
         return 1
     return 0
 

@@ -130,7 +130,10 @@ def render(d: Drawing, rec: dict) -> str:
     if missing:
         L.insert(1, ("f1", "Not checked: " + ", ".join(missing) + " (floor area not counted)"))
     if rec.get("gated"):
-        L.insert(1, ("f1", "Gated: " + ", ".join(rec["gated"]) + " (floor area not counted)"))
+        # Worded from total_sf: the default rule does not count a gated
+        # plan, the prototype rule (--prototype-behaviour) does.
+        counted = bool(rec.get("total_sf"))
+        L.insert(1, ("f1", "Gated: " + ", ".join(rec["gated"]) + (" (entitlement gate; floor area counted)" if counted else " (floor area not counted)")))
     if rec.get("second_building"):
         sb = rec["second_building"]
         L.append(("b", f"2nd: {sb['configuration']}, {sb['sf']:,} SF, {sb['doors']} doors, {sb['trailers']} trailers, {sb['cars_capacity']} cars; total {rec['total_sf_if_access']:,} SF"))

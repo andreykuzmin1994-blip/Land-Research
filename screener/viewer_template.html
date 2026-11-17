@@ -103,6 +103,8 @@ const fmt = n => (n===null||n===undefined||n==="")?"?":Number(n).toLocaleString(
 // main view never point at each other's patterns (ids are [A-Za-z][\w-]*,
 // checked by the sanitiser in viewer.py).
 let uid=0; const svgOf=p=>{const u="u"+(++uid)+"-";return p.svg.replace(/ id="([A-Za-z][A-Za-z0-9_-]*)"/g,(m,i)=>` id="${u}${i}"`).replace(/url\(#([A-Za-z][A-Za-z0-9_-]*)\)/g,(m,i)=>`url(#${u}${i})`);};
+// A feasible plan held only by an entitlement gate sorts by its drawn floor area.
+const sortSf = p => p.sf || (p.kind==="plan" && p.feasible===true && p.gated && p.gated.length ? p.sfIfAccess : 0);
 const feasText = p => p.feasible===true?"feasible":p.feasible===null?"incomplete":(p.hypothetical?"no road access":"not feasible");
 const filt = {status:new Set(), kind:new Set()};
 let shown = [], cur = 0, cmpId = null;
@@ -130,7 +132,7 @@ function match(p){
   if(filt.kind.size && !filt.kind.has(p.kind)) return false;
   const f=$("#fitf").value;
   if(f==="fits" && !p.stdFits) return false;
-  if(f==="none" && p.stdFits) return false;
+  if(f==="none" && p.stdFits!==false) return false;
   if(f==="cross" && !/cross-dock/.test(p.fit)) return false;
   const lf=$("#landf").value; if(lf==="none" ? p.land : (lf && p.land!==lf)) return false;
   const ff=$("#feasf").value; if(ff==="yes" && !(p.kind==="plan" && p.feasible===true)) return false; if(ff==="no" && !(p.kind==="plan" && p.feasible===false)) return false; if(ff==="incomplete" && !(p.kind==="plan" && p.feasible===null)) return false;
@@ -145,7 +147,7 @@ const thumbs = ("IntersectionObserver" in window) ? new IntersectionObserver(es=
 function render(){
   const s=$("#sort").value;
   const curId = shown[cur]?.id || load("cur");
-  shown = PLANS.filter(match).sort((a,b)=> s==="sf"? b.sf-a.sf || a.rank-b.rank : s==="acres"? (b.mapAc||0)-(a.mapAc||0) : a.rank-b.rank || (a.kind==="run"?-1:1));
+  shown = PLANS.filter(match).sort((a,b)=> s==="sf"? sortSf(b)-sortSf(a) || a.rank-b.rank : s==="acres"? (b.mapAc||0)-(a.mapAc||0) : a.rank-b.rank || (a.kind==="run"?-1:1));
   const active = $("#q").value || $("#fitf").value || $("#landf").value || $("#feasf").value || filt.status.size || filt.kind.size;
   $("#count").innerHTML=`Showing ${shown.length} of ${PLANS.length} plans`+(active?' · <button type="button" id="clr">clear filters</button>':"");
   if(active) $("#clr").onclick=clearFilters;
@@ -155,7 +157,7 @@ function render(){
     const b=document.createElement("button");b.className="item";b.type="button";
     b.innerHTML=`<div class="thumb" aria-hidden="true"></div><div><div class="it-t">${esc(p.title)}${p.kind==="plan"?'<span class="tag">plan</span>':""}${p.kind==="plan"&&p.feasible!==true?'<span class="tag" style="background:var(--drop)">'+esc(feasText(p))+'</span>':""}</div>
       <div class="it-s"><span class="dot s-${p.status}"></span>${esc(ST[p.status])} · ${esc(p.place)}</div>
-      <div class="it-s">${p.sf? fmt(p.sf)+" SF":(p.sfIfAccess? fmt(p.sfIfAccess)+" SF (not counted)":"no building fit")} · ${esc(p.mapAc??p.taxAc)} ac${p.land?" · "+esc(LANDL[p.land]||p.land):""}</div></div>`;
+      <div class="it-s">${esc(p.sfText)} · ${esc(p.mapAc??p.taxAc)} ac${p.land?" · "+esc(LANDL[p.land]||p.land):""}</div></div>`;
     b.onclick=()=>show(i); b.dataset.i=i;
     L.appendChild(b); thumbs.observe(b);
   });
@@ -181,20 +183,21 @@ function factsPlan(p){
   const rows=[["Parcel",(p.pids&&p.pids.length>1)?p.pids.join(", "):p.pid],["Land today",(LANDL[p.land]||"not reviewed")+(p.landWhat?": "+p.landWhat:"")],["Zoning",p.zoning],["Zoning rules used",`${p.zoningRules||"default"} (DRAFT screening values, not a zoning determination)`],
     ["Layout",p.fit],["Building",b?`${fmt(b.sf)} SF · ${b.L_ft} x ${b.D_ft} ft · ${b.clear_height_ft} ft clear (assumed)`:"none"]];
   if(v.second_building) rows.push(["Second building",`${v.second_building.configuration}: ${fmt(v.second_building.sf)} SF${v.second_building.own_driveways?" (own driveways)":" (shares driveways)"}`]);
-  if(tr&&ca&&cv&&de&&ac&&gr) rows.push(["Total",p.feasible===true?`${fmt(p.sf)} SF`:`${fmt(p.sfIfAccess)} SF if ${p.feasible===null?"the unchecked inputs were clear":"access and routes worked"} (not counted)`],
+  if(tr&&ca&&cv&&de&&ac&&gr) rows.push(["Total",p.sfText],
     ["Dock doors",fmt(v.doors)],["Trailer stalls",`${tr.total} (court rows ${tr.court_rows}, drop yard ${tr.drop_yards}) vs target ${tr.target}`],
     ["Car stalls",`${ca.provided} (required ${ca.required}; ADA ${ca.ada}; ${ca.stall}) — ${ca.basis}`],
     ["Coverage",`${cv.gross_ac} ac county map · ${fmt(cv.sf_per_gross_ac)} SF/gross ac · FAR ${cv.gross_far} · impervious ${cv.impervious_ac} ac (${cv.impervious_pct}%)`],
     ["Detention",`${de.storage_acft} ac-ft in ${de.ponds} pond(s) · ${de.fits?"fits":"does not fit"} · ${de.basis}`],
     ["Access",`${ac.truck_driveway?"truck":"no truck"}${ac.car_driveway?" + car":""} driveway(s) on ${ac.road||"no road"} · frontage ${fmt(ac.frontage_ft||0)} ft · truck route ${fmt(ac.truck_route_ft)} ft · car route ${fmt(ac.car_route_ft)} ft`],
     ["Grading",gr.relief_ft!=null?`relief ~${gr.relief_ft} ft · cut/fill ~${fmt(gr.cut_fill_cy||0)} CY · steep ${gr.steep_share_pct}% — ${gr.basis}`:"no lidar"]);
+  if(p.gated&&p.gated.length) rows.push(["Entitlement gate",p.gated.join(", ")+(p.sf?" (the layout is feasible and its floor area is counted; check the gate before pursuing)":" (the layout is feasible, but its floor area is not counted until the gate is cleared)")]);
   for(const [k,x] of (v.operator_decisions||[])) rows.push(["Operator decision: "+k,x]);
   let h=`<h2>${esc(p.title)}</h2><div class="place">${esc(p.place)}</div>
    <span class="badge" style="background:${COL[p.status]}">${esc(ST[p.status])}</span><span class="badge" style="background:var(--test)">Site plan</span><span class="badge" style="background:${p.feasible===true?"var(--open)":p.feasible===null?"var(--doubt)":"var(--drop)"}">${esc(feasText(p))}</span><span class="draft">DRAFT zoning</span>
    <dl>${rows.map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl>`;
   const fl=(arr,lab,col)=>arr&&arr.length?`<div class="note"><span class="lbl" style="color:${col}">${lab}</span><ul style="margin:4px 0 0;padding-left:18px">${arr.map(f=>`<li><b>${esc(f.flag)}</b>: ${esc(f.note)}</li>`).join("")}</ul></div>`:"";
   h+=fl(p.flags1,"Severity 1 (likely kills or cuts the yield)","#b3261e")+fl(p.flags2,"Severity 2 (verify)","#8a5a00")+fl(p.flags3,"For information","#5d676e");
-  if(p.alternatives&&p.alternatives.length) h+=`<table><tr><th>Layouts tried</th><th>SF</th><th>Feasible</th></tr>${p.alternatives.map(a=>`<tr><td>${esc(a.variant)}</td><td>${fmt(a.sf)}</td><td>${a.feasible===true?"yes":a.feasible===null?"incomplete":(a.route_problem?"no route":"no")}</td></tr>`).join("")}</table>`;
+  if(p.alternatives&&p.alternatives.length) h+=`<table><tr><th>Layouts tried</th><th>SF</th><th>Layout checks (not site feasibility)</th></tr>${p.alternatives.map(a=>`<tr><td>${esc(a.variant)}</td><td>${fmt(a.sf)}</td><td>${a.geometryOk===true?"pass":a.geometryOk===null?"?":(a.route_problem?"no route":"fail")}</td></tr>`).join("")}</table>`;
   if(p.related){const r=PLANS.find(x=>x.id===p.related); if(r) h+=`<p><button type="button" id="sbs">Compare with the screener's plan</button></p>`;}
   if(p.note) h+=`<div class="note"><span class="lbl">Mark in decisions.csv:</span> ${esc(p.note)}</div>`;
   h+=`<p class="lbl">Screening test fit from public data: not a survey, civil design or zoning determination. Zoning values are DRAFT; detention ±30%; routes, fire access and grading are indicative.</p>`;
@@ -224,7 +227,7 @@ const Z={1:{s:1,x:0,y:0,fitted:true,w:0,h:0},2:{s:1,x:0,y:0,fitted:true,w:0,h:0}
 const planOf={1:null,2:null};
 function put(n,p){
   planOf[n]=p; const c=$("#c"+n); c.innerHTML=svgOf(p);
-  $("#l"+n).innerHTML=`${esc(p.title)}<span class="mini"> · ${p.sf?fmt(p.sf)+" SF":"no building fit"} · ${esc(acresText(p))} · ${esc(ST[p.status])}</span>`;
+  $("#l"+n).innerHTML=`${esc(p.title)}<span class="mini"> · ${esc(p.sfText)} · ${esc(acresText(p))} · ${esc(ST[p.status])}</span>`;
   requestAnimationFrame(refit);
 }
 function apply(n){const z=Z[n];$("#c"+n).style.transform=`translate(${z.x}px,${z.y}px) scale(${z.s})`;$("#v"+n).classList.toggle("fitted",z.fitted);}

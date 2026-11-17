@@ -11,8 +11,9 @@ What goes in:
   or a prototype plans4.json) and the SVG files those name;
 - decisions.csv: only the decision value, and the "probably taken" status
   read from the note. The note text itself only with --include-notes;
-- lead folders (INVESTIGATE.md): only the skeptic verdict, an enum. The
-  "In one line" headline only with --include-headlines;
+- lead folders (each parcel's findings.checked.json and lead.md): only the
+  skeptic verdict, an enum. The lead.md "In one line" headline only with
+  --include-headlines;
 - land_today.json from ``screener.builtcheck``: the land class and what
   the aerial review saw.
 
@@ -69,6 +70,7 @@ SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 KEY_RE = re.compile(r"^[A-Za-z0-9_+-]{1,64}$")
 PLAN_SVG_RE = re.compile(r"^plan4?-[A-Za-z0-9_-]{1,64}\.svg$")
 BRIEF_SVG_RE = re.compile(r"^(\d{1,6})_([A-Za-z0-9_-]{1,64})\.svg$")
+FLAG_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,59}$")
 PLAN_FILES = ("plans.json", "plans4.json")   # the planner's, then the prototype's
 MAX_PAGE_BYTES = 15_000_000   # refuse above this (reviews/37 R28)
 WARN_PAGE_BYTES = 5_000_000   # say so above this
@@ -82,6 +84,11 @@ LAND_CLASSES = ("raw_land", "partly_usable", "not_raw_land", "unclear")
 SKEPTIC_VERDICTS = ("survives", "weakened", "killed")
 # Status shown per parcel, from decisions.csv.
 STATUSES = ("open", "unchecked", "doubt", "taken", "drop", "listed")
+# A multi-parcel plan shows its worst member: land class first to last
+# (None = not reviewed, worse than a reviewed usable class), status most
+# negative first.
+LAND_WORST_FIRST = ("not_raw_land", "unclear", None, "partly_usable", "raw_land")
+STATUS_WORST_FIRST = ("drop", "taken", "doubt", "unchecked", "listed", "open")
 
 
 class Refused(RuntimeError):
@@ -138,11 +145,179 @@ GENERIC_OWNER_WORDS = frozenset({"cemetery", "church", "unknown", "owner", "esta
                                  "vacant", "railroad", "railway"})
 
 
-def normal_tokens(text: str) -> list[str]:
+# Words that mark an owner string as not an individual's name (a public
+# body, a church, a company without a suffix): no natural-order name form
+# is added for those.
+NOT_PERSON_WORDS = frozenset({
+    "of", "and", "for", "county", "city", "state", "board", "church", "department", "dept", "authority",
+    "united", "states", "georgia", "ga", "fulton", "atlanta", "association", "assn", "assoc", "bank", "fund",
+    "group", "development", "dev", "investments", "investment", "invest", "realty", "land", "lands",
+    "enterprises", "ministries", "ministry", "school", "schools", "district", "housing", "partners",
+    "properties", "property", "holdings", "family", "living", "revocable", "irrevocable", "estate", "heirs",
+    "baptist", "methodist", "temple", "center", "club", "services", "management", "capital", "ventures",
+    "industries", "industrial", "logistics", "railroad", "railway", "power", "electric", "water", "dot",
+    "transportation", "commission", "federal", "national", "american", "south", "north", "east", "west",
+    "park", "union", "point", "college", "palmetto", "fairburn", "hills", "chattahoochee", "airport",
+    "rd", "road", "st", "street", "ave", "hwy", "cemetery", "unknown", "owner", "vacant", "farm", "farms",
+    "homes", "home", "builders", "construction", "storage", "warehouse", "equity", "trustee", "trust",
+}) - {"and"}
+
+
+# Spellings that read the same on both sides of the match (the guard's
+# strings and the text searched): the USPS street suffixes and unit words,
+# spelled out or abbreviated, and "&" / "and".
+STREET_WORDS = {
+    "road": "rd", "drive": "dr", "street": "st", "avenue": "ave", "av": "ave", "parkway": "pkwy",
+    "pky": "pkwy", "boulevard": "blvd", "circle": "cir", "court": "ct", "highway": "hwy",
+    "lane": "ln", "place": "pl", "terrace": "ter", "trail": "trl", "way": "wy", "square": "sq",
+    "crossing": "xing", "point": "pt", "suite": "ste", "apartment": "apt", "building": "bldg",
+    "floor": "fl", "room": "rm", "north": "n", "south": "s", "east": "e", "west": "w",
+    "northeast": "ne", "northwest": "nw", "southeast": "se", "southwest": "sw",
+}
+UNIT_WORDS = frozenset({"ste", "unit", "apt", "bldg", "fl", "rm", "lot", "spc"})
+# NOT_PERSON_WORDS as normal_tokens spells them ("point" -> "pt").
+NOT_PERSON_WORDS = NOT_PERSON_WORDS | {STREET_WORDS.get(w, w) for w in NOT_PERSON_WORDS}
+
+
+# An apostrophe after a one-letter prefix is dropped, not read as a
+# break: "O'Brien", "O’BRIEN" and "OBRIEN" read the same ("Smith's"
+# still reads "smith s").
+_PREFIX_APOSTROPHE = re.compile(r"(?<!\w)(\w)['\u2019\u02bc](?=\w\w)")
+# A company suffix spelled in single letters ("L.L.C.", "L L C", "Inc.")
+# reads as the one word.
+SPELLED_SUFFIXES = frozenset({"llc", "llp", "lllp", "lp", "lc", "pc", "pllc", "inc"})
+
+
+def normal_tokens(text: str, fold: bool = True) -> list[str]:
+    """The words of a text as the owner guard compares them. `fold` maps
+    the street and compass words to one spelling (STREET_WORDS); the guard
+    measures its length limits on the unfolded words."""
     text = html.unescape(text)
     text = _JSON_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)) if m.group(1) else " ", text)
-    text = unicodedata.normalize("NFKC", text).casefold()
-    return [t for t in _NON_WORD.split(text) if t]
+    text = unicodedata.normalize("NFKC", text).casefold().replace("&", " and ")
+    text = _PREFIX_APOSTROPHE.sub(r"\1", text)
+    raw = [t for t in _NON_WORD.split(text) if t]
+    toks = [STREET_WORDS.get(t, t) for t in raw] if fold else raw
+    # "P.O. Box" and "PO BOX" read the same; a run of single letters that
+    # spells a company suffix is joined ("l l c" -> "llc").
+    out: list[str] = []
+    i = 0
+    while i < len(toks):
+        if toks[i] == "p" and i + 2 < len(toks) and toks[i + 1] == "o" and toks[i + 2] == "box":
+            out.append("po")
+            i += 2
+            continue
+        if len(toks[i]) == 1 and toks[i].isalpha():
+            j = i
+            while j < len(toks) and len(toks[j]) == 1 and toks[j].isalpha():
+                j += 1
+            run = "".join(toks[i:j])
+            if j - i >= 2 and run in SPELLED_SUFFIXES:
+                out.append(run)
+                i = j
+                continue
+        out.append(toks[i])
+        i += 1
+    return out
+
+
+def street_base(street: str) -> list[str]:
+    """A mailing street line without its unit ("4410 OLD STAGE RD STE 300"
+    -> "4410 old stage rd"; "... RD # 300" -> "... rd"), so a text that
+    drops the suite still matches."""
+    toks = normal_tokens(street or "")
+    for i, t in enumerate(toks):
+        if i >= 2 and t in UNIT_WORDS:
+            return toks[:i]
+    if len(toks) >= 3 and toks[-1].isdigit() and not toks[-2].isdigit() and "#" in (street or ""):
+        return toks[:-1]
+    return toks
+
+
+_TAG = re.compile(r"<[^<>]*>")
+
+
+def markup_text(text: str) -> str:
+    """The text of an SVG or HTML fragment with every tag replaced by a
+    space, so an owner name split across elements ("A <tspan>B</tspan>")
+    or wrapped over two text lines reads as one run of words."""
+    return _TAG.sub(" ", text)
+
+
+# Words after an individual's name on the tax roll that are not part of it.
+PERSON_TRAILERS = frozenset({"et", "al", "etal", "etux", "ux", "jr", "sr", "ii", "iii", "iv"})
+# "L.L.C.", "L.P.", "L.L.P." spelled with dots read as single letters.
+_DOTTED_SUFFIXES = (("l", "l", "c"), ("l", "l", "p"), ("l", "p"), ("l", "c"), ("p", "c"))
+
+
+# Surname particles kept with the surname ("DE LA CRUZ MARIA" -> "maria
+# de la cruz"), and one-letter surname prefixes the roll may write apart
+# ("O BRIEN PATRICK" -> "obrien").
+SURNAME_PARTICLES = frozenset({"de", "la", "del", "della", "van", "von", "der", "den", "di", "da", "du",
+                               "le", "dos", "das", "el", "mc", "mac"})
+SURNAME_PREFIX_LETTERS = frozenset({"o", "d"})
+
+
+def _person_words(toks: list[str]) -> list[str]:
+    """One person's words without initials and trailers, a split one-letter
+    surname prefix joined to the surname."""
+    toks = list(toks)
+    while toks and toks[-1] in PERSON_TRAILERS:
+        toks.pop()
+    if len(toks) >= 2 and toks[0] in SURNAME_PREFIX_LETTERS:
+        toks = [toks[0] + toks[1]] + toks[2:]
+    return [t for t in toks if len(t) > 1 and t not in PERSON_TRAILERS]
+
+
+def _surname_split(names: list[str]) -> tuple[str, list[str]]:
+    """(surname with its particles, the given names after it)."""
+    k = 0
+    while k < len(names) - 2 and names[k] in SURNAME_PARTICLES:
+        k += 1
+    return " ".join(names[:k + 1]), names[k + 1:]
+
+
+def person_name_forms(owner: str) -> list[str]:
+    """An individual owner as the tax roll writes it ("SMITH JOHN A",
+    "SMITH JOHN L", "SMITH JOHN ET AL") read in both orders without
+    initials ("smith john", "john smith"), the way a person writes a name in
+    a note. Middle initials and trailing ET AL / JR words are dropped first;
+    empty for anything that is not plainly a person's name (a company suffix
+    such as LLC or a dotted L.L.C., or a NOT_PERSON_WORDS word).
+
+    A couple ("WALKER DONALD & BETTY") gives both people's forms ("donald
+    walker", "betty walker") and the couple's ("donald and betty walker");
+    a second person with two words ("& SMITH BETTY") also gives those two
+    words as a name of its own. Surname particles stay with the surname
+    ("maria de la cruz"), and a split "O BRIEN" reads "obrien"."""
+    toks = normal_tokens(owner or "")
+    if not 2 <= len(toks) <= 8 or not all(t.isalpha() for t in toks):
+        return []
+    for pat in _DOTTED_SUFFIXES:
+        n = len(pat)
+        if any(tuple(toks[i:i + n]) == pat for i in range(len(toks) - n + 1)):
+            return []
+    words = [t for t in toks if len(t) > 1 and t != "and" and t not in PERSON_TRAILERS]
+    if any(t in OWNER_SUFFIXES or t in NOT_PERSON_WORDS for t in words):
+        return []
+    second: list[str] = []
+    if "and" in toks:                 # "WALKER DONALD & BETTY"
+        cut = toks.index("and")
+        toks, second = toks[:cut], _person_words(toks[cut + 1:])
+    names = _person_words(toks)
+    if not 2 <= len(names) <= 4:
+        return []
+    surname, given = _surname_split(names)
+    first = given[0]
+    forms = [f"{surname} {first}", f"{first} {surname}"]
+    if second and len(second) <= 4:
+        other = second[0]
+        forms += [f"{other} {surname}", f"{surname} {other}", f"{first} and {other} {surname}"]
+        if len(second) >= 2:
+            s2, g2 = _surname_split(second)
+            if g2:
+                forms += [f"{s2} {g2[0]}", f"{g2[0]} {s2}"]
+    return list(dict.fromkeys(forms))
 
 
 class OwnerDataFound(Refused):
@@ -160,7 +335,11 @@ class OwnerGuard:
     def add(self, text: str, what: str, *, min_chars: int = MIN_FULL_CHARS,
             skip: set[tuple[str, ...]] | frozenset = frozenset()) -> None:
         toks = tuple(normal_tokens(text or ""))
-        if not toks or len(" ".join(toks)) < min_chars or toks in skip:
+        # The length limit is measured on the words as written, before the
+        # street words are folded ("MILL ROAD" is 9 characters although it
+        # is matched as "mill rd").
+        size = len(" ".join(normal_tokens(text or "", fold=False)))
+        if not toks or size < min_chars or toks in skip:
             return
         if len(toks) == 1 and toks[0] in GENERIC_OWNER_WORDS:
             return
@@ -175,28 +354,40 @@ class OwnerGuard:
     def from_rows(cls, rows: Iterable[dict[str, str]]) -> "OwnerGuard":
         rows = list(rows)
         guard = cls()
-        # Site addresses and place names of the run are published data in
-        # every artifact. An owner or mailing string that is only (part of)
-        # one of them is skipped: a mailing address that is a site address
-        # (an owner-occupied house mailing from "12 X RD" for the parcel
-        # "12 X RD REAR"), or an owner named after its city (a city's own
-        # land, or "<CITY> LLC" once its suffix is gone).
-        public: set[tuple[str, ...]] = set()
+        # Two kinds of published text are skipped. (1) Place names: the run's
+        # jurisdiction names are in every artifact, so an owner named after
+        # a city (a city's own land, or "<CITY> LLC" once its suffix is
+        # gone) is skipped for every row. (2) The row's OWN site address: a
+        # mailing address that is the same parcel's site address (an
+        # owner-occupied house mailing from "12 X RD" for the parcel "12 X
+        # RD REAR"). Another row's site address is never skipped here; an
+        # artifact that writes it passes it to hits() as `public`. One
+        # exception, for one-word strings only: a single word that is a word
+        # of any site address of the run ("HILLSIDE LLC" -> "hillside", a
+        # street-name word) is an ordinary word in an aerial note, so it is
+        # skipped like a place name. A multi-word string (a name, a mailing
+        # line) is never skipped because of another row.
+        places: set[tuple[str, ...]] = set()
         for r in rows:
-            public |= _subphrases(r.get("site_address") or "")
-            public |= _subphrases(r.get("jurisdiction") or "")
+            places |= _subphrases(r.get("jurisdiction") or "")
+            places |= {(t,) for t in normal_tokens(r.get("site_address") or "")}
         for r in rows:
+            public = places | _subphrases(r.get("site_address") or "")
             owner = r.get("owner") or ""
             guard.add(owner, "owner", skip=public)
-            toks = normal_tokens(owner)
+            toks = normal_tokens(owner, fold=False)
             while toks and toks[-1] in OWNER_SUFFIXES:
                 toks.pop()
             while toks and toks[0] == "the":
                 toks.pop(0)
             guard.add(" ".join(toks), "owner", min_chars=MIN_CORE_CHARS, skip=public)
+            for form in person_name_forms(owner):
+                guard.add(form, "owner", min_chars=MIN_CORE_CHARS, skip=public)
             mailing = r.get("owner_mailing") or ""
             guard.add(mailing, "owner_mailing", skip=public)
-            guard.add(mailing.split(",")[0], "owner_mailing", min_chars=MIN_CORE_CHARS, skip=public)
+            street = mailing.split(",")[0]
+            guard.add(street, "owner_mailing", min_chars=MIN_CORE_CHARS, skip=public)
+            guard.add(" ".join(street_base(street)), "owner_mailing", min_chars=MIN_CORE_CHARS, skip=public)
         return guard
 
     @classmethod
@@ -212,8 +403,9 @@ class OwnerGuard:
 
     def hits(self, text: str, public: Iterable[str] = ()) -> Counter:
         """Owner strings found in text, by field. A string that is part of
-        one of the `public` texts (site addresses of county records written
-        in the same artifact) is skipped there, for the same reason as above."""
+        one of the `public` texts (the site addresses this artifact itself
+        writes: its sites' and county records' addresses) is skipped there,
+        for the same reason as above."""
         skip: set[tuple[str, ...]] = set()
         for p in public:
             skip |= _subphrases(p or "")
@@ -512,6 +704,12 @@ def lead_check(pid: str, roots: list[Path], with_headline: bool) -> tuple[str | 
     return None, None
 
 
+# builtcheck's words for a check that did not complete (footprint_check
+# NOT_CHECKED, and the start of `why` in classify_land's incomplete branch).
+BUILT_CHECK_NOT_RUN = "not checked"
+BUILT_CHECK_INCOMPLETE = ("footprint check not completed", "an input of the built check failed")
+
+
 def load_land(path: Path | None, identity: dict[str, str],
               by_pid: dict[str, dict[str, str]]) -> dict[str, dict[str, Any]]:
     """land_today keyed by parcel id; refused when it is from another run."""
@@ -533,7 +731,13 @@ def load_land(path: Path | None, identity: dict[str, str],
             raise Refused(f"{path}: rank and parcel id do not match this run")
         if x.get("land_today") not in LAND_CLASSES:
             raise Refused(f"{path}: unknown land class")
-        land[pid] = {"land": x["land_today"], "landWhat": text(x.get("what_is_there"))}
+        what = text(x.get("what_is_there"))
+        why = text(x.get("why")) or ""
+        if x.get("footprint_check") == BUILT_CHECK_NOT_RUN or why.startswith(BUILT_CHECK_INCOMPLETE):
+            # The built check did not complete for this parcel: say so next
+            # to the class, which then rests on the photo alone.
+            what = text(f"{what or 'no evidence'} [built check incomplete: {why or 'footprint check not completed'}]")
+        land[pid] = {"land": x["land_today"], "landWhat": what}
     return land
 
 
@@ -639,6 +843,26 @@ def build_plans(inp: Inputs) -> list[dict[str, Any]]:
             out["note"] = text(d["note"])
         return out
 
+    def common_many(pids: list[str]) -> dict[str, Any]:
+        """A multi-parcel plan: the worst member's land class and status,
+        and each member's class in landWhat (an assemblage is not raw land
+        because its first member is)."""
+        if len(pids) == 1:
+            return common(pids[0])
+        each = [(p, common(p)) for p in pids]
+        out = {"status": min((c["status"] for _, c in each), key=STATUS_WORST_FIRST.index),
+               "land": min((c["land"] for _, c in each), key=LAND_WORST_FIRST.index)}
+        parts = []
+        for p, c in each:
+            r = by_pid.get(p)
+            who = f"#{r['rank']}" if r else p
+            parts.append(f"{who} {(c['land'] or 'not reviewed').replace('_', ' ')}" + (f": {c['landWhat']}" if c.get("landWhat") else ""))
+        out["landWhat"] = text("; ".join(parts))
+        notes = [c["note"] for _, c in each if c.get("note")]
+        if notes:
+            out["note"] = text(" | ".join(notes))
+        return out
+
     plans: list[dict[str, Any]] = []
     brief_ranks: set[int] = set()
     briefs = run_dir / "briefs"
@@ -669,6 +893,7 @@ def build_plans(inp: Inputs) -> list[dict[str, Any]]:
             "exit": text(f"{r['exit_miles']} mi straight line to {r['exit_label']}"),
             "skeptic": verdict, "maps": text(r["maps_link"], 400), "svg": svg, **common(pid),
         }
+        rec["sfText"] = f"{rec['sf']:,} SF" if rec["sf"] else "no building fit"
         if headline:
             rec["headline"] = headline
         plans.append(rec)
@@ -676,10 +901,32 @@ def build_plans(inp: Inputs) -> list[dict[str, Any]]:
     if inp.plans_dir is not None:
         items, _ = load_plans(Path(inp.plans_dir), identity, inp.join_by_rank)
         seen: set[str] = set()
+        no_fit: list[str] = []
+        not_planned: list[str] = []
         for t in items:
-            if not isinstance(t, dict) or not t.get("svg") or t.get("fits") is False:
+            if not isinstance(t, dict):
                 continue
-            plans.append(_plan_record(t, inp, by_rank, by_pid, brief_ranks, common, seen))
+            if not t.get("svg") or t.get("fits") is False:
+                # Planned, nothing drawn: there is no drawing to show, so the
+                # page leaves it out and says why (no building fits, or the
+                # search or an input stopped before a plan was made).
+                key = str(t.get("key") if t.get("key") is not None else t.get("rank"))
+                key = key if KEY_RE.match(key) else "?"
+                sev = t.get("flags") if isinstance(t.get("flags"), dict) else {}
+                first = {f.get("flag") for f in (sev.get("1", sev.get(1)) or []) if isinstance(f, dict)}
+                if "PLAN_BUDGET_EXCEEDED" in first or any(str(f).endswith("_NOT_CHECKED") for f in first):
+                    not_planned.append(key)
+                else:
+                    no_fit.append(key)
+                continue
+            plans.append(_plan_record(t, inp, by_rank, by_pid, brief_ranks, common_many, seen))
+        if no_fit:
+            print(f"viewer: note: {len(no_fit)} planned site(s) without a drawing (no building fits) are not shown: "
+                  + ", ".join(no_fit[:40]) + (" ..." if len(no_fit) > 40 else ""), file=sys.stderr)
+        if not_planned:
+            print(f"viewer: note: {len(not_planned)} site(s) not planned (the search budget ran out or an input was "
+                  "not checked before any plan was made; re-run the planner) are not shown: "
+                  + ", ".join(not_planned[:40]) + (" ..." if len(not_planned) > 40 else ""), file=sys.stderr)
     return plans
 
 
@@ -689,7 +936,14 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
     key = str(t.get("key") if t.get("key") is not None else t.get("rank"))
     if not KEY_RE.match(key):
         raise Refused(f"plan key not allowed: {key!r}")
-    ranks = [int(k) for k in key.split("+")] if re.fullmatch(r"\d+(\+\d+)*", key) else []
+    # The ranks a plan names: its "rank" ("4", "115+170"; an --assemble NAME
+    # names none). screener.siteplan slugs the key ("115-170"), so the rank
+    # field is read first; the prototype's records carry only a rank.
+    ranks: list[int] = []
+    for cand in (t.get("rank"), key):
+        if cand is not None and re.fullmatch(r"\d{1,6}(\+\d{1,6})*", str(cand)):
+            ranks = [int(k) for k in str(cand).split("+")]
+            break
     pids = t.get("parcel_ids")
     if pids is not None:
         if not (isinstance(pids, list) and pids and all(isinstance(p, str) for p in pids)):
@@ -711,13 +965,18 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
     if plan_id in seen:
         raise Refused(f"two plans with the key {key!r}")
     seen.add(plan_id)
-    svg = sanitise_svg(inside(Path(inp.plans_dir), t["svg"], PLAN_SVG_RE).read_text(encoding="utf-8"))
+    svg_path = inside(Path(inp.plans_dir), t["svg"], PLAN_SVG_RE)
+    if not svg_path.is_file():
+        raise Refused(f"plan {key}: {t['svg']} is named in the plans file but is not in {inp.plans_dir}")
+    svg = sanitise_svg(svg_path.read_text(encoding="utf-8"))
     _, fpp = svg_meta(svg)
     sev = t.get("flags") if isinstance(t.get("flags"), dict) else {}
     zoning = t.get("zoning") if isinstance(t.get("zoning"), dict) else {}
     zoning_name = text(zoning.get("name") or t.get("jurisdiction_rules"), 80)
     feasible = t.get("feasible")
     feasible = None if feasible is None else bool(feasible)
+    gated = [g for g in (t.get("gated") if isinstance(t.get("gated"), list) else [])
+             if isinstance(g, str) and FLAG_NAME_RE.match(g)][:10]
     det = t.get("detention") if isinstance(t.get("detention"), dict) else {}
     cov = t.get("coverage") if isinstance(t.get("coverage"), dict) else {}
     v4 = {k: _sub(t.get(k), spec) for k, spec in PLAN_FACTS.items() if isinstance(t.get(k), dict)}
@@ -729,8 +988,13 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
     alts = []
     for a in (t.get("alternatives") or [])[:6] if isinstance(t.get("alternatives"), list) else []:
         if isinstance(a, dict):
+            # geometry_ok: the layout passed its own geometry checks (route,
+            # pond, caps); it is not the site's feasibility, which also
+            # needs access and complete inputs. The prototype called it
+            # "feasible".
+            ok = a.get("geometry_ok", a.get("feasible"))
             alts.append({"variant": text(a.get("variant"), 120), "sf": num(a.get("sf")),
-                         "feasible": a.get("feasible") if a.get("feasible") in (True, False, None) else None,
+                         "geometryOk": ok if ok in (True, False) else None,
                          "route_problem": bool(a.get("route_problem"))})
     main_rank = ranks[0] if ranks else (sort_rank if r else None)
     rec = {
@@ -744,17 +1008,55 @@ def _plan_record(t: dict[str, Any], inp: Inputs, by_rank: dict[str, dict[str, st
         "zoningRules": zoning_name, "zoningStatus": "draft",
         "grade": text(r["lead_grade"], 20) if r else None,
         "fit": text(t.get("configuration"), 200), "sf": int(num(t.get("total_sf")) or 0),
-        "sfIfAccess": int(num(t.get("total_sf_if_access")) or 0), "stdFits": True,
+        "sfIfAccess": int(num(t.get("total_sf_if_access")) or 0), "stdFits": plan_std_fits(t),
         "feasible": feasible, "hypothetical": bool(t.get("hypothetical")),
+        "sfText": plan_sf_text(feasible, gated, bool(t.get("hypothetical")),
+                               int(num(t.get("total_sf")) or 0), int(num(t.get("total_sf_if_access")) or 0)),
         "pond": ("fits" if det.get("fits") else "does not fit (see flags)"), "open": None,
         "v4": v4,
         "flags1": _flag_list(sev.get("1", sev.get(1))), "flags2": _flag_list(sev.get("2", sev.get(2))),
         "flags3": _flag_list(sev.get("3", sev.get(3))),
         "alternatives": alts,
+        # Entitlement gates (a use permit): named flags, kept apart from feasibility.
+        "gated": gated,
         "related": f"run-{main_rank}" if main_rank in brief_ranks else None,
-        "svg": svg, **common(pid),
+        "svg": svg, **common(list(dict.fromkeys(pids or [m["parcel_id"] for m in members]))),
     }
     return rec
+
+
+def plan_std_fits(t: dict[str, Any]) -> bool | None:
+    """Whether an operator prototype fits, for the "Operator prototypes fit"
+    filter: the plan drawn is an operator prototype, or one of the layouts
+    it lists (alternatives) is one and passed its own geometry checks. Most
+    plans are market depths, so a plan is not a prototype fit by being a
+    plan. None when the record says nothing either way."""
+    alts = [a for a in (t.get("alternatives") or []) if isinstance(a, dict)]
+    if t.get("operator_prototype") is True:
+        return True
+    if any(a.get("operator") is True and a.get("geometry_ok", a.get("feasible")) is True for a in alts):
+        return True
+    if t.get("operator_prototype") is False or alts or t.get("configuration") is None:
+        return False
+    return None
+
+
+def plan_sf_text(feasible: bool | None, gated: list[str], hypothetical: bool, sf: int, sf_if_access: int) -> str:
+    """The floor-area line the page shows for a planner record: what is
+    counted, and when nothing is, why (reviews/37: a gated plan is not
+    'no building fit')."""
+    if sf:
+        return f"{sf:,} SF"
+    if not sf_if_access:
+        return "no building fit"
+    drawn = f"{sf_if_access:,} SF"
+    if feasible is True and gated:
+        return f"{drawn} (gated: {', '.join(gated)}; not counted)"
+    if feasible is None:
+        return f"{drawn} if the unchecked inputs were clear (not counted)"
+    if hypothetical:
+        return f"{drawn} if the site had road access (not counted)"
+    return f"{drawn} if the severity-1 flags were cleared (not counted)"
 
 
 def _json_for_script(obj: Any) -> str:
@@ -791,11 +1093,30 @@ def build(inp: Inputs, out: Path, *, max_bytes: int = MAX_PAGE_BYTES) -> tuple[i
     any check refuses."""
     run_dir = Path(inp.run_dir)
     out = check_out_path(out, run_dir)
-    plans = build_plans(inp)
-    guard = OwnerGuard.from_run(run_dir)
-    guard.check(json.dumps(plans, ensure_ascii=False), "viewer data")
+    for root in inp.leads:
+        if not Path(root).is_dir():
+            raise Refused(f"--leads {root}: not a folder")
+    try:
+        plans = build_plans(inp)
+        guard = OwnerGuard.from_run(run_dir)
+        # The site addresses the page itself writes: those of the run's
+        # parcels it shows (titles and facts). An owner string that is part
+        # of one of them is that parcel's published address.
+        by_pid = {r["parcel_id"]: r for r in read_ranked(run_dir)}
+        shown = {q for p in plans for q in ([p.get("pid")] + list(p.get("pids") or [])) if q}
+        public = [by_pid[q].get("site_address") or "" for q in sorted(shown) if q in by_pid]
+    except (OSError, ValueError, csv.Error) as exc:
+        # A missing or unreadable input (a run folder without ranked.csv, a
+        # --land or --decisions file that is not there or not valid JSON /
+        # CSV). The page is written last, so nothing was written.
+        raise Refused(f"cannot read an input ({type(exc).__name__}: {str(exc)[:200]})") from None
+    guard.check(json.dumps(plans, ensure_ascii=False), "viewer data", public)
+    for p in plans:
+        # The visible text of each drawing, its markup removed (a name split
+        # across SVG elements or wrapped over two lines).
+        guard.check(markup_text(p.get("svg") or ""), f"plan {p.get('id')}", public)
     page = render_page(plans, run_dir.name)
-    guard.check(page, "viewer page")
+    guard.check(page, "viewer page", public)
     size = len(page.encode("utf-8"))
     if size > max_bytes:
         raise Refused(f"the page would be {size:,} bytes, over the {max_bytes:,} limit")
@@ -826,6 +1147,7 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as exc:
         print(f"viewer: refused: {exc}", file=sys.stderr)
         return 2
+
     if size > WARN_PAGE_BYTES:
         print(f"viewer: note: the page is {size:,} bytes", file=sys.stderr)
     print(f"{args.out}: {size:,} bytes; {n} plans")

@@ -410,6 +410,39 @@ class PlansTest(Offline):
         self.assertIsNone(north["taxAc"])
         self.assertEqual(north["zoningStatus"], "draft")
 
+    def test_screener_siteplan_schema_round_trip(self):
+        """The header and record shape screener.siteplan writes: a slugged
+        key ("1-3") with the rank list in "rank", flags keyed by severity,
+        a not-checked input (feasible None), a no-fit record without an SVG."""
+        recs = [plan_record("1-3", ["99F000100010001", "07 999900000001"], "plan-1-3.svg", rank="1+3",
+                            feasible=None, inputs={"frontage": "not_checked"},
+                            flags={"1": [{"flag": "FRONTAGE_NOT_CHECKED", "note": "fetch failed"}],
+                                   "2": [{"flag": "ZONING_DRAFT", "note": "draft"}], "3": []}),
+                plan_record("2", ["99F0001  LL0001"], "plan-2.svg", rank="2",
+                            gated=["USE_PERMIT_REQUIRED", "<b>x</b>"])]
+        nofit = plan_record("3", ["07 999900000001"], "", rank="3", fits=False, feasible=False)
+        del nofit["svg"]
+        write_plans(self.run_dir, self.plans, recs)
+        body = json.loads((self.plans / "plans.json").read_text(encoding="utf-8"))
+        body.update({"tool": "screener.siteplan", "code_sha256": "0" * 16, "generated": "2026-01-01",
+                     "options": {"parking": "max"}, "meta": {"zoning_status": "draft"}})
+        body["plans"].append(nofit)
+        (self.plans / "plans.json").write_text(json.dumps(body), encoding="utf-8")
+        size, n = self.build(plans_dir=self.plans)
+        data = {p["id"]: p for p in page_data(self.page())}
+        self.assertEqual(n, 4)                     # two briefs, two drawn plans; the no-fit is skipped
+        a = data["plan-1-3"]
+        self.assertEqual((a["rank"], a["key"], a["related"]), (1, "1-3", "run-1"))
+        self.assertIsNone(a["feasible"])
+        self.assertEqual(a["flags1"][0]["flag"], "FRONTAGE_NOT_CHECKED")
+        self.assertEqual(data["plan-2"]["related"], "run-2")
+        self.assertEqual(data["plan-2"]["gated"], ["USE_PERMIT_REQUIRED"])   # names only
+        # a rank list whose parcel ids do not hold those ranks' parcels: refused
+        body["plans"][0]["parcel_ids"] = ["99F000100010001", "99F0001  LL0001"]
+        (self.plans / "plans.json").write_text(json.dumps(body), encoding="utf-8")
+        self.out.unlink()
+        self.assert_refused(plans_dir=self.plans)
+
     def test_numbers_are_coerced_and_extra_keys_dropped(self):
         rec = plan_record("1", ["99F000100010001"], "plan-1.svg", doors="<b>30</b>",
                           owner=OWNER, inputs={"x": OWNER})
@@ -503,6 +536,208 @@ class LandTest(Offline):
         self.assert_refused(viewer.OwnerDataFound, land=path)
 
 
+class ReviewFixesTest(Offline):
+    """reviews/37 Agent 2 fixes: the floor-area wording, layout checks, a
+    missing SVG or input file, no-fit plans, and the guard's name forms."""
+
+    def setUp(self):
+        super().setUp()
+        self.plans = self.tmp / "plans"
+
+    def test_sf_text_for_gated_incomplete_hypothetical_and_blocked(self):
+        t = viewer.plan_sf_text
+        self.assertEqual(t(True, [], False, 156000, 156000), "156,000 SF")
+        gated = t(True, ["USE_PERMIT_REQUIRED"], False, 0, 254000)
+        self.assertIn("254,000 SF", gated)
+        self.assertIn("gated: USE_PERMIT_REQUIRED", gated)
+        self.assertNotIn("no building fit", gated)
+        self.assertIn("unchecked inputs", t(None, [], False, 0, 61000))
+        self.assertIn("road access", t(False, [], True, 0, 61000))
+        blocked = t(False, [], False, 0, 146000)
+        self.assertIn("severity-1 flags", blocked)
+        self.assertNotIn("access", blocked)
+        self.assertEqual(t(False, [], False, 0, 0), "no building fit")
+
+    def test_gated_plan_page_shows_its_floor_area(self):
+        write_plans(self.run_dir, self.plans, [plan_record(
+            "1", ["99F000100010001"], "plan-1.svg", total_sf=0, total_sf_if_access=254000,
+            gated=["USE_PERMIT_REQUIRED"],
+            alternatives=[{"variant": "rear-load 260", "sf": 254000, "geometry_ok": True, "route_problem": False}])])
+        self.build(plans_dir=self.plans)
+        p = {x["id"]: x for x in page_data(self.page())}["plan-1"]
+        self.assertIn("254,000 SF (gated: USE_PERMIT_REQUIRED", p["sfText"])
+        self.assertEqual(p["alternatives"][0]["geometryOk"], True)
+        self.assertNotIn("feasible", p["alternatives"][0])
+        tpl = viewer.TEMPLATE.read_text(encoding="utf-8")
+        self.assertNotIn('"no building fit"', tpl)       # the page uses sfText, worded in viewer.py
+        self.assertIn("Layout checks (not site feasibility)", tpl)
+
+    def test_prototype_alternatives_still_read(self):
+        write_plans(self.run_dir, self.plans, [plan_record("1", ["99F000100010001"], "plan-1.svg")])
+        self.build(plans_dir=self.plans)
+        p = {x["id"]: x for x in page_data(self.page())}["plan-1"]
+        self.assertIs(p["alternatives"][0]["geometryOk"], True)    # the old "feasible" key
+
+    def test_missing_plan_svg_refused_with_its_name(self):
+        write_plans(self.run_dir, self.plans, [plan_record("1", ["99F000100010001"], "plan-1.svg")], svgs={})
+        exc = self.assert_refused(plans_dir=self.plans)
+        self.assertIn("plan-1.svg", str(exc))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = viewer.main([str(self.run_dir), "--plans", str(self.plans), "--out", str(self.out)])
+        self.assertEqual(code, 2)
+        self.assertFalse(self.out.exists())
+
+    def test_missing_or_bad_input_files_exit_2(self):
+        bad = self.tmp / "bad.json"
+        bad.write_text("{not json", encoding="utf-8")
+        empty = self.tmp / "norun"
+        empty.mkdir()
+        for argv in ([str(self.run_dir), "--land", str(self.tmp / "nope.json")],
+                     [str(self.run_dir), "--land", str(bad)],
+                     [str(self.run_dir), "--decisions", str(self.tmp / "nope.csv")],
+                     [str(empty)]):
+            with self.subTest(argv[1:]):
+                err = io.StringIO()
+                with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                    code = viewer.main(argv + ["--out", str(self.out)])
+                self.assertEqual(code, 2, err.getvalue())
+                self.assertIn("cannot read an input", err.getvalue())
+                self.assertFalse(self.out.exists())
+
+    def test_no_fit_plans_are_named_on_stderr(self):
+        write_plans(self.run_dir, self.plans, [
+            plan_record("1", ["99F000100010001"], "plan-1.svg"),
+            {"key": "3", "rank": "3", "parcel_ids": ["07 999900000001"], "fits": False, "svg": None}],
+            svgs={"plan-1.svg": svg_doc("plan 1")})
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.build(plans_dir=self.plans)
+        self.assertIn("1 planned site(s) without a drawing", err.getvalue())
+        self.assertIn(": 3", err.getvalue())
+
+    def test_guard_name_forms_po_box_and_split_markup(self):
+        rows = [{"owner": "SMITH JOHN A", "owner_mailing": "PO BOX 4471, ATLANTA GA 30301",
+                 "site_address": "1 X RD", "jurisdiction": "Union City"},
+                {"owner": OWNER, "owner_mailing": "", "site_address": "2 X RD", "jurisdiction": "Union City"},
+                {"owner": "FULTON COUNTY BOARD OF EDUCATION", "owner_mailing": "", "site_address": "3 X RD",
+                 "jurisdiction": "Union City"}]
+        g = viewer.OwnerGuard.from_rows(rows)
+        for text in ("John Smith", "SMITH JOHN", "Smith, John A.", "a note on john  smith's land"):
+            with self.subTest(text):
+                self.assertEqual(g.hits(text), {"owner": 1})
+        for text in ("P.O. Box 4471", "p o box 4471", "PO BOX 4471"):
+            with self.subTest(text):
+                self.assertEqual(g.hits(text), {"owner_mailing": 1})
+        split = "<text>TEST <tspan>OWNER</tspan> ALPHA</text>"
+        self.assertFalse(g.hits(split))                       # markup tokens break the run...
+        self.assertEqual(g.hits(viewer.markup_text(split)), {"owner": 1})   # ...its text does not
+        self.assertEqual(viewer.person_name_forms("FULTON COUNTY BOARD OF EDUCATION"), [])
+        self.assertEqual(viewer.person_name_forms(OWNER), [])
+        self.assertFalse(g.hits("board of education"))
+
+    def test_owner_split_across_svg_elements_refused(self):
+        write_plans(self.run_dir, self.plans, [plan_record("1", ["99F000100010001"], "plan-1.svg")],
+                    svgs={"plan-1.svg": svg_doc("plan", extra="<text>TEST <tspan>OWNER</tspan> ALPHA</text>")})
+        self.assert_refused(viewer.OwnerDataFound, plans_dir=self.plans)
+
+
+class RoundOneFixesTest(Offline):
+    """reviews/37 Agent 2, round 1: the guard's per-row skip, name forms with
+    initials L/C and ET AL, address spellings, an assemblage's worst member,
+    budget-cut sites and a missing --leads folder."""
+
+    def setUp(self):
+        super().setUp()
+        self.plans = self.tmp / "plans"
+
+    def test_another_rows_site_address_does_not_unguard_an_owner(self):
+        rows = [{"owner": "LEE DONALD R", "owner_mailing": "77 QUIET WAY, MARIETTA GA 30060",
+                 "site_address": "0 X RD", "jurisdiction": "Fairburn"}]
+        text = "note: Donald Lee, mail to 77 Quiet Way"
+        alone = viewer.OwnerGuard.from_rows(rows).hits(text)
+        self.assertEqual(alone, {"owner": 1, "owner_mailing": 1})
+        # two unrelated (rejected, never published) rows whose site addresses
+        # are that mailing street and a street named like the owner
+        more = rows + [{"site_address": "77 QUIET WAY", "jurisdiction": "Fairburn"},
+                       {"site_address": "100 DONALD LEE HOLLOWELL PKWY", "jurisdiction": "Atlanta"}]
+        self.assertEqual(viewer.OwnerGuard.from_rows(more).hits(text), alone)
+        # an artifact that itself writes that site address passes it as public
+        self.assertEqual(viewer.OwnerGuard.from_rows(more).hits(text, public=["77 QUIET WAY"]), {"owner": 1})
+        # the row's own site address and the run's place names are still skipped
+        own = viewer.OwnerGuard.from_rows([{"owner": "FAIRBURN", "owner_mailing": "5 MAIN ST, X GA",
+                                            "site_address": "5 MAIN ST REAR", "jurisdiction": "Union City"},
+                                           {"site_address": "1 A RD", "jurisdiction": "Fairburn"}])
+        self.assertFalse(own.hits("#1 5 MAIN ST REAR, Fairburn"))
+
+    def test_natural_order_name_with_initials_and_et_al(self):
+        for owner in ("WALKER DONALD A", "WALKER DONALD L", "WALKER DONALD C", "WALKER DONALD ET AL",
+                      "WALKER DONALD L ET AL", "WALKER DONALD JR", "WALKER DONALD & BETTY"):
+            with self.subTest(owner):
+                g = viewer.OwnerGuard.from_rows([{"owner": owner, "owner_mailing": "", "site_address": "1 X RD",
+                                                  "jurisdiction": "Union City"}])
+                self.assertEqual(g.hits("Donald Walker has held it since 1990"), {"owner": 1})
+        for company in ("WALKER DONALD L.L.C.", "WALKER HOLDINGS LLC", "SMITH & JONES INVESTMENTS LLC"):
+            self.assertEqual(viewer.person_name_forms(company), [], company)
+
+    def test_mailing_spellings_suite_and_ampersand(self):
+        g = viewer.OwnerGuard.from_rows([{"owner": "SMITH & JONES INVESTMENTS LLC",
+                                          "owner_mailing": "4410 OLD STAGE RD STE 300, ATLANTA GA 30303",
+                                          "site_address": "0 X RD", "jurisdiction": "Fairburn"}])
+        for text in ("owner mails from 4410 Old Stage Rd, Atlanta", "4410 Old Stage Road Suite 300",
+                     "4410 OLD STAGE ROAD"):
+            with self.subTest(text):
+                self.assertEqual(g.hits(text), {"owner_mailing": 1})
+        self.assertEqual(g.hits("Smith and Jones Investments bought it"), {"owner": 1})
+        self.assertEqual(g.hits("Smith & Jones Investments bought it"), {"owner": 1})
+        self.assertFalse(g.hits("a truck court on Old Stage, 4410 ft of frontage"))
+        self.assertEqual(viewer.street_base("4410 OLD STAGE RD # 300"), ["4410", "old", "stage", "rd"])
+
+    def test_assemblage_shows_its_worst_member(self):
+        land = self.tmp / "land.json"
+        land.write_text(json.dumps({"run": {"ranked_csv_sha256": viewer.ranked_sha256(self.run_dir)}, "parcels": [
+            {"rank": 1, "parcel_id": "99F000100010001", "land_today": "raw_land", "what_is_there": "woods"},
+            {"rank": 2, "parcel_id": "99F0001  LL0001", "land_today": "not_raw_land",
+             "what_is_there": "operating truck terminal"}]}), encoding="utf-8")
+        dec = self.tmp / "decisions.csv"
+        dec.write_text("parcel_id,decision,note\n99F000100010001,pursue,\n99F0001  LL0001,pass,\n", encoding="utf-8")
+        write_plans(self.run_dir, self.plans, [plan_record("n", ["99F000100010001", "99F0001  LL0001"], "plan-n.svg",
+                                                           rank="n", title="n assemblage")])
+        self.build(plans_dir=self.plans, land=land, decisions=dec)
+        data = {p["id"]: p for p in page_data(self.page())}
+        self.assertEqual((data["run-1"]["land"], data["run-1"]["status"]), ("raw_land", "open"))
+        n = data["plan-n"]
+        self.assertEqual((n["land"], n["status"]), ("not_raw_land", "drop"))
+        self.assertIn("#1 raw land: woods", n["landWhat"])
+        self.assertIn("#2 not raw land: operating truck terminal", n["landWhat"])
+        self.assertEqual(viewer.LAND_WORST_FIRST[-1], "raw_land")
+
+    def test_budget_cut_site_is_not_called_a_no_fit(self):
+        write_plans(self.run_dir, self.plans, [
+            plan_record("1", ["99F000100010001"], "plan-1.svg"),
+            {"key": "3", "rank": "3", "parcel_ids": ["07 999900000001"], "fits": False, "svg": None,
+             "flags": {"1": [{"flag": "PLAN_BUDGET_EXCEEDED", "note": "not a no-fit"}], "2": [], "3": []}},
+            {"key": "2", "rank": "2", "parcel_ids": ["99F0001  LL0001"], "fits": False, "svg": None,
+             "flags": {"1": [{"flag": "NO_FIT", "note": "x"}], "2": [], "3": []}}],
+            svgs={"plan-1.svg": svg_doc("plan 1")})
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.build(plans_dir=self.plans)
+        self.assertIn("1 planned site(s) without a drawing (no building fits) are not shown: 2\n", err.getvalue())
+        self.assertIn("1 site(s) not planned (the search budget ran out", err.getvalue())
+        self.assertRegex(err.getvalue(), r"re-run the planner\) are not shown: 3")
+
+    def test_missing_leads_folder_refused(self):
+        for bad in (self.tmp / "no-such-leads", self.run_dir / "ranked.csv"):
+            with self.subTest(str(bad)):
+                self.assert_refused(leads=[bad])
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = viewer.main([str(self.run_dir), "--out", str(self.out), "--leads", str(self.tmp / "typo")])
+        self.assertEqual(code, 2)
+        self.assertIn("not a folder", err.getvalue())
+
+
 class CliAndStaticTest(Offline):
     def test_cli_exit_codes(self):
         out = io.StringIO()
@@ -541,6 +776,67 @@ class CliAndStaticTest(Offline):
         self.assertNotIn("http://", tpl)
         self.assertNotRegex(tpl, r"<script[^>]+src")
 
+
+class RoundFourFixesTest(Offline):
+    """reviews/37 round 4: the guard's length limits and name variants,
+    the prototype-fit filter, the built check's incomplete state."""
+
+    def test_core_length_is_measured_before_street_words_fold(self):
+        g = viewer.OwnerGuard.from_rows([{"owner": o} for o in ("MILL ROAD LLC", "WEST END LLC", "SOUTH PARK LP")])
+        for text in ("a note: Mill Road owns the land", "West End next door", "South Park owns it",
+                     "mill rd", "W. End"):
+            with self.subTest(text):
+                self.assertEqual(g.hits(text), {"owner": 1})
+
+    def test_name_variants(self):
+        g = viewer.OwnerGuard.from_rows([{"owner": o} for o in (
+            "WALKER DONALD & BETTY", "ACE LLC", "O'BRIEN PATRICK J", "O BRIEN SEAN", "DE LA CRUZ MARIA",
+            "KING ROSA & JONES ALAN")])
+        for text in ("Betty Walker", "Donald and Betty Walker", "Donald & Betty Walker", "Donald Walker",
+                     "Ace, L.L.C.", "ACE L L C", "Ace LLC", "Patrick O'Brien", "Patrick O\u2019Brien",
+                     "Patrick OBrien", "Sean O'Brien", "Maria de la Cruz", "Alan Jones", "Rosa King"):
+            with self.subTest(text):
+                self.assertGreaterEqual(g.hits(text).get("owner", 0), 1)
+        for text in ("an ace in the hole", "the road west", "Smith's land", "a lot on the left"):
+            with self.subTest(text):
+                self.assertEqual(g.hits(text), {})
+        self.assertEqual(viewer.normal_tokens("Smith's L.L.C."), ["smith", "s", "llc"])
+
+    def test_prototype_fit_filter_reads_the_plan(self):
+        alt = lambda op, ok: {"variant": "v", "operator": op, "sf": 1, "geometry_ok": ok, "route_problem": False}
+        self.assertIs(viewer.plan_std_fits({"configuration": "x", "operator_prototype": True}), True)
+        self.assertIs(viewer.plan_std_fits({"configuration": "x", "operator_prototype": False,
+                                            "alternatives": [alt(False, True), alt(True, False)]}), False)
+        self.assertIs(viewer.plan_std_fits({"configuration": "x", "operator_prototype": False,
+                                            "alternatives": [alt(True, True)]}), True)
+        self.assertIs(viewer.plan_std_fits({"configuration": None, "operator_prototype": None}), False)
+        self.assertIsNone(viewer.plan_std_fits({"configuration": "x"}))
+        plans = self.tmp / "plans"
+        write_plans(self.run_dir, plans, [
+            plan_record("1", ["99F000100010001"], "plan-1.svg", operator_prototype=False,
+                        alternatives=[{"variant": "rear-load 310", "operator": False, "sf": 1, "geometry_ok": True}]),
+            plan_record("2", ["99F0001  LL0001"], "plan-2.svg", operator_prototype=True)])
+        self.build(plans_dir=plans)
+        data = {p["id"]: p for p in page_data(self.page())}
+        self.assertIs(data["plan-1"]["stdFits"], False)
+        self.assertIs(data["plan-2"]["stdFits"], True)
+        tpl = (Path(viewer.__file__).parent / "viewer_template.html").read_text(encoding="utf-8")
+        self.assertIn('f==="none" && p.stdFits!==false', tpl)
+
+    def test_land_from_an_incomplete_built_check_says_so(self):
+        body = {"schema_version": 1, "run": {"ranked_csv_sha256": viewer.ranked_sha256(self.run_dir)},
+                "parcels": [{"rank": 1, "parcel_id": "99F000100010001", "land_today": "unclear",
+                             "what_is_there": "houses", "footprint_check": "not checked",
+                             "why": "footprint check not completed: partly usable not confirmed"},
+                            {"rank": 2, "parcel_id": "99F0001  LL0001", "land_today": "raw_land",
+                             "what_is_there": "woods", "footprint_check": "no building found", "why": ""}]}
+        path = self.tmp / "land_today.json"
+        path.write_text(json.dumps(body), encoding="utf-8")
+        self.build(land=path)
+        data = {p["id"]: p for p in page_data(self.page())}
+        self.assertIn("built check incomplete", data["run-1"]["landWhat"])
+        self.assertTrue(data["run-1"]["landWhat"].startswith("houses"))
+        self.assertEqual(data["run-2"]["landWhat"], "woods")
 
 if __name__ == "__main__":
     unittest.main()

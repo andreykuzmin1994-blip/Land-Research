@@ -11,6 +11,7 @@ needs), which keeps a plan under a second.
 from __future__ import annotations
 
 import ast
+import csv
 import io
 import json
 import math
@@ -211,8 +212,18 @@ class Numbers(unittest.TestCase):
     def test_dual_soil_group(self):
         self.assertEqual(sp.hsg_letter("B/D", fixes=False), ("B", None))
         letter, note = sp.hsg_letter("B/D", fixes=True)
-        self.assertEqual(letter, "D")
+        self.assertEqual(letter, "B")                  # the letter giving the larger pond
         self.assertIn("dual", note)
+        self.assertNotIn("undrained", note)
+        # A dual group never gives less storage than either of its letters
+        # (D nets out more pre-development runoff, so it shrinks the pond).
+        for dual in ("A/D", "B/D", "C/D"):
+            got, _ = sp.hsg_letter(dual, True)
+            for imp in (1.0, 6.0, 17.5, 40.0):
+                perv = imp * (sp.DISTURBED_FACTOR - 1)
+                v = sp.detention_storage(imp, perv, got)
+                for k in dual.split("/"):
+                    self.assertGreaterEqual(v + 1e-12, sp.detention_storage(imp, perv, k), (dual, k))
         self.assertEqual(sp.hsg_letter("none rated", True)[0], "B")
         self.assertEqual(sp.hsg_letter("C", True), ("C", None))
 
@@ -381,6 +392,7 @@ class Plans(Offline):
     def test_frontage_not_checked_is_incomplete(self):
         rec, d = planned("frontnc", lambda: site(450, 520, front_state="not_checked", dem_state="partial"))
         self.assertIsNone(rec["feasible"])
+        self.assertIsNone(rec["hypothetical"])        # access unknown, not landlocked
         self.assertNotIn("ACCESS_NONE", names(rec))
         self.assertTrue({"FRONTAGE_NOT_CHECKED", "DEM_PARTIAL"} <= names(rec, 1))
         self.assertEqual(rec["total_sf"], 0)
@@ -448,9 +460,12 @@ class Plans(Offline):
     def test_pond_that_cannot_fit(self):
         def nopond(*a, **k):
             return None
+        control, _ = planned("basic", lambda: site(600, 700))
+        self.assertTrue(control["detention"]["fits"])             # without the patch the pond fits
+        self.assertIs(control["feasible"], True)
         with mock.patch.object(sp, "place_sized_pond", nopond):
-            rec, _ = sp.plan_site(site(450, 520))
-            proto, _ = sp.plan_site(site(450, 520), sp.PlanOptions(behaviour="prototype"))
+            rec, _ = sp.plan_site(site(600, 700))
+            proto, _ = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
         self.assertIn("POND_DOES_NOT_FIT", names(rec, 1))
         self.assertIs(rec["feasible"], False)
         self.assertFalse(rec["detention"]["fits"])
@@ -522,9 +537,31 @@ class Plans(Offline):
         self.assertIs(rec["feasible"], True)
         assert_invariant(self, rec)
 
+    def test_height_cap_blocks_but_does_not_shrink(self):
+        # A 35 ft draft height cap leaves 25 ft clear on any building: severity
+        # 1 whatever the length. The default rule makes the site infeasible
+        # but must not shrink the building for it (no futile refits; #44
+        # College Park in the replay): the plan is the one drawn without the
+        # cap.
+        rules = dict(sp.JUR_DRAFT)
+        rules["capped"] = dict(rules["south fulton"], height=35, cover=None)
+        rules["open"] = dict(rules["south fulton"], height=None, cover=None)
+        with mock.patch.object(sp, "JUR_DRAFT", rules):
+            rec, _ = sp.plan_site(site(900, 900, jur="Capped"))
+            free, _ = sp.plan_site(site(900, 900, jur="Open"))
+        self.assertIn("HEIGHT_CAP", names(rec, 1))
+        self.assertIs(rec["feasible"], False)
+        self.assertNotIn("HEIGHT_CAP", names(free))
+        drop = lambda b: {k: v for k, v in b.items() if k != "clear_height_ft"}
+        self.assertEqual(drop(rec["building"]), drop(free["building"]))      # same building, lower clear height
+        self.assertEqual(rec["building"]["clear_height_ft"], 25)
+        self.assertEqual([a["sf"] for a in rec["alternatives"]], [a["sf"] for a in free["alternatives"]])
+        assert_invariant(self, rec)
+
     def test_trailer_ratio_is_consistent(self):
         o = sp.PlanOptions(trailer_tiers=sp.trailer_tiers_from("1.3"))
-        rec, d = planned("tr13", lambda: site(450, 520), o)
+        rec, d = planned("tr13", lambda: site(800, 800), o)
+        self.assertGreater(rec["trailers"]["drop_yards"], 0)     # the drop-yard branch runs
         self.assertEqual(rec["trailers"]["target"], math.ceil(1.3 * rec["doors"]))
         self.assertEqual(rec["operator_decisions"]["trailer_target_tiers"][0][1], 1.3)
         short = rec["trailers"]["total"] < rec["trailers"]["target"]
@@ -541,6 +578,162 @@ class Plans(Offline):
         rec, _ = sp.plan_site(site(450, 520), sp.PlanOptions(max_seconds=3.0), clock=clock)
         self.assertIn("PLAN_BUDGET_EXCEEDED", names(rec, 1))
         self.assertIs(rec["feasible"], False)
+        # Out of time before any plan was finished: that says nothing about
+        # fit, so the record is not a NO_FIT (reference #48 at 120 s).
+        t[0] = 0.0
+        rec, d = sp.plan_site(site(450, 520), sp.PlanOptions(max_seconds=0.1), clock=clock)
+        self.assertIsNone(d)
+        self.assertIn("PLAN_BUDGET_EXCEEDED", names(rec, 1))
+        self.assertNotIn("NO_FIT", names(rec))
+        self.assertIn("not a no-fit", rec["flags"][1][0]["note"])
+        self.assertIs(rec["feasible"], False)
+        self.assertEqual(rec["total_sf"], 0)
+
+    def test_budget_in_the_second_building_search_keeps_building_1(self):
+        """The budget running out only in the optional second-building
+        search leaves building 1, which was fully searched, feasible and
+        counted; the plan says SECOND_BUILDING_NOT_SEARCHED (severity 2)."""
+        two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+        t = [0.0]
+        real_finish = sp.finish
+
+        def finish(p, ctx, others=None):
+            if others is not None:
+                t[0] = 1e9             # the deadline passes inside the second-building search only
+            return real_finish(p, ctx, others)
+        with mock.patch.object(sp, "finish", finish):
+            rec, d = sp.plan_site(site(1600, 1000, front=two), sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
+        self.assertIs(rec["feasible"], True, rec["flags"][1])
+        self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
+        self.assertIn("SECOND_BUILDING_NOT_SEARCHED", names(rec, 2))
+        self.assertNotIn("second_building", rec)
+        self.assertEqual(rec["total_sf"], rec["building"]["sf"])
+        self.assertGreater(rec["total_sf"], 0)
+        assert_invariant(self, rec)
+
+    def test_budget_in_the_smaller_layout_search_is_a_note(self):
+        """The budget running out in the extra search for smaller layouts
+        (after the pond blocked every explored plan) keeps the plan as found
+        and says SMALLER_LAYOUTS_NOT_ALL_TRIED, not PLAN_BUDGET_EXCEEDED."""
+        t = [0.0]
+        real = sp._blocking
+
+        def blocking(o):
+            t[0] = 1e9                 # _blocking is asked only when the rescue pass is considered
+            return real(o)
+        with mock.patch.object(sp, "_blocking", blocking):
+            rec, _ = sp.plan_site(site(700, 700), sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
+        self.assertIn("SMALLER_LAYOUTS_NOT_ALL_TRIED", names(rec, 2))
+        self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
+        self.assertIn("POND_DOES_NOT_FIT", names(rec, 1))
+        self.assertIs(rec["feasible"], False)
+        assert_invariant(self, rec)
+
+    def test_alternatives_are_layout_checks_not_feasibility(self):
+        rec, _ = planned("nofront", lambda: site(450, 520, front_state="none"))
+        self.assertIs(rec["feasible"], False)
+        self.assertTrue(rec["alternatives"])
+        for a in rec["alternatives"]:
+            self.assertIn("geometry_ok", a)
+            self.assertNotIn("feasible", a)
+
+    def test_prototype_mode_budget_and_gate_wording(self):
+        proto = sp.PlanOptions(behaviour="prototype")
+        self.assertEqual(sp.decide([("PLAN_BUDGET_EXCEEDED", 1, "x")], True, False, proto), (False, []))
+        self.assertEqual(sp.decide([("USE_PERMIT_REQUIRED", 1, "x")], True, False, proto), (True, ["USE_PERMIT_REQUIRED"]))
+        rec, d = planned("basic", lambda: site(600, 700))
+        counted = dict(rec, gated=["USE_PERMIT_REQUIRED"])
+        self.assertIn("floor area counted", sr.render(d, counted))
+        self.assertIn("floor area not counted", sr.render(d, dict(counted, total_sf=0)))
+
+    def test_frontage_geometry_error_is_not_hypothetical(self):
+        def boom(front):
+            raise sp.FrontageGeometryError("test")
+        with mock.patch.object(sp, "frontage_runs", boom):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertIn("FRONTAGE_GEOMETRY", names(rec, 1))
+        self.assertIsNone(rec["hypothetical"])
+        self.assertIsNone(rec["feasible"])
+        self.assertNotIn("ACCESS_NONE", names(rec))
+
+    def test_a_larger_parcel_is_not_worse_than_a_smaller_one_inside_it(self):
+        """Monotonicity: same frontage line, same setbacks, flat ground. The
+        prototype read 700 x 700 and 1100 x 700 as infeasible (the pond)
+        while 600 x 700 inside them was feasible."""
+        small, _ = planned("basic", lambda: site(600, 700))
+        self.assertIs(small["feasible"], True)
+        for w, h in ((700, 700), (1100, 700)):
+            with self.subTest(size=(w, h)):
+                rec, _ = planned(f"mono{w}x{h}", lambda w=w, h=h: site(w, h))
+                self.assertIs(rec["feasible"], True, rec["flags"][1])
+                self.assertGreater(rec["total_sf"], 0)
+                assert_invariant(self, rec)
+        proto, _ = sp.plan_site(site(700, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertIs(proto["feasible"], False)       # the prototype's answer, kept for parity
+
+    def test_clean_rectangles_raise_no_route_outside_flag(self):
+        """The joins from the driveway to the first grid cell are measured
+        against what they must not cross, not against the grid's walk area."""
+        for w, h in ((600, 500), (600, 600), (650, 550), (750, 700), (1000, 900)):
+            with self.subTest(size=(w, h)):
+                rec, _ = planned(f"route{w}x{h}", lambda w=w, h=h: site(w, h))
+                self.assertNotIn("ROUTE_OUTSIDE_ENVELOPE", names(rec), rec["plan_checks"])
+        walk = box(0, 2, 100, 100).difference(box(0, 2, 40, 30))
+        line = LineString([(10, 0), (60, 40), (90, 90)])      # the join cuts the notch's corner
+        joins = (((10, 0), (60, 40)), ((90, 90), (90, 90)))
+        self.assertGreater(sp.route_outside_ft(line, walk), sp.ROUTE_TOL_FT)
+        self.assertLessEqual(sp.route_stray_ft(line, walk, Polygon(), joins), sp.ROUTE_TOL_FT)
+        self.assertGreater(sp.route_stray_ft(line, walk, box(20, 0, 60, 60), joins), sp.ROUTE_TOL_FT)
+
+    def test_neighbours_without_a_shape_fail_closed(self):
+        ff = FakeFetch(lambda url, p: {"features": [{"attributes": {"ParcelID": "07 9", "LUCode": "101", "ClassCode": "R3"},
+                                                     "geometry": None}]})
+        nb, st = si.county_near(G, ff)
+        self.assertEqual((nb, st.state), ([], "partial"))
+        rec, _ = sp.plan_site(site(600, 700, states={"neighbours": st}))
+        self.assertIn("NEIGHBOURS_NOT_CHECKED", names(rec, 1))
+        self.assertIsNone(rec["feasible"])
+        self.assertEqual(rec["total_sf"], 0)
+
+    def test_no_fit_with_a_missing_input_stays_false(self):
+        # A missing input only enlarges the envelope, so NO_FIT stands
+        # (documented in SITE_PLANNING.md); every other record follows R4.
+        for key in STATES:
+            with self.subTest(key):
+                rec, _ = sp.plan_site(site(150, 150, states={key: sp.InputState("not_checked", "x")}))
+                self.assertIn("NO_FIT", names(rec, 1))
+                self.assertIs(rec["feasible"], False)
+                self.assertEqual(rec["total_sf"], 0)
+
+    def test_nan_elevation_is_nodata(self):
+        plane = sp.Plane(G)
+        parcel, _ = sp.site_parcel(plane, G, False, sp.PlanOptions())
+
+        def answers(url, p):
+            n = len(json.loads(p["geometry"])["points"])
+            return {"samples": [{"locationId": i, "value": v} for i, v in zip(range(n), ("NaN", "nan", "Infinity", "-inf") * n)]}
+        d = si.dem(plane, parcel, FakeFetch(answers))
+        self.assertEqual((d.state, d.elev), ("not_checked", {}))
+
+    def test_soil_value_blank_or_not_checked_is_flagged(self):
+        self.assertEqual(sp.hsg_letter("", True), ("B", "no soil value in the run: B assumed"))
+        letter, note = sp.hsg_letter("not checked: outside the top 250 ([soils] max_parcels)", True)
+        self.assertEqual(letter, "B")
+        self.assertTrue(note.startswith("soil group not checked"))
+        self.assertNotIn("no soil group rated", note)
+        self.assertEqual(sp.hsg_letter("", False), ("B", None))
+        rec, _ = planned("hsgblank", lambda: site(600, 700, hsg=""))
+        self.assertIn("HSG_ASSUMED", names(rec, 3))
+        self.assertIn("HSG B (see HSG_ASSUMED)", rec["detention"]["basis"])
+        rec, _ = planned("hsgdual", lambda: site(600, 700, hsg="B/D"))
+        self.assertIn("HSG B (see HSG_ASSUMED)", rec["detention"]["basis"])
+        self.assertEqual(si._meta({"soil_hsg": ""})["hsg"], "")
+
+    def test_fairburn_district_buffer_is_flagged(self):
+        rec, _ = planned("fairburn", lambda: site(600, 700, jur="Fairburn"))
+        self.assertIn("DISTRICT_BUFFER_NOT_DRAWN", names(rec, 2))
+        rec, _ = planned("basic", lambda: site(600, 700))
+        self.assertNotIn("DISTRICT_BUFFER_NOT_DRAWN", names(rec))
 
     def test_water_buffer_before_clipping(self):
         wet = wgs(box(-200, 200, -5, 400))            # wetland 5 ft outside the west line
@@ -552,6 +745,33 @@ class Plans(Offline):
         self.assertGreater(pd.P.intersection(probe).area, 0)        # prototype: no buffer inside
         self.assertTrue(d.P.intersection(probe).is_empty)           # fixes: about 20 ft taken
         self.assertLess(d.P.intersection(strip).area, pd.P.intersection(strip).area)
+
+    def test_wetland_in_the_access_path_keeps_routes_out_or_flags(self):
+        # R17: a mapped wetland inside the line where the driveway throat or a
+        # court entry would go. The routes stay out of its 25 ft buffer
+        # (within the conflict tolerance) or the plan says so with a
+        # severity-1 flag and is not feasible. The first wetland sits across
+        # the frontage centre (the route is forced through: flagged), the
+        # second at a front corner (the route passes within tolerance).
+        seen = set()
+        for wet_ft in (box(250, 20, 450, 80), box(0, 60, 120, 140)):
+            wet = wgs(wet_ft)
+            rec, d = sp.plan_site(site(700, 700, constraints_wgs=[wet], constraints_near_wgs=[wet]))
+            self.assertTrue(rec["fits"])
+            wet_buf = d.constraints.buffer(sp.WATER_BUFFER_FT)
+            routes = shapely.union_all([pp for _, pp in d.o["route_polys"]])
+            inside = routes.intersection(wet_buf).area
+            flagged = any("route in a water buffer" in f["note"] for f in rec["flags"][1])
+            self.assertTrue(inside <= sp.CONFLICT_TOL_SF or flagged, (inside, rec["flags"][1]))
+            if flagged:
+                self.assertIn("PLAN_GEOMETRY_CONFLICT", names(rec, 1))
+                self.assertIs(rec["feasible"], False)
+            seen.add(flagged)
+            self.assertLess(d.p.module.intersection(d.constraints).area, 1.0)
+            for pond in d.o["ponds"]:
+                self.assertLess(pond.intersection(wet_buf).area, sp.CONFLICT_TOL_SF)
+            assert_invariant(self, rec)
+        self.assertEqual(seen, {True, False})       # both branches exercised
 
     def test_assemblage_seam_gives_the_solid_plan(self):
         solid, _ = planned("solid", lambda: site(shapes=[box(0, 0, 700.5, 700)], front=LineString([(0, 0), (700.5, 0)])))
@@ -585,7 +805,7 @@ class Plans(Offline):
     def test_large_sites_keep_to_the_budget(self):
         for w, h in ((3615, 3615), (1000, 20000)):
             t = time.monotonic()
-            rec, _ = sp.plan_site(site(w, h, z=lambda x, y: 900.0), sp.PlanOptions(max_seconds=1.0))
+            rec, _ = sp.plan_site(site(w, h, z=lambda x, y: 900.0), sp.PlanOptions(max_seconds=0.25))
             self.assertLess(time.monotonic() - t, 8.0, (w, h))
             if "PLAN_BUDGET_EXCEEDED" in names(rec):
                 self.assertIs(rec["feasible"], False)
@@ -777,9 +997,10 @@ def fake_run(root: Path, owner=OWNER, title_owner=False) -> Path:
     run.mkdir()
     rows = [{"rank": "1", "parcel_id": "T1", "jurisdiction": "South Fulton / unincorporated",
              "site_address": "1 TEST RD" if not title_owner else "1 test  owner alpha rd", "acres": "9.6", "soil_hsg": "B",
-             "zoning": "M-1", "owner": owner, "owner_mailing": "99 HIDDEN LANE BOX 7, ATLANTA GA"},
+             "zoning": "M-1", "lead_grade": "B", "owner": owner, "owner_mailing": "99 HIDDEN LANE BOX 7, ATLANTA GA"},
             {"rank": "2", "parcel_id": "T2", "jurisdiction": "Fairburn", "site_address": "2 TEST RD", "acres": "4.0",
-             "soil_hsg": "B/D", "zoning": "M-1", "owner": "OTHER PARTY HOLDINGS LLC", "owner_mailing": "2 TEST RD"}]
+             "soil_hsg": "B/D", "zoning": "M-1", "lead_grade": "C", "owner": "OTHER PARTY HOLDINGS LLC",
+             "owner_mailing": "2 TEST RD"}]
     with open(run / "ranked.csv", "w", encoding="utf-8", newline="") as fh:
         import csv
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
@@ -873,6 +1094,7 @@ class Files(unittest.TestCase):
 
 
 class Cli(Offline):
+    title = None          # a test may plant a title (owner-guard tests)
 
     def run_cli(self, argv):
         out, err = io.StringIO(), io.StringIO()
@@ -882,8 +1104,10 @@ class Cli(Offline):
 
     def fake_inputs(self):
         def gather(spec, fetch, opts):
-            inp = site(450, 520, key=spec.key, rank=spec.name, title=spec.title, parcel_ids=spec.parcel_ids,
-                       tax_acres=spec.tax_acres, assembled=spec.assembled)
+            # 600 x 700 ft: a site that is feasible without any patch, so the
+            # CLI and viewer round trips carry a counted plan end to end.
+            inp = site(600, 700, key=spec.key, rank=spec.name, title=self.title or spec.title,
+                       parcel_ids=spec.parcel_ids, tax_acres=spec.tax_acres, assembled=spec.assembled)
             inp.meta = spec.meta
             return inp
         self.patch(si, "gather", gather)
@@ -901,6 +1125,8 @@ class Cli(Offline):
         self.assertEqual(len(body["run"]["ranked_csv_sha256"]), 64)
         rec = body["plans"][0]
         self.assertEqual((rec["rank"], rec["key"], rec["parcel_ids"], rec["svg"]), ("1", "1", ["T1"], "plan-1.svg"))
+        self.assertIs(rec["feasible"], True)
+        self.assertGreater(rec["total_sf"], 0)
         svg = (out / "plan-1.svg").read_text()
         self.assertIn("DRAFT", svg)
         ET.fromstring(svg)
@@ -920,14 +1146,120 @@ class Cli(Offline):
         self.assertEqual(code, 2)
         self.assertIn("refused", se)
 
+    def test_plans_round_trip_into_the_viewer(self):
+        """The planner's real output (plans.json + SVGs) builds a viewer
+        page with no join flag: the run fingerprint and parcel ids join it,
+        the facts the page shows are all present, and DRAFT is kept."""
+        from screener import viewer
+        self.fake_inputs()
+        run = fake_run(self.tmp)
+        out = self.tmp / "out"
+        code, _, se = self.run_cli([str(run), "--ranks", "1,2", "--out", str(out)])
+        self.assertEqual(code, 0, se)
+        page = self.tmp / "page.html"
+        err = io.StringIO()
+        with redirect_stdout(io.StringIO()), redirect_stderr(err):
+            vcode = viewer.main([str(run), "--plans", str(out), "--out", str(page)])
+        self.assertEqual(vcode, 0, err.getvalue())
+        html_text = page.read_text(encoding="utf-8")
+        data = json.loads(re.search(r"const PLANS = (.*?);\n", html_text, re.S).group(1))
+        plans = {p["id"]: p for p in data}
+        body = json.loads((out / "plans.json").read_text())
+        self.assertEqual(set(plans), {"plan-" + r["key"] for r in body["plans"] if r.get("svg")})
+        self.assertTrue(any(r["feasible"] is True and r["total_sf"] > 0 for r in body["plans"]))
+        for rec in body["plans"]:
+            if not rec.get("svg"):
+                continue
+            p = plans["plan-" + rec["key"]]
+            self.assertEqual(p["sfText"], f"{rec['total_sf']:,} SF" if rec["total_sf"] else p["sfText"])
+            self.assertEqual((p["pids"], p["zoningStatus"], p["sf"]), (rec["parcel_ids"], "draft", rec["total_sf"]))
+            self.assertEqual(p["feasible"], rec["feasible"])
+            for section, spec in viewer.PLAN_FACTS.items():
+                if isinstance(rec.get(section), dict):
+                    self.assertEqual(set(spec) - set(rec[section]), set(), section)   # every shown fact is written
+            self.assertEqual(p["v4"]["doors"], rec["doors"])
+            self.assertIn("DRAFT", p["svg"])
+            self.assertTrue(p["v4"]["operator_decisions"])
+        self.assertIn("DRAFT", html_text)
+
     def test_owner_in_title_writes_nothing(self):
         self.fake_inputs()
-        run = fake_run(self.tmp, title_owner=True)
+        run = fake_run(self.tmp)
+        self.title = "#1 1 TEST RD, held by Test Owner Alpha LLC"
         out = self.tmp / "out"
         code, so, se = self.run_cli([str(run), "--ranks", "1", "--out", str(out)])
         self.assertEqual(code, 3)
         self.assertNotIn("alpha", (so + se).lower())
         self.assertEqual([p.name for p in out.rglob("*")], [])
+
+    def test_owner_name_in_a_site_address_is_the_site_address(self):
+        # The shared guard's rule: an owner string that is part of a site
+        # address of the run is that site's published address, not owner data.
+        self.fake_inputs()
+        run = fake_run(self.tmp, title_owner=True)
+        code, _, se = self.run_cli([str(run), "--ranks", "1", "--out", str(self.tmp / "out")])
+        self.assertEqual(code, 0, se)
+
+    def owner_refused(self, run, argv, title):
+        self.title = title
+        out = Path(tempfile.mkdtemp(dir=self.tmp)) / "out-guard"
+        code, so, se = self.run_cli([str(run), *argv, "--out", str(out)])
+        self.assertEqual(code, 3, se)
+        self.assertEqual([p.name for p in out.rglob("*")], [], "a refused site writes no file")
+        return so + se
+
+    def test_owner_guard_is_the_shared_guard(self):
+        """R1: XML-escaped & and ', a mailing street line, an accented name
+        (JSON \\u escapes) and an assemblage member from rejected.csv are all
+        caught, and --out stays empty."""
+        self.fake_inputs()
+        run = fake_run(self.tmp, owner="O'NEAL & SONS DEVELOPMENT LLC")
+        with open(run / "ranked.csv", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+        rows[1]["owner"], rows[1]["owner_mailing"] = "CAFÉ ÉLAN HOLDINGS LLC", "55 ELM ST, ATLANTA GA 30301"
+        with open(run / "ranked.csv", "w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        with open(run / "rejected.csv", "w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=["parcel_id", "owner", "owner_mailing", "site_address", "jurisdiction"])
+            w.writeheader()
+            w.writerow({"parcel_id": "07 3", "owner": "REJECTED MEMBER HOLDINGS LLC", "owner_mailing": "7 QUIET WAY, X GA",
+                        "site_address": "9 OTHER RD", "jurisdiction": "Fairburn"})
+        g3 = esri_poly(wgs(box(600, 0, 900, 700)))
+        self.patch(si, "county_parcels", lambda pids, fetch: {p: shapely.geometry.shape({"type": "Polygon", "coordinates": g3["rings"]}) for p in pids})
+        cases = [(["--ranks", "1"], "#1 1 TEST RD, O'Neal & Sons Development LLC"),     # & and ' escaped in the SVG
+                 (["--ranks", "2"], "#2 2 TEST RD, mail to 55 Elm St"),                  # the mailing street line
+                 (["--ranks", "2"], "#2 2 TEST RD, Café Élan Holdings"),                 # \u escapes in plans.json
+                 (["--assemble", "n=T1,07 3"], "n: Rejected Member Holdings")]          # rejected.csv owner
+        for argv, title in cases:
+            with self.subTest(title=title):
+                text = self.owner_refused(run, argv, title).lower()
+                for bad in ("neal", "elm st", "élan", "rejected member"):
+                    self.assertNotIn(bad, text)
+        # the plans.json body is checked before the SVG is written: owner text
+        # only in the record leaves no SVG behind (R1)
+        self.patch(sr, "render", lambda d, rec: '<svg xmlns="http://www.w3.org/2000/svg"><text>clean</text></svg>')
+        self.owner_refused(run, ["--ranks", "1"], "#1 O'Neal & Sons Development")
+        self.owner_refused(run, ["--ranks", "2"], "#2 Café Élan Holdings")      # only as \u escapes in plans.json
+
+    def test_fetch_failure_through_the_real_gather_exits_1(self):
+        """R26: the real gather turns a failed fetch into a not-checked input;
+        the plan is written (feasible null) and the CLI exits 1."""
+        run = fake_run(self.tmp)
+        self.patch(si, "sources", lambda: {})
+        self.patch(si.Fetcher, "call", mock.Mock(side_effect=arcgis.ArcGISError("host down (test)")))
+        self.patch(layers, "fetch", mock.Mock(side_effect=arcgis.ArcGISError("layer down (test)")))
+        self.patch(frontage, "check_parcel", lambda g: frontage.not_checked(f"{frontage.SERVICE_FAILED} (test)"))
+        out = self.tmp / "o"
+        code, so, se = self.run_cli([str(run), "--ranks", "1", "--out", str(out)])
+        self.assertEqual(code, 1, se)
+        self.assertIn("incomplete", se)
+        rec = json.loads((out / "plans.json").read_text())["plans"][0]
+        self.assertIn(rec["feasible"], (None, False))
+        self.assertTrue({"TRANSMISSION_NOT_CHECKED", "LAYERS_NOT_CHECKED", "NEIGHBOURS_NOT_CHECKED"}
+                        <= {f["flag"] for f in rec["flags"]["1"]})
+        self.assertEqual(rec["total_sf"], 0)
 
     def test_bad_arguments_refused_before_any_request(self):
         run = fake_run(self.tmp)
@@ -1066,7 +1398,8 @@ class Static(unittest.TestCase):
             self.assertIsNone(re.search(r"(?i)owner[\"'\]]?\)?\s*\.?\s*(upper|lower)?\(?\)?\.startswith", s))
 
     def test_private_access_allow_list(self):
-        allowed = {("checks", "_overlap"), ("plan", "_esc"), ("arcgis", "_session")}
+        allowed = {("checks", "_overlap"), ("plan", "_esc"), ("arcgis", "_session"),
+                   ("frontage", "_params"), ("frontage", "_answer_problem")}
         for name in NEW:
             tree = ast.parse(self.src(name))
             for node in ast.walk(tree):
@@ -1111,6 +1444,487 @@ class Static(unittest.TestCase):
                 self.assertNotIn("siteplan", s, f)
         self.assertFalse(any("elevation.nationalmap" in l.url or "Transmission" in l.url for l in layers.LAYERS.values()))
 
+
+
+# ---------------------------------------------------------------------------
+# Review round 1 fixes (reviews/37_screener_site_planner, Agent 2)
+# ---------------------------------------------------------------------------
+TWO_FRONTS = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+
+
+class LayoutVersusSiteFlags(Offline):
+    """A flag no other layout can clear (a draft height cap, a frontage too
+    short for a truck driveway) blocks the site, not the layout: the plan
+    drawn, the second-building search, the rescue pass and geometry_ok are
+    those of the same site without the flag."""
+
+    def rules(self):
+        r = dict(sp.JUR_DRAFT)
+        r["capped"] = dict(r["south fulton"], height=35, cover=None)
+        r["nocap"] = dict(r["south fulton"], height=None, cover=None)
+        r["cpark"] = dict(r["college park"])
+        r["cpfree"] = dict(r["college park"], height=None)
+        return r
+
+    def test_height_cap_keeps_the_second_building(self):
+        with mock.patch.object(sp, "JUR_DRAFT", self.rules()):
+            capped, _ = sp.plan_site(site(1600, 1000, front=TWO_FRONTS, jur="Capped"))
+            free, _ = sp.plan_site(site(1600, 1000, front=TWO_FRONTS, jur="NoCap"))
+        self.assertIn("second_building", free)
+        self.assertIn("second_building", capped, names(capped, 1))   # was never searched under the cap
+        self.assertEqual(capped["second_building"]["sf"], free["second_building"]["sf"])
+        self.assertEqual(capped["total_sf_if_access"], free["total_sf_if_access"])
+        self.assertEqual([a["geometry_ok"] for a in capped["alternatives"]], [a["geometry_ok"] for a in free["alternatives"]])
+        self.assertTrue(any(a["geometry_ok"] for a in capped["alternatives"]))
+        self.assertIn("HEIGHT_CAP", names(capped, 1))
+        self.assertIs(capped["feasible"], False)
+        self.assertEqual(capped["total_sf"], 0)
+        assert_invariant(self, capped)
+
+    def test_height_cap_does_not_pick_a_broken_larger_layout(self):
+        # 700 x 800 College Park: the largest layout fails its pond, a route
+        # and the 70% impervious cap; a smaller one fails only the draft
+        # 35 ft height cap, and it is the one drawn (as without the cap).
+        with mock.patch.object(sp, "JUR_DRAFT", self.rules()):
+            capped, _ = sp.plan_site(site(700, 800, jur="cpark"))
+            free, _ = sp.plan_site(site(700, 800, jur="cpfree"))
+        self.assertEqual(names(capped, 1), {"HEIGHT_CAP"})
+        self.assertTrue(capped["detention"]["fits"])
+        self.assertEqual(capped["configuration"], free["configuration"])
+        self.assertEqual(capped["total_sf_if_access"], free["total_sf_if_access"])
+        self.assertEqual(capped["plan_checks"], [])
+        assert_invariant(self, capped)
+
+    def test_short_frontage_does_not_pick_a_broken_larger_layout(self):
+        landlocked, _ = planned("ll700x800", lambda: site(700, 800, front_state="none"))
+        self.assertTrue(landlocked["detention"]["fits"])
+        for ft in (5, 150):
+            with self.subTest(frontage_ft=ft):
+                rec, _ = sp.plan_site(site(700, 800, front=LineString([(0, 0), (ft, 0)])))
+                self.assertEqual(names(rec, 1), {"ACCESS_CONSTRAINED"})       # no avoidable POND_DOES_NOT_FIT
+                self.assertTrue(rec["detention"]["fits"])
+                self.assertEqual(rec["total_sf_if_access"], landlocked["total_sf_if_access"])
+                self.assertIs(rec["feasible"], False)
+                assert_invariant(self, rec)
+
+    def test_rescue_and_second_gate_ignore_length_independent_flags(self):
+        o = {"flags": [("HEIGHT_CAP", 1, "x"), ("ACCESS_CONSTRAINED", 1, "y"), ("POND_DOES_NOT_FIT", 1, "z"), ("RELIEF", 2, "r")]}
+        self.assertEqual(sp._blocking(o), {"POND_DOES_NOT_FIT"})
+        self.assertEqual(sp.LENGTH_INDEPENDENT_FLAGS, {"HEIGHT_CAP", "ACCESS_CONSTRAINED"})
+        # decide() still blocks the site on them
+        self.assertEqual(sp.decide([("HEIGHT_CAP", 1, "x")], True, False, sp.PlanOptions()), (False, []))
+
+
+class DetentionAndSoils(Offline):
+
+    def test_reported_storage_is_what_the_ponds_hold(self):
+        """No drop yard placed: the volume re-computed without it is smaller,
+        and the ponds are re-sized to it, so storage, count and drawn ponds
+        agree (they kept the first, larger estimate before)."""
+        o = sp.PlanOptions(trailer_tiers=sp.trailer_tiers_from("5"))
+        vols = []
+        real = sp.detention_storage
+
+        def spy(*a):
+            vols.append(real(*a))
+            return vols[-1]
+        with mock.patch.object(sp, "place_near", lambda *a, **k: None), mock.patch.object(sp, "detention_storage", spy):
+            rec, d = sp.plan_site(site(800, 800), o)
+        self.assertIn("TRAILER_SHORT", names(rec))
+        self.assertEqual(rec["trailers"]["drop_yards"], 0)
+        self.assertTrue(any(b < a - 1e-6 for a, b in zip(vols[::2], vols[1::2])))   # the smaller re-computed volume
+        v = d.o["v_det"]
+        self.assertEqual(rec["detention"]["storage_acft"], round(v, 1))
+        self.assertTrue(rec["detention"]["fits"])
+        if rec["detention"]["fits"]:
+            n = len(d.o["ponds"])
+            self.assertEqual(n, sp.pond_count(v))
+            _, Lf, Wf, _ = sp.pond_dims(v / n)
+            for pond in d.o["ponds"]:
+                self.assertAlmostEqual(pond.area, Lf * Wf, delta=0.01 * Lf * Wf)
+
+    def test_assemblage_rules_are_compared(self):
+        meta = {"jurisdiction": "South Fulton / unincorporated", "hsg": "D", "zoning": "M-1",
+                "members": [{"rank": "1", "jurisdiction": "South Fulton / unincorporated", "hsg": "D", "zoning": "M-1"},
+                            {"rank": "2", "jurisdiction": "East Point", "hsg": "B", "zoning": "I-2"}],
+                "members_unranked": 1}
+        flags = sp.assemblage_flags(meta, "south fulton")
+        self.assertIn(("ASSEMBLAGE_MIXED_RULES", 1), [(f, s) for f, s, _ in flags])
+        self.assertIn(("ASSEMBLAGE_MEMBER_NOT_RANKED", 2), [(f, s) for f, s, _ in flags])
+        self.assertEqual(sp.assemblage_hsg(meta, "D", None)[0], "B")      # the larger pond
+        inp = site(600, 700, assembled=True)
+        inp.meta = meta
+        rec, _ = sp.plan_site(inp)
+        self.assertIn("ASSEMBLAGE_MIXED_RULES", names(rec, 1))
+        self.assertEqual(rec["gated"], ["USE_PERMIT_REQUIRED"])            # the East Point member's gate
+        self.assertIn("member #2", " ".join(f["note"] for f in rec["flags"][1] if f["flag"] == "USE_PERMIT_REQUIRED"))
+        self.assertIn("HSG B", rec["detention"]["basis"])
+        self.assertIs(rec["feasible"], False)
+        assert_invariant(self, rec)
+        same = dict(meta, members=[dict(m, jurisdiction="Fairburn", zoning="M-1") for m in meta["members"]], members_unranked=0)
+        self.assertEqual(sp.assemblage_flags(same, "fairburn"), [])
+        zoned = dict(same, members=[same["members"][0], dict(same["members"][1], zoning="R-1")])
+        self.assertEqual([(f, s) for f, s, _ in sp.assemblage_flags(zoned, "fairburn")], [("ASSEMBLAGE_MIXED_RULES", 2)])
+
+    def test_assemblage_spec_carries_every_member(self):
+        run = si.load_run(fake_run(self.tmp))
+        spec = si.site_spec(run, "both", ["T1", "T2"], None, FakeFetch(lambda u, p: {"features": []}), sp.PlanOptions())
+        self.assertEqual([(m["rank"], m["jurisdiction"], m["hsg"]) for m in spec.meta["members"]],
+                         [("1", "South Fulton / unincorporated", "B"), ("2", "Fairburn", "B/D")])
+        self.assertEqual(spec.meta["members_unranked"], 0)
+        self.assertNotIn("owner", json.dumps(spec.meta).lower())
+
+
+class FailClosedDefaults(Offline):
+
+    def test_site_inputs_with_default_fields_are_incomplete(self):
+        inp = site(600, 700)
+        bare = sp.SiteInputs("k", "1", "t", ["T1"], inp.geometry, inp.meta)
+        rec, _ = sp.plan_site(bare)
+        self.assertIsNone(rec["feasible"])
+        self.assertEqual(rec["total_sf"], 0)
+        self.assertTrue({"FRONTAGE_NOT_CHECKED", "DEM_NOT_CHECKED", "LAYERS_NOT_CHECKED"} <= names(rec, 1))
+        self.assertEqual(rec["inputs"]["states"]["frontage"]["state"], "not_checked")
+        # a states entry that disagrees with the frontage object fails closed too
+        st = dict(inp.states, frontage=sp.InputState("checked"))
+        rec2, _ = sp.plan_site(site(600, 700, front_state="not_checked", states=st))
+        self.assertIn("FRONTAGE_NOT_CHECKED", names(rec2, 1))
+        self.assertIsNone(rec2["feasible"])
+
+
+class RealGather(Offline):
+    """The real siteplan_inputs.gather with every fetch faked: states, the
+    near-water shapes (R21) and the --cut-parcel construction."""
+
+    def fakes(self, water):
+        def lfetch(layer, tiles, region):
+            if layer is layers.LAYERS["wetlands"]:
+                return layers.Index([(water, {})])
+            return layers.Index([])
+        self.patch(layers, "fetch", lfetch)
+        front = wgs(LineString([(0, 0), (600, 0)]))
+        self.patch(frontage, "check_parcel", lambda g: frontage.Frontage(frontage.CHECKED, feet=600, road="local road, test", line=front))
+
+        def answers(url, p):
+            if url == si.DEM_URL:
+                n = len(json.loads(p["geometry"])["points"])
+                return {"samples": [{"locationId": i, "value": "275.0"} for i in range(n)]}
+            if "where" in p:
+                return {"features": [{"attributes": {"ParcelID": "07 9"}, "geometry": esri_poly(wgs(box(0, 600, 100, 700)))}]}
+            return {"features": []}
+        return FakeFetch(answers)
+
+    def test_gather_states_near_water_and_cut(self):
+        water = wgs(box(-200, 0, -2, 700))               # a wetland 2 ft outside the west line
+        ff = self.fakes(water)
+        run = si.load_run(fake_run(self.tmp))
+        spec = si.site_spec(run, "1", None, ("07 9", 50.0), ff, sp.PlanOptions())
+        inp = si.gather(spec, ff, sp.PlanOptions())
+        self.assertEqual({k: v.state for k, v in inp.states.items()},
+                         {"layers": "none", "transmission": "none", "neighbours": "checked", "frontage": "checked", "dem": "checked"})
+        self.assertEqual(inp.constraints_wgs, [])
+        self.assertEqual(len(inp.constraints_near_wgs), 1)
+        # the cut: the county shape (100 x 100 ft corner) plus 50 ft, in the site plane
+        plane = sp.Plane(inp.geometry)
+        cut = plane.ft(inp.cut_wgs)
+        self.assertAlmostEqual(cut.area, box(0, 600, 100, 700).buffer(50).area, delta=0.01 * cut.area)
+        rec, _ = sp.plan_site(inp)
+        self.assertIs(rec["feasible"], True, rec["flags"][1])
+        clean = sp.plan_site(dataclasses_replace(inp, constraints_near_wgs=[]))[0]
+        self.assertLess(rec["inputs"]["paving_envelope_ac"], clean["inputs"]["paving_envelope_ac"])    # the 25 ft buffer reaches in
+        self.assertGreater(rec["inputs"]["test_cut_ac"], 0)
+        hit = si.constraints(wgs(box(-50, 100, 600, 700)))
+        self.assertEqual(hit[2].state, "checked")                    # the wetland inside the line
+        self.assertEqual(len(hit[0]), 1)
+
+    def test_near_water_across_a_tile_edge_is_fetched(self):
+        asked = []
+
+        def lfetch(layer, tiles, region):
+            asked.append(list(tiles))
+            return layers.Index([])
+        self.patch(layers, "fetch", lfetch)
+        edge = -84.40
+        g = box(edge - 0.004, 33.61, edge - 0.00002, 33.613)       # ends about 6 ft short of the 0.05 deg tile line
+        si.constraints(g)
+        east_tile = any(t[0] == round(edge, 10) or abs(t[0] - edge) < 1e-9 for t in asked[0])
+        self.assertTrue(east_tile, asked[0])
+
+
+def dataclasses_replace(obj, **kw):
+    import dataclasses
+    return dataclasses.replace(obj, **kw)
+
+
+class FetcherCache(Offline):
+
+    def test_cached_answer_is_used_after_the_host_is_down(self):
+        cache = {json.dumps({"k": "cached"}, sort_keys=True): ({"features": []}, 0)}
+        self.patch(arcgis, "cached_json", lambda url, params, **kw: cache.get(json.dumps(params, sort_keys=True)))
+        self.patch(arcgis, "request_json", mock.Mock(side_effect=arcgis.ArcGISError("down")))
+        f = si.Fetcher(sleep=lambda s: None, stop_after=2)
+        for k in range(2):
+            with self.assertRaises(arcgis.ArcGISError):
+                f.call(si.TRANSMISSION_URL + "/query", {"k": k}, check=si._features_check)
+        self.assertTrue(f.down)
+        self.assertEqual(f.call(si.TRANSMISSION_URL + "/query", {"k": "cached"}, check=si._features_check), {"features": []})
+        with self.assertRaises(si.HostDown):
+            f.call(si.TRANSMISSION_URL + "/query", {"k": "new"}, check=si._features_check)
+        self.assertEqual(arcgis.request_json.call_count, 2)
+
+
+class CliRound1(Cli):
+
+    def test_merge_plans_an_incomplete_site_again(self):
+        self.fake_inputs()
+        run = fake_run(self.tmp)
+        out = self.tmp / "out"
+        self.assertEqual(self.run_cli([str(run), "--ranks", "1,2", "--out", str(out)])[0], 0)
+        body = json.loads((out / "plans.json").read_text())
+        for r in body["plans"]:
+            r["feasible"] = None
+            r["flags"]["1"].append({"flag": "DEM_NOT_CHECKED", "note": "test"})
+        (out / "plans.json").write_text(json.dumps(body))
+        code, so, se = self.run_cli([str(run), "--ranks", "1", "--out", str(out), "--merge"])
+        self.assertEqual(code, 1, se)                       # rank 2 is still incomplete in --out
+        self.assertRegex(so, r"(?m)^1 .* feasible True")    # rank 1 planned again
+        self.assertIn("incomplete plan(s) kept by --merge", se)
+        recs = {r["rank"]: r for r in json.loads((out / "plans.json").read_text())["plans"]}
+        self.assertIs(recs["1"]["feasible"], True)
+        self.assertIsNone(recs["2"]["feasible"])
+        code, _, se = self.run_cli([str(run), "--ranks", "2", "--out", str(out), "--merge"])
+        self.assertEqual(code, 0, se)
+
+    def test_rank_like_assemble_names_and_key_collisions(self):
+        self.fake_inputs()
+        run = fake_run(self.tmp)
+        out = self.tmp / "out"
+        for bad in (["--assemble", "2=T1,T2"], ["--assemble", "3+4=T1,T2"]):
+            code, _, se = self.run_cli([str(run), "--out", str(out)] + bad)
+            self.assertEqual(code, 2, (bad, se))
+            self.assertIn("ranks", se)
+        code, _, se = self.run_cli([str(run), "--out", str(out), "--assemble", "1+2=T1,T2"])
+        self.assertEqual(code, 0, se)                      # a rank name listing exactly those parcels
+        code, _, se = self.run_cli([str(run), "--out", str(out), "--assemble", "a+b=T1,T2"])
+        self.assertEqual(code, 0, se)
+        code, so, se = self.run_cli([str(run), "--out", str(out), "--assemble", "a-b=T1,T2", "--merge"])
+        self.assertEqual(code, 2, se)                      # slugs to the kept plan's key "a-b"
+        self.assertIn("already a plan", se)
+
+    def test_time_budget_must_be_a_positive_number(self):
+        run = fake_run(self.tmp)
+        for v in ("nan", "inf", "0", "-5", "1e9"):
+            code, _, se = self.run_cli([str(run), "--ranks", "1", "--out", str(self.tmp / "o"), "--max-seconds-per-site", v])
+            self.assertEqual(code, 2, v)
+            self.assertIn("max-seconds", se)
+
+    def test_code_hash_and_options_cover_the_prototypes(self):
+        o = sp.PlanOptions()
+        self.assertIn("sitefit.py", sp.CODE_FILES)
+        before = (sp.code_hash(), o.decisions())
+        rear = dict(sitefit.PROTOTYPES["rear"])
+        with mock.patch.dict(sitefit.PROTOTYPES, {"rear": dict(rear, L=rear["L"] + 200)}):
+            self.assertNotEqual(o.decisions(), before[1])     # --merge refuses: the options differ
+        self.assertEqual(o.decisions()["prototype_dims"]["rear"]["L"], rear["L"])
+
+    def test_python_m_keeps_planning_after_a_bad_rank(self):
+        run = fake_run(self.tmp)
+        env = dict(os.environ, HTTPS_PROXY="http://127.0.0.1:9", HTTP_PROXY="http://127.0.0.1:9")
+        res = subprocess.run([sys.executable, "-m", "screener.siteplan", str(run), "--ranks", "99999,88888",
+                              "--out", str(self.tmp / "o")], capture_output=True, text=True, cwd=str(SCREENER.parent),
+                             env=env, timeout=120)
+        self.assertEqual(res.returncode, 1, res.stderr[-800:])
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertIn("99999: rank 99999 is not in the run", res.stderr)
+        self.assertIn("88888: rank 88888 is not in the run", res.stderr)   # the loop went on
+
+
+# ---------------------------------------------------------------------------
+# Review round 4 (reviews/37): fixes and their regression tests
+# ---------------------------------------------------------------------------
+def rotated_site(w, h, ang, **kw):
+    """A w x h rectangle and its frontage on y=0, turned together by ang
+    degrees about the origin."""
+    from shapely import affinity
+    g = affinity.rotate(box(0, 0, w, h), ang, origin=(0, 0))
+    fr = affinity.rotate(LineString([(0, 0), (w, 0)]), ang, origin=(0, 0))
+    return site(shapes=[g], front=fr, **kw)
+
+
+class RotatedModules(Offline):
+    angles = False
+
+    def test_road_court_seam_is_closed_on_a_rotated_module(self):
+        """A point on the court just past the end-road seam is truck
+        pavement at any angle; the prototype's plain inset lost a 12 ft band
+        there once rotated (the union of the rectangles kept a crack)."""
+        prog = sp.Program("south fulton", sp.jur_rules("south fulton")[1], "fulton", sp.PlanOptions())
+        v = [x for x in sp.variants() if x["type"] == "rear" and x["D"] == 230 and not x["row"] and x["cars"] == "side"][0]
+        cd = sp.car_rows_layout(1)[1]
+        cracked = 0
+        for ang in (0.0, 33.0, 61.7, 90.0, 123.4):
+            for fv in (False, True):
+                for fu in (False, True):
+                    depth, lmod = sp.geometry_of(v, 500, 1)
+                    fr = sp.Frame(lmod, depth, sitefit.Placement(1000.0, ang, 0.0, 0.0), (1234.5, -987.25), fv, fu)
+                    p = sp.build(v, 500, 1, fr, prog, draw=False)
+                    q = Point(fr.pt(sp.TRUCK_ROAD - 11, cd + 230 + 0.9))
+                    with self.subTest(angle=ang, flipv=fv, flipu=fu):
+                        self.assertTrue(sp.own_truck_area(p, True).contains(q))
+                    cracked += not sp.own_truck_area(p, False).contains(q)
+        self.assertGreater(cracked, 0)          # the prototype inset, kept for parity, has the crack
+
+    def test_rotated_rectangle_gives_no_route_outside_flag(self):
+        """A plain rectangle turned 33 degrees (fit angles along its sides)
+        plans like the same rectangle on the axes, with no stray route."""
+        axis, _ = planned("route700x600", lambda: site(700, 600))
+        with mock.patch.object(sitefit, "_angles", lambda rings: [33.0, 123.0]):
+            rec, _ = sp.plan_site(rotated_site(700, 600, 33.0))
+        self.assertNotIn("ROUTE_OUTSIDE_ENVELOPE", names(rec), rec["plan_checks"])
+        self.assertFalse([c for c in rec["plan_checks"] if "route outside" in c["check"]])
+        self.assertIs(rec["feasible"], True)
+        self.assertGreaterEqual(rec["total_sf"], 0.95 * axis["total_sf"])
+
+    def test_route_stray_is_reported_with_one_decimal(self):
+        from types import SimpleNamespace as NS
+        big = box(0, 0, 1000, 1000)
+        for fixes, want in ((True, 5.1), (False, 5)):
+            ctx = NS(B=big, P=big, parcel=big, wet_buf=Polygon(), trans=Polygon(),
+                     prog=NS(opts=sp.PlanOptions(behaviour="fixes" if fixes else "prototype")))
+            p = NS(building=box(100, 100, 200, 200), module=box(90, 90, 210, 210))
+            o = {"ponds": [], "drops": [], "route_polys": [], "n_main_routes": 0, "route_outside": [("truck", 5.14)]}
+            got = sp.check_plan(p, o, ctx)
+            self.assertEqual(got, [{"check": "truck route outside its paving envelope", "ft": want}])
+
+    def test_yield_spread_over_rotations_is_bounded(self):
+        """Orientation sensitivity (documented in SITE_PLANNING.md, about
+        +/-30%): with the real fit angles the same parcel turned on the map
+        stays feasible and within that band."""
+        totals = []
+        for ang in (0.0, 30.0):
+            rec, _ = sp.plan_site(rotated_site(600, 700, ang))
+            self.assertIs(rec["feasible"], True, ang)
+            totals.append(rec["total_sf"])
+        self.assertGreaterEqual(min(totals), 0.7 * max(totals), totals)
+
+
+class MultipartParcel(Offline):
+
+    def test_pond_and_yard_stay_on_the_buildings_piece(self):
+        """One parcel split by a 60 ft road: the pond does not go across
+        the road from the building, and the parcel is flagged."""
+        from shapely.geometry import MultiLineString
+        shapes = [box(0, 0, 600, 700), box(660, 0, 960, 700)]
+        fr = MultiLineString([[(600, 0), (600, 700)], [(660, 0), (660, 700)]])
+        rec, d = planned("multipart-road", lambda: site(shapes=shapes, front=fr))
+        self.assertIn("PARCEL_MULTIPART", names(rec, 3))
+        assert_invariant(self, rec)
+        home = [g for g in sp.parts(d.parcel) if g.intersects(d.p.module)]
+        self.assertEqual(len(home), 1)
+        for g in d.o["ponds"] + d.o["drops"]:
+            self.assertGreater(g.intersection(home[0]).area, 0.99 * g.area)
+        alone, _ = planned("basic", lambda: site(600, 700))
+        self.assertLessEqual(rec["total_sf"], alone["total_sf"] * 1.05)   # the far piece adds no building area
+        assembled, _ = planned("multipart-assembled", lambda: site(shapes=shapes, front=fr, assembled=True))
+        self.assertNotIn("PARCEL_MULTIPART", names(assembled))
+        self.assertIn("ASSEMBLAGE_NOT_CONTIGUOUS", names(assembled, 1))
+
+
+class FrontageCacheAfterDown(Offline):
+
+    def test_cached_frontage_is_measured_after_gdot_is_down(self):
+        f = si.Fetcher(sleep=lambda s: None, stop_after=1)
+        f.down.add(f._host(frontage.IDENTIFY_URL))
+        ask = mock.Mock(side_effect=AssertionError("asked GDOT"))
+        self.patch(frontage, "check_parcel", ask)
+        kept = {}
+
+        def cached(url, params, **kw):
+            self.assertEqual(url, frontage.IDENTIFY_URL)
+            self.assertIs(kw.get("check"), frontage._answer_problem)
+            return kept.get(json.dumps(params, sort_keys=True))
+        self.patch(arcgis, "cached_json", cached)
+        miss = f.frontage(G)
+        self.assertEqual(miss.state, frontage.NOT_CHECKED)
+        self.assertIn(frontage.SERVICE_FAILED, miss.reason)
+        kept[json.dumps(frontage._params(G), sort_keys=True)] = ({"results": []}, 0)
+        hit = f.frontage(G)
+        self.assertEqual(hit.state, frontage.NONE)
+        ask.assert_not_called()
+
+
+class CliRound4(Offline):
+    # Cli's helpers without re-running Cli's own tests.
+    title = None
+    run_cli = Cli.run_cli
+    fake_inputs = Cli.fake_inputs
+
+    def fake_spec(self):
+        seen = []
+
+        def spec(run, name, pids, cut, fetch, opts):
+            seen.append((name, pids, cut))
+            return si.SiteSpec(name, sp.slug(name), f"#{name}", list(pids or [run.rows[name]["parcel_id"]]), G,
+                               {"jurisdiction": "South Fulton / unincorporated", "hsg": "B", "zoning": "M-1"},
+                               None, bool(pids))
+        self.patch(si, "site_spec", spec)
+        return seen
+
+    def test_merge_plans_a_site_again_when_its_definition_changed(self):
+        self.fake_inputs()
+        seen = self.fake_spec()
+        run = fake_run(self.tmp)
+        out = self.tmp / "out"
+        code, _, se = self.run_cli([str(run), "--ranks", "1", "--assemble", "east=T1,T2", "--out", str(out)])
+        self.assertEqual(code, 0, se)
+        # the same definition (members in another order): kept, nothing planned
+        seen.clear()
+        code, _, se = self.run_cli([str(run), "--ranks", "1", "--assemble", "east=T2,T1", "--out", str(out), "--merge"])
+        self.assertEqual((code, seen), (0, []), se)
+        # a new cut and other members: both sites planned again
+        code, _, se = self.run_cli([str(run), "--ranks", "1", "--cut-parcel", "1=T2:50", "--assemble", "east=T1,T2,T9",
+                                    "--out", str(out), "--merge"])
+        self.assertEqual(code, 0, se)
+        self.assertEqual(sorted(n for n, _, _ in seen), ["1", "east"])
+        self.assertIn("planned again", se)
+        body = json.loads((out / "plans.json").read_text())
+        got = {r["key"]: r["site_definition"] for r in body["plans"]}
+        self.assertEqual(got, {"1": {"members": None, "cut": ["T2", 50.0]},
+                               "east": {"members": ["T1", "T2", "T9"], "cut": None}})
+
+    def test_cut_parcel_given_twice_for_a_site_refused(self):
+        with self.assertRaises(sp.PlanError):
+            sp._parse_cut(["4=14F001 LL0010:50", "4=14F001 LL0020:100"])
+        self.assertEqual(sp._parse_cut(["4=14F001 LL0010:50", "5=14F001 LL0020:100"]),
+                         {"4": ("14F001 LL0010", 50.0), "5": ("14F001 LL0020", 100.0)})
+        run = fake_run(self.tmp)
+        code, _, se = self.run_cli([str(run), "--ranks", "1", "--cut-parcel", "1=T2:50", "--cut-parcel", "1=T2:80",
+                                    "--out", str(self.tmp / "o")])
+        self.assertEqual(code, 2, se)
+        self.assertIn("given twice", se)
+
+    def test_cache_days_must_be_a_finite_number_not_below_zero(self):
+        run = fake_run(self.tmp)
+        spy = mock.Mock(side_effect=AssertionError("asked"))
+        self.patch(arcgis, "request_json", spy)
+        for bad in ("nan", "inf", "-1"):
+            code, _, se = self.run_cli([str(run), "--ranks", "1", "--cache-days", bad, "--out", str(self.tmp / "o")])
+            self.assertEqual(code, 2, bad)
+            self.assertIn("--cache-days", se)
+        spy.assert_not_called()
+        self.assertFalse((self.tmp / "o").exists())
+
+    def test_code_files_cover_every_imported_screener_module(self):
+        for name in ("frontage.py", "checks.py", "layers.py", "arcgis.py", "sitefit.py", "geo.py", "plan.py", "viewer.py"):
+            self.assertIn(name, sp.CODE_FILES)
+        for name in sp.CODE_FILES:
+            tree = ast.parse((SCREENER / name).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level == 1:
+                    mods = [node.module.split(".")[0]] if node.module else [a.name for a in node.names]
+                    for m in mods:
+                        if (SCREENER / f"{m}.py").exists():
+                            self.assertIn(f"{m}.py", sp.CODE_FILES, name)
 
 if __name__ == "__main__":
     unittest.main()

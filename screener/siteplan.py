@@ -42,8 +42,9 @@ zoning rules are the authority; nothing here reads them. Every record
 carries ``zoning.status == "draft"`` and the ``ZONING_DRAFT`` flag, and
 every SVG says DRAFT.
 
-OPERATOR DECISIONS still open (named constants, each a CLI option, and
-recorded in every plan's ``operator_decisions``):
+OPERATOR DECISIONS still open (named constants recorded in every plan's
+``operator_decisions``; the parking and trailer ones are also CLI options,
+the prototype set, market depths and edge strip are constants only):
 
 - ``PARKING_RULE`` = "max": cars required = max(draft code minimum, market
   ratio). ``MARKET_PARKING_TIERS``: 0.55 per 1,000 SF at 250k SF and up,
@@ -59,19 +60,38 @@ recorded in every plan's ``operator_decisions``):
   comps (operator=False) that fill the 166k-312k SF gap.
 - ``OTHER_EDGE_MIN_PAVE_FT`` = 10: a landscape strip on other lot lines.
 
-BEHAVIOUR. ``--prototype-behaviour`` reproduces the v4 prototype exactly
-(the parity proof). The default adds the reviewed fixes, each a listed
+BEHAVIOUR. ``--prototype-behaviour`` reproduces the v4 prototype's numbers
+(the parity proof; the draft labels, the input states and a search cut by
+the time budget are reported the same way in both modes). The default adds the reviewed fixes, each a listed
 delta in reviews/37: feasibility follows a declared flag rule (R4),
 coverage and height caps per alternative (R4), route and plan geometry
 checks (R16, R17), impervious area recomputed after the drop-yard links
-and only placed yards counted (R17), water buffers built before clipping
-to the parcel (R21), assemblage seams closed (R13), dual soil groups read
-as the undrained group (R24). Missing inputs fail closed in both modes
-(R2): ``feasible`` is None ("incomplete"), never a clean result.
+and only placed yards counted, the ponds re-sized to it (R17), water
+buffers built before clipping to the parcel (R21), assemblage seams closed
+(R13), dual soil groups read as the letter giving the larger pond (R24),
+an assemblage's members' rules compared (ASSEMBLAGE_MIXED_RULES). A
+blocking flag no other layout can clear (``LENGTH_INDEPENDENT_FLAGS``: a
+draft height cap, a frontage too short for a truck driveway) blocks the
+site but not the layout: it does not shrink the building and stays out of
+the layout's own check (``geometry_ok``), the ranking of layouts, the
+rescue pass and the second-building search. When the pond or a route blocks every explored plan, the
+search also tries the shorter lengths and the remaining fits (so a larger
+parcel never reads worse than a smaller one inside it). Missing inputs
+fail closed in both modes (R2): ``feasible`` is None ("incomplete"),
+never a clean result; the one exception is NO_FIT, which stays False
+because a missing input can only enlarge the envelope. A search cut by the time
+budget (``--max-seconds-per-site``) is flagged ``PLAN_BUDGET_EXCEEDED``
+and is not feasible; when it is cut before any plan is finished the
+record says so rather than ``NO_FIT``; when it is cut only in the optional
+second-building search, building 1 stands and the plan says
+``SECOND_BUILDING_NOT_SEARCHED``.
 
 Owner names and mailing addresses never enter a plan: assemblages are
-explicit parcel-id lists, no query asks for an owner field, and
-``owner_guard`` scans the final bytes of every file before it is written.
+explicit parcel-id lists, no query this tool writes asks for a parcel
+owner or mailing field, and the shared owner guard (``viewer.OwnerGuard``,
+built from ranked.csv and rejected.csv) scans the final bytes of every
+file of a site, as written and with its markup removed, before any of
+them is written.
 """
 
 from __future__ import annotations
@@ -87,7 +107,6 @@ import re
 import subprocess
 import sys
 import time
-import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -102,6 +121,7 @@ from shapely.prepared import prep
 
 from . import sitefit
 from .geo import FT_PER_M, LocalProjection
+from .viewer import OwnerGuard, markup_text
 
 SCHEMA_VERSION = 1
 SQFT_PER_AC = 43560.0
@@ -135,7 +155,11 @@ MIN_PART_SF = 40000    # paving parts smaller than this are not fitted
 WATER_BUFFER_FT = 25.0
 SECOND_MIN_AC = 3.5
 SECOND_MIN_SF = 50000
-MAX_SECONDS_PER_SITE = 120.0
+# Per-site search budget (R19). The offline replay of the 33 reference sites
+# needs up to 193 s (#48) and 848 s (the 77.6 ac 115+170 assemblage) on this
+# container; at 120 s #48 would come out with no plan. 900 s lets every
+# reference site finish; --max-seconds-per-site changes it.
+MAX_SECONDS_PER_SITE = 900.0
 SEAM_FT = 2.5          # assemblage seam closing radius (R13)
 ROUTE_TOL_FT = 5.0     # route outside its walk area beyond this is a violation
 CONFLICT_TOL_SF = 500.0
@@ -152,7 +176,11 @@ PLANNER_PROTOTYPES = ("rear", "cross")     # front-load not drawn (operator deci
 MARKET_REAR_DEPTHS = (160, 190, 230, 270, 310)   # market comps, operator=False
 MARKET_CROSS_DEPTHS = (470, 600)
 OTHER_EDGE_MIN_PAVE_FT = 10
-DUAL_HSG_USE = "undrained"                 # 'B/D' read as D (conservative); prototype read B
+# A dual soil group ('B/D') is read as the letter that gives the larger
+# detention storage (with HSG_K that is the drained letter, as the prototype
+# read it): the conservative choice for pond size. Reading D would shrink
+# the pond about 27% (the shortcut nets out pre-development runoff).
+DUAL_HSG_USE = "larger storage"
 
 # ---------------------------------------------------------------------------
 # DRAFT dimensional rules by jurisdiction (research spec 1.10; code mirrors,
@@ -207,6 +235,20 @@ GATE_FLAGS = frozenset({"USE_PERMIT_REQUIRED"})   # entitlement gates: `gated`, 
 # Default behaviour: feasible == no severity-1 flag outside GATE_FLAGS (and no
 # not-checked flag). POND_DOES_NOT_FIT is promoted to severity 1 there.
 BLOCKING_RULE = "no severity-1 flag outside GATE_FLAGS"
+# Severity-1 flags a smaller layout can clear: when one of these blocks every
+# explored plan, the default search also tries shorter lengths and the fits
+# it left out (a parcel never reads worse than a smaller parcel inside it).
+RESCUE_FLAGS = frozenset({"POND_DOES_NOT_FIT", "ROUTE_INFEASIBLE", "CAR_ROUTE_NONE", "ROUTE_OUTSIDE_ENVELOPE",
+                          "PLAN_GEOMETRY_CONFLICT"})
+RESCUE_MAX_FITS = 12
+# Severity-1 flags no other layout of the same site can clear. The default
+# rule makes them block feasibility (decide()), but they stay out of the
+# layout's own check (o["ok"], geometry_ok), the ranking, the rescue pass and
+# the second-building gate, so the plan drawn is the one drawn without them
+# (the prototype checked caps only on the plan it kept). HEIGHT_CAP depends
+# on the jurisdiction's draft height, ACCESS_CONSTRAINED on the frontage
+# runs, neither on the layout.
+LENGTH_INDEPENDENT_FLAGS = frozenset({"HEIGHT_CAP", "ACCESS_CONSTRAINED"})
 
 
 class PlanError(ValueError):
@@ -244,6 +286,8 @@ class PlanOptions:
                 "market_depths": {"rear": list(MARKET_REAR_DEPTHS), "cross": list(MARKET_CROSS_DEPTHS)},
                 "other_edge_min_pave_ft": OTHER_EDGE_MIN_PAVE_FT,
                 "dual_hsg": DUAL_HSG_USE if self.fixes else "drained (first letter)",
+                "prototype_dims": {k: {d: sitefit.PROTOTYPES[k].get(d) for d in ("W", "L", "min_length_ft")}
+                                   for k in PLANNER_PROTOTYPES},
                 "behaviour": self.behaviour}
 
 
@@ -354,15 +398,37 @@ def pond_volume(w0: float, d: float = POND_DEPTH, z: float = POND_Z) -> float:
 
 
 def hsg_letter(hsg: str | None, fixes: bool) -> tuple[str, str | None]:
-    """(soil group letter used, note when it was a choice)."""
-    raw = (hsg or "B").strip().upper()
+    """(soil group letter used, note when it was a choice). The default
+    behaviour notes every assumed B: a blank value, a soil check that was
+    not run ("not checked: ...") and "none rated" each say which."""
+    given = (hsg or "").strip()
+    raw = given.upper()
     if not fixes:
+        raw = raw or "B"
         return (raw[:1] if raw[:1] in HSG_K else "B"), None
     if re.fullmatch(r"[ABC]/D", raw):
-        return ("D" if DUAL_HSG_USE == "undrained" else raw[0]), f"dual soil group {raw}: read as {'D (undrained, conservative)' if DUAL_HSG_USE == 'undrained' else raw[0]}"
+        letter = dual_hsg_letter(raw)
+        return letter, f"dual soil group {raw}: read as {letter} (the letter giving the larger pond)"
     if raw in HSG_K:
         return raw, None
+    if not raw:
+        return "B", "no soil value in the run: B assumed"
+    if raw.startswith("NOT CHECKED"):
+        return "B", f"soil group {given[:120]}; B assumed"
     return "B", "no soil group rated: B assumed"
+
+
+def hsg_storage_rank(letter: str) -> float:
+    """Detention storage per impervious acre for a soil letter, with the
+    disturbed pervious area the planner uses (DISTURBED_FACTOR)."""
+    ki, kp = HSG_K.get(letter, HSG_K["B"])
+    return ki + kp * (DISTURBED_FACTOR - 1)
+
+
+def dual_hsg_letter(raw: str) -> str:
+    """The letter of a dual group ('A/D', 'B/D', 'C/D') that gives the
+    larger storage (DUAL_HSG_USE)."""
+    return max(raw.split("/"), key=lambda k: (hsg_storage_rank(k), k))
 
 
 def detention_storage(imp_ac: float, perv_ac: float, letter: str) -> float:
@@ -472,7 +538,7 @@ class Dem:
     step: float = DEM_STEP_FT
     points: dict = field(default_factory=dict)     # (i, j) -> (x, y) feet
     elev: dict = field(default_factory=dict)       # (i, j) -> z feet, in answer order
-    state: str = "checked"                         # checked | partial | not_checked
+    state: str = "not_checked"                     # checked | partial | not_checked (fail closed: R2)
     reason: str = ""
 
     def coords(self) -> Iterable[tuple[tuple[float, float], float]]:
@@ -703,7 +769,11 @@ class Plan:
     clear: int
 
 
-def build(v, L, r, fr: Frame, prog: Program) -> Plan:
+def build(v, L, r, fr: Frame, prog: Program, draw: bool = True) -> Plan:
+    """One variant at length L with r car rows in frame fr. draw=False
+    leaves out the stall ticks and door marks (drawing only, hundreds of
+    lines): the fit search builds four frames per candidate length, and
+    plan_site rebuilds only the plans it draws."""
     D = v["D"]
     rowd = TRAILER_ROW if v["row"] else 0
     depth, Lmod = fr.depth, fr.Lmod
@@ -723,7 +793,8 @@ def build(v, L, r, fr: Frame, prog: Program) -> Plan:
             cars.append(fr.rect(uL, uL + L, 0, cd))
             for vr in car_rows_layout(r)[0]:
                 for u in range(int(uL + 24), int(uL + L - 24), int(sw * 2)):
-                    ticks.append(fr.line(u, vr, u, vr + CAR_ROW))
+                    if draw:
+                        ticks.append(fr.line(u, vr, u, vr + CAR_ROW))
             cin.append(P(uL + L / 2, 0))
             # end roads with a lead-in beside the car field (curbed)
             roads += [fr.rect(0, uL, 0, vB + D), fr.rect(uL + L, Lmod, 0, vB + D)]
@@ -737,7 +808,8 @@ def build(v, L, r, fr: Frame, prog: Program) -> Plan:
             for vr in car_rows_layout(r)[0]:
                 u0 = cd - vr - CAR_ROW
                 for vv in range(24, int(fs + D - 24), int(sw * 2)):
-                    ticks.append(fr.line(u0, vv, u0 + CAR_ROW, vv))
+                    if draw:
+                        ticks.append(fr.line(u0, vv, u0 + CAR_ROW, vv))
             cin.append(P(cd / 2, 0))
             # fire lane along the office wall; far end road
             roads += [fr.rect(cd, cd + L, 0, fs), fr.rect(cd + L, Lmod, 0, vB + D)]
@@ -751,7 +823,7 @@ def build(v, L, r, fr: Frame, prog: Program) -> Plan:
             rl = n * 12
             u0 = uL + (L - rl) / 2
             rows.append(fr.rect(u0, u0 + rl, vB + D + COURT, depth))
-            for k in range(n + 1):
+            for k in range(n + 1 if draw else 0):
                 ticks.append(fr.line(u0 + 12 * k, vB + D + COURT, u0 + 12 * k, depth))
             court_stalls = n
         tin += [P(ue0, vB + D + COURT / 2), P(ue1, vB + D + COURT / 2)]
@@ -768,7 +840,7 @@ def build(v, L, r, fr: Frame, prog: Program) -> Plan:
             rl = n * 12
             u0 = uL + (L - rl) / 2
             rows += [fr.rect(u0, u0 + rl, 0, rowd), fr.rect(u0, u0 + rl, depth - rowd, depth)]
-            for k in range(n + 1):
+            for k in range(n + 1 if draw else 0):
                 ticks += [fr.line(u0 + 12 * k, 0, u0 + 12 * k, rowd), fr.line(u0 + 12 * k, depth - rowd, u0 + 12 * k, depth)]
             court_stalls = 2 * n
         roads += [fr.rect(0, uL, vB, vB + D), fr.rect(uL + L, uL + L + TRUCK_ROAD, 0, depth)]
@@ -776,7 +848,8 @@ def build(v, L, r, fr: Frame, prog: Program) -> Plan:
         for vr in car_rows_layout(r)[0]:
             u0 = uL + L + TRUCK_ROAD + vr
             for vv in range(int(vB + 24), int(vB + D - 24), int(sw * 2)):
-                ticks.append(fr.line(u0, vv, u0 + CAR_ROW, vv))
+                if draw:
+                    ticks.append(fr.line(u0, vv, u0 + CAR_ROW, vv))
         tin += [P(0, rowd + COURT / 2), P(0, depth - rowd - COURT / 2)]
         fb = [P(uL + L + TRUCK_ROAD / 2, 0), P(uL + L + TRUCK_ROAD / 2, depth)]
         cin.append(P(Lmod, vB + D / 2))
@@ -785,7 +858,7 @@ def build(v, L, r, fr: Frame, prog: Program) -> Plan:
         dock_v = [(vB, -1), (vB + D, 1)]
     per_wall = [doors // walls + (1 if k < doors % walls else 0) for k in range(walls)]
     for (vw, sg), nd in zip(dock_v, per_wall):
-        for k in range(nd):
+        for k in range(nd if draw else 0):
             u = uL + END_CLEAR + (L - 2 * END_CLEAR) * (k + 0.5) / max(nd, 1)
             doors_g.append(fr.line(u, vw, u, vw + sg * 12))
     req, rule = required_cars(prog.prule, sf, prog.opts)
@@ -863,7 +936,7 @@ def fit_variant(v, P, B, prog: Program, row_line, res_line, search: Search, leng
             for fv in (False, True):
                 for fu in (False, True):
                     fr = Frame(Lmod, depth, pl, origin, fv, fu)
-                    p = build(v, L, r, fr, prog)
+                    p = build(v, L, r, fr, prog, draw=False)
                     if B.buffer(0.5).contains(p.building):
                         cands.append((orient_score(p, row_line, res_line), p))
             if cands:
@@ -953,11 +1026,19 @@ def pick_driveways(runs, truck_target, car_target, spacing, taken=()):
     return tp, cp, True
 
 
-def grid_route(start, goal, walk, cost_zone=None, step=GRID, stats: dict | None = None, simplify: float = 0.9):
+def grid_route(start, goal, walk, cost_zone=None, step=GRID, stats: dict | None = None, simplify: float = 0.9,
+               clean_joins: bool = False):
     """Shortest 8-connected path over `walk` from start to goal (Dijkstra,
     with steep cells costing STEEP_COST times more and a small bend
     penalty). Returns a LineString or None. Kept byte-equal to the
-    prototype for parity; the diagonal cost is a listed later delta (R16)."""
+    prototype for parity; the diagonal cost is a listed later delta (R16).
+
+    clean_joins (default behaviour): the straight joins from the start and
+    goal points to their grid cells stay inside the walk area (no further
+    out than the point itself, plus 1 ft). The prototype took the first
+    walkable cell of the nearest ring, whose join can cut a corner of an
+    excluded area by more than ROUTE_TOL_FT: the planner's own grid error,
+    which then read as ROUTE_OUTSIDE_ENVELOPE on a plain rectangle."""
     if walk.is_empty:
         return None
     minx, miny, maxx, maxy = walk.bounds
@@ -983,12 +1064,19 @@ def grid_route(start, goal, walk, cost_zone=None, step=GRID, stats: dict | None 
 
     def nearest_ok(p):
         i0, j0 = idx(p)
+        first = None
+        limit = walk.distance(p) + 1.0 if clean_joins else None
         for rad in range(0, 8):
             for di in range(-rad, rad + 1):
                 for dj in range(-rad, rad + 1):
                     if max(abs(di), abs(dj)) == rad and 0 <= i0 + di < nx and 0 <= j0 + dj < ny and cell(i0 + di, j0 + dj):
-                        return (i0 + di, j0 + dj)
-        return None
+                        if limit is None:
+                            return (i0 + di, j0 + dj)
+                        first = first or (i0 + di, j0 + dj)
+                        q = (minx + (i0 + di) * step, miny + (j0 + dj) * step)
+                        if route_outside_ft(LineString([(p.x, p.y), q]), walk) <= limit:
+                            return (i0 + di, j0 + dj)
+        return first
     s, g = nearest_ok(start), nearest_ok(goal)
     if s is None or g is None:
         return None
@@ -1018,6 +1106,10 @@ def grid_route(start, goal, walk, cost_zone=None, step=GRID, stats: dict | None 
         path.append(prev[path[-1]])
     pts = [(minx + i * step, miny + j * step) for i, j in reversed(path)]
     pts = [(start.x, start.y)] + pts + [(goal.x, goal.y)]
+    if stats is not None:
+        # The straight joins from the given points to their grid cells, for
+        # route_stray_ft (the default behaviour measures them on their own).
+        stats["joins"] = ((pts[0], pts[1]), (pts[-2], pts[-1]))
     line = LineString(pts)
     return line.simplify(step * simplify) if simplify else line
 
@@ -1034,13 +1126,41 @@ def route_outside_ft(route: LineString, walk: BaseGeometry) -> float:
     return max((walk.distance(Point(c)) for ln in _lines_of(dense) for c in ln.coords), default=0.0)
 
 
+def route_stray_ft(route: LineString, walk: BaseGeometry, hard: BaseGeometry | None, joins) -> float:
+    """The default behaviour's route check (R16). The grid part of the
+    route is measured against its walk area as in route_outside_ft. The two
+    straight joins from the driveway (or entry) points to their first grid
+    cells are a drawing of the throat, not part of the search, and are
+    measured against what they must not cross (`hard`: buildings, the wrong
+    kind of pavement, water buffers, the test cut): the ft of join inside
+    it. Without joins it is route_outside_ft."""
+    if route is None or route.is_empty:
+        return 0.0
+    if not joins:
+        return route_outside_ft(route, walk)
+    js = [LineString(j) for j in joins if j[0] != j[1]]
+    body = route.difference(unary_union([j.buffer(0.5) for j in js])) if js else route
+    stray = route_outside_ft(body, walk) if not body.is_empty else 0.0
+    if hard is not None and not hard.is_empty:
+        edge = hard.boundary
+        for j in js:
+            inside = j.intersection(hard)
+            if inside.is_empty:
+                continue
+            # how deep the join goes into what it must not cross, sampled every 2 ft
+            dense = shapely.segmentize(inside, 2.0)
+            stray = max([stray] + [edge.distance(Point(c)) for ln in _lines_of(dense) for c in ln.coords])
+    return stray
+
+
 def checked_route(start, goal, walk, ctx: "Ctx"):
     """grid_route, and in the default behaviour the unsimplified grid path
     when the simplified line cuts outside the walk area (the 0.9-cell
     simplify can cut corners by up to 18 ft)."""
-    rt = grid_route(start, goal, walk, ctx.steep, stats=ctx.route_steps)
-    if rt is not None and ctx.prog.opts.fixes and route_outside_ft(rt, walk) > ROUTE_TOL_FT:
-        rt = grid_route(start, goal, walk, ctx.steep, stats=ctx.route_steps, simplify=0.0)
+    fixes = ctx.prog.opts.fixes
+    rt = grid_route(start, goal, walk, ctx.steep, stats=ctx.route_steps, clean_joins=fixes)
+    if rt is not None and fixes and route_outside_ft(rt, walk) > ROUTE_TOL_FT:
+        rt = grid_route(start, goal, walk, ctx.steep, stats=ctx.route_steps, simplify=0.0, clean_joins=True)
     return rt
 
 
@@ -1051,16 +1171,20 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
     if region.is_empty:
         return None
     base = box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2)
-    pts = [(z, p) for p, z in dem.coords() if region.contains(Point(p))]
+    # Prepared contains is the same exact predicate, only faster; the
+    # rotated rectangle does not depend on the point, so it is made once.
+    inside = prep(region)
+    turned = [shapely.affinity.rotate(base, a, origin=(0, 0)) for a in angles]
+    pts = [(z, p) for p, z in dem.coords() if inside.contains(Point(p))]
     if not pts:
         minx, miny, maxx, maxy = region.bounds
-        pts = [(0.0, (x, y)) for x in range(int(minx), int(maxx), 40) for y in range(int(miny), int(maxy), 40) if region.contains(Point(x, y))]
+        pts = [(0.0, (x, y)) for x in range(int(minx), int(maxx), 40) for y in range(int(miny), int(maxy), 40) if inside.contains(Point(x, y))]
     pts.sort(key=lambda t: t[0])
     best = None
     for z, (x, y) in pts[:max_pts]:
-        for a in angles:
-            r = shapely.affinity.translate(shapely.affinity.rotate(base, a, origin=(0, 0)), x, y)
-            if not region.contains(r):
+        for rb in turned:
+            r = shapely.affinity.translate(rb, x, y)
+            if not inside.contains(r):
                 continue
             d = r.distance(near)
             link = LineString(nearest_points(r, near))
@@ -1093,22 +1217,24 @@ def place_near(region, Lr, Wr, target, angles, step=30.0):
     if region.is_empty:
         return None
     minx, miny, maxx, maxy = region.bounds
+    inside = prep(region)
     pts = []
     y = miny
     while y <= maxy:
         x = minx
         while x <= maxx:
             p = Point(x, y)
-            if region.contains(p):
+            if inside.contains(p):
                 pts.append((p.distance(target), (x, y)))
             x += step
         y += step
     pts.sort()
     base = box(-Lr / 2, -Wr / 2, Lr / 2, Wr / 2)
+    turned = [shapely.affinity.rotate(base, a, origin=(0, 0)) for a in angles]
     for _, (x, y) in pts[:1500]:
-        for a in angles:
-            r = shapely.affinity.translate(shapely.affinity.rotate(base, a, origin=(0, 0)), x, y)
-            if region.contains(r):
+        for rb in turned:
+            r = shapely.affinity.translate(rb, x, y)
+            if inside.contains(r):
                 return r
     return None
 
@@ -1180,8 +1306,63 @@ def check_plan(p: Plan, o: dict[str, Any], ctx: "Ctx", others: dict | None = Non
         out.append({"check": "outside the parcel", "sf": round(outside)})
     for kind, ft in o.get("route_outside", []):
         if ft > ROUTE_TOL_FT:
-            out.append({"check": f"{kind} route outside its paving envelope", "ft": round(ft)})
+            # one decimal in the default behaviour: a 5.1 ft stray over the
+            # 5 ft tolerance must not read as "(5 ft)"
+            out.append({"check": f"{kind} route outside its paving envelope",
+                        "ft": round(ft, 1) if ctx.prog.opts.fixes else round(ft)})
     return out
+
+
+def _blocking(o: dict[str, Any]) -> set[str]:
+    """The severity-1 flag names of one finished plan that another layout
+    could clear (LENGTH_INDEPENDENT_FLAGS left out)."""
+    return {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS
+
+
+def assemblage_flags(meta: dict[str, Any], jname: str) -> list[tuple[str, int, str]]:
+    """Flags for an assemblage whose members' rules differ. The planner can
+    apply one jurisdiction's draft rules to the whole site (the best-ranked
+    member's); members under other draft rules make that a severity-1
+    flag (the plan is drawn, not counted: a human decides which code
+    governs), a different zoning in the same jurisdiction a severity-2 one,
+    and members not in ranked.csv (rules unknown) a severity-2 one."""
+    out: list[tuple[str, int, str]] = []
+    members = [m for m in meta.get("members") or [] if isinstance(m, dict)]
+    rules = {}
+    for m in members:
+        rules.setdefault(jur_rules(m.get("jurisdiction", ""))[0], []).append(f"#{m.get('rank')}")
+    if len(rules) > 1:
+        listed = "; ".join(f"{k}: {', '.join(v)}" for k, v in sorted(rules.items()))
+        out.append(("ASSEMBLAGE_MIXED_RULES", 1, f"the members fall under different draft rules ({listed}); "
+                                                  f"the plan uses {jname}'s for the whole site: which code governs is not known"))
+    else:
+        zones = {}
+        for m in members:
+            zones.setdefault((m.get("zoning") or "unknown").upper(), []).append(f"#{m.get('rank')}")
+        if len(zones) > 1:
+            listed = "; ".join(f"{k}: {', '.join(v)}" for k, v in sorted(zones.items()))
+            out.append(("ASSEMBLAGE_MIXED_RULES", 2, f"the members are zoned differently ({listed}); "
+                                                      "the draft rules used are the jurisdiction's, not per district: verify"))
+    n = meta.get("members_unranked") or 0
+    if n:
+        out.append(("ASSEMBLAGE_MEMBER_NOT_RANKED", 2, f"{n} member(s) not in ranked.csv: their jurisdiction, zoning and "
+                                                        "soil group are not known here and not compared"))
+    return out
+
+
+def assemblage_hsg(meta: dict[str, Any], letter: str, note: str | None) -> tuple[str, str | None]:
+    """The soil letter of an assemblage: the members' letter that gives the
+    larger pond (default behaviour), with a note when the members differ."""
+    letters = {}
+    for m in meta.get("members") or []:
+        if isinstance(m, dict):
+            k, _ = hsg_letter(m.get("hsg"), True)
+            letters.setdefault(k, []).append(f"#{m.get('rank')}")
+    if len(letters) <= 1:
+        return letter, note
+    best = max([letter] + list(letters), key=lambda k: (hsg_storage_rank(k), k))
+    listed = "; ".join(f"{k}: {', '.join(v)}" for k, v in sorted(letters.items()))
+    return best, f"members' soil groups differ ({listed}): {best} used, the letter giving the larger pond"
 
 
 def decide(flags: list[tuple[str, int, str]], o_ok: bool, hypothetical: bool, opts: PlanOptions) -> tuple[bool | None, list[str]]:
@@ -1193,7 +1374,9 @@ def decide(flags: list[tuple[str, int, str]], o_ok: bool, hypothetical: bool, op
     if names & NOT_CHECKED_FLAGS:
         return None, gated
     if not opts.fixes:
-        return (o_ok and not hypothetical), gated
+        # The prototype had no time budget; a search cut short is never
+        # feasible in either mode.
+        return (o_ok and not hypothetical and "PLAN_BUDGET_EXCEEDED" not in names), gated
     return (not any(s == 1 and f not in GATE_FLAGS for f, s, _ in flags)), gated
 
 
@@ -1279,6 +1462,36 @@ class Drawing:
 # ---------------------------------------------------------------------------
 # One plan: driveways, routes, detention, yards, grading
 # ---------------------------------------------------------------------------
+def home_pieces(parcel: BaseGeometry, module: BaseGeometry) -> BaseGeometry | None:
+    """The pieces of a parcel in separate pieces that the building module
+    is on, where its ponds and drop yards go (a pond across a road from
+    the building is not on the site the building can drain to or reach);
+    None for a parcel in one piece."""
+    pieces = parts(parcel)
+    if len(pieces) < 2:
+        return None
+    on = [g for g in pieces if g.intersects(module)]
+    return unary_union(on) if on else None
+
+
+def own_truck_area(p: Plan, fixes: bool) -> BaseGeometry:
+    """The module's own end roads and court, inset 6 ft (half a truck lane
+    less the curb), where truck routes may run.
+
+    The end-road and court rectangles share an edge only in exact
+    arithmetic: once rotated, their union is often 2-3 polygons with a
+    hairline crack along the seam, and buffer(-6) erodes 6 ft on each side
+    of it, a 12 ft band right where every truck route enters the court
+    (ROUTE_OUTSIDE_ENVELOPE on a plain rotated rectangle). The default
+    behaviour closes the seams first (+0.5 ft, then -6.5 ft, mitred so the
+    rectangles keep their corners); the prototype behaviour keeps the
+    prototype's plain inset for parity."""
+    u = unary_union(p.roads + p.courts)
+    if not fixes:
+        return u.buffer(-6)
+    return u.buffer(0.5, join_style=2).buffer(-6.5, join_style=2)
+
+
 def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     parcel, P, wet_buf, trans, cut, steep, dem, meta, rules, runs = (
         ctx.parcel, ctx.P, ctx.wet_buf, ctx.trans, ctx.cut, ctx.steep, ctx.dem, ctx.meta, ctx.rules, ctx.runs)
@@ -1291,10 +1504,12 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     taken = [] if others is None else [q for q in (others["tpt"], others["cpt"]) if q is not None]
     tpt = cpt = None
     shared = False
+    access_constrained = False
     if runs:
         ttarget = min(p.truck_entries, key=lambda q: q.distance(unary_union(runs)))
         tpt, cpt, okrun = pick_driveways(runs, ttarget, p.car_entries[0], sp, taken)
         if not okrun:
+            access_constrained = True
             flags.append(("ACCESS_CONSTRAINED", 1, "no frontage run can hold a truck driveway (about 190 ft of curb with 75 ft radii, 110 ft from corners)"))
         if others is not None and tpt is None:
             tpt, cpt, shared = others["tpt"], others["cpt"], True
@@ -1307,7 +1522,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         entries = entries.difference(wet_buf).difference(cut)
     route_polys, routes, problem = [], [], False
     route_outside = []
-    own_truck = unary_union(p.roads + p.courts).buffer(-6)          # the module's own end roads and court carry trucks too
+    own_truck = own_truck_area(p, fixes)    # the module's own end roads and court carry trucks too
     walk_t = (base.buffer(-20).union(throat_zone(tpt, parcel, unary_union([wet_buf, cut]))).difference(occupied.buffer(-2))
               .difference(unary_union(p.cars).buffer(8)).union(entries.difference(unary_union(p.cars))).union(own_truck))
     rt = None
@@ -1328,7 +1543,12 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         else:
             routes.append(("truck", rt))
             route_polys.append(("truck", rt.buffer(20, cap_style=2).intersection(parcel)))
-            route_outside.append(("truck", route_outside_ft(rt, walk_t)))
+            if fixes:
+                hard_t = unary_union([occupied.buffer(-2).difference(own_truck.buffer(2)), wet_buf, cut]
+                                     + ([others["blocked"]] if others is not None else []))
+                route_outside.append(("truck", route_stray_ft(rt, walk_t, hard_t, ctx.route_steps.get("joins"))))
+            else:
+                route_outside.append(("truck", route_outside_ft(rt, walk_t)))
     truck_poly = unary_union([pp for _, pp in route_polys]) if route_polys else Polygon()
     start_c = cpt if cpt is not None else tpt
     if start_c is not None:
@@ -1345,7 +1565,14 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         else:
             routes.append(("car", rc))
             route_polys.append(("car", rc.buffer(12, cap_style=2).intersection(parcel)))
-            route_outside.append(("car", route_outside_ft(rc, walk_c)))
+            if fixes:
+                hard_c = unary_union([occupied.buffer(-2).difference(unary_union(p.cars).buffer(2)),
+                                      unary_union(p.courts + p.roads + p.rows), wet_buf, cut]
+                                     + ([truck_poly] if cpt is not None else [])
+                                     + ([others["blocked"]] if others is not None else []))
+                route_outside.append(("car", route_stray_ft(rc, walk_c, hard_c, ctx.route_steps.get("joins"))))
+            else:
+                route_outside.append(("car", route_outside_ft(rc, walk_c)))
         if cpt is None:
             flags.append(("ACCESS_SHARED", 2, "one driveway: cars split from trucks inside the throat"))
     rp = unary_union([pp for _, pp in route_polys]) if route_polys else Polygon()
@@ -1376,6 +1603,9 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     pad_z = sum(pad) / len(pad) if pad else None
     region0 = (parcel.buffer(-10).difference(wet_buf).difference(trans).difference(cut).difference(occupied.buffer(15))
                .difference(rp.buffer(10)).intersection(P.buffer(rules["pave"].get("ROW", 10) + 1)))
+    home = home_pieces(parcel, p.module) if fixes else None
+    if home is not None:
+        region0 = region0.intersection(home)
     if others is not None:
         region0 = region0.difference(others["blocked"])
     angles = [0, 90, 45, 135, p.frame.pl.angle_deg, p.frame.pl.angle_deg + 90]
@@ -1399,6 +1629,8 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
                 .difference(unary_union(ponds).buffer(20) if ponds else Polygon()))
         if others is not None:
             free = free.difference(others["blocked"])
+        if home is not None:
+            free = free.intersection(home)
         court_u = unary_union(p.courts)
         ctx.search.check()
         yd = place_near(free, ds[0], ds[1], court_u.centroid, [p.frame.pl.angle_deg, p.frame.pl.angle_deg + 90, 0, 90, 45, 135])
@@ -1425,15 +1657,21 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         imp_ac = unary_union([p.module, all_rp] + drops).area / SQFT_PER_AC
         disturbed = max(min(P.area / SQFT_PER_AC, imp_ac * DISTURBED_FACTOR), imp_ac)
         v = detention_storage(imp_ac, max(disturbed - imp_ac, 0), ctx.hsg)
-        if v > v_sized + 1e-9:
-            npd = pond_count(v)
-            _, Lf, Wf, _ = pond_dims(v / npd)
+        if abs(v - v_sized) > 1e-9:
+            # The ponds are re-sited for the new volume, larger or smaller,
+            # so the storage, the pond count and the drawn ponds agree.
+            npd2 = pond_count(v)
+            _, Lf2, Wf2, _ = pond_dims(v / npd2)
             region = region0.difference(all_rp.buffer(10))
             for d in drops:
                 region = region.difference(d.buffer(20))
-            ponds = site_ponds(region, npd, Lf, Wf)
-            pond_ok = len(ponds) == npd
-            v_sized = v
+            ponds2 = site_ponds(region, npd2, Lf2, Wf2)
+            if v > v_sized or len(ponds2) == npd2:
+                ponds, npd, v_sized = ponds2, npd2, v
+                pond_ok = len(ponds) == npd
+            # else: smaller ponds did not fit where the larger ones are
+            # (the yard links took the room); keep the larger ponds and
+            # report the volume they were sized for (v_sized).
     if not pond_ok:
         flags.append(("POND_DOES_NOT_FIT", 1 if fixes else 2, f"{npd} pond(s) of {v_sized / npd:.1f} ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"))
     # grading over the whole module
@@ -1444,10 +1682,13 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         mean = sum(mod_pts) / len(mod_pts)
         cutfill = p.module.area * (sum(abs(z - mean) for z in mod_pts) / len(mod_pts)) / 2 / 27
     steep_mod = (p.module.intersection(steep).area / p.module.area * 100) if not steep.is_empty else 0.0
-    feasible = pond_ok and not problem and (tpt is not None or not runs)
+    # The layout's own check. In the default behaviour a frontage too short
+    # for any truck driveway (ACCESS_CONSTRAINED, the same for every layout)
+    # does not fail it: decide() still blocks the site on that flag.
+    feasible = pond_ok and not problem and (tpt is not None or not runs or (fixes and access_constrained))
     o = {"ok": feasible, "pond_ok": pond_ok, "route_problem": problem, "tpt": tpt, "cpt": cpt, "shared_access": shared,
          "routes": routes, "route_polys": route_polys, "route_outside": route_outside, "n_main_routes": n_main_routes,
-         "drops": drops, "trailers": trailers, "imp_ac": imp_ac, "v_det": v, "ponds": ponds, "relief": relief,
+         "drops": drops, "trailers": trailers, "imp_ac": imp_ac, "v_det": v_sized if fixes else v, "ponds": ponds, "relief": relief,
          "cutfill_cy": cutfill, "steep_module_pct": steep_mod, "dem_points_module": len(mod_pts), "flags": flags,
          "clear": p.clear}
     o["violations"] = check_plan(p, o, ctx, others)
@@ -1463,7 +1704,10 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         o["clear"] = clear
         o["cover_ratio"] = ratio.get("cover")
         flags += cflags
-        o["ok"] = o["ok"] and not any(s == 1 for _, s, _ in flags)
+        # Geometry and caps apart: a flag no other layout can clear (a draft
+        # height cap, a frontage too short for a truck driveway) does not
+        # fail the layout's own check; decide() applies it to the site.
+        o["ok"] = o["ok"] and not any(s == 1 and f not in LENGTH_INDEPENDENT_FLAGS for f, s, _ in flags)
     return o
 
 
@@ -1489,19 +1733,37 @@ def _sev(flags: list[tuple[str, int, str]]) -> dict[int, list[dict[str, str]]]:
     return sevd
 
 
+INPUT_KEYS = ("frontage", "neighbours", "transmission", "layers", "dem")
+_BAD_STATES = ("not_checked", "partial")
+
+
+def input_state(inp: SiteInputs, key: str) -> InputState:
+    """The state of one input, failing closed (R2): a missing entry in
+    ``inp.states`` is not checked, and the frontage and lidar objects' own
+    state wins when it is worse than the entry."""
+    st = inp.states.get(key)
+    if st is None:
+        st = InputState("not_checked", "no state given for this input")
+    own = {"frontage": (inp.frontage.state, inp.frontage.reason), "dem": (inp.dem.state, inp.dem.reason)}.get(key)
+    if own is not None and own[0] in _BAD_STATES and st.state not in _BAD_STATES:
+        st = InputState(own[0], own[1] or f"the {key} input says {own[0].replace('_', ' ')}")
+    return st
+
+
 def _input_flags(inp: SiteInputs) -> list[tuple[str, int, str]]:
     """Named flags for inputs that were not checked (R2), never a clean result."""
     out = []
     names = {"frontage": "FRONTAGE_NOT_CHECKED", "neighbours": "NEIGHBOURS_NOT_CHECKED",
              "transmission": "TRANSMISSION_NOT_CHECKED", "layers": "LAYERS_NOT_CHECKED"}
     for key, flag in names.items():
-        st = inp.states.get(key)
-        if st is not None and st.state == "not_checked":
-            out.append((flag, 1, f"{key} not checked ({st.reason or 'no answer'}): the plan is incomplete"))
-    dem = inp.states.get("dem")
-    if dem is not None and dem.state == "not_checked":
+        st = input_state(inp, key)
+        if st.state in _BAD_STATES:
+            what = "not checked" if st.state == "not_checked" else "only partly checked"
+            out.append((flag, 1, f"{key} {what} ({st.reason or 'no answer'}): the plan is incomplete"))
+    dem = input_state(inp, "dem")
+    if dem.state == "not_checked":
         out.append(("DEM_NOT_CHECKED", 1, f"lidar elevation not checked ({dem.reason or 'no answer'}): no slope, relief or pond siting from ground"))
-    elif dem is not None and dem.state == "partial":
+    elif dem.state == "partial":
         out.append(("DEM_PARTIAL", 1, f"lidar elevation answered for {inp.dem.coverage:.0%} of the samples ({dem.reason}): slope and relief are incomplete"))
     return out
 
@@ -1520,6 +1782,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     rules["pave"]["OTHER"] = max(rules["pave"].get("OTHER", 0), OTHER_EDGE_MIN_PAVE_FT)
     prog = Program(jname, rules, parking_rule_for(jname, rules, opts), opts)
     hsg, hsg_note = hsg_letter(meta.get("hsg"), opts.fixes)
+    if opts.fixes and inp.assembled:
+        hsg, hsg_note = assemblage_hsg(meta, hsg, hsg_note)
     flags: list[tuple[str, int, str]] = []
     late: list[tuple[str, int, str]] = list(_input_flags(inp))   # appended after the prototype's flags
     if defaulted:
@@ -1530,6 +1794,13 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         n_parts = len(parts(parcel))
         if n_parts > 1:
             late.append(("ASSEMBLAGE_NOT_CONTIGUOUS", 1, f"the assembled parcels form {n_parts} separate pieces"))
+        late += assemblage_flags(meta, jname)
+    elif opts.fixes and len(parts(parcel)) > 1:
+        # One county parcel in separate pieces (often split by a road): the
+        # ponds and drop yards stay on the piece the building is on
+        # (home_pieces in finish).
+        late.append(("PARCEL_MULTIPART", 3, f"the parcel is {len(parts(parcel))} separate pieces (a road or a gap between "
+                     "them); ponds and drop yards are kept on the building's piece"))
     if parcel.is_empty or parcel.area < 1:
         return _no_fit(inp, jname, rules, flags + late, opts, parcel, Polygon(), Polygon(), Polygon(), Polygon(),
                        Polygon(), Polygon(), inp.frontage, [], seam_sf), None
@@ -1575,16 +1846,28 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     except FrontageGeometryError as exc:
         runs = []
         late.append(("FRONTAGE_GEOMETRY", 1, f"the frontage line could not be merged ({exc}): access not checked"))
-    hypothetical = not runs
-    if hypothetical and fr.state != "not_checked" and not any(f == "FRONTAGE_GEOMETRY" for f, _, _ in late):
+    # hypothetical: True only when the frontage was checked and has no usable
+    # run (ACCESS_NONE); None when access is unknown (frontage not checked,
+    # or its line could not be merged), never a landlocked signal from an outage.
+    access_unknown = fr.state == "not_checked" or any(f == "FRONTAGE_GEOMETRY" for f, _, _ in late)
+    hypothetical = False if runs else (None if access_unknown else True)
+    if hypothetical:
         flags.append(("ACCESS_NONE", 1, "no public road frontage from the GDOT check: landlocked or access by easement only; the plan is hypothetical and its floor area is not counted"))
-    zl = (meta.get("zoning") or "").upper()
-    if jname.startswith("east point") and zl in ("I-1", "I1", "I-2", "I2"):
-        flags.append(("USE_PERMIT_REQUIRED", 1, "East Point: warehousing is use-permit only in I-1/I-2 and needs 5,280 ft from residential (draft reading)"))
-    if "chattahoochee" in (meta.get("jurisdiction") or "").lower():
-        flags.append(("USE_PERMIT_REQUIRED", 1, "Chattahoochee Hills: no by-right warehousing"))
+    # Entitlement gates of every member (an assemblage carries each member's).
+    members = [m for m in meta.get("members") or [] if isinstance(m, dict)]
+    for m in members or [meta]:
+        zl = (m.get("zoning") or "").upper()
+        mj = jur_rules(m.get("jurisdiction", ""))[0]
+        who = f" (member #{m['rank']})" if len(members) > 1 and m.get("rank") else ""
+        if mj.startswith("east point") and zl in ("I-1", "I1", "I-2", "I2"):
+            flags.append(("USE_PERMIT_REQUIRED", 1, "East Point: warehousing is use-permit only in I-1/I-2 and needs 5,280 ft from residential (draft reading)" + who))
+        if "chattahoochee" in (m.get("jurisdiction") or "").lower():
+            flags.append(("USE_PERMIT_REQUIRED", 1, "Chattahoochee Hills: no by-right warehousing" + who))
     if jname.startswith("fairburn") and fr.road and "local" in fr.road:
         flags.append(("COLLECTOR_FRONTAGE", 2, "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"))
+    if opts.fixes and jname.startswith("fairburn") and any(k == "OTHER" and not ln.is_empty for k, ln in edges):
+        late.append(("DISTRICT_BUFFER_NOT_DRAWN", 2, "Fairburn M-districts: a 50 ft buffer to every other district (draft reading) is not drawn; "
+                                                     "lot lines toward non-residential land carry only the draft 'other' setback, so the yield may be overstated"))
     if prog.prule == "market":
         flags.append(("ATL_PARKING_CODE", 2, "parking at the market ratio; Atlanta's 1/600 SF code minimum (unverified after the parking reforms) would need far more"))
     elif jname.startswith("atlanta"):
@@ -1593,6 +1876,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     ctx = Ctx(parcel, P, B, wet_buf, trans, cut, steep, dem, meta, rules, runs, jname, constraints, fr.road, hsg, prog, search)
     VARIANTS = variants()
     results, excluded = [], Polygon()
+    first: tuple | None = None          # (Pe, Be, fits, picked, explore) of the first attempt, for the rescue pass
     try:
         for attempt in range(3):
             Pe, Be = clean(P.difference(excluded)), clean(B.difference(excluded))
@@ -1613,14 +1897,21 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 seen.add(key)
                 if len(picked) >= 8:
                     break
-            def explore(q):
+            def explore(q, Pe=Pe, Be=Be, shorten_routes=False):
                 cur = q
                 for _i in range(10):
                     o = finish(cur, ctx)
                     if o["ok"]:
                         results.append((cur, o))
                         break
-                    if o["route_problem"]:
+                    if o["route_problem"] and not shorten_routes:
+                        results.append((cur, o))
+                        break
+                    if opts.fixes and not o["route_problem"] and not (
+                            {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS):
+                        # Blocked only by what a shorter building cannot fix
+                        # (a height cap, a short frontage): keep this length
+                        # (default only; o["ok"] already says so).
                         results.append((cur, o))
                         break
                     cap_len = int(cur.L - 40)
@@ -1635,6 +1926,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     cur = nxt
                 else:
                     results.append((cur, o))
+            if first is None:
+                first = (Pe, Be, fits, picked, explore)
             for q in picked:
                 explore(q)
             if opts.fixes and not any(o["ok"] for _, o in results) and any(o.get("cover_ratio") for _, o in results):
@@ -1654,10 +1947,31 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             excluded = unary_union([excluded] + [t[0].module.buffer(60) for t in bad])   # unreachable pads: try elsewhere
     except _BudgetExceeded:
         pass
+    rescue_cut = False
+    if (opts.fixes and first is not None and results and not search.exceeded
+            and not any(o["ok"] for _, o in results)
+            and any(_blocking(o) and _blocking(o) <= RESCUE_FLAGS for _, o in results)):
+        # Every explored plan failed on its pond or a route (R4 monotonicity):
+        # a smaller parcel inside this one could still read feasible. Try the
+        # explored variants shorter than a route problem stopped them, then
+        # the fits the first attempt did not explore (shallower and shorter
+        # variants), on the full envelopes. Default behaviour only.
+        P0, B0, fits0, picked0, explore0 = first
+        tried = list(results)
+        try:
+            for q, o in tried:
+                if o["route_problem"]:
+                    nxt = fit_variant(q.v, P0, B0, prog, row_line, res_line, search, length_cap=int(q.L - 40))
+                    if nxt is not None:
+                        explore0(nxt, P0, B0, shorten_routes=True)
+            for q in [q for q in fits0 if all(q is not x for x in picked0)][:RESCUE_MAX_FITS]:
+                explore0(q, P0, B0, shorten_routes=True)
+        except _BudgetExceeded:
+            rescue_cut = True
     budget_flag = ("PLAN_BUDGET_EXCEEDED", 1, f"the search stopped after {opts.max_seconds:.0f} s; the plan shown is the best found so far")
     if not results:
-        fl = flags + late + ([budget_flag] if search.exceeded else [])
-        return _no_fit(inp, jname, rules, fl, opts, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small), None
+        return _no_fit(inp, jname, rules, flags + late, opts, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small,
+                       cut_short=search.exceeded), None
 
     def score(t):
         q, o = t
@@ -1667,6 +1981,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
     second = None
+    second_cut = False      # the budget ran out in the optional second-building search only
     if best_o["ok"] and not search.exceeded:
         try:
             blocked = unary_union([best_p.module.buffer(40)] + [d.buffer(25) for d in best_o["drops"]] + [r.buffer(20) for r in best_o["ponds"]]
@@ -1684,20 +1999,38 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                         second = (q, o2)
                         break
         except _BudgetExceeded:
-            second = None
-    if search.exceeded:
+            # Building 1 was fully searched before this point (the block
+            # runs only when its search finished in time), so its result
+            # stands: the cut search is a note, not a blocking flag.
+            second, second_cut = None, True
+    if rescue_cut:
+        late.append(("SMALLER_LAYOUTS_NOT_ALL_TRIED", 2,
+                     f"the search stopped after {opts.max_seconds:.0f} s while trying shorter and shallower layouts after the "
+                     "pond or a route blocked every plan it explored first; the plan shown is the best found by then "
+                     "(re-run with a larger --max-seconds-per-site)"))
+    elif second_cut:
+        late.append(("SECOND_BUILDING_NOT_SEARCHED", 2,
+                     f"the search stopped after {opts.max_seconds:.0f} s while looking for a second building; "
+                     "building 1 is complete, a second building may still fit (re-run with a larger --max-seconds-per-site)"))
+    elif search.exceeded:
         late.append(budget_flag)
     rec = report(inp, best_p, best_o, second, parcel, P, B, rules, jname, flags, late, fr, hypothetical, res_line, row_line, opts)
     rec["alternatives"] = [{"variant": q.v["name"], "operator": q.v["operator"], "sf": rnd(q.sf, 1000), "L": q.L, "D": q.v["D"],
-                            "feasible": o["ok"], "route_problem": o["route_problem"]} for q, o in results[:10]]
+                            "geometry_ok": o["ok"], "route_problem": o["route_problem"]} for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
-    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, best_p, best_o, second)
+    # The search keeps undrawn plans (build(draw=False)); only the plans
+    # shown are rebuilt with their stall ticks and door marks.
+    shown = build(best_p.v, best_p.L, best_p.r, best_p.frame, prog)
+    if second is not None:
+        q = second[0]
+        second = (build(q.v, q.L, q.r, q.frame, prog), second[1])
+    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second)
     return rec, drawing
 
 
 def _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search=None, ctx=None):
     out = summary_inputs(parcel, P, B, constraints, trans, cut, steep, fr, edges)
-    out["states"] = {k: inp.states[k].as_dict() for k in sorted(inp.states)}
+    out["states"] = {k: input_state(inp, k).as_dict() for k in sorted(set(inp.states) | set(INPUT_KEYS))}
     out["dem_points"] = len(inp.dem.elev)
     out["dem_coverage_pct"] = round(100 * inp.dem.coverage, 1)
     out["paving_parts_dropped"] = {"count": len(small), "ac": round(sum(q.area for q in small) / SQFT_PER_AC, 2)}
@@ -1717,9 +2050,20 @@ def _base_record(inp: SiteInputs, jname: str, rules: dict[str, Any], opts: PlanO
             "operator_decisions": opts.decisions()}
 
 
-def _no_fit(inp, jname, rules, flags, opts, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small=()):
+def _no_fit(inp, jname, rules, flags, opts, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small=(),
+            cut_short: bool = False):
+    """A record with no plan. cut_short: the time budget stopped the search
+    before any plan was finished, which says nothing about fit, so the
+    record carries PLAN_BUDGET_EXCEEDED instead of NO_FIT (not feasible,
+    and not a no-fit either: re-run with a larger --max-seconds-per-site)."""
     flags = list(flags) + [("ZONING_DRAFT", 2, f"setbacks and buffers are draft screening values for {jname}; {ZONING_AUTHORITY}")]
-    sev = {1: [{"flag": "NO_FIT", "note": "no building variant fits the envelope with its truck court, parking and pond"}], 2: [], 3: []}
+    if cut_short:
+        first = {"flag": "PLAN_BUDGET_EXCEEDED",
+                 "note": f"the search stopped after {opts.max_seconds:.0f} s before any plan was finished; "
+                         "not a no-fit: re-run with a larger --max-seconds-per-site"}
+    else:
+        first = {"flag": "NO_FIT", "note": "no building variant fits the envelope with its truck court, parking and pond"}
+    sev = {1: [first], 2: [], 3: []}
     for f, s, n in flags:
         sev[s].append({"flag": f, "note": n})
     rec = _base_record(inp, jname, rules, opts)
@@ -1728,6 +2072,18 @@ def _no_fit(inp, jname, rules, flags, opts, parcel, P, B, constraints, trans, cu
                 "gated": [], "flags": sev,
                 "inputs": _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, list(small))})
     return rec
+
+
+def _hsg_basis(meta: dict[str, Any], fixes: bool, assembled: bool = False) -> str:
+    """The soil group named in the detention basis: the run's value in the
+    prototype behaviour, the letter actually used in the default."""
+    hsg = meta.get("hsg")
+    if not fixes:
+        return hsg or "B"
+    letter, note = hsg_letter(hsg, True)
+    if assembled:
+        letter, note = assemblage_hsg(meta, letter, note)
+    return letter + (" (see HSG_ASSUMED)" if note else "")
 
 
 def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypothetical, res_line, row_line, opts):
@@ -1802,7 +2158,7 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
                      "impervious_ac": round(imp_total, 1), "impervious_pct": round(imp_total / gross * 100), "paving_envelope_ac": round(P.area / SQFT_PER_AC, 1)},
         "detention": {"storage_acft": round(v_total, 1), "ponds": len(o["ponds"]) + (len(second[1]["ponds"]) if second else 0),
                       "fits": o["pond_ok"] if fixes else o["ok"],
-                      "basis": f"1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG {meta.get('hsg') or 'B'}; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"},
+                      "basis": f"1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG {_hsg_basis(meta, fixes, inp.assembled)}; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"},
         "access": {"truck_driveway": o["tpt"] is not None, "car_driveway": o["cpt"] is not None, "frontage_ft": fr.feet, "road": fr.road,
                    "frontage_state": fr.state,
                    "truck_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "truck")), "car_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "car"))},
@@ -1823,62 +2179,30 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
 
 
 # ---------------------------------------------------------------------------
-# Owner guard (SR-8): one check on the final bytes of every artifact
+# Owner guard (SR-8): the one shared guard (viewer.OwnerGuard, also used by
+# screener.builtcheck and the viewer) on the final bytes of every artifact
 # ---------------------------------------------------------------------------
-_ENTITY = re.compile(r"\b(?:l ?l ?c|inc|incorporated|corp|corporation|co|company|l ?p|l ?l ?p|l ?l ?l ?p|ltd|limited|"
-                     r"trust|trustee|trustees|tr|etal|et al|partnership|partners|holdings|properties|pllc|pc|the)\b")
-OWNER_MIN_CHARS = 8
+def owner_terms(rows: Iterable[dict[str, Any]]) -> OwnerGuard:
+    """The shared owner guard for these rows (owner and mailing strings,
+    the core name without company suffixes, the mailing street line, an
+    individual's name in both orders; site addresses and place names of
+    the rows are skipped). The CLI builds it with ``OwnerGuard.from_run``,
+    which also reads rejected.csv (an assemblage member may sit there)."""
+    return OwnerGuard.from_rows(list(rows))
 
 
-def _norm(s: str) -> str:
-    s = unicodedata.normalize("NFKC", s).casefold()
-    return " ".join(re.sub(r"[\W_]+", " ", s).split())
-
-
-@dataclass
-class OwnerTerms:
-    terms: dict = field(default_factory=dict)   # normalised term -> field name
-
-    def __len__(self) -> int:
-        return len(self.terms)
-
-
-def owner_terms(rows: Iterable[dict[str, Any]]) -> OwnerTerms:
-    """Normalised owner and mailing strings from a run's rows, plus each
-    owner's core name without entity suffixes (8 characters or more). A
-    mailing string equal to a site address of the run is skipped: a site
-    address is shown as the site's own address, not as owner data. So is a
-    term that is part of one of the run's jurisdiction names (a public
-    owner such as a city reads like the place: "South Fulton")."""
-    rows = list(rows)
-    sites = {_norm(str(r.get("site_address") or "")) for r in rows}
-    places = [f" {_norm(str(r.get('jurisdiction') or ''))} " for r in rows]
-    places = sorted(set(places))
-    out: dict[str, str] = {}
-
-    def add(term: str, fld: str) -> None:
-        if len(term) >= OWNER_MIN_CHARS and not any(f" {term} " in pl for pl in places):
-            out.setdefault(term, fld)
-    for r in rows:
-        own = _norm(str(r.get("owner") or ""))
-        add(own, "owner")
-        add(" ".join(_ENTITY.sub(" ", own).split()), "owner")
-        mail = _norm(str(r.get("owner_mailing") or ""))
-        if mail not in sites:
-            add(mail, "owner_mailing")
-    return OwnerTerms(out)
-
-
-def owner_hits(payload: str | bytes, terms: OwnerTerms) -> dict[str, int]:
-    """{field: number of distinct owner strings found}, on word boundaries.
-    Never returns the strings themselves."""
+def owner_hits(payload: str | bytes, guard: OwnerGuard, public: Iterable[str] = ()) -> dict[str, int]:
+    """{field: number of owner strings found}, never the strings. The text
+    is read as written (entities and JSON escapes decoded by the guard) and
+    once more with its markup removed, so a name split across SVG elements
+    or wrapped over two text lines is found too. `public`: the site
+    addresses this artifact writes (its sites' own addresses)."""
     text = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else payload
-    hay = f" {_norm(text)} "
-    hits: dict[str, int] = {}
-    for term, fld in terms.terms.items():
-        if f" {term} " in hay:
-            hits[fld] = hits.get(fld, 0) + 1
-    return hits
+    public = list(public)
+    counts = guard.hits(text, public)
+    for k, n in guard.hits(markup_text(text), public).items():
+        counts[k] = max(counts.get(k, 0), n)
+    return dict(counts)
 
 
 # ---------------------------------------------------------------------------
@@ -1912,11 +2236,11 @@ def contained(path: Path, base: Path) -> Path:
     return rp
 
 
-def write_atomic(path: Path, data: bytes, base: Path, terms: OwnerTerms | None) -> None:
+def write_atomic(path: Path, data: bytes, base: Path, terms: OwnerGuard | None, public: Iterable[str] = ()) -> None:
     """Owner guard on the final bytes, then a temp file and os.replace."""
     target = contained(path, base)
     if terms is not None:
-        hits = owner_hits(data, terms)
+        hits = owner_hits(data, terms, public)
         if hits:
             raise OwnerDataFound(f"{target.name}: owner data found ({', '.join(f'{k}: {v}' for k, v in sorted(hits.items()))}); nothing written")
     tmp = target.with_name(f".{target.name}.{os.getpid()}.tmp")
@@ -1928,10 +2252,40 @@ def write_atomic(path: Path, data: bytes, base: Path, terms: OwnerTerms | None) 
             tmp.unlink()
 
 
+PLANNER_FILES = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py")
+
+
+def _code_files(here: Path | None = None) -> tuple[str, ...]:
+    """Every screener file a plan depends on: the planner files and each
+    screener module they import, directly or through another screener
+    module (frontage, checks, layers, arcgis, sitefit, geo, plan, viewer,
+    ...). Read from the files' relative imports, so a new import is
+    covered without editing a list."""
+    import ast
+    here = here or Path(__file__).resolve().parent
+    seen: list[str] = []
+    todo = list(PLANNER_FILES)
+    while todo:
+        name = todo.pop(0)
+        if name in seen or not (here / name).exists():
+            continue
+        seen.append(name)
+        tree = ast.parse((here / name).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 1:
+                mods = [node.module.split(".")[0]] if node.module else [a.name for a in node.names]
+                todo += [f"{m}.py" for m in mods]
+    return tuple(sorted(seen))
+
+
+# --merge mixes plans only when all of these are unchanged.
+CODE_FILES = _code_files()
+
+
 def code_hash() -> str:
     h = hashlib.sha256()
     here = Path(__file__).resolve().parent
-    for name in ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py"):
+    for name in CODE_FILES:
         p = here / name
         if p.exists():
             h.update(p.read_bytes())
@@ -1982,6 +2336,28 @@ def _parse_assemble(items: list[str]) -> list[tuple[str, list[str]]]:
     return out
 
 
+RANK_KEY = re.compile(r"\d{1,6}(\+\d{1,6})*")
+
+
+def check_assemble_names(assembles: list[tuple[str, list[str]]], rows: dict[str, dict[str, Any]]) -> None:
+    """An --assemble NAME that reads as ranks ("2", "115+170") must list
+    exactly those ranks' parcels: the viewer and --merge read such a name
+    as ranks of the run."""
+    for name, pids in assembles:
+        if RANK_KEY.fullmatch(name):
+            want = [(rows.get(rk) or {}).get("parcel_id") for rk in name.split("+")]
+            if None in want or sorted(want) != sorted(pids):
+                raise PlanError(f"--assemble {name}: a name made of ranks must list exactly those ranks' parcels; "
+                                "use a name with a letter")
+
+
+def is_incomplete(rec: dict[str, Any]) -> bool:
+    """A written plan with an input that was not checked (R2)."""
+    flags = rec.get("flags") or {}
+    sev1 = flags.get(1, flags.get("1", [])) if isinstance(flags, dict) else []
+    return any(isinstance(f, dict) and f.get("flag") in NOT_CHECKED_FLAGS for f in sev1 or [])
+
+
 def _parse_cut(items: list[str]) -> dict[str, tuple[str, float]]:
     out = {}
     for item in items:
@@ -1997,8 +2373,23 @@ def _parse_cut(items: list[str]) -> dict[str, tuple[str, float]]:
             raise PlanError(f"--cut-parcel: bad buffer {ft!r}") from None
         if not (0 <= feet <= 1000) or not math.isfinite(feet):
             raise PlanError("--cut-parcel: buffer 0-1000 ft")
+        if key in out:
+            # One cut per site: a second would silently replace the first.
+            raise PlanError(f"--cut-parcel {key}: given twice (one test cut per site)")
         out[key] = (check_pid(pid), feet)
     return out
+
+
+def site_definition(name: str, assembles: list[tuple[str, list[str]]],
+                    cuts: dict[str, tuple[str, float]]) -> dict[str, Any]:
+    """What a call asks for one site beyond its name: the --assemble
+    members (sorted; None for a rank, whose parcel is fixed by the run) and
+    the --cut-parcel test cut. --merge keeps a plan only for the same
+    definition."""
+    members = dict(assembles).get(name)
+    cut = cuts.get(name)
+    return {"members": sorted(members) if members is not None else None,
+            "cut": [cut[0], float(cut[1])] if cut else None}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2011,7 +2402,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--merge", action="store_true", help="keep plans already in --out (same schema, run and options)")
     ap.add_argument("--redo", action="store_true", help="with --merge, plan sites again even if done")
     ap.add_argument("--cache-days", type=float, default=None, help="cache lifetime for this tool's county and HIFLD requests")
-    ap.add_argument("--max-seconds-per-site", type=float, default=MAX_SECONDS_PER_SITE)
+    ap.add_argument("--max-seconds-per-site", type=float, default=MAX_SECONDS_PER_SITE,
+                    help=f"search budget per site (default {MAX_SECONDS_PER_SITE:.0f} s); past it the plan is flagged PLAN_BUDGET_EXCEEDED")
     ap.add_argument("--parking", choices=("max", "code", "market"), default=PARKING_RULE)
     ap.add_argument("--atlanta-parking", choices=("market", "code"), default=ATLANTA_PARKING)
     ap.add_argument("--trailer-ratio", default=None, help="trailer stalls per door: one number, or three (below 250k, below 450k, above)")
@@ -2025,6 +2417,11 @@ def main(argv: list[str] | None = None) -> int:
 
     args = build_parser().parse_args(argv)
     try:
+        if not (math.isfinite(args.max_seconds_per_site) and 0 < args.max_seconds_per_site <= 86400):
+            raise PlanError("--max-seconds-per-site: a number of seconds above 0, up to 86400")
+        if args.cache_days is not None and not (math.isfinite(args.cache_days) and args.cache_days >= 0):
+            # nan would keep every cached answer forever (no age check passes).
+            raise PlanError("--cache-days: a number of days, 0 or more")
         opts = PlanOptions(behaviour="prototype" if args.prototype_behaviour else "fixes", parking=args.parking,
                            atlanta_parking=args.atlanta_parking,
                            trailer_tiers=trailer_tiers_from(args.trailer_ratio) if args.trailer_ratio else TRAILER_TARGET_TIERS,
@@ -2046,12 +2443,20 @@ def main(argv: list[str] | None = None) -> int:
         run_dir = args.run_dir
         check_out_dir(args.out, run_dir)
         run = si.load_run(run_dir)
+        check_assemble_names(assembles, run.rows)
     except (PlanError, ValueError, OSError) as exc:
         print(f"siteplan: {exc}", file=sys.stderr)
         return 2
     out = args.out
+    try:
+        # The one shared guard: owners and mailing addresses of ranked.csv
+        # and rejected.csv (an --assemble or --cut-parcel member may be a
+        # rejected parcel).
+        terms = OwnerGuard.from_run(run_dir)
+    except (OSError, ValueError) as exc:
+        print(f"siteplan: cannot read the run's owner columns ({exc})", file=sys.stderr)
+        return 2
     out.mkdir(parents=True, exist_ok=True)
-    terms = owner_terms(run.rows.values())
     header = {"schema_version": SCHEMA_VERSION, "tool": "screener.siteplan", "code_sha256": code_hash(),
               "run": run_identity(run_dir), "options": opts.decisions(),
               "meta": {"sources": si.sources(), "zoning_status": "draft"}}
@@ -2063,28 +2468,79 @@ def main(argv: list[str] | None = None) -> int:
         if not same:
             print("siteplan: --merge refused: the plans in --out come from another schema, code, run or options", file=sys.stderr)
             return 2
-        kept = [r for r in old.get("plans", []) if args.redo is False or r.get("rank") not in names]
-    done = {r.get("rank") for r in kept}
+        keys_now = {slug(n) for n in names}
+        kept = [r for r in old.get("plans", []) if args.redo is False or r.get("key") not in keys_now]
+        for r in kept:
+            # A name of this call that slugs to a kept plan's key but is
+            # another site ("a+b" then "a-b", or rank 2 then an --assemble 2).
+            k = r.get("key")
+            if k in keys_now and not any(slug(n) == k and n == r.get("rank") for n in names):
+                print(f"siteplan: --merge refused: {k!r} is already a plan of another site in --out; "
+                      "use another name", file=sys.stderr)
+                return 2
+    # A kept plan of a site this call names with another definition (other
+    # --assemble members, a new or changed --cut-parcel) is dropped and the
+    # site planned again: the kept plan answers another question.
+    defs = {slug(n): site_definition(n, assembles, cuts) for n in names}
+    changed = [r for r in kept if r.get("key") in defs and r.get("site_definition") != defs[r.get("key")]]
+    if changed:
+        kept = [r for r in kept if not any(r is c for c in changed)]
+        print("siteplan: --merge: planned again, the call defines them differently (members or test cut): "
+              + ", ".join(str(r.get("rank")) for r in changed), file=sys.stderr)
+    # A kept plan that is incomplete (an input not checked) is planned again
+    # when this call names it; one this call does not name keeps the exit
+    # code at 1 (the folder still holds an incomplete plan).
+    done = {r.get("key") for r in kept if not is_incomplete(r)}
+    stale = [str(r.get("rank")) for r in kept if is_incomplete(r) and r.get("key") not in {slug(n) for n in names}]
     fetch = si.Fetcher(cache_days=args.cache_days)
     failed = 0
+    incomplete: list[str] = []
 
-    def save(recs):
+    def body_of(recs):
         body = dict(header, generated=time.strftime("%Y-%m-%d"), plans=recs)
-        write_atomic(plans_path, (json.dumps(body, indent=1, default=str) + "\n").encode("utf-8"), out, terms)
+        return (json.dumps(body, indent=1, default=str) + "\n").encode("utf-8")
+
+    def published(recs_: list[dict[str, Any]]) -> list[str]:
+        """The site addresses the files write: a single ranked parcel's title
+        holds its own site address."""
+        out_ = []
+        for r in recs_:
+            row = run.rows.get(str(r.get("rank")))
+            if row is not None and r.get("parcel_ids") == [row.get("parcel_id")]:
+                out_.append(row.get("site_address") or "")
+        return out_
+
+    def refuse(data: bytes, name: str, public: list[str]) -> None:
+        hits = owner_hits(data, terms, public)
+        if hits:
+            raise OwnerDataFound(f"{name}: owner data found ({', '.join(f'{k}: {v}' for k, v in sorted(hits.items()))}); "
+                                 "nothing written for this site")
 
     recs = list(kept)
     for name in names:
-        if name in done:
+        if slug(name) in done:
             continue
+        svg_bytes, fname = None, None
         try:
             spec = si.site_spec(run, name, dict(assembles).get(name), cuts.get(name), fetch, opts)
             inp = si.gather(spec, fetch, opts)
             rec, drawing = plan_site(inp, opts)
+            rec["site_definition"] = defs[slug(name)]
             if drawing is not None:
-                svg = sr.render(drawing, rec)
+                svg_bytes = sr.render(drawing, rec).encode("utf-8")
                 fname = svg_name(inp.key)
-                write_atomic(out / fname, svg.encode("utf-8"), out, terms)
                 rec["svg"] = fname
+            new_recs = [r for r in recs if r.get("key") != rec.get("key")] + [rec]
+            body = body_of(new_recs)
+            # Every artifact of this site is guarded before any is written
+            # (R1): a refusal leaves --out as it was before this site.
+            pub_site, pub_all = published([rec]), published(new_recs)
+            if svg_bytes is not None:
+                refuse(svg_bytes, fname, pub_site)
+            refuse(body, PLANS_FILE, pub_all)
+            if svg_bytes is not None:
+                write_atomic(out / fname, svg_bytes, out, terms, pub_site)
+            write_atomic(plans_path, body, out, terms, pub_all)
         except (si.ArcGISError, GEOSException) as exc:
             failed += 1
             print(f"siteplan: {name}: input failed ({type(exc).__name__}: {str(exc)[:160]})", file=sys.stderr)
@@ -2096,23 +2552,31 @@ def main(argv: list[str] | None = None) -> int:
         except OwnerDataFound as exc:
             print(f"siteplan: {exc}", file=sys.stderr)
             return 3
-        recs = [r for r in recs if r.get("rank") != name] + [rec]
-        try:
-            save(recs)
-        except OwnerDataFound as exc:
-            print(f"siteplan: {exc}", file=sys.stderr)
-            return 3
+        recs = new_recs
+        if is_incomplete(rec):
+            incomplete.append(name)
         b = rec.get("building", {})
         print(name, rec.get("configuration"), b.get("sf"), "feasible", rec.get("feasible"), "doors", rec.get("doors"),
               "trailers", (rec.get("trailers") or {}).get("total"), "cars", (rec.get("cars") or {}).get("provided"), flush=True)
     if not recs:
-        save([])
+        write_atomic(plans_path, body_of([]), out, terms)
     keep = {r.get("svg") for r in recs if r.get("svg")}
     for f in out.glob("plan-*.svg"):
         if SVG_NAME.match(f.name) and f.name not in keep:
             f.unlink()           # stale plan from an earlier call (R11)
-    return 1 if failed else 0
+    if incomplete:
+        # Written, but an input fetch failed for these sites (feasible is
+        # null, or a NO_FIT with a not-checked input): run them again later.
+        print(f"siteplan: {len(incomplete)} plan(s) incomplete (an input was not checked; run again later): "
+              + ", ".join(incomplete), file=sys.stderr)
+    if stale:
+        print(f"siteplan: --out still holds {len(stale)} incomplete plan(s) kept by --merge (not named in this call; "
+              "name them again, with --merge, to plan them again): " + ", ".join(stale), file=sys.stderr)
+    return 1 if failed or incomplete or stale else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Run the package module's main, not this __main__ copy's: the fetch
+    # layer raises screener.siteplan.PlanError, which main() must catch.
+    from . import siteplan as _siteplan
+    sys.exit(_siteplan.main())

@@ -9,7 +9,24 @@ across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
-## Next session: start here (updated 2026-11-13)
+## Next session: start here (updated 2026-11-16)
+
+**2026-11-16, on `claude/magical-hypatia-htmio2` (not yet merged to
+`main`):** three standalone tools now exist, run by hand after a run.
+`screener.siteplan` draws screening test fits of industrial buildings
+on chosen parcels or explicit parcel-id assemblages. `screener.builtcheck`
+checks whether the top parcels are land today (footprints, holes in the
+parcel shape, other tax records, and a manual aerial review in
+`visual.json`). `screener.viewer` puts briefs, plans and the built check
+into one HTML page. They change no score, grade or rank, and every zoning
+value in them is DRAFT. The planner does not read the built check: run
+the built check first and plan only parcels it reads as land. All three
+share one owner guard (`viewer.OwnerGuard`). How to run them: `README.md` § "Site plans and
+the built check"; design basis and the operator's open decisions:
+`SITE_PLANNING.md`; review record: `reviews/37_screener_site_planner/`.
+Merging adds files under `screener/`, so a human must run
+`python -m screener.autoresearch.evaluate --decide --new-baseline` on the
+merge commit before the next loop; the score should not change.
 
 **2026-11-13, on `claude/upbeat-feynman-4bc1be` (not yet merged to
 `main`):** at the operator's request, the three screen gaps in item 4 below

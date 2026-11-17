@@ -101,8 +101,15 @@ class FakeArcGIS:
             return {"features": [{"attributes": {"OBJECTID": i, **self.footprints[i][1]},
                                   "geometry": esri(self.footprints[i][0])} for i in ids],
                     "spatialReference": {"wkid": 4326}}
+        # The county answers in WGS84 and always holds the parcel's own
+        # record (a test may give its own one in self.records).
+        q = Polygon(json.loads(params["geometry"])["rings"][0])
+        given = {a.get("ParcelID") for _, a in self.records}
+        own = [(parcel(i), {"ParcelID": f"PID  {i + 1:03d}"}) for i in range(10)
+               if f"PID  {i + 1:03d}" not in given and parcel(i).intersects(q)]
         return {"features": [{"attributes": a, "geometry": esri(g) if g is not None else None}
-                             for g, a in self.records]}
+                             for g, a in own + self.records],
+                "spatialReference": {"wkid": 4326, "latestWkid": 4326}}
 
 
 class Offline(unittest.TestCase):
@@ -190,6 +197,14 @@ class BuiltCheckTest(Offline):
                 res = self.check(visual=self.visual({"1": self.entry(1)}))
                 self.assertEqual(res.built[0]["built_check"], bc.NOT_CHECKED)
                 self.assertNotEqual(res.land[0]["land_today"], "raw_land")
+
+    def test_footprints_not_in_wgs84_are_not_checked(self):
+        self.footprint(1, box(X0 + 0.0001, Y0 + 0.0001, X0 + 0.0002, Y0 + 0.0002))
+        self.fake.answer = {"features": {"features": [{"attributes": {}, "geometry": None}],
+                                         "spatialReference": {"wkid": 102100}}}
+        res = self.check(visual=self.visual({"1": self.entry(1)}))
+        self.assertEqual(res.built[0]["footprint_state"], bc.FAILED)
+        self.assertEqual(res.land[0]["land_today"], "unclear")
 
     def test_records_failure_is_not_checked(self):
         self.fake.fail = {"records": arcgis.ArcGISError("county down")}
@@ -345,6 +360,26 @@ class LandTodayTest(unittest.TestCase):
         second = {"land_today": "raw_land", "what_is_there": "w", "why": "", "confidence": "high"}
         self.assertEqual(bc.classify_land(bc.NOT_CHECKED, self.v(), second)["land_today"], "unclear")
 
+    def test_incomplete_check_never_reads_better_than_a_completed_one(self):
+        """reviews/37: a first look of 'partly' that a completed check
+        sends to a second look read partly_usable when a fetch failed."""
+        cases = [(self.v(usable="partly", state="houses", confidence="medium"), bc.NONE_FOUND),
+                 (self.v(usable="partly", state="partly_built", confidence="low"), bc.BUILT),
+                 (self.v(usable="partly", state="vacant_wooded"), bc.NONE_FOUND)]
+        for v, fc in cases:
+            done = bc.classify_land(fc, v, None)["land_today"]
+            for c in (bc.classify_land(bc.NOT_CHECKED, v, None), bc.classify_land(fc, v, None, complete=False)):
+                with self.subTest(state=v["state"], check=fc):
+                    self.assertEqual(c["land_today"], "unclear")
+                    self.assertIn("not confirmed", c["why"])
+                    self.assertEqual(c["source"], bc.SOURCE_PENDING)
+            self.assertIn(done, ("unclear", "partly_usable"))
+        # a negative photo finding is kept; a second look's partly_usable too
+        self.assertEqual(bc.classify_land(bc.NOT_CHECKED, self.v(usable="no", state="other_use"), None,
+                                          complete=False)["land_today"], "not_raw_land")
+        second = {"land_today": "partly_usable", "what_is_there": "w", "why": "", "confidence": "high"}
+        self.assertEqual(bc.classify_land(bc.NOT_CHECKED, self.v(usable="partly"), second)["land_today"], "partly_usable")
+
     def test_no_review(self):
         for fc in (bc.NONE_FOUND, bc.BUILT, bc.CHECK, bc.NOT_CHECKED):
             self.assertEqual(bc.classify_land(fc, None, None)["land_today"], "unclear")
@@ -401,6 +436,21 @@ class OutputTest(Offline):
         self.assertFalse(self.out.exists() and any(self.out.iterdir()))
         self.assertNotIn("alpha", str(cm.exception).lower())
 
+    def test_record_address_that_reads_as_a_mailing_is_withheld(self):
+        inside = box(X0 + 0.0005, Y0 + 0.0005, X0 + 0.0008, Y0 + 0.0008)
+        self.fake.records = [(parcel(0), {"ParcelID": "PID  001", "ImprAppr": 0}),
+                             (inside, {"ParcelID": "HOUSE 1", "Address": "901 Private Mail Ln",
+                                       "ImprAppr": 90_000}),
+                             (box(X0 + 0.0010, Y0 + 0.0010, X0 + 0.0012, Y0 + 0.0012),
+                              {"ParcelID": "SHED 2", "Address": "5 PUBLIC RD", "ImprAppr": 1})]
+        paths = bc.write_outputs(self.check(), self.run_dir, self.out)
+        built = json.loads((self.out / "builtcheck.json").read_text(encoding="utf-8"))
+        recs = {r["parcel_id"]: r for r in built["parcels"][0]["records_inside"]}
+        self.assertEqual(recs["HOUSE 1"]["address"], bc.ADDRESS_WITHHELD)
+        self.assertEqual(recs["SHED 2"]["address"], "5 PUBLIC RD")
+        for p in paths:
+            self.assertNotIn("private mail", p.read_text(encoding="utf-8").lower())
+
     def test_cli_refuses_with_no_owner_text_and_exit_2(self):
         vis = self.tmp / "visual.json"
         vis.write_text(json.dumps(self.visual({"1": self.entry(
@@ -435,7 +485,8 @@ class OutputTest(Offline):
     def test_csv_formula_cells_are_escaped(self):
         res = self.check(visual=self.visual({"1": self.entry(1, evidence='=HYPERLINK("http://x")')}))
         bc.write_outputs(res, self.run_dir, self.out)
-        rows = list(csv.DictReader(open(self.out / "land_today.csv", encoding="utf-8")))
+        with open(self.out / "land_today.csv", encoding="utf-8", newline="") as fh:
+            rows = list(csv.DictReader(fh))
         self.assertEqual(rows[0]["what_is_there"], "'=HYPERLINK(\"http://x\")")
         data = json.loads((self.out / "land_today.json").read_text())
         self.assertEqual(data["parcels"][0]["what_is_there"], '=HYPERLINK("http://x")')
@@ -454,6 +505,15 @@ class OutputTest(Offline):
                 mock.patch.object(bc, "Fetcher", lambda **kw: self.fetcher()):
             self.assertEqual(bc.main([str(self.run_dir), "--out", str(self.out)]), 1)
         self.assertTrue((self.out / "land_today.json").exists())
+
+    def test_cache_days_must_be_a_finite_number_not_below_zero(self):
+        for bad in ("nan", "inf", "-1"):
+            err = io.StringIO()
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err), \
+                    mock.patch.object(bc, "Fetcher", mock.Mock(side_effect=AssertionError("fetched"))):
+                code = bc.main([str(self.run_dir), "--out", str(self.out), "--cache-days", bad])
+            self.assertEqual(code, 2, bad)
+            self.assertIn("--cache-days", err.getvalue())
 
     def test_out_inside_the_repo_must_be_ignored(self):
         with contextlib.redirect_stderr(io.StringIO()):
@@ -529,6 +589,107 @@ class FetcherTest(unittest.TestCase):
         self.assertEqual(rj.call_count, 4)       # 2 per host, then nothing more
 
 
+class PartialFailureTest(Offline):
+    """reviews/37 fixes: a fetch that failed while the other input found
+    something (a CHECK verdict) never gives raw_land, shows in land_today,
+    and makes the CLI exit 1; a missing input file is refused (exit 2)."""
+
+    def run_cli(self, *extra):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
+                mock.patch.object(bc, "Fetcher", lambda **kw: self.fetcher()):
+            code = bc.main([str(self.run_dir), "--out", str(self.out), *extra])
+        return code, out.getvalue(), err.getvalue()
+
+    def visual_file(self, body) -> Path:
+        path = self.tmp / "visual.json"
+        path.write_text(json.dumps(body), encoding="utf-8")
+        return path
+
+    def test_records_failure_with_a_footprint_is_check_not_raw_land(self):
+        self.run_dir = make_run(self.tmp / "one", n=1)
+        # one ~4,500 SF footprint inside the outline: CHECK; the records query fails
+        self.footprint(1, box(X0 + 0.0010, Y0 + 0.0010, X0 + 0.0012, Y0 + 0.0012), sqfeet=4_000)
+        self.fake.fail = {"records": arcgis.ArcGISError("timeout")}
+        vis = self.visual_file(self.visual({"1": self.entry(1)}))
+        code, so, se = self.run_cli("--visual", str(vis))
+        self.assertEqual(code, 1, se)
+        self.assertIn("input missing", se)
+        land = json.loads((self.out / "land_today.json").read_text())["parcels"][0]
+        self.assertEqual(land["footprint_check"], bc.CHECK)
+        self.assertNotEqual(land["land_today"], "raw_land")
+        self.assertEqual(land["land_today"], "unclear")
+        self.assertIn("records query failed", land["footprint_note"])
+
+    def test_footprint_failure_with_a_record_inside_is_not_raw_land(self):
+        self.run_dir = make_run(self.tmp / "one", n=1)
+        inside = box(X0 + 0.0005, Y0 + 0.0005, X0 + 0.0008, Y0 + 0.0008)
+        self.fake.records = [(parcel(0), {"ParcelID": "PID  001", "ImprAppr": 0}),
+                             (inside, {"ParcelID": "SHED 9", "Address": "5 PUBLIC RD", "ImprAppr": 10})]
+        self.fake.fail = {"ids": arcgis.ArcGISError("down")}
+        res = self.check(visual=self.visual({"1": self.entry(1)}))
+        self.assertEqual(res.built[0]["built_check"], bc.CHECK)
+        self.assertEqual(res.land[0]["land_today"], "unclear")
+        # a negative photo finding still stands
+        res = self.check(visual=self.visual({"1": self.entry(1, usable="no", state="paved_yard_or_storage")}))
+        self.assertEqual(res.land[0]["land_today"], "not_raw_land")
+
+    def test_classify_land_incomplete_never_raw_land(self):
+        v = {"state": "vacant_wooded", "usable": "yes", "evidence": "woods", "confidence": "high"}
+        second = {"land_today": "raw_land", "what_is_there": "woods", "why": "x", "confidence": "high"}
+        for check in (bc.CHECK, bc.NONE_FOUND, bc.BUILT):
+            self.assertNotEqual(bc.classify_land(check, v, None, complete=False)["land_today"], "raw_land")
+            self.assertNotEqual(bc.classify_land(check, v, second, complete=False)["land_today"], "raw_land")
+        self.assertEqual(bc.classify_land(bc.NONE_FOUND, v, None)["land_today"], "raw_land")
+
+    def test_missing_or_bad_input_files_exit_2_and_write_nothing(self):
+        bad = self.tmp / "bad.json"
+        bad.write_text("{not json", encoding="utf-8")
+        for extra in (["--visual", str(self.tmp / "nope.json")], ["--visual", str(bad)],
+                      ["--decisions", str(self.tmp / "nope.csv")]):
+            with self.subTest(extra):
+                code, _, se = self.run_cli(*extra)
+                self.assertEqual(code, 2, se)
+                self.assertIn("cannot read an input", se)
+                self.assertFalse(self.out.exists())
+        empty = self.tmp / "norun"
+        empty.mkdir()
+        self.run_dir = empty
+        code, _, se = self.run_cli()
+        self.assertEqual(code, 2, se)
+        self.assertFalse(self.out.exists())
+
+    def test_second_looks_carried_from_an_earlier_land_today(self):
+        # rank 1 needs a second look (the photo is low-confidence): unclear
+        # without one; an earlier land_today's second look decides it.
+        vis = self.visual({"1": self.entry(1, confidence="low")})
+        self.assertEqual(self.check(visual=vis).land[0]["land_today"], "unclear")
+        earlier = [{"rank": 1, "parcel_id": "PID  001", "land_today": "partly_usable", "what_is_there": "half graded",
+                    "why": "seen again", "confidence": "medium", "source": bc.SOURCE_SECOND},
+                   {"rank": 2, "parcel_id": "PID  002", "land_today": "raw_land", "what_is_there": "woods",
+                    "why": "", "confidence": "high", "source": bc.SOURCE_AGREES}]
+        merged = bc.with_second_looks(vis, earlier, viewer.run_identity(self.run_dir), "earlier")
+        self.assertEqual(list(merged["second_look"]), ["1"])
+        land = self.check(visual=merged).land[0]
+        self.assertEqual((land["land_today"], land["source"]), ("partly_usable", bc.SOURCE_SECOND))
+        # through the CLI, and refused when the earlier file names another run
+        path = self.tmp / "earlier.json"
+        path.write_text(json.dumps(earlier), encoding="utf-8")
+        code, so, se = self.run_cli("--visual", str(self.visual_file(vis)), "--second-looks-from", str(path))
+        self.assertEqual(code, 0, se)
+        self.assertEqual(json.loads((self.out / "land_today.json").read_text())["parcels"][0]["land_today"],
+                         "partly_usable")
+        other = {"run": {"name": "x", "ranked_csv_sha256": "0" * 64}, "parcels": earlier}
+        with self.assertRaises(viewer.Refused):
+            bc.with_second_looks(vis, other, viewer.run_identity(self.run_dir), "earlier")
+        with self.assertRaises(viewer.Refused):
+            bc.with_second_looks(None, earlier, viewer.run_identity(self.run_dir), "earlier")
+        # a second look naming another parcel for its rank is refused by load_visual
+        wrong = [dict(earlier[0], parcel_id="PID  002")]
+        with self.assertRaises(viewer.Refused):
+            self.check(visual=bc.with_second_looks(vis, wrong, viewer.run_identity(self.run_dir), "earlier"))
+
+
 class StaticTest(unittest.TestCase):
     def test_fields_hold_no_owner_or_mailing(self):
         for fields in (bc.STRUCTURE_FIELDS, bc.PARCEL_FIELDS):
@@ -560,6 +721,98 @@ class StaticTest(unittest.TestCase):
         self.assertEqual(p["outFields"], bc.PARCEL_FIELDS)
         self.assertEqual(set(p), {"geometry", "geometryType", "inSR", "spatialRel", "outFields",
                                   "returnGeometry", "outSR"})
+
+
+
+class HollowAnswersTest(Offline):
+    """reviews/37 Agent 2, round 1: a hollow answer (county records in
+    another spatial reference, a footprint without a shape, a county answer
+    without the parcel's own record) is not checked, never 'no building
+    found' or raw land, and the CLI exits 1; carried second looks and
+    numeric options are checked."""
+
+    run_cli = PartialFailureTest.run_cli
+    visual_file = PartialFailureTest.visual_file
+
+    def raw_land_visual(self):
+        return self.visual_file(self.visual({"1": self.entry(1)}))
+
+    def run_raw(self):
+        code, _, se = self.run_cli("--visual", str(self.raw_land_visual()))
+        self.assert_not_raw(code, se)
+
+    def assert_not_raw(self, code, se):
+        self.assertEqual(code, 1, se)
+        built = json.loads((self.out / "builtcheck.json").read_text())["parcels"][0]
+        land = json.loads((self.out / "land_today.json").read_text())["parcels"][0]
+        self.assertEqual(built["built_check"], bc.NOT_CHECKED)
+        self.assertNotEqual(land["land_today"], "raw_land")
+        self.assertNotEqual(land["source"], bc.SOURCE_AGREES)
+
+    def test_records_in_state_plane_are_not_checked(self):
+        self.run_dir = make_run(self.tmp / "one", n=1)
+        inside = box(X0 + 0.0005, Y0 + 0.0005, X0 + 0.0008, Y0 + 0.0008)
+        self.fake.answer = {"records": {"spatialReference": {"wkid": 2240}, "features": [
+            {"attributes": {"ParcelID": "PID  001"}, "geometry": esri(parcel(0))},
+            {"attributes": {"ParcelID": "OTHER", "ImprAppr": 900_000}, "geometry": esri(inside)}]}}
+        self.run_raw()
+
+    def test_footprint_without_a_shape_is_not_checked(self):
+        self.run_dir = make_run(self.tmp / "one", n=1)
+        self.footprint(1, box(X0 + 0.0005, Y0 + 0.0005, X0 + 0.0025, Y0 + 0.0025), sqfeet=100_000)
+        real = self.fake.route
+
+        def route(kind, params):
+            d = real(kind, params)
+            if kind == "features":
+                for f in d["features"]:
+                    f["geometry"] = None
+            return d
+        self.fake.route = route
+        self.run_raw()
+        built = json.loads((self.out / "builtcheck.json").read_text())["parcels"][0]
+        self.assertIn("without a shape", built["why"])
+
+    def test_county_answer_without_the_parcels_own_record_is_not_checked(self):
+        self.run_dir = make_run(self.tmp / "one", n=1)
+        self.fake.answer = {"records": {"features": [], "spatialReference": {"wkid": 4326}}}
+        self.run_raw()
+        built = json.loads((self.out / "builtcheck.json").read_text())["parcels"][0]
+        self.assertIn("own county record", built["why"])
+
+    def test_a_held_second_look_is_not_carried_as_a_verdict(self):
+        v = {"state": "vacant_wooded", "usable": "yes", "evidence": "woods", "confidence": "high"}
+        second = {"land_today": "raw_land", "what_is_there": "woods", "why": "x", "confidence": "high"}
+        held = bc.classify_land(bc.NONE_FOUND, v, second, complete=False)
+        self.assertEqual((held["land_today"], held["source"]), ("unclear", bc.SOURCE_SECOND_HELD))
+        kept = bc.classify_land(bc.NONE_FOUND, dict(v, usable="no"), dict(second, land_today="not_raw_land"), complete=False)
+        self.assertEqual(kept["source"], bc.SOURCE_SECOND)      # a negative verdict stands as the reviewer's
+        rows = [{"rank": 1, "parcel_id": "PID  001", **{k: held[k] for k in ("land_today", "what_is_there", "why", "confidence", "source")}},
+                {"rank": 2, "parcel_id": "PID  002", "land_today": "partly_usable", "what_is_there": "x", "why": "",
+                 "confidence": "high", "source": bc.SOURCE_SECOND}]
+        self.assertEqual(list(bc.second_looks_from(rows)), ["2"])
+
+    def test_second_looks_file_without_second_looks_is_refused(self):
+        vis = self.visual_file(self.visual({"1": self.entry(1)}))
+        path = self.tmp / "builtcheck.json"
+        path.write_text(json.dumps([{"rank": 1, "parcel_id": "PID  001", "built_check": bc.NONE_FOUND}]), encoding="utf-8")
+        code, _, se = self.run_cli("--visual", str(vis), "--second-looks-from", str(path))
+        self.assertEqual(code, 2, se)
+        self.assertIn("no 'second look' rows", se)
+        self.assertFalse(self.out.exists())
+
+    def test_top_must_be_positive(self):
+        for top in ("0", "-5"):
+            code, _, se = self.run_cli("--top", top)
+            self.assertEqual(code, 2, se)
+            self.assertFalse(self.out.exists())
+
+    def test_records_query_checks_wgs84(self):
+        check = bc._features_problem(None, wgs84=True)
+        self.assertIsNone(check({"features": [{}], "spatialReference": {"wkid": 4326}}))
+        self.assertIn("WGS84", check({"features": [{}], "spatialReference": {"wkid": 2240}}))
+        self.assertIn("WGS84", check({"features": [{}]}))
+        self.assertIsNone(check({"features": [], "spatialReference": {"wkid": 2240}}))
 
 
 if __name__ == "__main__":
