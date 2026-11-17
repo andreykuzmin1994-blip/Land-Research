@@ -156,7 +156,11 @@ fit.
   used.
 - **Pond geometry.** 6 ft deep, 4:1 side slopes, length twice the width,
   1 ft freeboard and a 15 ft rim. One pond up to 10 acre-feet, two up to
-  20, three above that.
+  20, three above that. In the default behaviour, when no 2:1 pond fits
+  at the lidar samples, the same volume is tried 20 ft off them, then
+  with the bottom 1.5, 1, 3 and 4 times as long as it is wide
+  (`POND_FALLBACK_RATIOS`; reviews/40); the detention basis then names
+  the proportions used. Not tried for a layout a route already fails.
 - Ponds go on low lidar ground near the building, on its side of any
   mapped wetland, outside water buffers and transmission corridors.
 - The impervious area, and so the pond, is worked out again after the
@@ -229,6 +233,23 @@ fit.
   then no longer reads infeasible while a smaller parcel inside it reads
   feasible (the prototype read 700 × 700 ft infeasible next to a
   feasible 600 × 700 ft).
+- **Room for the pond (default behaviour; operator request of
+  2026-11-17, reviews/40).** Each layout is fitted as long as it goes
+  wherever it fits longest, and its pond is placed after. When the pond
+  alone then blocks it, the search no longer only shortens the building
+  where it stands: it reserves each of the 6 lowest open spots a pond
+  could use (`RELOCATE_SPOTS`), fits the same cross-section around it no
+  longer than before, re-sizes the reserved pond for the building that
+  fits and fits again (up to 3 rounds), and checks each fit in full. The
+  largest that passes is kept, and the shorter lengths where the building
+  stood are still tried down to it. At most 48 such checks per site
+  (`RELOCATE_MAX_CHECKS`, a count, so the same site gives the same plan);
+  the record's `inputs.pond_relocation` says how many were used. The
+  docks keep the planner's orientation rule (away from the street and
+  homes). Reference site #21: 68,000 SF before, 84,000 SF now, the
+  largest layout an exhaustive check of every 3° and a 20 ft position
+  grid found. Reference site #25 keeps its plan: the only larger layout
+  turns its truck court to the arterial and loses its trailer stalls.
 - The alternatives' `geometry_ok` is the layout's own check (routes,
   pond, plan checks, coverage cap), not the site's feasibility.
 - An assemblage is planned under its best-ranked member's draft rules.
@@ -297,13 +318,14 @@ plan and changes no layout, flag, feasibility or floor area.
   (`selection.with_trailers`). When a larger layout passed its checks
   but ranks lower, it names that one and the mark-downs it carries.
 - **What the surface pond costs.** When a layout passes every layout
-  check but the pond, the search shortens it until a pond fits. The
+  check but the pond, the search moves it to leave the pond room and
+  shortens it until a pond fits (above). The
   read-out keeps the layout as first tried and reports it
   (`selection.without_pond`) when it is at least 5% larger than the plan
   drawn. What it says depends on the market (decision 7 below): here,
   that underground detention is not used and the plan drawn stands; in a
   market run with `--underground-detention`, to price a vault against
-  the floor area. On reference site #21 the plan drawn is 68,000 SF and
+  the floor area. On reference site #21 the plan drawn is 84,000 SF and
   a 95,000 SF layout passed all but the pond.
 - **Takeoff.** Heavy paving (truck courts, roads and routes, trailer
   stalls, drop yards), light paving (car parking and drives), earthwork
@@ -315,8 +337,8 @@ plan and changes no layout, flag, feasibility or floor area.
   status is `fits` or `fits_with_conditions`.
 
 What the read-out is not: a second feasibility rule, a cost estimate, or
-a zoning opinion. The search itself is unchanged (see the open items in
-the review note for what the read-out shows about it).
+a zoning opinion. The read-out changed no search; the search was changed
+later, on its own (room for the pond, reviews/40).
 
 ## Tightened draft values (2026-11-17)
 

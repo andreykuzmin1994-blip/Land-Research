@@ -11,11 +11,12 @@ import io
 import json
 import re
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ET
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-from shapely.geometry import LineString, box
+from shapely.geometry import LineString, Point, Polygon, box
 
 from screener import siteplan as sp
 from screener import siteplan_assess as assess
@@ -546,7 +547,14 @@ class TightenedRules(ts.Offline):
         proto, _ = ts.planned("basic", lambda: ts.site(600, 700), sp.PlanOptions(behaviour="prototype"))
         self.assertIsNone(proto["operator_decisions"]["open_yard_ft"])
         self.assertNotIn("tightened", proto["zoning"])
-        self.assertGreater(proto["building"]["sf"], ts.planned("basic", lambda: ts.site(600, 700))[0]["building"]["sf"])
+        # the yard binds: without it the same plan stands closer than 60 ft to
+        # a lot line. (It no longer costs floor area here: since the
+        # room-for-the-pond search, reviews/40, the building moves instead;
+        # the default plan is now larger than the prototype's.)
+        with mock.patch.object(sp, "OPEN_YARD_RULE_FT", 0):
+            _, d0 = ts.planned("basic_no_yard", lambda: ts.site(600, 700))
+        lines0 = sp.unary_union([ln for k, ln in d0.edges if k != "ROW"])
+        self.assertLess(d0.p.building.distance(lines0), sp.OPEN_YARD_RULE_FT - 1)
 
     def test_fairburn_truck_space_minimum(self):
         rec, _ = ts.planned("fair_yard", lambda: ts.site(900, 800, jur="Fairburn"))
@@ -699,7 +707,9 @@ class TightenedRules(ts.Offline):
         self.assertEqual(int(row["required"].split()[0]), -(-rec["building"]["sf"] // 5000))
         self.assertEqual(int(row["provided"].split()[0]), rec["trailers"]["total"])
         # second review, finding 3: the read-out gives the real reason a larger layout ranks lower
-        flat, _ = ts.planned("fair_flat", lambda: ts.site(700, 500, jur="Fairburn"))
+        # (700 x 500 ft until reviews/40: the pond search now passes the
+        # 68,000 SF layout there, which meets the code minimum itself)
+        flat, _ = ts.planned("fair_flat", lambda: ts.site(650, 500, jur="Fairburn"))
         up = flat["selection"]["upside"]
         self.assertIsNotNone(up)
         self.assertIn("truck spaces the draft code asks for", " ".join(up["reasons"]))
@@ -799,7 +809,7 @@ class Sheet(ts.Offline):
         self.assertNotIn("href", svg.lower())
         self.assertEqual(float(root.get("width")), sr.W)
         self.assertEqual(sr.render(d, rec), svg)                            # the same plan, the same bytes
-        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)), {"#sx", "#tx", "#cx", "#wx"} & set(re.findall(r"url\(([^)]*)\)", svg)))
+        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)), {"#sx", "#tx", "#cx", "#wx", "#gx"} & set(re.findall(r"url\(([^)]*)\)", svg)))
         # the building's length and depth are dimension strings on the plan
         b = rec["building"]
         self.assertIn(f">{int(b['L_ft'])}&#x27;<", svg.replace("&apos;", "&#x27;").replace("&#39;", "&#x27;"))
@@ -960,6 +970,190 @@ class ViewerReadOut(unittest.TestCase):
         self.assertEqual((len(out["compliance"]), out["compliance"][0]["status"], out["compliance"][0]["margin"]),
                          (viewer.MAX_ROWS, "verify", 4))
         self.assertLessEqual(len(out["selection"]), 900)
+
+
+# ---------------------------------------------------------------------------
+# The plan's context: contours of the existing ground and the neighbours
+# ---------------------------------------------------------------------------
+def grid_dem(nx, ny, z, step=40.0, drop=(), x0=0.0, y0=0.0):
+    """A Dem on an nx x ny grid of `step` ft cells from (x0, y0), elevation z(x, y); `drop` keys have no sample."""
+    pts = {(i, j): (x0 + step / 2 + i * step, y0 + step / 2 + j * step) for i in range(nx) for j in range(ny)}
+    return sp.Dem(step=step, points=pts, elev={k: z(*p) for k, p in pts.items() if k not in drop}, state="checked")
+
+
+def contour_lines(svg):
+    """The contour lines drawn on the plan (not the legend's swatch)."""
+    return re.findall(rf'<path d="[^"]+" stroke="{sr.C["contour"]}" stroke-width="[\d.]+" fill="none"', svg)
+
+
+class Decimalish:
+    """A number type that is not int or float (as numpy's float32 is not)."""
+    def __init__(self, v):
+        self.v = v
+
+    def __float__(self):
+        return float(self.v)
+
+
+def filled(svg, colour):
+    """The plan shapes filled with `colour` (not the legend's swatches, which are rects)."""
+    return re.findall(rf'<path d="[^"]+" fill="{colour}"', svg)
+
+
+class Contours(unittest.TestCase):
+
+    def test_interval_follows_the_relief(self):
+        self.assertEqual([sr.contour_interval(r) for r in (5, 15, 16, 30, 75, 150, 400)], [1, 1, 2, 2, 5, 10, 20])
+
+    def test_a_tilted_plane_gives_straight_lines_where_they_belong(self):
+        # 0.05 ft per ft eastward over 600 ft: 30 ft of relief, a 2 ft interval
+        dem = grid_dem(16, 16, lambda x, y: 900 + 0.05 * x)
+        every, lines = sr.contours(dem, box(0, 0, 640, 640))
+        self.assertEqual(every, 2)
+        levels = [z for z, _ in lines]
+        self.assertEqual(levels, sorted(levels))
+        self.assertEqual(set(levels), set(range(902, 931, 2)))
+        for z, g in lines:
+            xs = [x for x, _ in g.coords]
+            self.assertAlmostEqual(min(xs), (z - 900) / 0.05, delta=0.5, msg=z)        # a north-south line at its x
+            self.assertAlmostEqual(max(xs), (z - 900) / 0.05, delta=0.5, msg=z)
+            self.assertGreater(g.length, 500)                                             # one line, not pieces
+
+    def test_lines_are_clipped_to_the_region_and_skip_missing_samples(self):
+        dem = grid_dem(16, 16, lambda x, y: 900 + 0.05 * x, drop={(i, 8) for i in range(16)})
+        region = box(100, 100, 500, 500)
+        _, lines = sr.contours(dem, region)
+        self.assertTrue(lines)
+        for _, g in lines:
+            self.assertTrue(region.buffer(1e-6).contains(g))
+            for piece in getattr(g, "geoms", [g]):
+                ys = [y for _, y in piece.coords]
+                # no line crosses the row of cells around the missing samples (y 300 to 380)
+                self.assertFalse(min(ys) < 310 and max(ys) > 370)
+
+    def test_a_saddle_and_a_closed_hill(self):
+        # a saddle cell: two segments, no crossing, cutting off the corners
+        # on the other side of the level from the cell's mean
+        corners = {(0, 0): (0, 0), (1, 0): (40, 0), (1, 1): (40, 40), (0, 1): (0, 40)}
+        for d_z, cut in ((900, {(40, 0), (0, 40)}), (896, {(0, 0), (40, 40)})):
+            sad = sp.Dem(step=40.0, points=dict(corners), elev={(0, 0): 910, (1, 0): 900, (1, 1): 910, (0, 1): d_z},
+                         state="checked")
+            _, lines = sr.contours(sad, box(-1, -1, 41, 41), chaikin=0)
+            at_905 = [g for z, g in lines if z == 905]
+            self.assertEqual(len(at_905), 2)
+            self.assertFalse(at_905[0].intersects(at_905[1]))
+            # each segment runs round one corner: its middle is nearest that corner
+            near = {min(corners.values(), key=lambda c: g.interpolate(0.5, normalized=True).distance(Point(c))) for g in at_905}
+            self.assertEqual(near, cut, d_z)
+        # a round hill: closed lines
+        hill = grid_dem(21, 21, lambda x, y: 950 - 0.002 * ((x - 420) ** 2 + (y - 420) ** 2))
+        _, lines = sr.contours(hill, box(0, 0, 840, 840))
+        inner = [g for z, g in lines if z == 940]
+        self.assertEqual(len(inner), 1)
+        self.assertTrue(inner[0].is_ring or inner[0].coords[0] == inner[0].coords[-1])
+
+    def test_nothing_to_draw(self):
+        self.assertEqual(sr.contours(None, box(0, 0, 10, 10)), (0, []))
+        self.assertEqual(sr.contours(sp.Dem(), box(0, 0, 10, 10)), (0, []))
+        flat = grid_dem(5, 5, lambda x, y: 900.0)
+        self.assertEqual(sr.contours(flat, box(0, 0, 200, 200)), (0, []))          # no interval claimed for no lines
+        nan = grid_dem(5, 5, lambda x, y: 900 + 0.2 * x)
+        nan.elev[(2, 2)] = float("nan")
+        self.assertTrue(sr.contours(nan, box(0, 0, 200, 200))[1])                  # a bad sample is skipped, not fatal
+        odd = grid_dem(5, 5, lambda x, y: 900 + 0.2 * x)
+        odd.elev = {k: Decimalish(v) for k, v in odd.elev.items()}
+        self.assertTrue(sr.contours(odd, box(0, 0, 200, 200))[1])                  # any number type float() takes
+
+
+class PlanContext(ts.Offline):
+
+    def test_residential_neighbour_rule(self):
+        rules = {"ag_buffer": True}
+        self.assertTrue(sp.residential_neighbour({"LUCode": "101"}, None))
+        self.assertTrue(sp.residential_neighbour({"ClassCode": "R3"}, None))
+        self.assertFalse(sp.residential_neighbour({"ClassCode": "C3", "LUCode": "320"}, rules))
+        self.assertFalse(sp.residential_neighbour({"ClassCode": "A5"}, None))
+        self.assertTrue(sp.residential_neighbour({"ClassCode": "A5"}, rules))
+        self.assertFalse(sp.residential_neighbour({}, rules))
+
+    def test_the_sheet_draws_contours_and_neighbours(self):
+        rec, d = ts.planned("basic", lambda: ts.site(600, 700))
+        self.assertIsNotNone(d.dem)
+        # the synthetic parcel is 600 x 700 ft about the origin
+        tilted = grid_dem(17, 19, lambda x, y: 900 + 0.04 * x, x0=-340, y0=-380)
+        ctx = [("RES", box(-600, -100, -300, 200)), ("OTHER", box(300, -350, 600, 350)), ("RES", box(-100, -100, 100, 100))]
+        d2 = sp.Drawing(**{**d.__dict__, "dem": tilted, "context": ctx})
+        svg = sr.render(d2, rec)
+        self.assertEqual(len(filled(svg, sr.C["ctx_res"])), 1)          # the one outside the parcel
+        self.assertEqual(len(filled(svg, sr.C["ctx"])), 1)
+        self.assertTrue(contour_lines(svg))
+        self.assertIn("existing ground contour (lidar, every 2 ft", svg)
+        self.assertIn("Contours: existing ground every 2 ft", svg)
+        self.assertEqual(sr.render(d2, rec), svg)                           # the same plan, the same bytes
+        viewer.sanitise_svg(svg)
+        # a neighbour shape inside the parcel is not drawn over the site (only the part outside it is)
+        d3 = sp.Drawing(**{**d.__dict__, "dem": None, "context": [("RES", box(-100, -100, 100, 100))]})
+        self.assertEqual(filled(sr.render(d3, rec), sr.C["ctx_res"]), [])
+
+    def test_a_drawing_without_context_still_renders(self):
+        rec, d = ts.planned("basic", lambda: ts.site(600, 700))
+        d2 = sp.Drawing(d.title, d.parcel, d.P, d.constraints, d.trans, d.cut, d.steep, d.front_ft, d.p, d.o, d.second,
+                        B=d.B, edges=d.edges)
+        svg = sr.render(d2, rec)
+        self.assertEqual(contour_lines(svg), [])
+        self.assertNotIn("Contours:", svg)
+        self.assertIn("none drawn (no lidar samples)", svg)
+        self.assertNotIn("neighbouring parcel", svg)                             # no context, no legend entry for it
+        # only the kinds drawn are in the legend
+        d3 = sp.Drawing(**{**d2.__dict__, "context": [("OTHER", box(300, -350, 600, 350))]})
+        svg3 = sr.render(d3, rec)
+        self.assertIn("neighbouring parcel (county parcel map)", svg3)
+        self.assertNotIn("classed residential", svg3)
+        viewer.sanitise_svg(svg)
+
+    def test_the_tint_follows_the_edge_rule_in_each_behaviour(self):
+        # an agricultural neighbour counts as residential only where the draft
+        # rules buffer it (South Fulton, default behaviour), exactly as the edges do
+        farm = ({"LUCode": "700", "ClassCode": "A5"}, ts.wgs(box(0, 700, 600, 1000)))     # behind the site (its own 0..w frame)
+        for jur, beh, want in (("South Fulton / unincorporated", "default", "RES"), ("South Fulton / unincorporated", "prototype", "OTHER"),
+                               ("Atlanta", "default", "OTHER")):
+            rec, d = ts.planned(f"farm-{jur}-{beh}", lambda: ts.site(600, 700, jur=jur, neighbours=[farm]),
+                                sp.PlanOptions(behaviour=beh))
+            self.assertEqual([k for k, _ in d.context], [want], (jur, beh))
+            self.assertEqual(want == "RES", any(k.startswith("RES") for k, _ in d.edges), (jur, beh))
+
+    def test_bad_context_or_partial_lidar_does_not_break_the_sheet(self):
+        rec, d = ts.planned("basic", lambda: ts.site(600, 700))
+        bowtie = Polygon([(-700, -100), (-400, 200), (-400, -100), (-700, 200)])        # invalid: crosses itself
+        partial = grid_dem(17, 19, lambda x, y: 900 + 0.04 * x, x0=-340, y0=-380, drop={(i, j) for i in range(17) for j in range(9)})
+        partial.state = "partial"
+        svg = sr.render(sp.Drawing(**{**d.__dict__, "dem": partial, "context": [("RES", bowtie)]}), rec)
+        viewer.sanitise_svg(svg)
+        self.assertEqual(contour_lines(svg), [])                                       # half-sampled ground is not drawn as level
+        self.assertIn("none drawn (lidar incomplete)", svg)
+
+    def test_the_street_centre_line_stays_mid_street(self):
+        rec, d = ts.planned("basic", lambda: ts.site(600, 700))
+        svg = sr.render(d, rec)
+        paths = re.findall(rf'<path d="([^"]+)" stroke="{sr.C["centre"]}"', svg)
+        self.assertEqual(len(paths), 1)
+        px_per_ft = sr._scale(d)[0]
+        # the frontage is the parcel's south side: the line runs parallel to
+        # it, half a street outside it, with no hook back toward the parcel
+        ys = {round(float(y), 1) for y in re.findall(r"[ML]\s*[\d.]+,([\d.]+)", paths[0])}
+        self.assertEqual(len(ys), 1)
+        ground = re.search(r'<path d="([^"]+)" fill="url\(#gx\)"', svg).group(1)
+        south = max(float(y) for y in re.findall(r"[ML]\s*[\d.]+,([\d.]+)", ground))       # the parcel's south side, px
+        self.assertAlmostEqual(ys.pop(), south + sr.STREET_FT / 2 * px_per_ft, delta=1.0)
+
+    def test_plan_site_passes_the_neighbours_to_the_drawing(self):
+        inp, _ = ts.load_fixture("rank21")
+        rec, d = sp.plan_site(inp)
+        kinds = sorted({k for k, _ in d.context})
+        self.assertEqual(kinds, ["OTHER", "RES"])
+        # the tint agrees with the residential edge the plan measured
+        self.assertIn("RESIDENTIAL_EDGE", ts.names(rec))
+        self.assertIs(d.dem, inp.dem)
 
 
 if __name__ == "__main__":

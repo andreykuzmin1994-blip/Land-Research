@@ -327,6 +327,17 @@ BLOCKING_RULE = "no severity-1 flag outside GATE_FLAGS"
 RESCUE_FLAGS = frozenset({"POND_DOES_NOT_FIT", "ROUTE_INFEASIBLE", "CAR_ROUTE_NONE", "ROUTE_OUTSIDE_ENVELOPE",
                           "PLAN_GEOMETRY_CONFLICT"})
 RESCUE_MAX_FITS = 12
+# Default behaviour: a layout blocked only by its pond is moved to leave the
+# pond room before it is shortened (relocate_for_pond, reviews/40). Each
+# move reserves one of the RELOCATE_SPOTS lowest pond spots and is checked
+# in full; RELOCATE_MAX_CHECKS full checks per site at most (a count, so the
+# same site always gives the same plan).
+RELOCATE_SPOTS = 6
+RELOCATE_ROUNDS = 3        # re-sizing the reserved pond for the building that fits around it
+# Default behaviour: when no 2:1 pond fits, the same volume is tried at 20 ft
+# offsets from the lidar samples, 2:1 first, then these bottom proportions.
+POND_FALLBACK_RATIOS = (2.0, 1.5, 1.0, 3.0, 4.0)
+RELOCATE_MAX_CHECKS = 48
 # Severity-1 flags no other layout of the same site can clear. The default
 # rule makes them block feasibility (decide()), but they stay out of the
 # layout's own check (o["ok"], geometry_ok), the ranking, the rescue pass and
@@ -483,14 +494,15 @@ def trailer_target(sf: float, doors: int, tiers: tuple = TRAILER_TARGET_TIERS) -
     return math.ceil(tiers[-1][1] * doors)
 
 
-def pond_dims(v_acft: float, d: float = POND_DEPTH, z: float = POND_Z) -> tuple[float, float, float, float]:
-    """Bottom width W0 (bottom length 2 W0) holding v_acft at depth d by the
-    prismoidal formula; returns (W0, footprint length, footprint width, v)
-    with freeboard and the rim included in the footprint."""
+def pond_dims(v_acft: float, d: float = POND_DEPTH, z: float = POND_Z, ratio: float = 2.0) -> tuple[float, float, float, float]:
+    """Bottom width W0 (bottom length ratio x W0, 2 by default) holding
+    v_acft at depth d by the prismoidal formula; returns (W0, footprint
+    length, footprint width, v) with freeboard and the rim included in the
+    footprint."""
     v = v_acft * SQFT_PER_AC
 
     def vol(w0):
-        a = lambda h: (2 * w0 + 2 * z * h) * (w0 + 2 * z * h)
+        a = lambda h: (ratio * w0 + 2 * z * h) * (w0 + 2 * z * h)
         return d * (a(0) + a(d) + 4 * a(d / 2)) / 6
     lo, hi = 1.0, 2000.0
     for _ in range(60):
@@ -498,7 +510,7 @@ def pond_dims(v_acft: float, d: float = POND_DEPTH, z: float = POND_Z) -> tuple[
         lo, hi = (mid, hi) if vol(mid) < v else (lo, mid)
     w0 = hi
     ht = d + FREEBOARD
-    wt, lt = w0 + 2 * z * ht, 2 * w0 + 2 * z * ht
+    wt, lt = w0 + 2 * z * ht, ratio * w0 + 2 * z * ht
     return w0, lt + 2 * RIM, wt + 2 * RIM, v_acft
 
 
@@ -716,6 +728,16 @@ def steep_cells(dem: Dem, threshold: float = STEEP_PCT, float_keys: bool = False
 # ---------------------------------------------------------------------------
 # Edge classification and envelopes
 # ---------------------------------------------------------------------------
+def residential_neighbour(a: dict[str, Any], rules: dict[str, Any] | None) -> bool:
+    """Whether a county neighbour record counts as residential: a
+    residential land-use or tax class, or, where the rules say
+    ``ag_buffer``, an agricultural one. The one test both the edges and
+    the sheet's neighbour shading use."""
+    lu, cls = str(a.get("LUCode") or ""), str(a.get("ClassCode") or "")
+    ag = bool(rules and rules.get("ag_buffer"))
+    return lu.startswith("1") or cls.startswith(RES_CLASS) or (ag and cls.startswith(AG_CLASSES))
+
+
 def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any] | None = None):
     """Boundary pieces labelled ROW / RES_SIDE / RES_REAR / OTHER.
 
@@ -733,12 +755,10 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
         out.append(("ROW", row))
     rest = edge.difference(front_ft.buffer(5)) if not row.is_empty else edge
     res_zone, comm_zone = [], []
-    ag = bool(rules and rules.get("ag_buffer"))
     for a, s in neighbours:
-        lu, cls = str(a.get("LUCode") or ""), str(a.get("ClassCode") or "")
-        if lu.startswith("1") or cls.startswith(RES_CLASS) or (ag and cls.startswith(AG_CLASSES)):
+        if residential_neighbour(a, rules):
             res_zone.append(plane.ft(s).buffer(20))
-        elif rules is not None and cls.startswith(COMM_CLASSES):
+        elif rules is not None and str(a.get("ClassCode") or "").startswith(COMM_CLASSES):
             comm_zone.append(plane.ft(s).buffer(20))
     res_u = unary_union(res_zone) if res_zone else None
     dmax = (max(row.distance(Point(c)) for q in sitefit.polygon_parts(parcel_ft) for c in q.exterior.coords)
@@ -1132,6 +1152,104 @@ def fit_variant(v, P, B, prog: Program, row_line, res_line, search: Search, leng
     return None
 
 
+class Relocation:
+    """The default search's allowance for moving a building to make room
+    for its pond (operator request of 2026-11-17, reviews/40): a count of
+    layout checks, not seconds, so the same site gives the same plan."""
+
+    def __init__(self, max_checks: int | None = None):
+        self.max_checks = RELOCATE_MAX_CHECKS if max_checks is None else max_checks
+        self.checks = 0
+        self.moved = 0
+
+    @property
+    def spent(self) -> bool:
+        return self.checks >= self.max_checks
+
+
+def pond_rect(x: float, y: float, angle: float, v_acft: float) -> Polygon:
+    """The footprint of one 2:1 pond of v_acft centred at (x, y), its length at `angle`."""
+    _, Lf, Wf, _ = pond_dims(v_acft)
+    return shapely.affinity.translate(shapely.affinity.rotate(box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2), angle, origin=(0, 0)), x, y)
+
+
+def pond_spots(ctx: "Ctx", P: BaseGeometry, near_angle: float, v_acft: float) -> list[tuple[float, float, float]]:
+    """Where a pond of v_acft (one pond, 2:1) could go, best first, as
+    (x, y, angle): the lowest lidar samples on open ground inside the
+    parcel (clear of water, corridors and the test cut), at the module's
+    angles and square to the map, at most RELOCATE_SPOTS, each a pond
+    length or more from the others. A smaller pond at the same spot fits
+    too (it lies inside the larger one)."""
+    _, Lf, Wf, _ = pond_dims(v_acft)
+    room = (ctx.parcel.buffer(-10).difference(ctx.wet_buf).difference(ctx.trans).difference(ctx.cut)
+            .intersection(P.buffer(ctx.rules["pave"].get("ROW", 10) + 1)))
+    if room.is_empty:
+        return []
+    inside = prep(room)
+    base = box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2)
+    turned = [shapely.affinity.rotate(base, a, origin=(0, 0)) for a in (near_angle, near_angle + 90.0, 0.0, 90.0)]
+    pts = sorted(((z, p) for p, z in ctx.dem.coords() if inside.contains(Point(p))), key=lambda t: (t[0], t[1]))
+    angles = (near_angle, near_angle + 90.0, 0.0, 90.0)
+    out: list[tuple[float, float, float]] = []
+    for _z, (x, y) in pts:
+        if any(math.hypot(x - qx, y - qy) < Lf for qx, qy, _ in out):
+            continue
+        for a, rb in zip(angles, turned):
+            if inside.contains(shapely.affinity.translate(rb, x, y)):
+                out.append((x, y, a))
+                break
+        if len(out) >= RELOCATE_SPOTS:
+            break
+    return out
+
+
+def relocate_for_pond(cur: Plan, o: dict[str, Any], P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
+                      search: "Search", budget: Relocation) -> tuple[Plan, dict[str, Any]] | None:
+    """The same layout, moved to leave room for its pond.
+
+    The search fits each layout as long as it goes wherever it fits
+    longest, and checks the pond only after; when the pond then has no
+    room it used to shorten the building where it stood, while the same
+    building elsewhere on the parcel left room for it (reference site #21:
+    68,000 SF drawn, 84,000 SF with the pond moved; reviews/40). Here each
+    low spot a pond could use (pond_spots) is reserved in turn, the
+    variant is fitted around it no longer than now (the planner's own fit,
+    fit_variant), and each distinct fit is checked in full (finish). The
+    pond reserved is first sized for the building that failed; a shorter
+    building needs a smaller one, so the spot is reserved again at the
+    size the last fit needs and fitted again, up to RELOCATE_ROUNDS times
+    while that frees room. The largest plan that passes is returned (the
+    first of equals); None when none does or the allowance is spent."""
+    count = max(pond_count(o["v_det"]), 1)
+    v_each = o["v_det"] / count
+    best, seen = None, set()
+    for x, y, a in pond_spots(ctx, P, cur.frame.pl.angle_deg, v_each):
+        v_try = v_each
+        for _round in range(RELOCATE_ROUNDS):
+            if budget.spent:
+                break
+            hold = pond_rect(x, y, a, v_try).buffer(25)
+            P2, B2 = clean(P.difference(hold)), clean(B.difference(hold))
+            q = fit_variant(cur.v, P2, B2, ctx.prog, row_line, res_line, search, length_cap=int(cur.L))
+            if q is None:
+                break
+            key = (q.L, q.r, tuple(round(c, 1) for c in q.module.bounds))
+            if key in seen:
+                break
+            seen.add(key)
+            budget.checks += 1
+            o2 = finish(q, ctx)
+            if o2["ok"] and (best is None or q.sf > best[0].sf):
+                best = (q, o2)
+            v_next = o2["v_det"] / count
+            if v_next >= v_try - 0.01:
+                break
+            v_try = v_next
+    if best is not None:
+        budget.moved += 1
+    return best
+
+
 # ---------------------------------------------------------------------------
 # Frontage runs, driveways, routes, ponds, yards
 # ---------------------------------------------------------------------------
@@ -1343,10 +1461,14 @@ def checked_route(start, goal, walk, ctx: "Ctx"):
     return rt
 
 
-def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max_pts=700):
+def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max_pts=700, fine=False):
     """Best pond rectangle (Lf x Wf) in region: low, close to `near`, on the
     same side of `barrier` (mapped wetlands). Distinct from
-    detention.place_pond, which places the screener's fixed pond."""
+    detention.place_pond, which places the screener's fixed pond.
+    `fine` also tries each centre moved half a sample step (20 ft) each
+    way, at that sample's elevation: a tight piece of ground often holds
+    the pond only between two samples. The positions tried stay at
+    max_pts, the lowest samples' first."""
     if region.is_empty:
         return None
     base = box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2)
@@ -1359,8 +1481,12 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
         minx, miny, maxx, maxy = region.bounds
         pts = [(0.0, (x, y)) for x in range(int(minx), int(maxx), 40) for y in range(int(miny), int(maxy), 40) if inside.contains(Point(x, y))]
     pts.sort(key=lambda t: t[0])
+    pts = pts[:max_pts]
+    if fine:
+        h = dem.step / 2
+        pts = [(z, (x + dx, y + dy)) for z, (x, y) in pts for dx in (0.0, -h, h) for dy in (0.0, -h, h)][:max_pts]
     best = None
-    for z, (x, y) in pts[:max_pts]:
+    for z, (x, y) in pts:
         for rb in turned:
             r = shapely.affinity.translate(rb, x, y)
             if not inside.contains(r):
@@ -1639,6 +1765,11 @@ class Drawing:
     second: tuple | None
     B: BaseGeometry | None = None          # building envelope (draft building setbacks)
     edges: list = field(default_factory=list)   # [(ROW | RES_SIDE | RES_REAR | OTHER, line)]
+    # Drawing only (nothing in the record reads them): the lidar samples,
+    # for the sheet's contour lines, and the neighbouring county parcels,
+    # [(RES | OTHER, feet shape)], drawn as context around the site.
+    dem: Dem | None = None
+    context: list = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1792,17 +1923,30 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         region0 = region0.difference(others["blocked"])
     angles = [0, 90, 45, 135, p.frame.pl.angle_deg, p.frame.pl.angle_deg + 90]
 
-    def site_ponds(region, n, Lf_, Wf_):
+    shape_of: dict[int, float] = {}       # id(pond) -> bottom length / width, where not 2
+
+    def site_ponds(region, n, Lf_, Wf_, v_each):
         out = []
         for _k in range(n):
             ctx.search.check()
             r = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints)
+            if r is None and fixes and not problem:
+                # No 2:1 pond fits at the samples: the same volume at a
+                # finer spacing, then in other proportions (reviews/40).
+                # Not for a layout a route already fails.
+                for k in POND_FALLBACK_RATIOS:
+                    _, Lk, Wk, _ = pond_dims(v_each, ratio=k)
+                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=True)
+                    if r is not None:
+                        if k != 2.0:
+                            shape_of[id(r)] = k
+                        break
             if r is None:
                 break
             out.append(r)
             region = region.difference(r.buffer(20))
         return out
-    ponds = site_ponds(region0, npd, Lf, Wf)
+    ponds = site_ponds(region0, npd, Lf, Wf, v / npd)
     pond_ok = len(ponds) == npd
     # drop yard near the court, counted only with a truck route
     drops, trailers = [], p.court_stalls
@@ -1847,7 +1991,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             region = region0.difference(all_rp.buffer(10))
             for d in drops:
                 region = region.difference(d.buffer(20))
-            ponds2 = site_ponds(region, npd2, Lf2, Wf2)
+            ponds2 = site_ponds(region, npd2, Lf2, Wf2, v / npd2)
             if v > v_sized or len(ponds2) == npd2:
                 ponds, npd, v_sized = ponds2, npd2, v
                 pond_ok = len(ponds) == npd
@@ -1880,6 +2024,8 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
          "clear": p.clear,
          # read-outs for siteplan_assess; no decision reads them
          "pad_elev": pad_elev, "max_cut": max_cut, "max_fill": max_fill, "disturbed_ac": disturbed}
+    if fixes:
+        o["pond_ratios"] = [shape_of.get(id(r), 2.0) for r in ponds]
     o["violations"] = check_plan(p, o, ctx, others)
     if fixes:
         for viol in o["violations"]:
@@ -2097,6 +2243,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     small = [q for q in parts(P) if q.area <= MIN_PART_SF]
     ctx = Ctx(parcel, P, B, wet_buf, trans, cut, steep, dem, meta, rules, runs, jname, constraints, fr.road, hsg, prog, search)
     VARIANTS = variants()
+    reloc = Relocation()
     results, excluded = [], Polygon()
     # Layouts that passed every check but the surface pond, at the length
     # first tried (the search goes on to shorten them). Kept for the
@@ -2125,6 +2272,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     break
             def explore(q, Pe=Pe, Be=Be, shorten_routes=False):
                 cur = q
+                floor = None         # the length a moved layout reached: a shorter one where it stands cannot beat it
                 for _i in range(10):
                     o = finish(cur, ctx)
                     if o["ok"]:
@@ -2133,6 +2281,16 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     if (not o["pond_ok"] and not o["route_problem"] and not o["violations"]
                             and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
                         pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
+                    sev1 = {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS
+                    if (opts.fixes and floor is None and sev1 == {"POND_DOES_NOT_FIT"} and not o["route_problem"]
+                            and not reloc.spent):
+                        # Blocked by its pond alone: the same building moved
+                        # to leave the pond room. Kept as a result; shorter
+                        # lengths where it stands are still tried down to it.
+                        moved = relocate_for_pond(cur, o, Pe, Be, ctx, row_line, res_line, search, reloc)
+                        if moved is not None:
+                            results.append(moved)
+                            floor = moved[0].L
                     if o["route_problem"] and opts.fixes:
                         # Turn the same fit round before giving it up or
                         # shortening it. The first turn keeps docks away
@@ -2164,7 +2322,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                         # meet it, not 40 ft at a time (R4; default only).
                         cap_len = min(cap_len, int(cur.L * o["cover_ratio"]) // 20 * 20)
                     nxt = fit_variant(cur.v, Pe, Be, prog, row_line, res_line, search, length_cap=cap_len)
-                    if nxt is None:
+                    if nxt is None or (floor is not None and nxt.L <= floor):
                         results.append((cur, o))
                         break
                     cur = nxt
@@ -2274,6 +2432,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     gross_ac = parcel.area / SQFT_PER_AC
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
+    if opts.fixes:
+        rec["inputs"]["pond_relocation"] = {"checks": reloc.checks, "moved": reloc.moved, "max_checks": reloc.max_checks}
     try:
         _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
                   [_alternative(q, o, gross_ac) for q, o in pond_limited], opts)
@@ -2288,8 +2448,18 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     if second is not None:
         q = second[0]
         second = (build(q.v, q.L, q.r, q.frame, prog), second[1])
-    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second, B=B, edges=edges)
+    context = [("RES" if residential_neighbour(a, rules if opts.fixes else None) else "OTHER", plane.ft(s)) for a, s in neigh]
+    drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second, B=B, edges=edges,
+                      dem=dem, context=context)
     return rec, drawing
+
+
+def _pond_shape_text(o: dict[str, Any], second: tuple | None) -> str:
+    """'L=2W', or the proportions used where a 2:1 pond did not fit."""
+    ratios = list(o.get("pond_ratios") or []) + (list(second[1].get("pond_ratios") or []) if second else [])
+    if all(k == 2.0 for k in ratios):
+        return "L=2W"
+    return "L=2W where it fits, else " + ", ".join(f"L={k:g}W" for k in ratios if k != 2.0) + " (a 2:1 pond did not fit)"
 
 
 def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
@@ -2488,7 +2658,7 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
                      "impervious_ac": round(imp_total, 1), "impervious_pct": round(imp_total / gross * 100), "paving_envelope_ac": round(P.area / SQFT_PER_AC, 1)},
         "detention": {"storage_acft": round(v_total, 1), "ponds": len(o["ponds"]) + (len(second[1]["ponds"]) if second else 0),
                       "fits": o["pond_ok"] if fixes else o["ok"],
-                      "basis": f"1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG {_hsg_basis(meta, fixes, inp.assembled)}; 6 ft deep, 4:1 slopes, L=2W, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"},
+                      "basis": f"1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG {_hsg_basis(meta, fixes, inp.assembled)}; 6 ft deep, 4:1 slopes, {_pond_shape_text(o, second)}, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"},
         "access": {"truck_driveway": o["tpt"] is not None, "car_driveway": o["cpt"] is not None, "frontage_ft": fr.feet, "road": fr.road,
                    "frontage_state": fr.state,
                    "truck_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "truck")), "car_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "car"))},

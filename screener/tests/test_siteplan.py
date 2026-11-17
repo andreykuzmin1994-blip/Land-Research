@@ -623,7 +623,11 @@ class Plans(Offline):
         def blocking(o):
             t[0] = 1e9                 # _blocking is asked only when the rescue pass is considered
             return real(o)
-        with mock.patch.object(sp, "_blocking", blocking):
+        # This site needs the rescue pass only without the room-for-the-pond
+        # search (a 4:1 pond fits it at 151,000 SF on the first pass,
+        # reviews/40): both are switched off here, as this tests the pass.
+        with mock.patch.object(sp, "_blocking", blocking), mock.patch.object(sp, "POND_FALLBACK_RATIOS", ()), \
+                mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
             rec, _ = sp.plan_site(site(700, 700), sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
         self.assertIn("SMALLER_LAYOUTS_NOT_ALL_TRIED", names(rec, 2))
         self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
@@ -823,7 +827,10 @@ class Plans(Offline):
         self.assertNotIn("href", low)
         self.assertIsNone(re.search(r"\son[a-z]+\s*=", low))
         self.assertNotIn("<style", low)
-        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)) - {"#tx", "#sx", "#cx", "#wx"}, set())
+        refs = set(re.findall(r"url\(([^)]*)\)", svg))
+        self.assertEqual(refs - {"#tx", "#sx", "#cx", "#wx", "#gx"}, set())
+        # every pattern referenced is defined in the file itself
+        self.assertLessEqual({r[1:] for r in refs}, {e.get("id") for e in root.iter() if e.tag.endswith("pattern")})
         self.assertIn("DRAFT", svg)
         tags = {e.tag.split("}")[-1] for e in root.iter()}
         self.assertLessEqual(tags, {"svg", "title", "rect", "defs", "pattern", "line", "path", "circle", "text"})
@@ -1342,6 +1349,90 @@ class ReferenceSites(Offline):
                    "feasible": rec["feasible"], "flags": sorted(names(rec))}
             self.assertEqual(got, exp, name)
 
+
+# ---------------------------------------------------------------------------
+# Room for the pond (reviews/40): move the building before shortening it;
+# other pond proportions where a 2:1 pond fits nowhere
+# ---------------------------------------------------------------------------
+class PondShapes(unittest.TestCase):
+
+    def test_other_proportions_hold_the_same_volume(self):
+        for v in (0.8, 1.9, 4.5):
+            self.assertEqual(sp.pond_dims(v), sp.pond_dims(v, ratio=2.0))          # the default is the old 2:1, to the bit
+            for k in sp.POND_FALLBACK_RATIOS:
+                w0, lf, wf, _ = sp.pond_dims(v, ratio=k)
+                a = lambda h: (k * w0 + 2 * sp.POND_Z * h) * (w0 + 2 * sp.POND_Z * h)
+                vol = sp.POND_DEPTH * (a(0) + a(sp.POND_DEPTH) + 4 * a(sp.POND_DEPTH / 2)) / 6
+                self.assertAlmostEqual(vol / sp.SQFT_PER_AC, v, places=3, msg=(v, k))
+                ht = sp.POND_DEPTH + sp.FREEBOARD
+                self.assertAlmostEqual(lf, k * w0 + 2 * sp.POND_Z * ht + 2 * sp.RIM)
+                self.assertAlmostEqual(wf, w0 + 2 * sp.POND_Z * ht + 2 * sp.RIM)
+
+    def test_a_finer_position_finds_room_between_samples(self):
+        # samples every 40 ft at 20, 60, 100, ...; a strip 200 ft wide from
+        # x = 0 to 200 holds a 190 ft wide pond only centred at x = 100 (a
+        # sample) or near it; shift the strip 20 ft and only a centre between
+        # two samples (x = 120 + 20 ... ) works.
+        dem = sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(12) for j in range(12)},
+                     elev={(i, j): 900.0 + i for i in range(12) for j in range(12)}, state="checked")
+        strip = box(20, 0, 220, 480)                         # centre x = 120, between samples 100 and 140
+        near = box(300, 0, 400, 480)
+        self.assertIsNone(sp.place_sized_pond(strip, 300, 199, dem, [0, 90], near, None, None))
+        got = sp.place_sized_pond(strip, 300, 199, dem, [0, 90], near, None, None, fine=True)
+        self.assertIsNotNone(got)
+        self.assertTrue(strip.contains(got))
+
+    def test_the_basis_says_when_a_pond_is_not_2_to_1(self):
+        self.assertEqual(sp._pond_shape_text({"pond_ratios": [2.0]}, None), "L=2W")
+        self.assertEqual(sp._pond_shape_text({}, None), "L=2W")
+        txt = sp._pond_shape_text({"pond_ratios": [2.0]}, (None, {"pond_ratios": [3.0]}))
+        self.assertIn("L=3W", txt)
+        self.assertIn("a 2:1 pond did not fit", txt)
+
+
+@unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+class PondRoom(Offline):
+    angles = False          # the real search angles, as in ReferenceSites
+
+    def test_the_building_moves_to_leave_its_pond_room(self):
+        # reference site #21: the longest fit left the pond no room and the
+        # building used to be shortened where it stood (68,000 SF); the
+        # same layout moved leaves the pond room at 440 ft (reviews/40)
+        inp, _ = load_fixture("rank21")
+        rec, _ = sp.plan_site(inp)
+        self.assertIs(rec["feasible"], True)
+        self.assertEqual((rec["building"]["L_ft"], rec["building"]["D_ft"], rec["building"]["sf"]), (440.0, 190, 84000))
+        self.assertEqual(rec["configuration"], "rear-load 190 deep, court only, cars along office wall")
+        self.assertGreaterEqual(rec["inputs"]["pond_relocation"]["moved"], 1)
+        self.assertEqual(rec["detention"]["ponds"], 1)
+        # without the move, the old plan
+        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
+            old, _ = sp.plan_site(inp)
+        self.assertEqual(old["building"]["sf"], 68000)
+        self.assertEqual(old["inputs"]["pond_relocation"]["checks"], 0)
+
+    def test_a_move_does_not_turn_the_docks_to_the_street(self):
+        # reference site #25: a 72,000 SF layout exists with its truck court
+        # on the arterial and no trailer stalls; the planner keeps its plan
+        inp, _ = load_fixture("rank25")
+        rec, _ = sp.plan_site(inp)
+        self.assertEqual((rec["building"]["sf"], rec["trailers"]["total"]), (67000, 7))
+        self.assertEqual(rec["configuration"], "rear-load 160 deep, court + trailer row, cars along office wall")
+
+    def test_the_prototype_behaviour_does_not_move(self):
+        inp, exp = load_fixture("rank21")
+        rec, _ = sp.plan_site(inp, sp.PlanOptions(behaviour="prototype"))
+        self.assertEqual(rec["building"]["sf"], exp["sf"])
+        self.assertNotIn("pond_relocation", rec["inputs"])
+
+    def test_the_allowance_is_a_count(self):
+        inp, _ = load_fixture("rank21")
+        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 3):
+            rec, _ = sp.plan_site(inp)
+        self.assertLessEqual(rec["inputs"]["pond_relocation"]["checks"], 3)
+        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 3):
+            again, _ = sp.plan_site(inp)
+        self.assertEqual(json.dumps(rec, sort_keys=True, default=str), json.dumps(again, sort_keys=True, default=str))
 
 # ---------------------------------------------------------------------------
 # Static guards
