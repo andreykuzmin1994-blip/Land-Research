@@ -73,8 +73,12 @@ python -m screener.decide --import decisions-fulton-2026-11-17.csv --run screene
 - Each mark is then recorded exactly as one call above would: a row
   appended here, its features and its report facts copied. The date is
   the day the mark was made on the page.
-- A mark that is already the parcel's last row (same decision, date and
-  note) is skipped, so importing the same file twice adds nothing.
+- A mark is skipped, and the command says so, when the same mark (same
+  decision, date and note) is already among the parcel's rows, or when
+  the parcel's last row here is newer than the mark. So importing a file
+  twice adds nothing, and an old file never undoes a later decision. To
+  record such a mark anyway, give it as a single decision (above).
+- The page saves every mark it holds each time, not only the new ones.
 
 ## Editing the file by hand
 

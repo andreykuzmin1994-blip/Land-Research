@@ -229,6 +229,102 @@ class CompareTests(Base):
         self.assertIn(str(out), stdout)
 
 
+class OwnerTextTests(Base):
+    """reviews/39 finding 1: a column that is not the owner column can
+    still repeat the owner's name."""
+
+    def test_a_contamination_site_named_after_the_owner_is_not_shown(self):
+        found = f"a bordering parcel holds a listed contamination site ({OWNER}); no pond room"
+        make_run(self.root, "fulton-2026-11-08", [parcel(1, "X1", "A"), parcel(2, "X2", "B", lead_found=found)],
+                 run_time="2026-11-08T12:00:00+0000")
+        cur = make_run(self.root, "fulton-2026-11-15",
+                       [parcel(1, "X1", "B", lead_found=found), parcel(2, "X2", "C", lead_found=found)],
+                       run_time="2026-11-15T12:00:00+0000")
+        rc, out, err = run_main(str(cur))
+        self.assertEqual(rc, 0, err)
+        text = (cur / "changes.md").read_text()
+        self.assertIn("contamination site (named in the brief); no pond room", text)
+        for t in (text, out):
+            self.assertNotIn("QUARTERMAINE", t)
+
+    def test_an_owner_string_in_any_other_text_is_withheld(self):
+        make_run(self.root, "fulton-2026-11-08", [parcel(1, "X1", "A", decision="pursue")],
+                 run_time="2026-11-08T12:00:00+0000")
+        cur = make_run(self.root, "fulton-2026-11-15", [parcel(1, "Y1", "A")],
+                       [{"parcel_id": "X1", "decision": "pursue", "owner": OWNER,
+                         "reasons": f"held by Zebulon Quartermaine Holdings, L.L.C. of {MAILING.title()}"}],
+                       run_time="2026-11-15T12:00:00+0000",
+                       notes=[f"ZONING CHECK FAILED for 1 parcels: {OWNER.lower()}. Re-run later."])
+        rc, out, err = run_main(str(cur))
+        self.assertEqual(rc, 0, err)
+        text = (cur / "changes.md").read_text()
+        self.assertIn("withheld", err)
+        self.assertIn(changes.WITHHELD, text)
+        for t in (text, out):
+            self.assertNotRegex(t, "(?i)quartermaine")
+            self.assertNotRegex(t, "(?i)secret mailing")
+
+    def test_public_text_is_not_withheld(self):
+        # An owner-occupied site (the owner string is its own site address),
+        # a city's own land, a short or one-word owner name.
+        rows = [parcel(1, "X1", "A", owner="100 OAK HOLLOW RD", site_address="100 OAK HOLLOW RD"),
+                parcel(2, "X2", "A", owner="UNION CITY", owner_mailing="5047 UNION ST, UNION CITY GA"),
+                parcel(3, "X3", "A", owner="GRADE LLC", owner_mailing=""),
+                parcel(4, "X4", "B", owner="INDUSTRIAL", owner_mailing=""),
+                parcel(5, "X5", "B", owner="FULTON COUNTY", owner_mailing="141 PRYOR ST SW, ATLANTA GA")]
+        cur = make_run(self.root, "fulton-2026-11-15", rows)
+        rc, _, err = run_main(str(cur))
+        self.assertEqual(rc, 0, err)
+        text = (cur / "changes.md").read_text()
+        self.assertNotIn(changes.WITHHELD, text)
+        self.assertIn("100 OAK HOLLOW RD (Union City)", text)
+        self.assertIn("## Grade A (3)", text)
+        self.assertTrue(text.startswith("# Fulton County: what changed"))
+
+    def test_withhold_matches_whole_words_any_case_and_punctuation(self):
+        owners = changes.owner_strings([{"a": {"owner": "ACME LAND CO., LLC", "owner_mailing": "9 ELM ST, MACON GA"}}])
+        text, n = changes.withhold_owners("Acme  Land Co LLC; acme-land; ACMELAND; 9 Elm St.; 19 ELM ST", owners)
+        self.assertEqual(text, f"{changes.WITHHELD}; {changes.WITHHELD}; ACMELAND; {changes.WITHHELD}.; 19 ELM ST")
+        self.assertEqual(n, 3)
+
+
+class EdgeTests(Base):
+    def test_an_earlier_run_that_ranked_nothing_is_passed_over(self):
+        good = make_run(self.root, "fulton-2026-11-01", [parcel(1, "X1", "A")], run_time="2026-11-01T12:00:00+0000")
+        make_run(self.root, "fulton-2026-11-08", [], run_time="2026-11-08T12:00:00+0000")
+        cur = make_run(self.root, "fulton-2026-11-15", [parcel(1, "X1", "A")], run_time="2026-11-15T12:00:00+0000")
+        self.assertEqual(changes.find_previous(cur), good.resolve())
+        self.assertEqual(run_main(str(cur))[0], 0)
+
+    def test_a_rank_that_is_not_a_number_does_not_crash(self):
+        make_run(self.root, "fulton-2026-11-08", [{**parcel(1, "X1", "A"), "rank": "inf"}, {**parcel(2, "X2", "A"), "rank": ""}],
+                 run_time="2026-11-08T12:00:00+0000")
+        cur = make_run(self.root, "fulton-2026-11-15", [{**parcel(1, "X1", "A"), "rank": "nan"}, parcel(2, "X2", "B")],
+                       run_time="2026-11-15T12:00:00+0000")
+        rc, _, err = run_main(str(cur))
+        self.assertEqual(rc, 0, err)
+
+    def test_a_parcel_new_to_the_top_is_not_also_listed_as_moved(self):
+        old = [parcel(r, f"F{r:03d}") for r in range(1, 81)]
+        new = [parcel(1, "F080")] + [parcel(r + 1, f"F{r:03d}") for r in range(1, 80)]
+        make_run(self.root, "fulton-2026-11-08", old, run_time="2026-11-08T12:00:00+0000")
+        cur = make_run(self.root, "fulton-2026-11-15", new, run_time="2026-11-15T12:00:00+0000")
+        self.assertEqual(run_main(str(cur))[0], 0)
+        text = (cur / "changes.md").read_text()
+        self.assertIn("## New in the top 50 (1)", text)
+        self.assertIn("## Moved 10 or more places in the top 50 (0)", text)
+
+    def test_meta_text_cannot_add_a_heading(self):
+        make_run(self.root, "fulton-2026-11-08", [parcel(1, "X1")], run_time="2026-11-08T12:00:00+0000",
+                 limit="5`\n\n# Injected heading", commit="a`\n\n# Two")
+        cur = make_run(self.root, "fulton-2026-11-15", [parcel(1, "X1")], limit="6\n\n# Injected heading",
+                       run_time="2026-11-15T12:00:00+0000", commit="b\n\n# Three")
+        self.assertEqual(run_main(str(cur))[0], 0)
+        text = (cur / "changes.md").read_text()
+        self.assertEqual([l for l in text.splitlines() if l.startswith("# ")],
+                         ["# Fulton County: what changed since fulton-2026-11-08"])
+
+
 class SafetyTests(Base):
     def test_county_text_cannot_add_markup_or_a_column(self):
         make_run(self.root, "fulton-2026-11-08", [parcel(1, "X1", "C")], run_time="2026-11-08T12:00:00+0000")
@@ -244,10 +340,18 @@ class SafetyTests(Base):
         head = next(l for l in text.splitlines() if l.startswith("| # | Score"))
         self.assertEqual(row.count("|"), head.count("|"))
 
-    def test_an_odd_parcel_id_is_not_a_code_span(self):
+    def test_a_parcel_id_keeps_its_spaces_or_says_it_is_not_exact(self):
         self.assertEqual(changes.pid_cell("14F0063  LL0219"), "`14F0063  LL0219`")
-        self.assertNotIn("`", changes.pid_cell("AB`|C"))
-        self.assertNotIn("|", changes.pid_cell("AB`|C"))
+        self.assertEqual(changes.pid_cell("12/34  56"), "`12/34  56`")
+        self.assertEqual(changes.pid_cell("17 0123  LL#045"), "`17 0123  LL#045`")
+        odd = changes.pid_cell("AB`|C  D")
+        self.assertNotIn("`", odd)
+        self.assertNotIn("|", odd)
+        self.assertIn("id not exact", odd)
+
+    def test_bare_addresses_in_county_text_are_not_links(self):
+        self.assertEqual(changes.cell("see http://evil.example and WWW.evil.example"),
+                         "see http: evil.example and www evil.example")
 
     def test_refusals_write_nothing(self):
         empty = self.root / "fulton-2026-11-15"

@@ -789,6 +789,47 @@ class ImportMarksTests(DecisionHarness):
         self.assertEqual(code, 2)
         self.assert_nothing_written()
 
+    def test_the_single_decision_command_line_is_unchanged(self):
+        # Options between the parcel id and the decision parsed before
+        # --import existed, and still do (reviews/39, finding 3).
+        code, out, _ = self.decide("14F0001 0001", "--run", str(self.out), "pursue", "a", "note")
+        self.assertEqual(code, 0, out)
+        code, out, _ = self.decide("14F0002 0002", "--no-features", "maybe")
+        self.assertEqual(code, 0, out)
+        got = run.load_decisions()
+        self.assertEqual((got["14F0001 0001"]["decision"], got["14F0001 0001"]["note"]), ("pursue", "a note"))
+        self.assertEqual(got["14F0002 0002"]["decision"], "maybe")
+
+    def test_an_old_file_never_undoes_a_later_decision(self):
+        row = "14F0001 0001,pursue,2026-11-08,first,fulton-2026-11-09"
+        self.assertEqual(self.marks(row)[0], 0)
+        self.assertEqual(self.decide("14F0001 0001", "pass", "owner", "said", "no")[0], 0)
+        before = (run.DECISIONS_FILE.read_bytes(), decide.store_file().read_bytes())
+        code, out, _ = self.marks(row)                               # the same file again
+        self.assertEqual(code, 0)
+        self.assertIn("0 recorded", out)
+        self.assertEqual(run.load_decisions()["14F0001 0001"]["decision"], "pass")
+        # a different mark that is older than the pass on file is skipped too, and named
+        code, out, _ = self.marks("14F0001 0001,maybe,2026-11-07,,fulton-2026-11-09",
+                                  "14F0002 0002,pursue,2026-11-07,,fulton-2026-11-09")
+        self.assertEqual(code, 0)
+        self.assertIn("skipped: '14F0001 0001': maybe of 2026-11-07 not recorded", out)
+        self.assertIn("1 recorded", out)
+        self.assertIn("1 older than the decision on file", out)
+        self.assertEqual(run.load_decisions()["14F0001 0001"]["decision"], "pass")
+        self.assertEqual(run.load_decisions()["14F0002 0002"]["decision"], "pursue")
+        self.assertTrue(run.DECISIONS_FILE.read_bytes().startswith(before[0]))
+
+    def test_a_two_column_decisions_file_gets_no_duplicates(self):
+        self.write_decisions("parcel_id,decision\r\n")
+        row = "14F0001 0001,pursue,2026-11-08,a note,fulton-2026-11-09"
+        for want in ("1 recorded", "0 recorded", "0 recorded"):
+            code, out, _ = self.marks(row)
+            self.assertEqual(code, 0)
+            self.assertIn(want, out)
+        self.assertEqual(len(self.store()), 1)
+        self.assertEqual(run.DECISIONS_FILE.read_text().count("14F0001 0001"), 1)
+
     def test_a_spreadsheet_saved_file_is_read(self):
         self.file.write_bytes("\ufeffparcel_id , decision,date,note\n14F0001 0001, PURSUE ,2026-11-08,  two   spaces \n"
                               .encode("utf-8"))

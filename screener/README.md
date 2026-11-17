@@ -1002,7 +1002,8 @@ reads no network.
 - **Marking parcels on the page.** Each plan has Pursue, Maybe, Pass and
   Listed buttons (keys `p`, `m`, `x`, `l`) and a note field; pressing a
   button again takes the mark back. A plan of several parcels has one
-  row of buttons per parcel. The "Marked here" and "Not marked here"
+  row of buttons per parcel; a parcel that is not in the run's
+  `ranked.csv` (an assemblage member from outside the ranking) has none. The "Marked here" and "Not marked here"
   chips filter the list. The page writes no file and asks no server:
   marks stay in that browser, for that run, until **Save my marks**
   downloads `decisions-<run>.csv`. Record them with
@@ -1012,7 +1013,9 @@ reads no network.
   ```
 
   which checks every row first and records all or none, through the same
-  three files as one `decide` call per mark (see `inputs/README.md`). A
+  three files as one `decide` call per mark (see `inputs/README.md`). It
+  skips a mark that is already on file, and one older than the parcel's
+  last decision, so an old file never undoes a later decision. A
   mark on the page changes nothing until it is imported: the status dot
   still shows what `decisions.csv` held when the page was built.
 - Every input is joined by parcel id, and an input that names its run

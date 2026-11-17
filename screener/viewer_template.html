@@ -134,10 +134,12 @@ const filt = {status:new Set(), kind:new Set(), mark:new Set()};
 const RUN = (/^Run (.+?) · screener plans/.exec($(".head .sub")?.textContent || "") || ["",""])[1].trim();
 const DEC = {pursue:"Pursue", maybe:"Maybe", pass:"Pass", listed:"Listed"};
 const MARK_KEYS = {p:"pursue", m:"maybe", x:"pass", l:"listed"};
-const idsOf = p => (p.pids && p.pids.length ? p.pids : [p.pid]).filter(Boolean);
+// The parcels of a plan that can be marked: those in this run's ranking (viewer.py).
+const idsOf = p => Array.isArray(p.mark) ? p.mark : [];
 const PIDS = new Set(PLANS.flatMap(idsOf));
 const today = () => {const t=new Date();return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;};
 const marks = new Map();
+const otherMarks = [];   // stored marks of parcels this page does not show: kept as they are
 let shown = [], cur = 0, cmpId = null;
 function store(k,v){try{localStorage.setItem("spv:"+k,v)}catch(e){}}
 function load(k){try{return localStorage.getItem("spv:"+k)}catch(e){return null}}
@@ -145,12 +147,18 @@ try{
   const kept = JSON.parse(load("marks:"+RUN) || "[]");
   for (const row of (Array.isArray(kept) ? kept : [])){
     const [pid, m] = Array.isArray(row) ? row : [];
-    if (typeof pid==="string" && PIDS.has(pid) && m && Object.hasOwn(DEC, m.d))
-      marks.set(pid, {d:m.d, date:/^\d{4}-\d{2}-\d{2}$/.test(m.date)?m.date:today(), note:String(m.note??"").slice(0,200), saved:m.saved===true});
+    if (typeof pid!=="string" || !m || typeof m!=="object" || !Object.hasOwn(DEC, m.d)) continue;
+    const mark = {d:m.d, date:/^\d{4}-\d{2}-\d{2}$/.test(m.date)?m.date:today(), note:String(m.note??"").slice(0,200), saved:m.saved===true};
+    // Another page of the same run (other plans, a rebuilt page) may hold
+    // marks for parcels this one does not show: they are not ours to drop.
+    if (PIDS.has(pid)) marks.set(pid, mark); else if (otherMarks.length < 5000) otherMarks.push([pid.slice(0,80), mark]);
   }
 }catch(e){}
 function keepMarks(){
-  store("marks:"+RUN, JSON.stringify([...marks]));
+  store("marks:"+RUN, JSON.stringify([...marks, ...otherMarks]));
+  paintMarks();
+}
+function paintMarks(){
   const n=marks.size, u=[...marks.values()].filter(m=>!m.saved).length, b=$("#savemarks");
   b.textContent = n ? `Save my marks (${n}${u?`, ${u} not saved`:""})` : "Save my marks";
   b.disabled = !n;
@@ -167,12 +175,15 @@ function markTag(p){
   return ds.length ? `<span class="tag" style="background:var(--accent)">${esc(ds.length>1?"marked":"my mark: "+DEC[ds[0]].toLowerCase())}</span>` : "";
 }
 function markUI(p){
-  const ids=idsOf(p); if(!ids.length) return "";
+  const ids=idsOf(p), all=(p.pids&&p.pids.length?p.pids:[p.pid]).filter(Boolean);
+  if(!ids.length) return all.length?`<div class="markbox"><div class="lbl">No parcel of this plan is in the run's ranking, so there is nothing to mark here.</div></div>`:"";
+  const out=all.length-ids.length;
   return `<div class="markbox"><div class="lbl">Your mark${ids.length>1?"s, one per parcel":""} (keys p, m, x, l${ids.length>1?" work on single parcels":""}). Kept in this browser; "Save my marks" downloads them for <b>python -m screener.decide --import</b>.</div>`+
     ids.map(pid=>{const m=marks.get(pid);
       return `<div class="marks" data-pid="${esc(pid)}">${ids.length>1?`<span class="pid">${esc(pid)}</span>`:""}`+
         Object.entries(DEC).map(([d,l])=>`<button type="button" class="mk" data-d="${d}" aria-pressed="${m&&m.d===d?"true":"false"}">${l}</button>`).join("")+
-        `<input class="mknote" type="text" maxlength="200" placeholder="Note (optional)" aria-label="Note for this mark" value="${esc(m?m.note:"")}"${m?"":" disabled"}></div>`;}).join("")+`</div>`;
+        `<input class="mknote" type="text" maxlength="200" placeholder="Note (optional)" aria-label="Note for this mark" value="${esc(m?m.note:"")}"${m?"":" disabled"}></div>`;}).join("")+
+    (out>0?`<div class="lbl">${out} parcel${out>1?"s":""} of this plan ${out>1?"are":"is"} not in the run's ranking and cannot be marked.</div>`:"")+`</div>`;
 }
 const LANDL = {raw_land:"raw land", partly_usable:"partly usable", not_raw_land:"not raw land", unclear:"unclear"};
 const acresText = p => [p.taxAc!=null?`${p.taxAc} ac tax roll`:null, p.mapAc!=null?`${p.mapAc} ac county map`:null].filter(Boolean).join(" · ");
@@ -358,7 +369,8 @@ const both=f=>{zoomAt(1,f);if(cmpId!==null)zoomAt(2,f);};
 $("#zin").onclick=()=>both(1.25);$("#zout").onclick=()=>both(0.8);$("#zfit").onclick=refit;
 $("#prev").onclick=()=>show(cur-1);$("#next").onclick=()=>show(cur+1);
 $("#facts").addEventListener("click",e=>{const b=e.target.closest(".mk"); if(b) setMark(b.closest(".marks").dataset.pid, b.dataset.d);});
-$("#facts").addEventListener("change",e=>{
+// On every keystroke, so a note typed just before the page is closed is kept.
+$("#facts").addEventListener("input",e=>{
   if(!e.target.matches(".mknote")) return;
   const m=marks.get(e.target.closest(".marks").dataset.pid);
   if(m){m.note=e.target.value.replace(/\s+/g," ").trim().slice(0,200); m.saved=false; keepMarks();}
@@ -403,6 +415,6 @@ addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{
     if(Math.abs(v.clientWidth-z.w)<2 && Math.abs(v.clientHeight-z.h)<60) continue;   // URL bar show/hide on phones
     if(z.fitted) refit(); else {z.w=v.clientWidth;z.h=v.clientHeight;}
   }},120);});
-keepMarks();
+paintMarks();
 render();
 </script></body></html>

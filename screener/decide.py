@@ -19,8 +19,11 @@ saved ("Save my marks"): the same checks and the same three files as one
 call per mark. The file names the run its page was built from, and that
 run's folder must be the one used (the newest, or --run). Every row is
 checked before anything is written: one bad row and nothing is recorded.
-A mark that is already the parcel's last row (same decision, date and
-note) is skipped, so importing a file twice adds nothing.
+A mark is skipped, and said to be, when the same mark (decision, date and
+note) is already among the parcel's rows, or when the parcel's last row
+is newer than the mark: importing a file twice adds nothing, and an old
+file never undoes a later decision. To record such a mark anyway, give it
+as a single decision.
 """
 
 from __future__ import annotations
@@ -292,6 +295,28 @@ def read_marks(path: Path) -> list[dict[str, str]]:
     return list(marks.values())
 
 
+def decision_history() -> tuple[tuple[str, ...], dict[str, list[dict[str, str]]]]:
+    """(the columns of decision, date and note that decisions.csv has, every
+    valid row per parcel in file order). An absent file has all three
+    columns and no rows."""
+    path = decisions_file()
+    if not path.exists() or path.stat().st_size == 0:
+        return ("decision", "date", "note"), {}
+    history: dict[str, list[dict[str, str]]] = {}
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        names = [(h or "").strip() for h in (reader.fieldnames or [])]
+        reader.fieldnames = names
+        for row in reader:
+            pid = (row.get("parcel_id") or "").strip()
+            decision = (row.get("decision") or "").strip().lower()
+            if pid and decision in run.DECISION_VALUES:
+                history.setdefault(pid, []).append(
+                    {"decision": decision, "date": (row.get("date") or "").strip(),
+                     "note": " ".join((row.get("note") or "").split())})
+    return tuple(c for c in ("decision", "date", "note") if c in names), history
+
+
 def import_marks(path: Path, run_arg: Path | None, no_features: bool) -> int:
     """Record every mark of a viewer page's file, or none. Returns how many
     were written."""
@@ -312,11 +337,18 @@ def import_marks(path: Path, run_arg: Path | None, no_features: bool) -> int:
                      "pass --run with that run's folder (the features kept with a decision "
                      "must be that run's)")
     ranked, rejected = run_ids(run_dir)
-    last = run.load_decisions() if decisions_file().exists() else {}
-    todo, problems, same = [], [], 0
+    columns, history = decision_history()
+    todo, problems, same, older = [], [], 0, []
     for m in marks:
-        if last.get(m["parcel_id"]) == {"decision": m["decision"], "date": m["date"], "note": m["note"]}:
+        rows = history.get(m["parcel_id"], [])
+        # Compared on the columns the file has: a decisions.csv without a
+        # date or note column cannot tell two marks of one value apart.
+        if any(all(r[c] == m[c] for c in columns) for r in rows):
             same += 1
+            continue
+        if rows and "date" in columns and rows[-1]["date"] > m["date"]:
+            older.append(f"{m['parcel_id']!r}: {m['decision']} of {m['date']} not recorded, the "
+                         f"{rows[-1]['decision']} of {rows[-1]['date']} on file is newer")
             continue
         try:
             todo.append((m, prepare(run_dir, ranked, rejected, m["parcel_id"], no_features)))
@@ -335,36 +367,48 @@ def import_marks(path: Path, run_arg: Path | None, no_features: bool) -> int:
                     print(f"{m['parcel_id']}: {line}")
             print(f"{m['parcel_id']}: {m['decision']}: {CONSEQUENCE[m['decision']]}")
             commit(prep, header, m["decision"], m["date"], m["note"])
+    for line in older:
+        print(f"skipped: {line}")
     print(f"{len(todo)} recorded in {decisions_file()}"
-          + (f"; {same} already recorded, skipped" if same else ""))
+          + (f"; {same} already recorded, skipped" if same else "")
+          + (f"; {len(older)} older than the decision on file, skipped" if older else ""))
     return len(todo)
 
 
+def import_main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(
+        prog="python -m screener.decide --import",
+        description="Record every mark in a file saved from the Site Plan Viewer page.")
+    ap.add_argument("--import", dest="import_file", type=Path, metavar="FILE", required=True,
+                    help="the decisions-<run>.csv the page's Save my marks downloaded")
+    ap.add_argument("--run", type=Path, help="run folder (default: the newest under screener/output)")
+    ap.add_argument("--no-features", action="store_true",
+                    help="record a mark even if the run has no features for its parcel")
+    args, extra = ap.parse_known_args(argv)
+    if extra:
+        ap.error("--import takes no parcel id or decision (got: " + " ".join(extra)[:80] + ")")
+    try:
+        import_marks(args.import_file, args.run, args.no_features)
+    except Refuse as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    # The marks file has its own small parser, so the single-decision
+    # command line below is exactly what it was before --import existed.
+    if any(a == "--import" or a.startswith("--import=") for a in argv):
+        return import_main(argv)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("parcel_id", nargs="?",
-                    help="exactly as in ranked.csv; quote it if it has spaces")
-    ap.add_argument("decision", nargs="?", type=str.lower, choices=run.DECISION_VALUES)
+    ap.add_argument("parcel_id", help="exactly as in ranked.csv; quote it if it has spaces")
+    ap.add_argument("decision", type=str.lower, choices=run.DECISION_VALUES)
     ap.add_argument("reason", nargs="*", help="free text, saved as the note")
     ap.add_argument("--run", type=Path, help="run folder (default: the newest under screener/output)")
     ap.add_argument("--no-features", action="store_true",
                     help="record the decision even if the run has no features for this parcel")
-    ap.add_argument("--import", dest="import_file", type=Path, metavar="FILE",
-                    help="record every mark in a file saved from the Site Plan Viewer page "
-                         "(instead of a parcel id and a decision)")
     args = ap.parse_args(argv)
-
-    if args.import_file is not None:
-        if args.parcel_id is not None:
-            ap.error("--import takes no parcel id or decision")
-        try:
-            import_marks(args.import_file, args.run, args.no_features)
-        except Refuse as exc:
-            print(f"refused: {exc}", file=sys.stderr)
-            return 2
-        return 0
-    if args.parcel_id is None or args.decision is None:
-        ap.error("the following arguments are required: parcel_id, decision (or --import FILE)")
 
     pid = args.parcel_id.strip()
     note = " ".join(args.reason).strip()

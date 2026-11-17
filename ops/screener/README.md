@@ -168,7 +168,12 @@ shows its document check (killed, weakened or survives).
 - It says so at the top when the code or the settings file differ between
   the two runs: a difference may then come from that, not from new data.
 - `changes.md` holds site addresses and parcel ids, never an owner's name
-  or mailing address. The line it prints holds counts only.
+  or mailing address: the owner columns are not copied, and the finished
+  text is searched for every owner name and mailing address of both runs,
+  each one found being replaced by "(name withheld)" (a listed
+  contamination site is often named after the company that owns the
+  parcel). A misspelt name is not caught. The line it prints holds
+  counts only.
 - It reads files only, and changes no score, grade, rank or decision. The
   supervisor runs it after every run that finished; the on-demand runbook
   can run the same command in place of its own comparison.

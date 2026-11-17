@@ -790,11 +790,28 @@ class CliAndStaticTest(Offline):
         dec = re.search(r"const DEC = \{(.*?)\};", script).group(1)
         self.assertEqual(tuple(sorted(re.findall(r"(\w+):", dec))), tuple(sorted(screener_run.DECISION_VALUES)))
         self.assertIn("PIDS.has(pid)", script)                 # only this page's parcels can be marked
+        self.assertIn("const idsOf = p => Array.isArray(p.mark) ? p.mark : [];", script)
+        # Nothing is written to storage while the page loads (a page showing
+        # fewer parcels would otherwise wipe the marks of another, reviews/39).
+        self.assertRegex(script, r"paintMarks\(\);\nrender\(\);\n$")
+        self.assertIn("[...marks, ...otherMarks]", script)
+
         self.assertIn('id="savemarks"', tpl)
         # The run name the marks file carries is read from the header the
         # one __RUN__ fills (escaped by render_page), not from a second copy.
         self.assertIn('/^Run (.+?) · screener plans/', script)
         self.assertIn("Run __RUN__ · screener plans", tpl)
+
+    def test_only_parcels_of_the_run_can_be_marked(self):
+        plans = self.tmp / "plans"
+        write_plans(self.run_dir, plans, [
+            plan_record("1", ["99F000100010001", "99F0009  NOTRANKED"], "plan-1.svg"),
+            plan_record("2", ["99F0001  LL0001"], "plan-2.svg")])
+        self.build(plans_dir=plans)
+        data = {p["id"]: p for p in page_data(self.page())}
+        self.assertEqual(data["plan-1"]["mark"], ["99F000100010001"])
+        self.assertEqual(data["plan-2"]["mark"], ["99F0001  LL0001"])        # spaces as in ranked.csv
+        self.assertEqual(data["run-1"]["mark"], ["99F000100010001"])
 
 
 class RoundFourFixesTest(Offline):

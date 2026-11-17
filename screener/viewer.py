@@ -1179,6 +1179,12 @@ def build(inp: Inputs, out: Path, *, max_bytes: int = MAX_PAGE_BYTES) -> tuple[i
         # parcels it shows (titles and facts). An owner string that is part
         # of one of them is that parcel's published address.
         by_pid = {r["parcel_id"]: r for r in read_ranked(run_dir)}
+        # The parcels a plan's mark buttons are for: its own, as far as they
+        # are in this run's ranked.csv. An assemblage member from outside
+        # the ranking has no row for `decide --import` to record against.
+        for p in plans:
+            ids = [q for q in (p.get("pids") or [p.get("pid")]) if q]
+            p["mark"] = [q for q in dict.fromkeys(ids) if q in by_pid]
         shown = {q for p in plans for q in ([p.get("pid")] + list(p.get("pids") or [])) if q}
         public = [by_pid[q].get("site_address") or "" for q in sorted(shown) if q in by_pid]
     except (OSError, ValueError, csv.Error) as exc:

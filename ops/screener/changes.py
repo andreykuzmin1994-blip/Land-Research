@@ -18,7 +18,13 @@ as the run before a full run.
 
 It prints a short summary of counts on stdout. That summary carries no
 owner name, mailing address or site address, so it can go in an alert.
-``changes.md`` itself carries no owner name or mailing address either.
+``changes.md`` itself carries no owner name or mailing address either:
+the columns that hold them are never copied, and because other columns
+can repeat a name (a listed contamination site is often named after the
+company that owns the parcel), the finished text is searched for every
+owner name and mailing address of both runs and each one found is
+replaced by "(name withheld)". A misspelt name or a nickname is not
+caught.
 
 Reads files only: no network, no screener import, nothing written but the
 one output file. It changes no score, grade, rank, screen or decision.
@@ -48,6 +54,11 @@ ITEM_CAP = 160                # characters of a lead's open items shown in a cel
 GRADES = ("A", "B")           # the grades leads.md lists
 MARKS = ("pursue", "maybe")   # decisions that keep a parcel in the list
 SKEPTIC_VERDICTS = ("survives", "weakened", "killed")
+SITE_NAME = re.compile(r"(contamination site) \([^)]*\)")
+WITHHELD = "(name withheld)"
+OWNER_MIN_CHARS = 7           # shorter owner strings are too common to search for
+COMPANY_WORDS = frozenset({"LLC", "INC", "LP", "LLLP", "LLP", "CORP", "CORPORATION", "CO", "COMPANY",
+                           "LTD", "TRUST", "THE", "ET", "AL"})
 SLUG_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 DATE_IN_NAME = re.compile(r"-\d{4}-\d{2}-\d{2}")
 # Lines of summary.md that say a check failed (the screener's own words;
@@ -65,8 +76,10 @@ class Refuse(Exception):
 
 def cell(text: Any) -> str:
     """One markdown table cell of county text: no pipes or line breaks and
-    no link, HTML, code or emphasis markup (as screener/digest.py)."""
-    return re.sub(r"\s+", " ", str(text if text is not None else "").translate(_MARKUP)).strip()
+    no link, HTML, code or emphasis markup (as screener/digest.py), and no
+    bare address a renderer would turn into a link."""
+    out = re.sub(r"\s+", " ", str(text if text is not None else "").translate(_MARKUP)).strip()
+    return re.sub(r"(?i)\bwww\.", "www ", out.replace("://", ": "))
 
 
 class Raw(str):
@@ -78,8 +91,11 @@ PLAIN_ID = re.compile(r"[A-Za-z0-9 ._-]+")
 
 def pid_cell(pid: str) -> str:
     """A parcel id as a code span, so its spaces survive: ids are copied
-    from here into decisions.csv and must match exactly."""
-    return Raw(f"`{pid}`") if PLAIN_ID.fullmatch(pid) else cell(pid)
+    from here into decisions.csv and must match exactly. An id that cannot
+    sit in a code span is shown cleaned and marked as not exact."""
+    if PLAIN_ID.fullmatch(pid) or not re.search(r"[`|\r\n]", pid):
+        return Raw(f"`{pid}`")
+    return Raw(cell(pid) + " (id not exact: see ranked.csv)")
 
 
 def read_rows(path: Path) -> dict[str, dict[str, str]]:
@@ -140,6 +156,11 @@ def find_previous(run_dir: Path) -> Path | None:
             continue
         if m.get("limit") is not None and trial is None:
             continue                      # a trial run is not the run before a full one
+        try:
+            if not read_rows(d / "ranked.csv"):
+                continue                  # a run that ranked nothing compares with nothing
+        except (OSError, csv.Error, UnicodeDecodeError):
+            continue
         t = run_time(d, m)
         if t < when and (best is None or (t, d.name) > best[:2]):
             best = (t, d.name, d)
@@ -149,7 +170,7 @@ def find_previous(run_dir: Path) -> Path | None:
 def rank_of(row: dict[str, str] | None) -> int | None:
     try:
         return int(float((row or {}).get("rank") or ""))
-    except ValueError:
+    except (ValueError, OverflowError):
         return None
 
 
@@ -168,7 +189,9 @@ def where(row: dict[str, str]) -> str:
 def open_items(row: dict[str, str], limit: int = ITEM_CAP) -> str:
     """What the grade found or could not check, cut to limit characters
     (the full text is in ranked.csv and the brief)."""
-    found = (row.get("lead_found") or "").strip()
+    # The grade names a listed contamination site, which is often the
+    # company that owns the parcel: the name stays in the brief.
+    found = SITE_NAME.sub(r"\1 (named in the brief)", (row.get("lead_found") or "").strip())
     unchecked = (row.get("lead_not_checked") or "").strip()
     parts = ([f"found: {found}"] if found else []) + ([f"not checked: {unchecked}"] if unchecked else [])
     text = "; ".join(parts)
@@ -285,7 +308,7 @@ def compare(run_dir: Path, prev_dir: Path | None, leads: Path | None, top: int =
     top_old = {p for p, r in old.items() if (rank_of(r) or top + 1) <= top}
     entered = sorted(top_new - top_old, key=lambda p: rank_of(new[p]) or 0)
     left = sorted(top_old - top_new, key=lambda p: rank_of(old[p]) or 0)
-    moved = sorted((p for p in top_new & set(old)
+    moved = sorted((p for p in top_new & top_old
                     if rank_of(old[p]) is not None and rank_of(new[p]) is not None
                     and abs(rank_of(old[p]) - rank_of(new[p])) >= MOVED_BY),
                    key=lambda p: rank_of(new[p]) or 0)
@@ -465,13 +488,14 @@ def _marked(new: dict[str, dict[str, str]], old: dict[str, dict[str, str]],
 def _cautions(meta: dict[str, Any], old_meta: dict[str, Any]) -> list[str]:
     out = []
     if meta.get("limit") is not None:
-        out.append(f"This is a trial run (`--limit {meta.get('limit')}`): most differences are the limit.")
+        out.append(f"This is a trial run (--limit {cell(meta.get('limit'))[:20]}): most differences "
+                   "are the limit.")
     if old_meta.get("limit") is not None:
-        out.append(f"The run compared with was a trial run (`--limit {old_meta.get('limit')}`).")
+        out.append(f"The run compared with was a trial run (--limit {cell(old_meta.get('limit'))[:20]}).")
     for key, what in (("code_commit", "The code"), ("settings_sha256", "The settings file")):
         a, b = old_meta.get(key), meta.get(key)
         if a and b and a != b:
-            out.append(f"{what} changed between the two runs ({str(a)[:10]} to {str(b)[:10]}), so a "
+            out.append(f"{what} changed between the two runs ({cell(a)[:10]} to {cell(b)[:10]}), so a "
                        "difference below may come from that and not from new public data.")
     if not meta or not old_meta:
         out.append("One of the two runs has no readable features.json, so a change of code or "
@@ -511,6 +535,57 @@ def _checked_summary(checked: dict[str, int], leads: Path | None) -> str:
             + ", ".join(f"{checked[v]} {v}" for v in SKEPTIC_VERDICTS) + ".")
 
 
+def _words(text: str) -> list[str]:
+    return re.findall(r"[A-Z0-9]+", text.upper())
+
+
+def owner_strings(row_sets: list[dict[str, dict[str, str]]], also_public: tuple[str, ...] = ()) -> list[list[str]]:
+    """Every owner name and mailing address of the runs, as word lists: the
+    full string, an owner name without its company words, and a mailing
+    address's street line. Left out: strings under OWNER_MIN_CHARS, and a
+    string that is part of a site address or a jurisdiction of the runs,
+    or of also_public (the county's name): an owner-occupied site, a
+    city's or the county's own land, public text the tables rightly show."""
+    public: set[str] = {" ".join(_words(text)) for text in also_public}
+    for rows in row_sets:
+        for row in rows.values():
+            for column in ("site_address", "jurisdiction"):
+                public.add(" ".join(_words(row.get(column) or "")))
+    # One string to search per owner form. " | " parts the entries, and no
+    # owner word holds a "|", so a match never spans two of them.
+    shown = " | " + " | ".join(sorted(public)) + " | "
+    seen: set[tuple[str, ...]] = set()
+    for rows in row_sets:
+        for row in rows.values():
+            owner = _words(row.get("owner") or "")
+            mailing = row.get("owner_mailing") or ""
+            forms = [owner, [w for w in owner if w not in COMPANY_WORDS],
+                     _words(mailing), _words(mailing.split(",")[0])]
+            for words in forms:
+                flat = " ".join(words)
+                if len(flat) < OWNER_MIN_CHARS or len(words) < 2 and len(flat) < 2 * OWNER_MIN_CHARS:
+                    continue
+                if f" {flat} " in shown:
+                    continue
+                seen.add(tuple(words))
+    return [list(words) for words in sorted(seen, key=lambda w: -len(" ".join(w)))]
+
+
+def withhold_owners(text: str, owners: list[list[str]]) -> tuple[str, int]:
+    """Replace every owner string found in text, whole words, any case, any
+    punctuation between the words. Returns (text, how many were replaced)."""
+    flat = " " + " ".join(_words(text)) + " "
+    count = 0
+    for words in owners:
+        if f" {' '.join(words)} " not in flat:
+            continue                           # the cheap test; most names are nowhere in it
+        pattern = re.compile(r"(?<![A-Za-z0-9])" + r"[^A-Za-z0-9\n|`]+".join(map(re.escape, words))
+                             + r"(?![A-Za-z0-9])", re.I)
+        text, n = pattern.subn(WITHHELD, text)
+        count += n
+    return text, count
+
+
 def write(path: Path, text: str) -> None:
     """Atomically: a temp name in the same folder, then os.replace."""
     tmp = path.with_name("." + path.name + ".tmp")
@@ -545,6 +620,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.leads is not None and not args.leads.is_dir():
             raise Refuse(f"--leads {args.leads}: not a folder")
         text, summary = compare(run_dir, prev, args.leads, args.top)
+        folders = [run_dir] + ([prev] if prev is not None else [])
+        county = county_of(run_dir, meta_of(run_dir))
+        owners = owner_strings([read_rows(d / name) for d in folders
+                                for name in ("ranked.csv", "rejected.csv")],
+                               (county, f"{county} county"))
+        text, withheld = withhold_owners(text, owners)
+        summary, _ = withhold_owners(summary, owners)
+        if withheld:
+            print(f"changes: {withheld} owner name(s) or address(es) withheld from the text",
+                  file=sys.stderr)
         out = args.out if args.out is not None else run_dir / FILE_NAME
         write(out, text)
     except Refuse as exc:
