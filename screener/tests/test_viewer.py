@@ -776,6 +776,26 @@ class CliAndStaticTest(Offline):
         self.assertNotIn("http://", tpl)
         self.assertNotRegex(tpl, r"<script[^>]+src")
 
+    def test_marks_stay_in_the_page_until_saved(self):
+        """The mark buttons write no file and ask no server: marks live in
+        the browser's own storage and leave only as a download whose
+        columns are the ones ``decide --import`` reads."""
+        tpl = viewer.TEMPLATE.read_text(encoding="utf-8")
+        script = re.findall(r"<script>(.*?)</script>", tpl, re.S)[0]
+        for banned in ("fetch(", "XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource",
+                       "document.cookie", "<form", "import(", "eval(", "new Function"):
+            self.assertNotIn(banned, tpl, banned)
+        self.assertIn('["parcel_id","decision","date","note","run"]', script)
+        from screener import run as screener_run
+        dec = re.search(r"const DEC = \{(.*?)\};", script).group(1)
+        self.assertEqual(tuple(sorted(re.findall(r"(\w+):", dec))), tuple(sorted(screener_run.DECISION_VALUES)))
+        self.assertIn("PIDS.has(pid)", script)                 # only this page's parcels can be marked
+        self.assertIn('id="savemarks"', tpl)
+        # The run name the marks file carries is read from the header the
+        # one __RUN__ fills (escaped by render_page), not from a second copy.
+        self.assertIn('/^Run (.+?) · screener plans/', script)
+        self.assertIn("Run __RUN__ · screener plans", tpl)
+
 
 class RoundFourFixesTest(Offline):
     """reviews/37 round 4: the guard's length limits and name variants,

@@ -28,7 +28,7 @@ h1{font-size:17px;margin:0 0 2px}.sub{color:var(--mute);font-size:12.5px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
 .s-open{background:var(--open)}.s-unchecked{background:var(--unchecked)}.s-doubt{background:var(--doubt)}.s-taken{background:var(--taken)}.s-drop{background:var(--drop)}.s-listed{background:var(--listed)}
 .draft{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;padding:0 6px;border-radius:4px;background:#a86a00;color:#fff}
-.tag{font-size:11px;font-weight:600;padding:0 6px;border-radius:999px;background:var(--test);color:#fff;margin-left:4px}
+.tag{font-size:11px;font-weight:600;padding:0 6px;border-radius:999px;background:var(--test);color:#fff;margin-left:4px;white-space:nowrap}
 main{display:grid;grid-template-rows:auto 1fr;min-width:0;min-height:0}
 .bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
 .bar button,.bar a.btn,.bar select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;text-decoration:none}
@@ -62,6 +62,13 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .cond .code{font-size:11.5px;color:var(--mute);overflow-wrap:anywhere}
 details{margin:10px 0;font-size:13px}summary{cursor:pointer;color:var(--accent)}
 .facts button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer}
+.bar button:disabled{opacity:.45;cursor:default}
+.markbox{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0}
+.marks{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:6px 0 2px}
+.marks .mk[aria-pressed=true]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.marks input{flex:1 1 150px;min-width:0;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.marks input:disabled{opacity:.5}
+.marks .pid{font-size:12px;color:var(--mute);flex:1 0 100%;white-space:pre}
 @media (max-width:860px){.app{grid-template-columns:1fr;height:auto}aside{max-height:46vh}main{min-height:80vh}.stage,.stage.cmp{grid-template-columns:1fr}.view{height:55vh}.view.fitted{touch-action:pan-y}.facts{border-left:0;border-top:1px solid var(--line)}}
 </style></head><body>
 <div class="app">
@@ -90,6 +97,7 @@ details{margin:10px 0;font-size:13px}summary{cursor:pointer;color:var(--accent)}
   <select id="cmpsel" aria-label="Compare with" hidden></select>
   <label id="samewrap" hidden><input type="checkbox" id="same" checked> Same scale</label>
   <span class="sp"></span>
+  <button id="savemarks" type="button" title="Download your marks as a file for: python -m screener.decide --import FILE" disabled>Save my marks</button>
   <a class="btn" id="dl" download>Download SVG</a>
  </div>
  <div class="stage" id="stage">
@@ -118,20 +126,64 @@ const feasText = p => p.feasible===true?"feasible":p.feasible===null?"incomplete
 const PS = {fits:"Fits: standard checks only",fits_with_conditions:"Fits with conditions",gated:"Fits: entitlement gate",hypothetical:"No road access",blocked:"Blocked as tested",incomplete:"Incomplete: run again",no_fit:"No building fits",not_planned:"Not planned"};
 const PCOL = {fits:"var(--open)",fits_with_conditions:"var(--doubt)",gated:"var(--doubt)",hypothetical:"var(--drop)",blocked:"var(--drop)",incomplete:"var(--unchecked)",no_fit:"var(--drop)",not_planned:"var(--unchecked)"};
 const yieldOf = p => (p.kind==="plan" && p.v4 && p.v4.coverage && p.v4.coverage.sf_per_gross_ac) || 0;
-const filt = {status:new Set(), kind:new Set()};
+const filt = {status:new Set(), kind:new Set(), mark:new Set()};
+// Your marks: pursue / maybe / pass / listed per parcel, kept in this
+// browser for this run until "Save my marks" downloads them as a CSV that
+// python -m screener.decide --import records. The page itself writes no file.
+// The run's folder name, as the page header gives it ("Run <name> · screener plans ...").
+const RUN = (/^Run (.+?) · screener plans/.exec($(".head .sub")?.textContent || "") || ["",""])[1].trim();
+const DEC = {pursue:"Pursue", maybe:"Maybe", pass:"Pass", listed:"Listed"};
+const MARK_KEYS = {p:"pursue", m:"maybe", x:"pass", l:"listed"};
+const idsOf = p => (p.pids && p.pids.length ? p.pids : [p.pid]).filter(Boolean);
+const PIDS = new Set(PLANS.flatMap(idsOf));
+const today = () => {const t=new Date();return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(t.getDate()).padStart(2,"0")}`;};
+const marks = new Map();
 let shown = [], cur = 0, cmpId = null;
 function store(k,v){try{localStorage.setItem("spv:"+k,v)}catch(e){}}
 function load(k){try{return localStorage.getItem("spv:"+k)}catch(e){return null}}
+try{
+  const kept = JSON.parse(load("marks:"+RUN) || "[]");
+  for (const row of (Array.isArray(kept) ? kept : [])){
+    const [pid, m] = Array.isArray(row) ? row : [];
+    if (typeof pid==="string" && PIDS.has(pid) && m && Object.hasOwn(DEC, m.d))
+      marks.set(pid, {d:m.d, date:/^\d{4}-\d{2}-\d{2}$/.test(m.date)?m.date:today(), note:String(m.note??"").slice(0,200), saved:m.saved===true});
+  }
+}catch(e){}
+function keepMarks(){
+  store("marks:"+RUN, JSON.stringify([...marks]));
+  const n=marks.size, u=[...marks.values()].filter(m=>!m.saved).length, b=$("#savemarks");
+  b.textContent = n ? `Save my marks (${n}${u?`, ${u} not saved`:""})` : "Save my marks";
+  b.disabled = !n;
+}
+function setMark(pid, d){
+  if(!PIDS.has(pid) || !Object.hasOwn(DEC, d)) return;
+  const old=marks.get(pid);
+  if(old && old.d===d) marks.delete(pid);              // the same button again takes the mark back
+  else marks.set(pid, {d, date:today(), note:old?old.note:"", saved:false});
+  keepMarks(); render(true);
+}
+function markTag(p){
+  const ds=[...new Set(idsOf(p).map(i=>marks.get(i)?.d).filter(Boolean))];
+  return ds.length ? `<span class="tag" style="background:var(--accent)">${esc(ds.length>1?"marked":"my mark: "+DEC[ds[0]].toLowerCase())}</span>` : "";
+}
+function markUI(p){
+  const ids=idsOf(p); if(!ids.length) return "";
+  return `<div class="markbox"><div class="lbl">Your mark${ids.length>1?"s, one per parcel":""} (keys p, m, x, l${ids.length>1?" work on single parcels":""}). Kept in this browser; "Save my marks" downloads them for <b>python -m screener.decide --import</b>.</div>`+
+    ids.map(pid=>{const m=marks.get(pid);
+      return `<div class="marks" data-pid="${esc(pid)}">${ids.length>1?`<span class="pid">${esc(pid)}</span>`:""}`+
+        Object.entries(DEC).map(([d,l])=>`<button type="button" class="mk" data-d="${d}" aria-pressed="${m&&m.d===d?"true":"false"}">${l}</button>`).join("")+
+        `<input class="mknote" type="text" maxlength="200" placeholder="Note (optional)" aria-label="Note for this mark" value="${esc(m?m.note:"")}"${m?"":" disabled"}></div>`;}).join("")+`</div>`;
+}
 const LANDL = {raw_land:"raw land", partly_usable:"partly usable", not_raw_land:"not raw land", unclear:"unclear"};
 const acresText = p => [p.taxAc!=null?`${p.taxAc} ac tax roll`:null, p.mapAc!=null?`${p.mapAc} ac county map`:null].filter(Boolean).join(" · ");
 
 // chips with counts
-const chipDefs = [["kind","run","Screener plans"],["kind","plan","Site plans"],...Object.entries(ST).map(([k,v])=>["status",k,v])];
+const chipDefs = [["kind","run","Screener plans"],["kind","plan","Site plans"],...Object.entries(ST).map(([k,v])=>["status",k,v]),["mark","yes","Marked here"],["mark","no","Not marked here"]];
 for (const [g,k,label] of chipDefs){
-  const n = PLANS.filter(p=>(g==="kind"?p.kind:p.status)===k).length;
+  const n = g==="mark" ? null : PLANS.filter(p=>(g==="kind"?p.kind:p.status)===k).length;
   const b=document.createElement("button");b.className="chip";b.type="button";b.setAttribute("aria-pressed","false");b.dataset.g=g;b.dataset.k=k;
-  b.innerHTML=(g==="status"?`<span class="dot s-${k}"></span>`:"")+esc(label)+` <span class="lbl">${n}</span>`;
-  if(!n){b.disabled=true;b.title="No plans have this status";}
+  b.innerHTML=(g==="status"?`<span class="dot s-${k}"></span>`:"")+esc(label)+(n===null?"":` <span class="lbl">${n}</span>`);
+  if(n===0){b.disabled=true;b.title="No plans have this status";}
   b.onclick=()=>{const s=filt[g];s.has(k)?s.delete(k):s.add(k);b.setAttribute("aria-pressed",s.has(k));render();};
   $("#chips").appendChild(b);
 }
@@ -142,6 +194,7 @@ function match(p){
   if(q && !norm(`#${p.rank} ${p.title} ${p.pid} ${p.place}`).includes(q)) return false;
   if(filt.status.size && !filt.status.has(p.status)) return false;
   if(filt.kind.size && !filt.kind.has(p.kind)) return false;
+  if(filt.mark.size && !filt.mark.has(idsOf(p).some(i=>marks.has(i))?"yes":"no")) return false;
   const f=$("#fitf").value;
   if(f==="fits" && !p.stdFits) return false;
   if(f==="none" && p.stdFits!==false) return false;
@@ -151,30 +204,31 @@ function match(p){
   return true;
 }
 function clearFilters(){
-  $("#q").value="";$("#fitf").value="";$("#landf").value="";$("#feasf").value="";filt.status.clear();filt.kind.clear();
+  $("#q").value="";$("#fitf").value="";$("#landf").value="";$("#feasf").value="";filt.status.clear();filt.kind.clear();filt.mark.clear();
   document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));render();
 }
 // Thumbnails are drawn only when their list row scrolls into view (R28).
 const thumbs = ("IntersectionObserver" in window) ? new IntersectionObserver(es=>{for(const e of es){if(!e.isIntersecting)continue;const t=e.target.querySelector(".thumb");const p=shown[+e.target.dataset.i];if(t&&p&&!t.firstChild)t.innerHTML=svgOf(p);thumbs.unobserve(e.target);}},{root:null,rootMargin:"200px"}) : {observe:b=>{const p=shown[+b.dataset.i];b.querySelector(".thumb").innerHTML=svgOf(p);}};
-function render(){
+function render(stay){
   const s=$("#sort").value;
   const curId = shown[cur]?.id || load("cur");
   shown = PLANS.filter(match).sort((a,b)=> s==="sf"? sortSf(b)-sortSf(a) || a.rank-b.rank : s==="yield"? yieldOf(b)-yieldOf(a) || a.rank-b.rank : s==="acres"? (b.mapAc||0)-(a.mapAc||0) : a.rank-b.rank || (a.kind==="run"?-1:1));
-  const active = $("#q").value || $("#fitf").value || $("#landf").value || $("#feasf").value || filt.status.size || filt.kind.size;
+  const active = $("#q").value || $("#fitf").value || $("#landf").value || $("#feasf").value || filt.status.size || filt.kind.size || filt.mark.size;
   $("#count").innerHTML=`Showing ${shown.length} of ${PLANS.length} plans`+(active?' · <button type="button" id="clr">clear filters</button>':"");
   if(active) $("#clr").onclick=clearFilters;
   const L=$("#list"); L.innerHTML=""; if(thumbs.disconnect) thumbs.disconnect();
   if(!shown.length){L.innerHTML='<div class="empty">No plans match.</div>';}
   shown.forEach((p,i)=>{
     const b=document.createElement("button");b.className="item";b.type="button";
-    b.innerHTML=`<div class="thumb" aria-hidden="true"></div><div><div class="it-t">${esc(p.title)}${p.kind==="plan"?'<span class="tag">plan</span>':""}${p.kind==="plan"&&p.feasible!==true?'<span class="tag" style="background:var(--drop)">'+esc(feasText(p))+'</span>':""}${p.kind==="plan"&&p.feasible===true&&p.assessment&&p.assessment.status!=="fits"?'<span class="tag" style="background:var(--doubt)">'+esc(p.assessment.status==="gated"?"gated":"conditions")+'</span>':""}</div>
+    b.innerHTML=`<div class="thumb" aria-hidden="true"></div><div><div class="it-t">${esc(p.title)}${p.kind==="plan"?'<span class="tag">plan</span>':""}${p.kind==="plan"&&p.feasible!==true?'<span class="tag" style="background:var(--drop)">'+esc(feasText(p))+'</span>':""}${p.kind==="plan"&&p.feasible===true&&p.assessment&&p.assessment.status!=="fits"?'<span class="tag" style="background:var(--doubt)">'+esc(p.assessment.status==="gated"?"gated":"conditions")+'</span>':""}${markTag(p)}</div>
       <div class="it-s"><span class="dot s-${p.status}"></span>${esc(ST[p.status])} · ${esc(p.place)}</div>
       <div class="it-s">${esc(p.sfText)} · ${esc(p.mapAc??p.taxAc)} ac${p.land?" · "+esc(LANDL[p.land]||p.land):""}</div></div>`;
     b.onclick=()=>show(i); b.dataset.i=i;
     L.appendChild(b); thumbs.observe(b);
   });
   const idx = shown.findIndex(p=>p.id===curId);
-  show(idx<0?0:idx);
+  // After a mark, a plan the filters now hide gives way to the one that took its place.
+  show(idx<0?(stay?Math.min(cur,Math.max(shown.length-1,0)):0):idx);
 }
 function show(i){
   if(!shown.length){
@@ -209,6 +263,7 @@ function factsPlan(p){
   const st=A?A.status:null;
   let h=`<h2>${esc(p.title)}</h2><div class="place">${esc(p.place)}</div>
    <span class="badge" style="background:${COL[p.status]}">${esc(ST[p.status])}</span><span class="badge" style="background:var(--test)">Site plan</span><span class="badge" style="background:${st?PCOL[st]:(p.feasible===true?"var(--open)":p.feasible===null?"var(--doubt)":"var(--drop)")}">${esc(st?PS[st]:feasText(p))}</span><span class="draft">DRAFT zoning</span>`;
+  h+=markUI(p);
   if(A&&A.headline) h+=`<div class="verdict" style="border-color:${PCOL[st]}">${esc(A.headline)}</div>`;
   if(A&&A.steps&&A.steps.length) h+=`<h3>Next steps, in order</h3><ol class="steps">${A.steps.map(x=>`<li><span class="lead">${esc(x.stage)} · ${esc(x.workstream)}</span><br>${esc(x.action)}${x.closes?`<br><span class="lbl">Closes with: ${esc(x.closes)}</span>`:""}</li>`).join("")}</ol>`;
   h+=`<h3>Key numbers</h3><dl>${rows.map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl>`;
@@ -242,6 +297,7 @@ function facts(p){
   if(p.kind==="run") rows.push(["Ground",`flood ${p.flood}%, wetlands ${p.wet}%, steep ${p.steep}% (steep ground not located)`],["Frontage",fr],["Access",p.exit]);
   let h=`<h2>${esc(p.title)}</h2><div class="place">${esc(p.place)}</div>
    <span class="badge" style="background:${COL[p.status]}">${esc(ST[p.status])}</span>
+   ${markUI(p)}
    <dl>${rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
   if(p.note) h+=`<div class="note"><span class="lbl">Mark in decisions.csv:</span> ${esc(p.note)}</div>`;
   if(p.skeptic) h+=`<div class="note"><span class="lbl">Document check: skeptic verdict</span> ${esc(p.skeptic)}${p.headline?`<br><span class="lbl">Headline (agent reading, not verified):</span> ${esc(p.headline)}`:""}</div>`;
@@ -301,6 +357,21 @@ for (const n of [1,2]){
 const both=f=>{zoomAt(1,f);if(cmpId!==null)zoomAt(2,f);};
 $("#zin").onclick=()=>both(1.25);$("#zout").onclick=()=>both(0.8);$("#zfit").onclick=refit;
 $("#prev").onclick=()=>show(cur-1);$("#next").onclick=()=>show(cur+1);
+$("#facts").addEventListener("click",e=>{const b=e.target.closest(".mk"); if(b) setMark(b.closest(".marks").dataset.pid, b.dataset.d);});
+$("#facts").addEventListener("change",e=>{
+  if(!e.target.matches(".mknote")) return;
+  const m=marks.get(e.target.closest(".marks").dataset.pid);
+  if(m){m.note=e.target.value.replace(/\s+/g," ").trim().slice(0,200); m.saved=false; keepMarks();}
+});
+$("#savemarks").onclick=()=>{
+  if(!marks.size) return;
+  const q=c=>/[",\r\n]|^\s|\s$/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;
+  const rows=[["parcel_id","decision","date","note","run"],...[...marks].map(([pid,m])=>[pid,m.d,m.date,m.note,RUN])];
+  const url=URL.createObjectURL(new Blob([rows.map(r=>r.map(c=>q(String(c))).join(",")).join("\r\n")+"\r\n"],{type:"text/csv"}));
+  const a=document.createElement("a"); a.href=url; a.download=`decisions-${RUN.replace(/[^A-Za-z0-9._-]/g,"_")||"run"}.csv`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+  for(const m of marks.values()) m.saved=true; keepMarks();
+};
 $("#same").onchange=refit;
 // compare
 function openCmp(){
@@ -324,6 +395,7 @@ document.addEventListener("keydown",e=>{
   if(e.target.matches("input,select,textarea"))return;
   if(e.key==="ArrowRight"||e.key==="j")show(cur+1); else if(e.key==="ArrowLeft"||e.key==="k")show(cur-1);
   else if(e.key==="+"||e.key==="=")both(1.25); else if(e.key==="-")both(0.8); else if(e.key==="0")refit(); else if(e.key==="c")$("#cmp").click();
+  else if(Object.hasOwn(MARK_KEYS,e.key)){const ids=shown[cur]?idsOf(shown[cur]):[]; if(ids.length===1) setMark(ids[0],MARK_KEYS[e.key]);}
 });
 let rt=null;
 addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{
@@ -331,5 +403,6 @@ addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{
     if(Math.abs(v.clientWidth-z.w)<2 && Math.abs(v.clientHeight-z.h)<60) continue;   // URL bar show/hide on phones
     if(z.fitted) refit(); else {z.w=v.clientWidth;z.h=v.clientHeight;}
   }},120);});
+keepMarks();
 render();
 </script></body></html>

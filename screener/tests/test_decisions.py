@@ -633,6 +633,171 @@ class CliTests(DecisionHarness):
         self.assert_nothing_written()
 
 
+class ImportMarksTests(DecisionHarness):
+    """--import: the marks file the Site Plan Viewer page saves. Every row
+    is checked before anything is written; a second import adds nothing."""
+
+    HEAD = "parcel_id,decision,date,note,run\r\n"
+
+    def setUp(self):
+        super().setUp()
+        self.assertEqual(self.rerun("--no-slope")[0], 0)
+        self.before = run.DECISIONS_FILE.read_bytes()
+        self.file = self.tmp / "decisions-fulton-2026-11-09.csv"
+
+    def marks(self, *rows, head=None):
+        self.file.write_text((self.HEAD if head is None else head) + "".join(r + "\r\n" for r in rows),
+                             encoding="utf-8", newline="")
+        return self.decide("--import", str(self.file))
+
+    def assert_nothing_written(self):
+        self.assertEqual(run.DECISIONS_FILE.read_bytes(), self.before)
+        self.assertFalse(decide.store_file().exists())
+        self.assertFalse(decide.facts_store_file().exists())
+
+    def test_marks_are_recorded_like_single_calls(self):
+        code, out, err = self.marks(
+            f'{SPACED},pursue,2026-11-08,"called, ""open"" to offers",fulton-2026-11-09',
+            "14F0001 0001,pass,2026-11-09,,fulton-2026-11-09",
+            "14F0002 0002,Maybe,,,fulton-2026-11-09")
+        self.assertEqual(code, 0, err)
+        self.assertIn("3 recorded", out)
+        self.assertIn(decide.CONSEQUENCE["pass"], out)
+        got = run.load_decisions()
+        self.assertEqual(got[SPACED], {"decision": "pursue", "date": "2026-11-08",
+                                       "note": 'called, "open" to offers'})
+        self.assertEqual(got["14F0001 0001"]["decision"], "pass")
+        self.assertEqual(got["14F0002 0002"]["decision"], "maybe")
+        self.assertEqual(len(got["14F0002 0002"]["date"]), 10)      # no date given: today
+        self.assertTrue(run.DECISIONS_FILE.read_bytes().startswith(self.before))
+        store = self.store()
+        self.assertEqual([e["parcel_id"] for e in store], [SPACED, "14F0001 0001", "14F0002 0002"])
+        self.assertTrue(all(e["run"] == "fulton-2026-11-09" and e["records"] for e in store))
+        self.assertEqual(store[0]["date"], "2026-11-08")
+        facts_rows = [json.loads(x) for x in decide.facts_store_file().read_text().splitlines()]
+        self.assertEqual(len(facts_rows), 3)
+
+    def test_a_second_import_adds_nothing(self):
+        row = "14F0001 0001,pursue,2026-11-08,a note,fulton-2026-11-09"
+        self.assertEqual(self.marks(row)[0], 0)
+        once = (run.DECISIONS_FILE.read_bytes(), decide.store_file().read_bytes())
+        code, out, _ = self.marks(row)
+        self.assertEqual(code, 0)
+        self.assertIn("0 recorded", out)
+        self.assertIn("1 already recorded", out)
+        self.assertEqual((run.DECISIONS_FILE.read_bytes(), decide.store_file().read_bytes()), once)
+        # a changed mark is a new row
+        code, out, _ = self.marks("14F0001 0001,pass,2026-11-08,a note,fulton-2026-11-09")
+        self.assertIn("1 recorded", out)
+        self.assertEqual(run.load_decisions()["14F0001 0001"]["decision"], "pass")
+
+    def test_the_last_row_for_a_parcel_wins(self):
+        code, out, _ = self.marks("14F0001 0001,pursue,2026-11-08,,fulton-2026-11-09",
+                                  "14F0001 0001,maybe,2026-11-08,,fulton-2026-11-09")
+        self.assertEqual(code, 0)
+        self.assertIn("1 recorded", out)
+        self.assertEqual(run.load_decisions()["14F0001 0001"]["decision"], "maybe")
+
+    def test_one_bad_row_and_nothing_is_recorded(self):
+        good = "14F0001 0001,pursue,2026-11-08,,fulton-2026-11-09"
+        cases = {
+            "99X9999 9999,pursue,2026-11-08,,fulton-2026-11-09": "not in this run",
+            "14F0002 0002,skip,2026-11-08,,fulton-2026-11-09": "is not one of",
+            "14F0002 0002,pursue,08/11/2026,,fulton-2026-11-09": "not YYYY-MM-DD",
+            "14F0002 0002,pursue,2999-01-01,,fulton-2026-11-09": "in the future",
+            ",pursue,2026-11-08,,fulton-2026-11-09": "empty parcel id",
+            "14F0002 0002,pursue,2026-11-08,,fulton-2026-11-09,extra": "more cells",
+            "14F0002 0002,pursue,2026-11-08," + "n" * 501 + ",fulton-2026-11-09": "over 500 characters",
+            "14F0063 LL0219,pursue,2026-11-08,,fulton-2026-11-09": repr(SPACED),   # shown, never picked
+        }
+        for row, why in cases.items():
+            with self.subTest(why):
+                code, _, err = self.marks(good, row)
+                self.assertEqual(code, 2)
+                self.assertIn(why, err)
+                self.assertIn("nothing recorded", err)
+                self.assert_nothing_written()
+
+    def test_marks_of_another_run_are_refused(self):
+        code, _, err = self.marks("14F0001 0001,pursue,2026-11-08,,fulton-2026-10-01")
+        self.assertEqual(code, 2)
+        self.assertIn("'fulton-2026-10-01'", err)
+        self.assertIn("--run", err)
+        self.assert_nothing_written()
+        code, _, err = self.marks("14F0001 0001,pursue,2026-11-08,,fulton-2026-11-09",
+                                  "14F0002 0002,pursue,2026-11-08,,fulton-2026-10-01")
+        self.assertEqual(code, 2)
+        self.assertIn("more than one run", err)
+        self.assert_nothing_written()
+
+    def test_run_override_must_be_the_marks_run(self):
+        other = self.tmp / "output" / "fulton-2026-11-10"
+        shutil.copytree(self.out, other)
+        os.utime(self.out / "ranked.csv", ns=(1, 1))               # 11-10 is now the newest
+        self.marks("14F0001 0001,pursue,2026-11-08,,fulton-2026-11-09")
+        code, _, err = self.decide("--import", str(self.file))
+        self.assertEqual(code, 2)
+        self.assertIn("--run", err)
+        code, out, _ = self.decide("--import", str(self.file), "--run", str(self.out))
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.store()[0]["run"], "fulton-2026-11-09")
+        self.assertEqual(self.decide("--import", str(self.file), "--run", str(self.tmp / "nowhere"))[0], 2)
+
+    def test_a_file_without_a_run_column_uses_the_chosen_run(self):
+        code, out, _ = self.marks("14F0001 0001,maybe", head="parcel_id, decision\r\n")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(run.load_decisions()["14F0001 0001"]["decision"], "maybe")
+
+    def test_rejected_parcel_needs_no_features_flag(self):
+        self.write_decisions("parcel_id,decision,date,note\n14F0003 0003,listed,2026-11-01,\n")
+        self.assertEqual(self.rerun("--no-slope")[0], 0)
+        self.before = run.DECISIONS_FILE.read_bytes()
+        code, _, err = self.marks("14F0001 0001,pursue,2026-11-08,,", "14F0003 0003,maybe,2026-11-08,,")
+        self.assertEqual(code, 2)
+        self.assertIn("--no-features", err)
+        self.assert_nothing_written()
+        code, out, _ = self.decide("--import", str(self.file), "--no-features")
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 recorded", out)
+        self.assertEqual(run.load_decisions()["14F0003 0003"]["decision"], "maybe")
+
+    def test_files_that_are_not_marks_files(self):
+        for text, why in (("", "no parcel_id,decision header"), ("a,b\r\n1,2\r\n", "no parcel_id,decision header"),
+                          (self.HEAD, "holds no marks")):
+            with self.subTest(why):
+                self.file.write_text(text, encoding="utf-8", newline="")
+                code, _, err = self.decide("--import", str(self.file))
+                self.assertEqual(code, 2)
+                self.assertIn(why, err)
+                self.assert_nothing_written()
+        self.file.write_bytes(b"parcel_id,decision\r\n" + b"x" * (decide.IMPORT_MAX_BYTES + 1))
+        self.assertIn("not a marks file", self.decide("--import", str(self.file))[2])
+        self.assertIn("not a file", self.decide("--import", str(self.tmp / "missing.csv"))[2])
+        self.file.write_bytes(b"\xff\xfe\x00bad")
+        self.assertEqual(self.decide("--import", str(self.file))[0], 2)
+        self.assert_nothing_written()
+
+    def test_import_and_a_parcel_id_together_is_a_usage_error(self):
+        self.file.write_text(self.HEAD + "14F0001 0001,pursue,2026-11-08,,\r\n", encoding="utf-8", newline="")
+        code, _, err = self.decide("14F0001 0001", "pursue", "--import", str(self.file))
+        self.assertEqual(code, 2)
+        self.assertIn("--import takes no parcel id", err)
+        code, _, err = self.decide()
+        self.assertEqual(code, 2)
+        self.assertIn("required", err)
+        code, _, err = self.decide("14F0001 0001")
+        self.assertEqual(code, 2)
+        self.assert_nothing_written()
+
+    def test_a_spreadsheet_saved_file_is_read(self):
+        self.file.write_bytes("\ufeffparcel_id , decision,date,note\n14F0001 0001, PURSUE ,2026-11-08,  two   spaces \n"
+                              .encode("utf-8"))
+        code, out, _ = self.decide("--import", str(self.file))
+        self.assertEqual(code, 0, out)
+        self.assertEqual(run.load_decisions()["14F0001 0001"],
+                         {"decision": "pursue", "date": "2026-11-08", "note": "two spaces"})
+
+
 class OfflineImportTests(unittest.TestCase):
     """H8: decide.py and snapshot.py are stdlib plus screener modules only."""
 

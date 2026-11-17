@@ -4,6 +4,7 @@
     python -m screener.decide 09F030000140097 maybe
     python -m screener.decide "07 290001330986" pass power line easement
     python -m screener.decide ID pursue --run screener/output/fulton-2026-11-09
+    python -m screener.decide --import decisions-fulton-2026-11-09.csv
 
 Decisions: pursue, pass, maybe, listed (as in inputs/decisions.csv). The
 parcel id must match the run's ranked.csv (or rejected.csv) exactly,
@@ -12,6 +13,14 @@ last row for a parcel wins, so a later row undoes an earlier one) and
 copies the parcel's features from the run's features.json into
 inputs/decision_features.jsonl, so they outlive the run folder. Both files
 are kept out of git. Offline: no network.
+
+--import FILE records every mark in a file the Site Plan Viewer page
+saved ("Save my marks"): the same checks and the same three files as one
+call per mark. The file names the run its page was built from, and that
+run's folder must be the one used (the newest, or --run). Every row is
+checked before anything is written: one bad row and nothing is recorded.
+A mark that is already the parcel's last row (same decision, date and
+note) is skipped, so importing a file twice adds nothing.
 """
 
 from __future__ import annotations
@@ -22,7 +31,7 @@ import json
 import os
 import sys
 import time
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +44,11 @@ CONSEQUENCE = {
     "pursue": "marked in ranked.csv; summary.md says so if a later run screens it out.",
     "maybe": "a mark only: no score, flag, order or screen changes.",
 }
+
+
+IMPORT_MAX_BYTES = 1_000_000   # a marks file is a few rows; refuse anything large
+IMPORT_MAX_ROWS = 5_000
+NOTE_MAX_CHARS = 500
 
 
 class Refuse(Exception):
@@ -174,15 +188,183 @@ def append_facts(entry: dict[str, Any]) -> None:
         fh.write(line)
 
 
+def prepare(run_dir: Path, ranked: list[str], rejected: list[str], pid: str,
+            no_features: bool) -> dict[str, Any]:
+    """Read and check everything one decision needs. Writes nothing; raises
+    Refuse when the decision cannot be recorded."""
+    if not pid:
+        raise Refuse("empty parcel id")
+    if pid not in ranked and pid not in rejected:
+        close = near(pid, ranked + rejected)
+        hint = ("; close matches: " + " | ".join(repr(c) for c in close)) if close else ""
+        raise Refuse(f"parcel id {pid!r} is not in this run{hint}")
+    meta, records = snapshot_records(run_dir, pid)
+    no_features_note = ""
+    if not records:
+        why = (f"{run_dir.name} has no {snapshot.FILE_NAME}" if meta is None
+               else "it isn't in this run's snapshot (only ranked parcels are)")
+        if not no_features:
+            raise Refuse(f"no features to keep for {pid!r}: {why}. "
+                         "Pass --no-features to record the decision anyway")
+        no_features_note = (f"no features kept for this decision ({why}); missing: "
+                            + ", ".join(snapshot.FEATURES))
+    facts_meta, fact_records, facts_problem = facts.records_for(run_dir, pid)
+    return {"pid": pid, "run": run_dir.name, "meta": meta, "records": records,
+            "no_features_note": no_features_note, "facts_meta": facts_meta,
+            "fact_records": fact_records, "facts_problem": facts_problem}
+
+
+def commit(prep: dict[str, Any], header: list[str], decision: str, day: str, note: str) -> None:
+    """Append one checked decision to the three files."""
+    pid = prep["pid"]
+    # Features first: a crash after this leaves features without a
+    # decision row (harmless), never a decision whose features are lost.
+    append_store({
+        "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "parcel_id": pid, "decision": decision, "date": day,
+        "run": prep["run"], "run_meta": prep["meta"], "records": prep["records"],
+    })
+    if prep["fact_records"]:
+        # The facts are an extra: a failure here must never cost the
+        # decision row (the features above are already kept).
+        try:
+            append_facts({
+                "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                "parcel_id": pid, "decision": decision, "date": day,
+                "run": prep["run"], "run_meta": prep["facts_meta"],
+                "records": prep["fact_records"],
+            })
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"no report facts kept for this decision (could not be written: {exc})")
+    append_decision(header, pid, decision, day, note)
+
+
+def read_marks(path: Path) -> list[dict[str, str]]:
+    """The marks in a file the viewer page saved: parcel_id, decision, and
+    optionally date, note and run. Checked, not yet matched to a run. The
+    last row for a parcel wins, as in decisions.csv."""
+    if not path.is_file():
+        raise Refuse(f"{path} is not a file")
+    if path.stat().st_size > IMPORT_MAX_BYTES:
+        raise Refuse(f"{path} is over {IMPORT_MAX_BYTES:,} bytes: not a marks file")
+    try:
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            reader = csv.DictReader(fh)
+            reader.fieldnames = [(h or "").strip() for h in (reader.fieldnames or [])]
+            rows = list(reader)
+    except (OSError, UnicodeDecodeError, csv.Error) as exc:
+        raise Refuse(f"{path} cannot be read as CSV ({exc})") from exc
+    if not {"parcel_id", "decision"} <= set(reader.fieldnames):
+        raise Refuse(f"{path} has no parcel_id,decision header")
+    if len(rows) > IMPORT_MAX_ROWS:
+        raise Refuse(f"{path} has more than {IMPORT_MAX_ROWS:,} rows: not a marks file")
+    today = date.today()
+    marks: dict[str, dict[str, str]] = {}
+    for n, row in enumerate(rows, start=2):
+        def bad(why: str) -> Refuse:
+            return Refuse(f"{path.name} line {n}: {why}; nothing recorded")
+        if None in row:    # csv puts the cells beyond the header under None
+            raise bad("more cells than the header has columns")
+        pid = (row.get("parcel_id") or "").strip()
+        decision = (row.get("decision") or "").strip().lower()
+        day = (row.get("date") or "").strip()
+        note = " ".join((row.get("note") or "").split())
+        if not pid:
+            raise bad("empty parcel id")
+        if decision not in run.DECISION_VALUES:
+            raise bad(f"decision {decision!r} is not one of {', '.join(run.DECISION_VALUES)}")
+        if day:
+            try:
+                parsed = date.fromisoformat(day)
+            except ValueError:
+                raise bad(f"date {day!r} is not YYYY-MM-DD") from None
+            # One day of slack: the page's clock may be a time zone ahead.
+            if parsed > today + timedelta(days=1):
+                raise bad(f"date {day} is in the future")
+            day = parsed.isoformat()
+        if len(note) > NOTE_MAX_CHARS:
+            raise bad(f"the note is over {NOTE_MAX_CHARS} characters")
+        marks.pop(pid, None)   # the last row for a parcel wins, in its own place
+        marks[pid] = {"parcel_id": pid, "decision": decision, "date": day or today.isoformat(),
+                      "note": note, "run": (row.get("run") or "").strip()}
+    if not marks:
+        raise Refuse(f"{path} holds no marks")
+    return list(marks.values())
+
+
+def import_marks(path: Path, run_arg: Path | None, no_features: bool) -> int:
+    """Record every mark of a viewer page's file, or none. Returns how many
+    were written."""
+    marks = read_marks(path)
+    named = sorted({m["run"] for m in marks if m["run"]})
+    if len(named) > 1:
+        raise Refuse(f"{path.name} holds marks from more than one run ({', '.join(named)}): "
+                     "import each run's file on its own")
+    if run_arg is not None:
+        run_dir = run_arg
+        if not (run_dir / "ranked.csv").is_file():
+            raise Refuse(f"{run_dir} has no ranked.csv")
+    else:
+        run_dir = latest_run()
+    print(f"run: {run_dir}")
+    if named and named[0] != run_dir.resolve().name:
+        raise Refuse(f"these marks were made on the page of run {named[0]!r}, not {run_dir.name!r}: "
+                     "pass --run with that run's folder (the features kept with a decision "
+                     "must be that run's)")
+    ranked, rejected = run_ids(run_dir)
+    last = run.load_decisions() if decisions_file().exists() else {}
+    todo, problems, same = [], [], 0
+    for m in marks:
+        if last.get(m["parcel_id"]) == {"decision": m["decision"], "date": m["date"], "note": m["note"]}:
+            same += 1
+            continue
+        try:
+            todo.append((m, prepare(run_dir, ranked, rejected, m["parcel_id"], no_features)))
+        except Refuse as exc:
+            problems.append(str(exc))
+    if problems:
+        raise Refuse("nothing recorded; " + "; ".join(problems[:10])
+                     + (f"; and {len(problems) - 10} more" if len(problems) > 10 else ""))
+    if todo:
+        header = decisions_header()
+        for m, prep in todo:
+            for line in (prep["no_features_note"],
+                         f"no report facts kept for this decision ({prep['facts_problem']})"
+                         if prep["facts_problem"] else ""):
+                if line:
+                    print(f"{m['parcel_id']}: {line}")
+            print(f"{m['parcel_id']}: {m['decision']}: {CONSEQUENCE[m['decision']]}")
+            commit(prep, header, m["decision"], m["date"], m["note"])
+    print(f"{len(todo)} recorded in {decisions_file()}"
+          + (f"; {same} already recorded, skipped" if same else ""))
+    return len(todo)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("parcel_id", help="exactly as in ranked.csv; quote it if it has spaces")
-    ap.add_argument("decision", type=str.lower, choices=run.DECISION_VALUES)
+    ap.add_argument("parcel_id", nargs="?",
+                    help="exactly as in ranked.csv; quote it if it has spaces")
+    ap.add_argument("decision", nargs="?", type=str.lower, choices=run.DECISION_VALUES)
     ap.add_argument("reason", nargs="*", help="free text, saved as the note")
     ap.add_argument("--run", type=Path, help="run folder (default: the newest under screener/output)")
     ap.add_argument("--no-features", action="store_true",
                     help="record the decision even if the run has no features for this parcel")
+    ap.add_argument("--import", dest="import_file", type=Path, metavar="FILE",
+                    help="record every mark in a file saved from the Site Plan Viewer page "
+                         "(instead of a parcel id and a decision)")
     args = ap.parse_args(argv)
+
+    if args.import_file is not None:
+        if args.parcel_id is not None:
+            ap.error("--import takes no parcel id or decision")
+        try:
+            import_marks(args.import_file, args.run, args.no_features)
+        except Refuse as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 2
+        return 0
+    if args.parcel_id is None or args.decision is None:
+        ap.error("the following arguments are required: parcel_id, decision (or --import FILE)")
 
     pid = args.parcel_id.strip()
     note = " ".join(args.reason).strip()
@@ -197,44 +379,15 @@ def main(argv: list[str] | None = None) -> int:
             run_dir = latest_run()
         print(f"run: {run_dir}")
         ranked, rejected = run_ids(run_dir)
-        if pid not in ranked and pid not in rejected:
-            close = near(pid, ranked + rejected)
-            hint = ("; close matches: " + " | ".join(repr(c) for c in close)) if close else ""
-            raise Refuse(f"parcel id {pid!r} is not in this run{hint}")
-        meta, records = snapshot_records(run_dir, pid)
-        if not records:
-            why = (f"{run_dir.name} has no {snapshot.FILE_NAME}" if meta is None
-                   else "it isn't in this run's snapshot (only ranked parcels are)")
-            if not args.no_features:
-                raise Refuse(f"no features to keep for {pid!r}: {why}. "
-                             "Pass --no-features to record the decision anyway")
-            print(f"no features kept for this decision ({why}); missing: "
-                  + ", ".join(snapshot.FEATURES))
+        prep = prepare(run_dir, ranked, rejected, pid, args.no_features)
+        if prep["no_features_note"]:
+            print(prep["no_features_note"])
         header = decisions_header()
         day = date.today().isoformat()
-        facts_meta, fact_records, facts_problem = facts.records_for(run_dir, pid)
-        if facts_problem:
-            print(f"no report facts kept for this decision ({facts_problem})")
+        if prep["facts_problem"]:
+            print(f"no report facts kept for this decision ({prep['facts_problem']})")
         print(f"{pid}: {args.decision}: {CONSEQUENCE[args.decision]}")
-        # Features first: a crash after this leaves features without a
-        # decision row (harmless), never a decision whose features are lost.
-        append_store({
-            "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-            "parcel_id": pid, "decision": args.decision, "date": day,
-            "run": run_dir.name, "run_meta": meta, "records": records,
-        })
-        if fact_records:
-            # The facts are an extra: a failure here must never cost the
-            # decision row (the features above are already kept).
-            try:
-                append_facts({
-                    "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                    "parcel_id": pid, "decision": args.decision, "date": day,
-                    "run": run_dir.name, "run_meta": facts_meta, "records": fact_records,
-                })
-            except (OSError, ValueError, TypeError) as exc:
-                print(f"no report facts kept for this decision (could not be written: {exc})")
-        append_decision(header, pid, args.decision, day, note)
+        commit(prep, header, args.decision, day, note)
     except Refuse as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
