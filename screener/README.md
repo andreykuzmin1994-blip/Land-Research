@@ -651,6 +651,326 @@ command (poppler-utils).
   zoning code (Municode) and the Secretary of State cannot be read by a
   polite fetch, so those two stay a person's job.
 
+## Site plans and the built check
+
+Three tools work on a finished run folder. They are optional and run by
+hand; `python -m screener.run` never calls them, and they change no
+score, grade or rank. All three use one owner guard (`OwnerGuard` in
+`viewer.py`) on the final text of every file they write, and refuse to
+write when it finds an owner name or owner mailing address of the run
+(`ranked.csv` and `rejected.csv`). The guard matches the tax-roll strings
+whole-word, after decoding entities and JSON escapes, ignoring case and
+reading any run of spaces and punctuation as one break between words,
+with the usual street spellings read alike (`RD`/`Road`, `STE`/`Suite`,
+`N`/`North` and the like, and `&`/`and`), a company suffix spelled in
+letters read as the word (`L.L.C.`, `L L C` and `LLC`) and an apostrophe
+after a one-letter prefix dropped (`O'Brien` and `OBRIEN`): the full
+name, the name without company suffixes (8 characters or more, counted
+as written), an individual's surname and first name in either order (8
+characters or more; middle initials and a trailing `ET AL` or `JR` are
+dropped first, surname particles such as `DE LA` stay with the surname,
+and for a couple, `WALKER DONALD & BETTY`, each person's name and
+"Donald and Betty Walker"),
+the full mailing address, its street line and the street line without
+its suite or unit ("P.O. Box" and "PO BOX" read the same), and each
+drawing's text with its markup removed. It skips strings of 6 characters
+or fewer, one-word generic names ("cemetery"), a string that is part of
+the same parcel's own site address (an owner-occupied house), a string
+that is part of a jurisdiction name of the run (a city's own land), a
+one-word string that is a word of any site address of the run (a street
+word such as "hillside"), and, in each file, a string that is part of a
+site address that file itself writes (its sites' own published
+addresses). Another parcel's site address never makes a name or mailing
+line pass. It cannot catch a misspelt name or a nickname. No
+request these tools write asks for a parcel owner or mailing field (the
+map layers keep `layers.py`'s field lists, which name the easement
+holder and a protected area's manager, public bodies; only the shapes
+are used).
+
+- `screener.builtcheck` asks whether a top parcel is really land today.
+- `screener.siteplan` draws a screening test fit of an industrial
+  building on chosen parcels.
+- `screener.viewer` puts the run's briefs, the site plans and the built
+  check into one HTML page.
+
+The design basis, the numbers and the operator's open decisions are in
+[`SITE_PLANNING.md`](SITE_PLANNING.md).
+
+### The built check
+
+```bash
+python -m screener.builtcheck RUN_DIR --out screener/output/builtcheck-<date> \
+    --visual visual.json --decisions screener/inputs/decisions.csv    # --top 250 is the default
+```
+
+The screen drops a parcel whose own tax record shows a building. It can't
+see a building on a separate tax record, a paved yard, outdoor storage, a
+quarry or a landfill. For the top N parcels by rank this reads three
+signals:
+
+1. FEMA USA Structures footprints inside the parcel's outline, with holes
+   in the county shape filled in. A building in a hole is often on a
+   separate improvements-only record.
+2. The holes in the county parcel shape.
+3. Other Fulton tax records that lie mostly inside the outline, with their
+   class and improvement value.
+
+| File | What it is |
+|---|---|
+| `builtcheck.csv` / `.json` | One row per parcel. `built_check` is `built`, `check`, `no building found` or `not checked`, with the reason and the measurements. The JSON adds the records found inside the outline and the thresholds used. |
+| `land_today.csv` / `.json` | One row per parcel. `land_today` is `raw_land`, `partly_usable`, `not_raw_land` or `unclear`, with what the photo shows and where the verdict came from. |
+
+**The aerial review is a manual step.** `land_today` rests on a look at
+the county's 2024 aerial photo of each parcel. The screener has no image
+tooling (its dependency rule allows only `requests` and `shapely`), so
+reviewers who can see the images, a person or an agent with image
+access, write the verdicts into a `visual.json` file. Its format is in
+the `builtcheck.py` docstring. The rule that turns the file into
+`land_today`:
+
+- Where the photo and the footprints agree, the photo's verdict stands.
+- Where they disagree, or the reviewer was unsure, a second reviewer
+  looks again with both in hand. That verdict goes in the file's
+  `second_look` part. Until then the parcel reads `unclear`.
+- No photo review, a footprint check that did not complete, or a check
+  with any input missing (a failed footprint or records fetch, even when
+  the other input found something), never gives `raw_land`. The failure
+  is named in the `land_today` row's `footprint_note`. A hollow answer
+  counts as a failed input: county records not in WGS84, a county answer
+  without the parcel's own record, or a footprint without a shape.
+
+A `visual.json` that names no run and no parcel ids (the 2026-11-16 one)
+needs `--visual-by-rank`, which says you vouch it was made for this run.
+That file holds only the first looks. The 71 second-look verdicts of the
+2026-11-16 check are rows of its `land_today.json` (source `second
+look`); without them those parcels read `unclear` (73 unclear instead of
+4). Carry them over with `--second-looks-from`:
+
+```bash
+python -m screener.builtcheck RUN_DIR --out screener/output/builtcheck-<date> \
+    --visual screener/output/builtcheck-2026-11-16/visual.json --visual-by-rank \
+    --second-looks-from screener/output/builtcheck-2026-11-16/land_today.json
+```
+
+Each carried row is joined by rank and parcel id; a file that names
+another run is refused, and so is a file with no second-look rows (for
+example `builtcheck.json` given by mistake). A `second_look` entry in
+`visual.json` itself wins over a carried one. A second look whose
+`raw_land` was held back because an input of that check failed reads
+`unclear` with source `second look (held: an input failed)`; it is not
+carried (the tool says how many were skipped), so carry second looks
+from the file they were first recorded in, as above.
+
+Without a second look, a parcel whose check did not complete (`not
+checked`, or an input missing) keeps only a `not_raw_land` first look;
+a first look of `raw_land` or `partly_usable` reads `unclear`, so a
+failed fetch never reads better than a completed check. The viewer adds
+"built check incomplete" to such a parcel's land text.
+
+Exit codes: 0 done; 1 written, but some parcels read `not checked` or
+were checked with an input missing (a fetch failed; run it again later);
+2 refused, nothing written (owner text found, a foreign run, a
+missing or unreadable input such as `ranked.csv`, `--visual` or
+`--decisions`, a `--second-looks-from` file with no second looks,
+`--top` below 1, or a `--cache-days` that is not a number of 0 or more). It asks
+`services2.arcgis.com` (USA Structures) and `gismaps.fultoncountyga.gov`,
+at least a second apart per host, through the shared cache
+(`--cache-days`, 7 by default). 250 parcels take about 10 minutes cold.
+
+What it can't tell you: the footprints come from imagery of 2012 to 2022,
+so newer buildings and recent demolitions are missed. "No building found"
+means no mapped footprint, not empty ground. The photo review is a
+person's or an agent's judgement of one image, not a site visit.
+
+### Site plans
+
+```bash
+python -m screener.siteplan RUN_DIR --ranks 4,33 --out screener/output/siteplans-<date>
+python -m screener.siteplan RUN_DIR --assemble "north=<parcel id>,<parcel id>" \
+    --out screener/output/siteplans-<date> --merge
+```
+
+For each site the planner draws one explicit industrial cross-section
+(rear-load or cross-dock) on the open ground inside draft setbacks and
+buffers. It reports the building, dock doors, trailer and car stalls,
+truck and car routes from two driveways on the frontage, detention ponds
+sized from the impervious area, a drop-trailer yard, a second building
+where the land allows, grading, and a list of flags. The search tries the
+operator's prototypes and market depths and keeps the best feasible plan.
+
+- `--assemble NAME=PID,PID` plans several parcels as one site. The ids
+  are typed out; nothing picks parcels by owner. At most 12 ids. A name
+  made only of ranks (`2`, `115+170`) must list exactly those ranks'
+  parcels. The whole site is planned under the draft rules of its
+  best-ranked member's jurisdiction. When members fall under other draft
+  rules the plan is flagged `ASSEMBLAGE_MIXED_RULES` at severity 1 (drawn,
+  not counted: which code governs is for a person to say); a different
+  zoning in one jurisdiction is the same flag at severity 2, and a member
+  not in `ranked.csv` (its rules unknown) is `ASSEMBLAGE_MEMBER_NOT_RANKED`.
+  Every member's entitlement gate applies (an East Point I-1/I-2 member
+  gates the site), and the pond uses the members' soil group that gives
+  the larger pond.
+- `--cut-parcel RANK=PID:FT` removes a parcel plus a buffer from a site,
+  as a test cut (a cemetery, a house you would not buy). One cut per
+  site: the option given twice for the same site is refused.
+- `--merge` keeps the plans already in `--out`, when they come from the
+  same code (the planner files and every screener module they import,
+  directly or not: `sitefit.py`, `geo.py`, `plan.py`, `viewer.py`,
+  `frontage.py`, `checks.py`, `layers.py`, `arcgis.py` and the rest), run
+  and options (the prototypes' dimensions included). `--redo` plans those
+  sites again. A kept plan of a named site whose `--assemble` members or
+  `--cut-parcel` differ from this call's is dropped and the site planned
+  again (named on stderr). A kept plan that is incomplete (an input not
+  checked) is planned again when the call names it; one the call does
+  not name keeps the exit code at 1 and is listed on stderr. A name that
+  would take a kept plan of another site's key (`a+b` then `a-b`) is
+  refused.
+- `--parking`, `--atlanta-parking` and `--trailer-ratio` are the
+  operator's open decisions (`SITE_PLANNING.md`). Every plan records the
+  values it used.
+- `--max-seconds-per-site` is the search budget, 900 s by default (above
+  0, up to 86,400; anything else is refused). Most
+  sites take under a minute; a 78-acre assemblage took 14 minutes. A
+  site cut short is flagged `PLAN_BUDGET_EXCEEDED` and counts as not
+  feasible, in both behaviours. When only the optional second-building
+  search is cut, building 1 stands and the plan says
+  `SECOND_BUILDING_NOT_SEARCHED`; when only the extra search for smaller
+  layouts (below) is cut, the plan says `SMALLER_LAYOUTS_NOT_ALL_TRIED`.
+- `--prototype-behaviour` reproduces the session's v4 prototype's
+  numbers. It is there for the parity check in
+  `reviews/37_screener_site_planner/`; the draft labels, input states and
+  budget rule are the same in both behaviours, and the default carries
+  that review's fixes.
+
+| File | What it is |
+|---|---|
+| `plans.json` | One record per site: the configuration, `feasible`, floor area, doors, trailers, cars, coverage, detention, access, grading, flags by severity, `gated` (a use permit), the alternatives tried, the draft zoning values used, the operator decisions used, and the state of each input. The header names the run (`ranked.csv`'s SHA-256) and the code. |
+| `plan-<site>.svg` | The drawing, with a side panel of the numbers and flags. |
+
+How to read a plan:
+
+- **`feasible`** is `true` only when no severity-1 flag stands other than
+  an entitlement gate (those are listed in `gated`): there is a truck
+  route and a car route, the pond fits, and the draft caps hold.
+  `false` means something kills or cuts it. `null` means an input could
+  not be read (a flag ending in `_NOT_CHECKED` or `DEM_PARTIAL` says
+  which); it is not a clean result, so run it again. One exception: when
+  no building fits at all (`NO_FIT`), `feasible` stays `false` even with
+  an input missing, because a missing input can only make the envelope
+  larger.
+- **`hypothetical`** is `true` when the frontage was checked and the
+  parcel has no usable frontage (`ACCESS_NONE`): the plan shows what
+  would fit if access were bought. It is `null` when access is unknown
+  (the frontage check failed), never a landlocked signal from an outage.
+- **`gated`** lists entitlement gates such as `USE_PERMIT_REQUIRED`. The
+  geometry can be feasible while the use still needs a permit; the
+  floor area is then not counted in `total_sf` (it stays in
+  `total_sf_if_access`).
+- **`alternatives`** lists the layouts tried. Their `geometry_ok` says
+  whether a layout passed its own checks (routes, pond, plan checks, the
+  coverage cap); it is not the site's feasibility, which also needs
+  access, complete inputs and the draft height cap. A flag no other
+  layout of the site can clear (`HEIGHT_CAP`, `ACCESS_CONSTRAINED`)
+  blocks the site but leaves the layouts alone: the plan drawn, the
+  second building and `total_sf_if_access` are those the site would have
+  without it.
+- When the pond or a route blocks every plan the search tried first, it
+  also tries shorter lengths and the shallower layouts it left out, so a
+  larger parcel does not read worse than a smaller one inside it.
+- **The planner does not check whether a parcel is built.** Run the built
+  check first and plan only parcels it reads as `raw_land` or
+  `partly_usable`; the viewer shows both side by side.
+- Severity 2 flags need checking by a person; severity 3 flags are
+  information.
+
+**These are test fits, not engineering.** They come from public maps:
+county parcel lines, USGS lidar, the national wetland and flood layers,
+HIFLD transmission lines and GDOT roads. They are not a survey, a civil
+design or a zoning determination. Detention is good to about ±30%, and so
+is the building size: the layout search depends on how the parcel sits on
+the map (`SITE_PLANNING.md`, "Still out of scope").
+Routes, fire access and grading are indicative.
+
+**Zoning values are DRAFT.** Every setback, buffer, parking code,
+coverage cap and height cap is a draft screening value (`JUR_DRAFT` in
+`siteplan.py`), mostly from code mirrors, not checked against the
+adopted codes. Every record carries `zoning.status: draft` and the
+`ZONING_DRAFT` flag, and every drawing says DRAFT. A jurisdiction with no
+draft rules gets South Fulton's, flagged `JURISDICTION_DEFAULTED`. The
+root system's human-owned `zoning_rules.json` is the authority, and
+nothing here reads or changes it.
+
+What a plan can't tell you: stream buffers, petroleum pipelines, utility
+capacity, fire flow, sight distance, turn lanes, traffic, truck swept
+paths, retaining walls, outfalls, tree rules and cost are not modelled.
+Residential edges come from county land-use codes, not zoning. The search
+can miss a layout that straddles a corridor. `SITE_PLANNING.md` has the
+full list.
+
+Exit codes: 0 done; 1 written, but some site failed (a bad id, a county
+lookup that failed) or a written plan is incomplete (an input fetch
+failed, so `feasible` is null or a `_NOT_CHECKED` flag stands; run it
+again later); 2 refused before planning (bad arguments, an unreadable
+run folder, or `--out` in the run folder or in a tracked part of the
+repository); 3 owner text found in an output: the run stops, and no file
+of that site is written (its drawing and `plans.json` are both checked
+before either is written; sites finished earlier in the call stay). It
+asks the Fulton parcel service, HIFLD (`services1.arcgis.com`), USGS 3DEP
+elevation (`elevation.nationalmap.gov`), GDOT roads and the map layers in
+`layers.py`, through the shared cache. Its own county, HIFLD and
+elevation requests are spaced a second apart per host and stop after
+five failures in a row (a young cached answer is still used after
+that). `--cache-days` sets the county and HIFLD cache lifetime; elevation
+answers are kept for 10 years whatever it says (lidar does not change).
+The GDOT frontage and the map layers go through the existing screener
+code and keep its cache and retries.
+
+### The viewer
+
+```bash
+python -m screener.viewer RUN_DIR --out screener/output/site-plan-viewer-<date>.html \
+    --plans screener/output/siteplans-<date> \
+    --land screener/output/builtcheck-<date>/land_today.json \
+    --decisions screener/inputs/decisions.csv --leads screener/leads
+```
+
+One self-contained HTML page: the run's briefs and the site plans, with
+filters by decision, building fit, land today and plan feasibility. It reads no network.
+
+- Every input is joined by parcel id, and an input that names its run
+  must name this one. A plans file with no run fingerprint (the
+  prototype's `plans4.json`) needs `--join-by-rank`.
+- From `decisions.csv` it reads only the decision value, and whether the
+  note says "probably taken" (shown as the status). The note text
+  appears only with `--include-notes`. From the lead folders it reads
+  only the skeptic's verdict; the one-line headline appears only with
+  `--include-headlines`. Both are still owner-checked.
+- Every SVG is parsed and rewritten from an allow-list (no scripts, links
+  or styles), and the page allows only its own script to run.
+- A planned site with no drawing is not on the page. The viewer names
+  those sites on stderr in two lists: no building fits, and not planned
+  (the search budget ran out, or an input was not checked, before any
+  plan was made: re-run the planner).
+- A plan of several parcels shows its worst member: the land class
+  (not raw land, unclear, not reviewed, partly usable, raw land, in that
+  order) and the status (pass before pursue), with each member's class
+  in the "Land today" text.
+- A plan's floor area reads as counted, or, when it is not, says why
+  (gated by a use permit, an input not checked, no road access, or a
+  severity-1 flag).
+- Exit codes: 0 written; 2 refused, nothing written (owner text found, a
+  foreign run, an unsafe SVG or file name, a plan SVG named in
+  `plans.json` but missing, a missing or unreadable input file, a
+  `--leads` path that is not a folder, or a page over 15 MB).
+
+### After merging these tools
+
+They add files under `screener/`, so `evaluate.py --decide` refuses
+until a human records a new baseline on the merge commit:
+`python -m screener.autoresearch.evaluate --decide --new-baseline`. The
+score is expected to be unchanged: the evaluator reads none of the new
+modules.
+
 ## AutoResearch
 
 `screener/autoresearch/` runs Karpathy's keep-or-revert loop on `rank.py`
