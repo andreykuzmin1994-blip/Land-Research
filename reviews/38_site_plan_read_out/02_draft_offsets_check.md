@@ -108,8 +108,78 @@ the safe side.
 
 ## B. East Point, College Park, Palmetto
 
-(Research in progress when this file was first committed; see the next
-commit.)
+Researched on the web on 2026-11-17 by a subagent of this session. **The
+result is thin and none of it is from a current official code text.**
+Only Palmetto could be set against a full ordinance, and that copy is
+from 2013. Treat every line as a lead to check, not a finding.
+
+Sources: [P] a 2013 PDF of the Palmetto Zoning Ordinance on a third-party
+host; [E] the eLaws mirror of East Point's zoning, current to January
+2019; [A] official East Point hearing agendas of 2025 and 2026; [S] a
+search-engine excerpt, page not opened. The College Park and Palmetto
+city sites refused automated requests.
+
+### East Point (I-1, I-2, B-P)
+
+| Item | Planner | Source says | Reads |
+|---|---|---|---|
+| Warehouse use | use permit in I-1 / I-2; 5,280 ft from residential (a gate) | [A] I-1: a use permit plus a variance from the one-mile rule, in hearings of 2025-26. I-2 not confirmed. The 2019 text [E] allowed it by right. | matches for I-1 |
+| Front setback | 40 ft | [E] 40 ft (I-1, I-2); 45 ft (B-P) | matches; looser in B-P |
+| Side setback | 8 ft | [E] 8 ft | matches |
+| Rear setback | 8 ft | [E] **30 ft** | **looser by 22 ft** |
+| Truck court and loading strip | 50 ft toward residential | [E] a 50 ft landscaped strip beside **any non-industrial district** | **looser beside commercial land** |
+| Car parking toward residential | 50 ft | [E] 25 ft | stricter |
+| Height / coverage | 40 ft / none | [E] 40 ft / none listed | matches |
+| Residential buffer width, parking ratio | 50 ft; 1 / 2,000 SF | tables missing from the mirror | not found |
+
+- The 8 ft rear offset is the planner's "other lot lines" value; the 2019
+  text has 30 ft at the rear.
+- East Point is rewriting its code; adoption is aimed at March 2027.
+
+### College Park (M-1 / M-2)
+
+Nothing dimensional was found. Every College Park value in the planner
+(50 / 40 / 40 / 25 ft, 35 ft height, 70% impervious) is unchecked.
+
+- [secondary] An ordinance of May 2024 put a 120-day moratorium on
+  applications for warehousing and distribution centers, pending a text
+  amendment. What replaced it was not found. **Ask before trusting any
+  warehouse fit there.**
+- [S] The parking rule reads "1 per 2 employees on the largest shift, or
+  10% of the gross floor area, whichever is greater". The planner uses
+  only the floor-area half.
+
+### Palmetto (M-1 / M-2), 2013 text
+
+| Item | Planner | Source says [P] | Reads |
+|---|---|---|---|
+| Warehouse use | no gate | permitted in M-1 and M-2 | matches |
+| Front / side / rear | 50 / 20 / 20 ft | 50 / 20 / 20 ft | matches |
+| Residential buffer | 50 ft | 50 ft with a 6 ft screen | matches |
+| Buffer beside commercial | 10 ft paving strip | 20 ft (C-1, C-2), 10 ft (C-3, C-4) | **looser beside C-1 / C-2** |
+| Arterial corridor overlay (US 29, SR 154, Weldon, Johnson, Tommy Lee Cook roads) | 50 ft building, 10 ft paving | **95 ft building** (80 with one parking bay), **35 ft paving** | **looser on those roads** |
+| Coverage / height | building 70% / 40 ft | 70% / 40 ft, 3 storeys | matches |
+| Parking | floor area / 1,500 | 1 per employee or 1 per 1,500 SF, whichever is greater | matches but for the employee test |
+| Dock doors | no rule | may not face a public right-of-way unless the building is 200 ft back | no rule (`STREET_FACING_DOCKS` flags within 100 ft) |
+
+- [S] An ordinance of February 2026 rewrote the industrial article and
+  was not read. Every row may be out of date.
+- A watershed overlay caps impervious cover at 25% where it applies.
+
+### What was not read, and a mistake to record
+
+This repository does not read Zoneomics by machine: the operator reviewed
+its terms, which ban scraping, and `rules_scrape.py` blocks the host
+(`reviews/24_rules_local_files/`). Municode refuses automated requests.
+The brief I gave the research subagent named both as places to try. That
+was my error: I had not read review 24. The subagent found the rule and
+read neither site, but it had already sent **five status-only requests
+(three to Zoneomics, two to Municode)**; no content was kept or read. A
+printout of East Point's code on a CoStar-owned host was not opened.
+
+The repository's zoning facts file (section A) cites the Zoneomics mirror
+for South Fulton, Fairburn and Atlanta. That research predates the
+operator's decision; section A read the file, not the mirror.
 
 ## C. Building and fire code
 
@@ -141,6 +211,14 @@ there: verify with the building official and the fire marshal).
    wall. The module rings the building with the court, the end roads and
    the car aisle, so this holds by construction.
 
+The 60 ft and 40 ft figures, the 75% limit and the 3-hour walls were
+confirmed on 2026-11-17 against the model building code text (Section
+507.4 and 507.2.1, 2021 edition, read in a city's published copy), and
+the aerial lane's 30 ft trigger, 26 ft width and 15 to 30 ft distance
+against the fire code's appendix D105. The appendix does not say which
+edge of the road the distance is measured to. Georgia's amendments to
+either section were not checked.
+
 ## What would change if the looser values were tightened
 
 Not done here; each is a planner change that moves yields and needs its
@@ -152,4 +230,8 @@ own review and the replay of `reviews/37`.
 - South Fulton and Union City: a way to mark an agricultural neighbour
   as triggering the buffer (the screener's zoning layers have the
   neighbour's district; the planner reads only land-use codes).
-- All: the open yard as a layout rule, not only a row on the sheet.
+- East Point: a 30 ft rear offset, if the 2019 text still stands.
+- Palmetto: the corridor overlay's 95 ft and 35 ft on the five roads.
+- All: the open yard as a layout rule, not only a row on the sheet; a
+  rear offset apart from the side offset (the planner has one "other lot
+  lines" value, and three of these codes have a deeper rear yard).

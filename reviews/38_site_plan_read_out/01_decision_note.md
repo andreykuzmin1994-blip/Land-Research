@@ -94,6 +94,15 @@ what the sheet now does:
   and the truck court's depth; counts written on the fields ("70 CAR
   STALLS", "13 DOCK DOORS").
 
+## A mistake in this session
+
+The brief for the web research named Zoneomics and Municode as sources to
+try. The operator's decision in `reviews/24_rules_local_files/` is that
+Zoneomics is not read by machine (its terms ban scraping). The research
+subagent found that rule and read neither site, after sending five
+status-only requests (three to Zoneomics, two to Municode). No content
+was kept. Recorded in `02_draft_offsets_check.md`.
+
 ## Open items for the operator
 
 1. **Underground detention.** On reference site #21 the plan drawn is
@@ -108,7 +117,11 @@ what the sheet now does:
    rule wants 60 ft, or 40 ft with 3-hour walls. The sheet now shows the
    row; the layout is unchanged. See `02_draft_offsets_check.md`.
 4. **The draft offsets against the codes.** `02_draft_offsets_check.md`.
-   No value in `JUR_DRAFT` was changed.
+   No value in `JUR_DRAFT` was changed. The largest gaps: rear setbacks
+   (Fairburn 30 ft against 25; East Point 30 ft against 8, from a 2019
+   text), Fairburn's truck-space minimum, Atlanta's height plane beside
+   homes, Palmetto's corridor overlay, and College Park, where nothing
+   was found and a 2024 moratorium on warehouses needs an answer.
 5. **The search itself.** Unchanged by this work. What the read-out shows
    about it: 33 to 41% of the net area is left unused on both reference
    sites, and the layout is one rectangle module per building. Improving
