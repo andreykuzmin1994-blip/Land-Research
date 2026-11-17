@@ -165,8 +165,10 @@ fit.
   reported, the pond count and the ponds drawn agree. (If smaller ponds
   do not fit where the larger ones did, the larger ones stay and the
   storage reported is the one they hold.)
-- When no pond fits, the plan says `POND_DOES_NOT_FIT`: underground
-  vaults or a smaller building.
+- When no pond fits, the plan says `POND_DOES_NOT_FIT`: a smaller
+  building or detention off site. Underground vaults are not offered in
+  this market (operator decision 7); the prototype behaviour keeps the
+  prototype's wording.
 
 ### Second building, grading and ranking
 
@@ -177,9 +179,21 @@ fit.
 - **Grading.** One balanced plane over the whole module, from USGS 1 m
   lidar sampled every 40 ft. Relief and the steep share are reported.
 - **Ranking of alternatives.** Plans that pass their own layout checks
-  first (`geometry_ok`, below), then plans with a route, then by floor area.
-  Floor area is marked down for steep ground, for relief over 25 ft and
-  for a trailer shortfall.
+  first (`geometry_ok`, below), then plans with a route, then plans that
+  meet a draft code minimum of truck spaces where the rules have one
+  (Fairburn), then by floor area. Floor area is marked down for steep
+  ground and for relief over 25 ft. A trailer shortfall against the
+  market target costs no floor area since 2026-11-17 (operator decision
+  9) and only settles a tie; the prototype behaviour keeps its 2,000 SF
+  per stall.
+- **Turning a layout round.** Each fit is first turned so its courts
+  face away from homes and the street. With homes or a farm behind, that
+  puts the court on the street and the cars at the back, where no car
+  route reaches them without crossing truck pavement, and every layout
+  failed (`CAR_ROUTE_NONE`). Since 2026-11-17 the default behaviour
+  tries the other ways round the same fit before giving it up
+  (`Plan.flips`). A court that ends up within 150 ft of homes is flagged
+  (`LOADING_FACES_RES`).
 - **Comp band.** Georgia comps run 10,500 to 15,400 SF per gross acre. A
   plan below that says `BELOW_COMP_BAND`.
 
@@ -313,19 +327,25 @@ They are in `JUR_TIGHTENED` in `siteplan.py`, laid over the draft table
 in the default behaviour only. `--prototype-behaviour` reads the draft
 table as it was. **They are still draft**: several rest on a 2013 or a
 2019 text, and none is verified against the adopted code. Each plan
-lists what was applied under `zoning.tightened`.
+lists its jurisdiction's tightened rules under `zoning.tightened` (the
+whole set for that place, whether or not each one bit on this site).
 
 - **The open yard.** The building stands 60 ft (`OPEN_YARD_RULE_FT`)
   from every lot line that is not a road: the building code's
-  unlimited-area rule. Applied to every building, whatever its size. A
-  smaller building may not need it, and 40 ft is allowed with 3-hour
-  walls; set the constant to 40 to plan that way.
+  unlimited-area rule. It is cut out of the building envelope as one
+  band round those lines, so an inside corner of the parcel is held
+  too, and the zoning table keeps the codes' own numbers (a 30 ft rear
+  yard reads 30 ft in the record and on the sheet; the open yard has
+  its own row). Applied to every building, whatever its size. A smaller
+  building may not need it, and 40 ft is allowed with 3-hour walls; set
+  the constant to 40 to plan that way.
 - **Rear lot lines.** A rear line that is not residential is its own
   kind (`OTHER_REAR`): a stretch of boundary further from the road than
   half the parcel's depth. Fairburn 30 ft, East Point 30 ft (2019 text).
   Fairburn's side stays at the draft 25 ft (the code says 20).
 - **Commercial and institutional neighbours** (`COMM`: county tax class
-  C or E). East Point: the 50 ft landscaped strip toward any
+  C or E; E is every tax-exempt parcel, so it takes in public vacant
+  land as well as schools and churches, which errs on the safe side). East Point: the 50 ft landscaped strip toward any
   non-industrial parcel. Fairburn: the 50 ft buffer to other districts
   (the flag `DISTRICT_BUFFER_NOT_DRAWN` stays for the other lot lines,
   where the wording is unclear). Palmetto: 20 ft.
@@ -335,10 +355,17 @@ lists what was applied under `zoning.tightened`.
 - **Atlanta.** 31 ft from a residential line: the 20 ft transitional
   yard plus 11 ft for the 45-degree height plane at a 46 ft building.
 - **Fairburn truck spaces.** One per 5,000 SF of warehouse is a floor
-  under the trailer target; the check has a "Truck spaces" row.
+  under the trailer target; the check has a "Truck spaces" row. Among
+  layouts that pass, one that meets this minimum is drawn before a
+  larger one that does not (as every layout meets the code's car
+  parking). This is the one place a trailer count still steers the
+  choice: it is a code minimum, not the market target of decision 9. If
+  the reading is wrong ("oversized (truck) space" may not mean a
+  trailer stall), take `truck_space_sf` out of `JUR_TIGHTENED`.
 - **East Point B-P.** Front yard 45 ft.
 - **Palmetto corridor overlay.** 95 ft building and 35 ft paving at the
-  road when the frontage reads as SR 14 (US 29) or SR 154. The other
+  road when the site fronts SR 14 (US 29) or SR 154, on any of its
+  frontages. The other
   three overlay roads are county roads, which carry no name in the GDOT
   layer, so every other Palmetto plan carries `CORRIDOR_OVERLAY`: check
   the road.

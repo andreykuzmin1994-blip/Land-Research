@@ -376,7 +376,7 @@ class PlanOptions:
                 "market_depths": {"rear": list(MARKET_REAR_DEPTHS), "cross": list(MARKET_CROSS_DEPTHS)},
                 "other_edge_min_pave_ft": OTHER_EDGE_MIN_PAVE_FT,
                 "dual_hsg": DUAL_HSG_USE if self.fixes else "drained (first letter)",
-                "underground_detention": "yes" if self.underground else "no",
+                "underground_detention": ("yes" if self.underground else "no") if self.fixes else "not set (prototype)",
                 "ranking": dict(self.ranking),
                 "open_yard_ft": OPEN_YARD_RULE_FT if self.fixes else None,
                 "tightened_rules": self.fixes,
@@ -402,7 +402,8 @@ def trailer_tiers_from(text: str) -> tuple:
 def jur_rules(name: str, tightened: bool = False) -> tuple[str, dict[str, Any], bool]:
     """(rules name, a copy of the DRAFT rules, defaulted?). tightened (the
     default behaviour): with JUR_TIGHTENED laid over the draft table, a
-    value for every edge kind, and the open yard at the building."""
+    value for every edge kind, and the open yard at the building
+    (``open_yard_ft``, cut by plan_site)."""
     n = (name or "").lower()
     key, defaulted = next(((k, False) for k in JUR_DRAFT if k in n), (DEFAULT_JURISDICTION, True))
     rules = copy.deepcopy(JUR_DRAFT[key])
@@ -414,9 +415,10 @@ def jur_rules(name: str, tightened: bool = False) -> tuple[str, dict[str, Any], 
             rules[table].setdefault("COMM", max(rules[table]["OTHER"], rules[table]["OTHER_REAR"]))
         rules["tightened"] = extra.pop("why", [])
         rules.update(extra)
-        for kind in EDGE_KINDS:
-            if kind != "ROW" and rules["bldg"][kind] < OPEN_YARD_RULE_FT:
-                rules["bldg"][kind] = OPEN_YARD_RULE_FT
+        # The open yard is not a zoning value: plan_site cuts it out of the
+        # building envelope in one piece, so the table keeps the codes' own
+        # numbers (a 30 ft rear yard stays 30 ft in the record).
+        rules["open_yard_ft"] = OPEN_YARD_RULE_FT
         rules["tightened"].append(f"the building stands {OPEN_YARD_RULE_FT} ft from every lot line that is not a road "
                                   "(the building code's open yard)")
     return (f"{DEFAULT_JURISDICTION} (default)" if defaulted else key), rules, defaulted
@@ -740,10 +742,33 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
     res_u = unary_union(res_zone) if res_zone else None
     dmax = (max(row.distance(Point(c)) for q in sitefit.polygon_parts(parcel_ft) for c in q.exterior.coords)
             if not row.is_empty else None)
+
+    def side_and_rear(g):
+        """The straight stretches of `g`, as (side line, rear line): a
+        stretch is a rear one when its middle lies further from the road
+        than half the parcel's depth. Each is merged back into runs, so an
+        offset from it keeps its corners."""
+        rear, side = [], []
+        for ln in _lines_of(g):
+            pts = list(ln.coords)
+            for q0, q1 in zip(pts, pts[1:]):
+                seg = LineString([q0, q1])
+                if seg.length > 0:
+                    (rear if row.distance(seg.interpolate(0.5, normalized=True)) > 0.5 * dmax else side).append(seg)
+        merged = [linemerge(unary_union(x)) if len(x) > 1 else (x[0] if x else LineString()) for x in (side, rear)]
+        return merged[0], merged[1]
+
     if res_u is not None:
         res = rest.intersection(res_u)
         rest = rest.difference(res_u)
-        if not row.is_empty:
+        if row.is_empty:
+            out.append(("RES_REAR", res))
+        elif rules is not None:
+            # per straight stretch: a neighbour along a whole side is a side
+            # line, though it is read 20 ft round the back corner
+            side, rear = side_and_rear(res)
+            out += [(k, g) for k, g in (("RES_SIDE", side), ("RES_REAR", rear)) if not g.is_empty]
+        else:
             for seg in getattr(res, "geoms", [res]):
                 # Points from touching lines carry no length (the prototype
                 # crashed on them in interpolate).
@@ -752,28 +777,17 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any]
                 mid = seg.interpolate(0.5, normalized=True)
                 kind = "RES_REAR" if row.distance(mid) > 0.5 * dmax else "RES_SIDE"
                 out.append((kind, seg))
-        else:
-            out.append(("RES_REAR", res))
     if rules is not None:
         if comm_zone:
             comm_u = unary_union(comm_zone)
             comm = unary_union(_lines_of(rest.intersection(comm_u)))
             rest = rest.difference(comm_u)
             if not comm.is_empty:
-                out.append(("COMM", comm))
+                out.append(("COMM", linemerge(comm) if comm.geom_type == "MultiLineString" else comm))
         if dmax is not None:
-            # each straight stretch of what is left is a side or a rear line,
-            # by how far it lies from the road (the rule the residential lines use)
-            rear, side = [], []
-            for ln in _lines_of(rest):
-                pts = list(ln.coords)
-                for q0, q1 in zip(pts, pts[1:]):
-                    seg = LineString([q0, q1])
-                    if seg.length > 0:
-                        (rear if row.distance(seg.interpolate(0.5, normalized=True)) > 0.5 * dmax else side).append(seg)
-            if rear:
-                out.append(("OTHER_REAR", unary_union(rear)))
-            rest = unary_union(side) if side else LineString()
+            rest, rear = side_and_rear(rest)
+            if not rear.is_empty:
+                out.append(("OTHER_REAR", rear))
     if not rest.is_empty:
         out.append(("OTHER", rest))
     return out
@@ -907,6 +921,8 @@ class Plan:
     cars_rule: str
     trailers_target: int
     clear: int
+    code_trailers: int = 0      # a draft code minimum of truck spaces (0: the rules have none)
+    flips: list = field(default_factory=list)   # the same fit turned the other ways round, best first
 
 
 def build(v, L, r, fr: Frame, prog: Program, draw: bool = True) -> Plan:
@@ -1006,7 +1022,7 @@ def build(v, L, r, fr: Frame, prog: Program, draw: bool = True) -> Plan:
     req, rule = required_cars(prog.prule, sf, prog.opts)
     capc = int(r * car_per_row(v, L, sw) * prog.island)
     return Plan(v, L, r, fr, fr.rect(0, Lmod, 0, depth), b, courts, rows, cars, roads, offices, ticks, doors_g, tin, cin, fb,
-                sf, doors, court_stalls, capc, req, rule, target, 32 if sf < 200000 else 36)
+                sf, doors, court_stalls, capc, req, rule, target, 32 if sf < 200000 else 36, code_min)
 
 
 def orient_score(p: Plan, row_line, res_line) -> float:
@@ -1083,6 +1099,10 @@ def fit_variant(v, P, B, prog: Program, row_line, res_line, search: Search, leng
                         cands.append((orient_score(p, row_line, res_line), p))
             if cands:
                 found = max(cands, key=lambda t: t[0])[1]
+                # The other ways round the same fit stands (docks to the
+                # other side, the office to the other end), for a layout
+                # whose routes fail the way it was first turned.
+                found.flips = [q for _, q in sorted(cands, key=lambda t: -t[0]) if q is not found]
                 break
             smaller = [x for x in lat if x < Lmod]
             cap = smaller[-1] if smaller else None
@@ -1541,6 +1561,7 @@ class FrontageInput:
     feet: int | None = None
     road: str | None = None
     reason: str = ""
+    roads: list = field(default_factory=list)     # labels of every road fronted, longest first (may be empty)
 
 
 @dataclass
@@ -1994,11 +2015,12 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             rules["tightened"].append(f"front yard {feet} ft applied: zoned {meta.get('zoning')}")
     corridor = rules.get("corridor")
     if corridor:
-        on = [r for r in corridor["routes"] if re.search(rf"\b{re.escape(r)}\b", fr.road or "")]
+        fronted = [fr.road or ""] + [str(x) for x in fr.roads]
+        on = [r for r in corridor["routes"] if any(re.search(rf"\b{re.escape(r)}\b", lab) for lab in fronted)]
         if on:
             rules["bldg"]["ROW"] = max(rules["bldg"]["ROW"], corridor["bldg"])
             rules["pave"]["ROW"] = max(rules["pave"]["ROW"], corridor["pave"])
-            late.append(("CORRIDOR_OVERLAY", 2, f"the frontage reads as {on[0]}: the corridor overlay's {corridor['bldg']} ft "
+            late.append(("CORRIDOR_OVERLAY", 2, f"the site fronts {on[0]}: the corridor overlay's {corridor['bldg']} ft "
                          f"building and {corridor['pave']} ft paving setbacks at the road are applied (draft reading)"))
         else:
             late.append(("CORRIDOR_OVERLAY", 2, f"a corridor overlay sets {corridor['bldg']} ft building and {corridor['pave']} ft "
@@ -2013,7 +2035,15 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         whose = "residential or agricultural parcels (county tax classes)" if rules.get("ag_buffer") else "residential parcels (county land-use codes)"
         flags.append(("RESIDENTIAL_EDGE", 2, f"about {res_line.length:,.0f} ft of boundary touches {whose}; draft buffers applied"))
     P = clean(envelope(parcel, edges, rules["pave"]).difference(wet_buf).difference(cut))
-    B = clean(envelope(parcel, edges, rules["bldg"]).difference(wet_buf).difference(trans).difference(cut))
+    B = envelope(parcel, edges, rules["bldg"]).difference(wet_buf).difference(trans).difference(cut)
+    if rules.get("open_yard_ft"):
+        # The open yard, as one band round every lot line that is not a
+        # road: round at the bends and the ends, so an inside corner of the
+        # parcel and the end of a side line at the road are held too.
+        off_road = [ln for k, ln in edges if k != "ROW" and not ln.is_empty]
+        if off_road:
+            B = B.difference(unary_union(off_road).buffer(rules["open_yard_ft"]))
+    B = clean(B)
     dem = inp.dem
     steep = steep_cells(dem, float_keys=not opts.fixes).intersection(parcel) if dem.elev else Polygon()
     try:
@@ -2040,7 +2070,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             flags.append(("USE_PERMIT_REQUIRED", 1, "Chattahoochee Hills: no by-right warehousing" + who))
     if jname.startswith("fairburn") and fr.road and "local" in fr.road:
         flags.append(("COLLECTOR_FRONTAGE", 2, "Fairburn M-districts require collector-street frontage; this frontage reads as a local road"))
-    if opts.fixes and jname.startswith("fairburn") and any(k == "OTHER" and not ln.is_empty for k, ln in edges):
+    if opts.fixes and jname.startswith("fairburn") and any(k in ("OTHER", "OTHER_REAR") and not ln.is_empty for k, ln in edges):
         late.append(("DISTRICT_BUFFER_NOT_DRAWN", 2, "Fairburn M-districts: a 50 ft buffer to every other district (draft reading) is not drawn; "
                                                      "lot lines toward non-residential land carry only the draft 'other' setback, so the yield may be overstated"))
     if prog.prule == "market":
@@ -2087,6 +2117,16 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                             and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
                         pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
                     if o["route_problem"] and not shorten_routes:
+                        if opts.fixes:
+                            # Turn the same fit round before giving it up. The
+                            # first turn keeps docks away from homes and the
+                            # street; with homes behind, that puts the court
+                            # on the street and the cars at the back, where no
+                            # car route reaches them. Default behaviour only.
+                            turned = next(((alt, o2) for alt in cur.flips for o2 in [finish(alt, ctx)] if o2["ok"]), None)
+                            if turned is not None:
+                                results.append(turned)
+                                break
                         results.append((cur, o))
                         break
                     if opts.fixes and not o["route_problem"] and not (
@@ -2164,8 +2204,14 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         q, o = t
         st = o["steep_module_pct"] / 100
         rel = (o["relief"] or 0)
-        # the trailer shortfall last: it only settles a tie in floor area
-        return (o["ok"], not o["route_problem"], rank_sf(q, o, st, rel), -max(0, q.trailers_target - o["trailers"]))
+        if not opts.fixes:
+            return (o["ok"], not o["route_problem"], rank_sf(q, o, st, rel))
+        # A layout that meets a draft code minimum of truck spaces (where
+        # the rules have one) before one that does not, as code car
+        # parking is met by every layout; then floor area. The shortfall
+        # against the market target comes last: it only settles a tie.
+        return (o["ok"], not o["route_problem"], o["trailers"] >= q.code_trailers, rank_sf(q, o, st, rel),
+                -max(0, q.trailers_target - o["trailers"]))
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
     second = None
@@ -2275,7 +2321,8 @@ def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], p
                            sum(oo["trailers"] for _, oo in layouts)) if rules.get("truck_space_sf") else None))}
     rec["quantities"] = assess.quantities(shapes, layouts, building_sf=rec["total_sf_if_access"], frontage_ft=fr.feet,
                                           residential_edge_ft=res_line.length if res_line is not None else 0.0, net_ac=net_ac)
-    rec["selection"] = assess.selection(rec["alternatives"], opts.ranking, pond_limited, underground=opts.underground)
+    rec["selection"] = assess.selection(rec["alternatives"], opts.ranking, pond_limited,
+                                        underground=opts.underground if opts.fixes else None)
     rec["assessment"] = assess.assessment(rec, COMP_BAND_SF_PER_AC)
 
 

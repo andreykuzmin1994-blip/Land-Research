@@ -560,9 +560,9 @@ class Plans(Offline):
 
     def test_trailer_ratio_is_consistent(self):
         o = sp.PlanOptions(trailer_tiers=sp.trailer_tiers_from("1.3"))
-        # 800 x 1000 ft: the plan drawn has a drop yard (the ranking no longer
+        # 1000 x 1000 ft: the plan drawn has a drop yard (the ranking no longer
         # trades floor area for trailer stalls, so 800 x 800 draws none)
-        rec, d = planned("tr13b", lambda: site(800, 1000), o)
+        rec, d = planned("tr13c", lambda: site(1000, 1000), o)
         self.assertGreater(rec["trailers"]["drop_yards"], 0)     # the drop-yard branch runs
         self.assertEqual(rec["trailers"]["target"], math.ceil(1.3 * rec["doors"]))
         self.assertEqual(rec["operator_decisions"]["trailer_target_tiers"][0][1], 1.3)

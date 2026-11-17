@@ -229,9 +229,9 @@ class Selection(unittest.TestCase):
         self.assertIsNone(assess.selection([alt(68000)], sp.RANKING)["with_trailers"])       # not short: nothing to say
 
     def test_without_pond_by_market(self):
-        args = ([alt(58000), alt(68000, trailers=0)], sp.PROTOTYPE_RANKING, [alt(96000, ok=False, trailers=0), alt(60000, ok=False)])
+        args = ([alt(58000), alt(68000, trailers=0)], sp.RANKING, [alt(96000, ok=False, trailers=0), alt(60000, ok=False)])
         s = assess.selection(*args)                               # the default: no underground detention here
-        self.assertEqual((s["without_pond"]["sf"], s["without_pond"]["gain_sf"]), (96000, 38000))
+        self.assertEqual((s["without_pond"]["sf"], s["without_pond"]["gain_sf"]), (96000, 38000))    # against the plan drawn
         self.assertIs(s["without_pond"]["underground"], False)
         self.assertIn("passed every layout check but the pond", s["basis"])
         self.assertIn("0 of its 10 target trailer stalls", s["basis"])
@@ -492,14 +492,17 @@ class TightenedRules(ts.Offline):
             _, r, _ = sp.jur_rules(name, tightened=True)
             self.assertEqual(set(r["bldg"]), set(sp.EDGE_KINDS))
             self.assertEqual(set(r["pave"]), set(sp.EDGE_KINDS))
+            self.assertEqual(r["open_yard_ft"], sp.OPEN_YARD_RULE_FT)          # cut by plan_site, not folded into the table
             for kind in sp.EDGE_KINDS:
-                if kind != "ROW":                                   # the open yard at the building
-                    self.assertGreaterEqual(r["bldg"][kind], sp.OPEN_YARD_RULE_FT, (name, kind))
                 self.assertGreaterEqual(r["bldg"][kind], sp.JUR_DRAFT[name]["bldg"].get(kind, 0))      # never looser
                 self.assertGreaterEqual(r["pave"][kind], sp.JUR_DRAFT[name]["pave"].get(kind, 0))
             self.assertTrue(r["tightened"])
         _, fair, _ = sp.jur_rules("Fairburn", tightened=True)
         self.assertEqual((fair["pave"]["COMM"], fair["truck_space_sf"], fair["pave"]["OTHER_REAR"]), (50, 5000, 5))
+        # the table keeps the codes' own numbers: the 60 ft yard does not overwrite them
+        self.assertEqual((fair["bldg"]["OTHER_REAR"], fair["bldg"]["OTHER"], fair["bldg"]["COMM"]), (30, 25, 50))
+        self.assertEqual(sp.jur_rules("Atlanta", tightened=True)[1]["bldg"]["RES_REAR"], 31)
+        self.assertEqual(sp.jur_rules("East Point", tightened=True)[1]["bldg"]["OTHER_REAR"], 30)
         _, ep, _ = sp.jur_rules("East Point", tightened=True)
         self.assertEqual((ep["pave"]["COMM"], ep["row_by_zoning"]), (50, {"BP": 45}))
         for name in ("South Fulton", "Union City"):
@@ -550,7 +553,7 @@ class TightenedRules(ts.Offline):
         sf = rec["building"]["sf"]
         self.assertGreaterEqual(rec["trailers"]["target"], sf // 5000)        # the floor under the market target
         row = [r for r in rec["compliance"]["rows"] if r["item"] == "Truck spaces"][0]
-        self.assertEqual(row["status"], "meets" if rec["trailers"]["total"] >= int(row["required"].split()[0]) else "short")
+        self.assertEqual(int(row["required"].split()[0]), -(-sf // 5000))
         if rec["trailers"]["total"] < rec["trailers"]["target"]:
             note = [f["note"] for f in rec["flags"][2] if f["flag"] == "TRAILER_SHORT"][0]
             self.assertIn("5,000 SF", note)
@@ -588,11 +591,113 @@ class TightenedRules(ts.Offline):
     def test_atlanta_stands_back_from_homes(self):
         homes = ts.wgs(box(600, 0, 800, 700))
         rec, d = ts.planned("atl_homes", lambda: ts.site(600, 700, jur="Atlanta", neighbours=[({"LUCode": "101"}, homes)]))
-        self.assertEqual(rec["zoning"]["values"]["bldg"]["RES_SIDE"], max(31, sp.OPEN_YARD_RULE_FT))
+        self.assertEqual(rec["zoning"]["values"]["bldg"]["RES_SIDE"], 31)
         self.assertEqual(rec["zoning"]["values"]["pave"]["RES_SIDE"], 20)
-        if rec["fits"]:
-            res = sp.unary_union([ln for k, ln in d.edges if k.startswith("RES")])
-            self.assertGreaterEqual(d.p.building.distance(res), 31)
+        self.assertTrue(rec["fits"])
+        res = sp.unary_union([ln for k, ln in d.edges if k.startswith("RES")])
+        self.assertGreaterEqual(d.p.building.distance(res), sp.OPEN_YARD_RULE_FT - 1)        # the open yard governs here
+        # without the open yard the 31 ft of the height plane is what holds the building back:
+        # the building envelope stops 31 ft from the homes' line, where the draft table stopped at 20
+        with ts.mock.patch.object(sp, "OPEN_YARD_RULE_FT", 0), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            free, d2 = sp.plan_site(ts.site(600, 700, jur="Atlanta", neighbours=[({"LUCode": "101"}, homes)]))
+            proto, d3 = sp.plan_site(ts.site(600, 700, jur="Atlanta", neighbours=[({"LUCode": "101"}, homes)]),
+                                     sp.PlanOptions(behaviour="prototype"))
+        res2 = sp.unary_union([ln for k, ln in d2.edges if k == "RES_SIDE"])
+        # (measured square to the line: the envelope is square at a line's ends)
+        self.assertAlmostEqual(assess.band_clearance(d2.B, res2), 31, delta=1.5)
+        res3 = sp.unary_union([ln for k, ln in d3.edges if k.startswith("RES")])
+        self.assertAlmostEqual(assess.band_clearance(d3.B, res3), 20, delta=1.5)
+
+    def test_open_yard_holds_at_an_inside_corner(self):
+        # review 38/04, finding 1: a notch in the rear line; the building stood 53 ft from the notch's corner
+        notch = [box(0, 0, 1000, 600).difference(box(400, 450, 600, 600))]
+        rec, d = ts.planned("fair_notch", lambda: ts.site(shapes=notch, jur="Fairburn", front=LineString([(0, 0), (1000, 0)])))
+        self.assertTrue(rec["fits"])
+        lines = sp.unary_union([ln for k, ln in d.edges if k != "ROW"])
+        self.assertGreaterEqual(d.p.building.distance(lines), sp.OPEN_YARD_RULE_FT - 0.5)
+        self.assertGreaterEqual(d.B.distance(lines), sp.OPEN_YARD_RULE_FT - 0.5)             # the whole envelope, not only this plan
+        yard = [r for r in rec["compliance"]["rows"] if r["item"].startswith("Open yard")][0]
+        self.assertEqual(yard["status"], "meets")
+        rear = [r for r in rec["compliance"]["rows"] if r["item"] == "Building setback, rear lot line"][0]
+        self.assertEqual(rear["required"], "30 ft")                                          # the code's number, not the yard's
+
+    def test_neighbour_behind_and_beside(self):
+        # review 38/04, finding 2. A farm behind counts as residential in South
+        # Fulton; the plan no longer fails on its car route (the fit is turned round).
+        farm = ({"ClassCode": "A5"}, ts.wgs(box(0, 900, 900, 1100)))
+        rec, d = ts.planned("sf_farm_behind", lambda: ts.site(900, 900, neighbours=[farm]))
+        self.assertIs(rec["feasible"], True)
+        self.assertIn("agricultural", [f["note"] for f in rec["flags"][2] if f["flag"] == "RESIDENTIAL_EDGE"][0])
+        self.assertGreater(rec["inputs"]["edges_ft"]["RES_REAR"], 850)
+        rear = sp.unary_union([ln for k, ln in d.edges if k == "RES_REAR"])
+        self.assertGreaterEqual(d.p.building.distance(rear), 110 - 1)
+        self.assertGreaterEqual(d.p.module.distance(rear), 110 - 1)
+        # the same farm in Atlanta is not a residential edge
+        atl, _ = ts.planned("atl_farm_behind", lambda: ts.site(900, 900, neighbours=[farm], jur="Atlanta"))
+        self.assertNotIn("RESIDENTIAL_EDGE", ts.names(atl))
+        # homes along a whole side are a side line (60 ft), though read 20 ft round the back corner
+        beside = ({"LUCode": "101"}, ts.wgs(box(900, 0, 1100, 900)))
+        side, _ = ts.planned("sf_homes_beside", lambda: ts.site(900, 900, neighbours=[beside]))
+        self.assertGreater(side["inputs"]["edges_ft"]["RES_SIDE"], 850)
+        self.assertLess(side["inputs"]["edges_ft"].get("RES_REAR", 0), 40)
+
+    def test_fairburn_buffer_flag_covers_rear_lines(self):
+        # review 38/04, finding 5: shops on both sides and industry behind
+        shops = [({"ClassCode": "C3"}, ts.wgs(box(900, 0, 1100, 800))), ({"ClassCode": "C3"}, ts.wgs(box(-200, 0, 0, 800))),
+                 ({"ClassCode": "I4"}, ts.wgs(box(0, 800, 900, 1000)))]
+        rec, _ = ts.planned("fair_shops", lambda: ts.site(900, 800, jur="Fairburn", neighbours=shops))
+        kinds = set(rec["inputs"]["edges_ft"])
+        self.assertIn("COMM", kinds)
+        self.assertIn("OTHER_REAR", kinds)
+        self.assertIn("DISTRICT_BUFFER_NOT_DRAWN", ts.names(rec, 2))
+
+    def test_code_truck_spaces_steer_the_choice(self):
+        # review 38/04, finding 4: among passing layouts, one that meets the draft code minimum first
+        shops = [({"ClassCode": "C3"}, ts.wgs(box(900, 0, 1100, 800))), ({"ClassCode": "E1"}, ts.wgs(box(-200, 0, 0, 800)))]
+        rec, _ = ts.planned("fair_shops2", lambda: ts.site(900, 800, jur="Fairburn", neighbours=shops))
+        need = lambda a: -(-a["sf"] // 5000)
+        met = [a for a in rec["alternatives"] if a["geometry_ok"] and a["trailers"] >= need(a)]
+        first = rec["alternatives"][0]
+        if met:
+            self.assertGreaterEqual(first["trailers"], need(first))                            # the plan drawn meets it
+            self.assertEqual(first["sf"], max(a["sf"] for a in met))                           # and is the largest that does
+        row = [r for r in rec["compliance"]["rows"] if r["item"] == "Truck spaces"][0]
+        self.assertEqual(int(row["required"].split()[0]), -(-rec["building"]["sf"] // 5000))
+        self.assertEqual(int(row["provided"].split()[0]), rec["trailers"]["total"])
+
+    def test_corridor_on_a_shorter_frontage(self):
+        # review 38/04, finding 7: the state route is not the longest frontage
+        def corner():
+            inp = ts.site(900, 900, jur="Palmetto", road="local road, GDOT route 1121200054600")
+            inp.frontage.roads = ["local road, GDOT route 1121200054600", "minor arterial, SR 154"]
+            return inp
+        rec, _ = ts.planned("palm_corner", corner)
+        self.assertEqual(rec["zoning"]["values"]["bldg"]["ROW"], 95)
+        self.assertIn("fronts SR 154", [f["note"] for f in rec["flags"][2] if f["flag"] == "CORRIDOR_OVERLAY"][0])
+
+    def test_prototype_read_out_states_no_default_decision(self):
+        # review 38/04, finding 3
+        proto = sp.PlanOptions(behaviour="prototype")
+
+        def nopond_once(*a, **k):
+            return None
+        rec, _ = ts.planned("basic", lambda: ts.site(600, 700), proto)
+        self.assertEqual(rec["operator_decisions"]["underground_detention"], "not set (prototype)")
+        self.assertEqual(rec["operator_decisions"]["ranking"]["trailer_sf"], 2000)
+        text = rec["selection"]["basis"] + " ".join(rec["assessment"]["yield"]["notes"])
+        self.assertNotIn("does not trade floor area", text)
+        self.assertNotIn("not used in this market", text)
+        with ts.mock.patch.object(sp, "place_sized_pond", nopond_once), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            blocked, _ = sp.plan_site(ts.site(600, 700), proto)
+        acts = " ".join(c["action"] for c in blocked["assessment"]["conditions"])
+        self.assertNotIn("not used in this market", acts)
+        # the unit: no market stated, every larger pond-limited layout reported, the trailer sentence by the weights
+        s = assess.selection([alt(67000, trailers=0)], sp.PROTOTYPE_RANKING, [alt(68000, ok=False)], underground=None)
+        self.assertEqual(s["without_pond"]["sf"], 68000)
+        self.assertIsNone(s["without_pond"]["underground"])
+        self.assertNotIn("market", s["basis"])
+        self.assertIn("It has 0 of its 10 target trailer stalls.", s["basis"])
+        self.assertNotIn("does not trade", s["basis"])
 
 
 @unittest.skipUnless(ts.FIXTURES.is_dir(), "no reference fixtures")

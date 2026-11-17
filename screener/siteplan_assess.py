@@ -154,8 +154,7 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                                "planning staff's answer on the governing code"),
     # stormwater, grading, environmental
     "POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer test a smaller building, and ask whether a regional or "
-                          "off-site pond serves the site. Underground detention is not used in this market.",
-                          "a detention concept sized under the local ordinance"),
+                          "off-site pond serves the site.", "a detention concept sized under the local ordinance"),
     "CORRIDOR_OVERLAY": (W_ZONING, "desk", "Check whether the road is in the corridor overlay. On an overlay road the front "
                          "setbacks are much deeper and the yield falls; the plan applies them only on the state routes it "
                          "can read.", "the overlay map or the code's list of roads"),
@@ -215,12 +214,16 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
     "PLAN_BUDGET_EXCEEDED": _BUDGET, "SECOND_BUILDING_NOT_SEARCHED": _BUDGET, "SMALLER_LAYOUTS_NOT_ALL_TRIED": _BUDGET,
 }
 _UNKNOWN = (W_DATA, "desk", "Read this flag against the drawing.", "")
-# Where the market uses underground detention (an operator decision, off by
-# default: not in a cheap land market).
-PLAYBOOK_UNDERGROUND: dict[str, tuple[str, str, str, str]] = {
-    "POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer price underground detention against the floor area it "
-                          "frees, and ask whether a regional or off-site pond serves the site.",
-                          "a detention concept sized under the local ordinance, with a vault cost"),
+# By the market's decision on underground detention (an operator decision:
+# "no" where land is cheap, "yes" where it is dear). A record that states
+# neither (the prototype behaviour) gets the plain entry above.
+PLAYBOOK_BY_MARKET: dict[str, dict[str, tuple[str, str, str, str]]] = {
+    "no": {"POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer test a smaller building, and ask whether a regional "
+                                 "or off-site pond serves the site. Underground detention is not used in this market.",
+                                 "a detention concept sized under the local ordinance")},
+    "yes": {"POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer price underground detention against the floor area "
+                                  "it frees, and ask whether a regional or off-site pond serves the site.",
+                                  "a detention concept sized under the local ordinance, with a vault cost")},
 }
 # A flag raised at two severities for two different facts.
 PLAYBOOK_AT_SEVERITY: dict[tuple[str, int], tuple[str, str, str, str]] = {
@@ -230,12 +233,13 @@ PLAYBOOK_AT_SEVERITY: dict[tuple[str, int], tuple[str, str, str, str]] = {
 }
 
 
-def playbook_for(flag: str, severity: int | None = None, underground: bool = False) -> tuple[str, str, str, str]:
+def playbook_for(flag: str, severity: int | None = None, market: str | None = None) -> tuple[str, str, str, str]:
     """The playbook entry of a flag. A second building's flag
-    (``SECOND_<flag>``) takes the entry of the flag it repeats."""
+    (``SECOND_<flag>``) takes the entry of the flag it repeats. market:
+    the record's decision on underground detention ("yes" / "no")."""
     base = flag[7:] if flag.startswith("SECOND_") and flag[7:] in PLAYBOOK else flag
-    if underground and base in PLAYBOOK_UNDERGROUND:
-        return PLAYBOOK_UNDERGROUND[base]
+    if base in PLAYBOOK_BY_MARKET.get(market or "", {}):
+        return PLAYBOOK_BY_MARKET[market][base]
     if (base, severity) in PLAYBOOK_AT_SEVERITY:
         return PLAYBOOK_AT_SEVERITY[(base, severity)]
     return PLAYBOOK.get(base, _UNKNOWN)
@@ -555,7 +559,7 @@ def _fail_text(a: dict[str, Any]) -> str:
 
 
 def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
-              pond_limited: Iterable[dict[str, Any]] = (), underground: bool = False) -> dict[str, Any]:
+              pond_limited: Iterable[dict[str, Any]] = (), underground: bool | None = False) -> dict[str, Any]:
     """Why the plan drawn (the first alternative) ranks first; the largest
     layout that passed its checks when it is larger; the largest that
     meets its trailer target when the plan drawn does not; and what the
@@ -566,7 +570,8 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
     every layout check but the surface pond, at the length first tried.
     underground: whether the market uses underground detention (an
     operator decision); it decides what is said about the pond, nothing
-    else."""
+    else. None (the prototype behaviour) says nothing about the market
+    and reports every larger pond-limited layout."""
     alts = [a for a in alternatives if isinstance(a, dict)]
     out: dict[str, Any] = {"basis": "", "upside": None, "with_trailers": None, "without_pond": None, "larger_failed": 0}
     if not alts:
@@ -604,8 +609,8 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
         # The ranking gives no floor area for trailer stalls (an operator
         # decision), so say what meeting the target would cost.
         full = [a for a in alts[1:] if a.get("geometry_ok") and (a.get("trailers") or 0) >= (a.get("trailers_target") or 0)]
-        text = (f"It has {chosen.get('trailers') or 0} of its {chosen.get('trailers_target')} target trailer stalls; the "
-                "ranking does not trade floor area for trailer stalls.")
+        text = f"It has {chosen.get('trailers') or 0} of its {chosen.get('trailers_target')} target trailer stalls"
+        text += ("; the ranking does not trade floor area for trailer stalls." if not weights.get("trailer_sf") else ".")
         if full:
             wt = max(full, key=lambda a: a.get("sf") or 0)
             loss = (wt.get("sf") or 0) - (chosen.get("sf") or 0)
@@ -624,24 +629,29 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
         parts.append(f"{len(larger_bad)} larger layout{'s' if len(larger_bad) != 1 else ''} failed: {listed}.")
     best_ok = max([chosen.get("sf") or 0] + [a.get("sf") or 0 for a in larger_ok])
     # worth a line only when it is a real step up (5% of the plan drawn)
+    floor = POND_GAIN_MIN if underground is not None else 1.0
     no_pond = [a for a in pond_limited if isinstance(a, dict)
-               and (a.get("sf") or 0) > best_ok and (a.get("sf") or 0) >= POND_GAIN_MIN * (chosen.get("sf") or 0)]
+               and (a.get("sf") or 0) > best_ok and (a.get("sf") or 0) >= floor * (chosen.get("sf") or 0)]
     if no_pond:
         np_ = max(no_pond, key=lambda a: a.get("sf") or 0)
         gain = np_["sf"] - (chosen.get("sf") or 0)
         pct = 100 * gain / chosen["sf"] if chosen.get("sf") else 0.0
         out["without_pond"] = {"variant": np_.get("variant"), "sf": np_["sf"], "gain_sf": gain, "gain_pct": round(pct),
                                "detention_acft": np_.get("detention_acft"), "trailers": np_.get("trailers"),
-                               "trailers_target": np_.get("trailers_target"), "underground": bool(underground)}
+                               "trailers_target": np_.get("trailers_target"), "underground": underground}
         np_short = (np_.get("trailers_target") or 0) - (np_.get("trailers") or 0)
         text = (f"The surface pond is what holds the building: {np_.get('variant')} at {np_['sf']:,} SF ({gain:+,} SF, "
                 f"{pct:+.0f}%) passed every layout check but the pond"
                 + (f", with {np_.get('trailers') or 0} of its {np_.get('trailers_target')} target trailer stalls" if np_short > 0 else "")
                 + ".")
-        text += (f" Its {np_.get('detention_acft')} ac-ft would have to go underground or off site: price that against the "
-                 "floor area." if underground else
-                 " Underground detention is not used in this market (operator decision), so the plan drawn stands; "
-                 "a pond off site would be the only way to that floor area.")
+        if underground is None:
+            text += f" Its {np_.get('detention_acft')} ac-ft would have to go underground or off site."
+        elif underground:
+            text += (f" Its {np_.get('detention_acft')} ac-ft would have to go underground or off site: price that against "
+                     "the floor area.")
+        else:
+            text += (" Underground detention is not used in this market (operator decision), so the plan drawn stands; "
+                     "a pond off site would be the only way to that floor area.")
         parts.append(text)
     out["basis"] = " ".join(parts)
     return out
@@ -684,11 +694,11 @@ def conditions(rec: dict[str, Any]) -> list[dict[str, Any]]:
     # behaviour a severity-1 flag does not always make a plan infeasible,
     # and a plan the record counts has no blocking condition.
     counted = rec.get("feasible") is True
-    underground = (rec.get("operator_decisions") or {}).get("underground_detention") == "yes"
+    market = (rec.get("operator_decisions") or {}).get("underground_detention")
     for level in (1, 2, 3):
         for f in _sev(rec, level):
             name = f["flag"]
-            ws, stage, action, closes = playbook_for(name, level, underground)
+            ws, stage, action, closes = playbook_for(name, level, market)
             if level == 1:
                 kind = "gate" if name in GATE_FLAGS else ("site" if counted else "blocking")
             else:
@@ -773,10 +783,10 @@ def yield_notes(rec: dict[str, Any], comp_band: tuple[int, int]) -> dict[str, An
             notes.append(f"A {up['sf']:,} SF layout ({up['gain_sf']:+,} SF) passed its checks but ranks lower.")
         np_ = (rec.get("selection") or {}).get("without_pond")
         if np_:
+            market = {True: " Price underground or off-site detention against that floor area.",
+                      False: " Underground detention is not used in this market, so that is not on offer."}
             notes.append(f"The surface pond sets the size: without it {np_['sf']:,} SF ({np_['gain_sf']:+,} SF) passed every "
-                         "other layout check. " + ("Price underground or off-site detention against that floor area."
-                                                   if np_.get("underground") else
-                                                   "Underground detention is not used in this market, so that is not on offer."))
+                         "other layout check." + market.get(np_.get("underground"), ""))
         wt = (rec.get("selection") or {}).get("with_trailers")
         if wt:
             notes.append(f"Meeting the trailer target would cost floor area: {wt['sf']:,} SF ({wt['gain_sf']:+,} SF) is the "
