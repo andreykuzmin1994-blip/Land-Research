@@ -169,7 +169,12 @@ COMP_BAND_SF_PER_AC = (10500, 15400)   # Georgia comps, SF per gross acre
 # The ranking of finished layouts (plan_site's score): floor area, marked
 # down for steep ground under the pad, for relief past a free allowance
 # and for each trailer stall short of the target.
-RANKING = {"steep_share": 0.6, "relief_free_ft": 25, "relief_sf_per_ft": 400, "trailer_sf": 2000}
+# Operator decision of 2026-11-17: a trailer stall short of the target is
+# NOT worth floor area, so the default ranking has no trailer mark (the
+# shortfall is still flagged, TRAILER_SHORT). The prototype behaviour keeps
+# the prototype's 2,000 SF per stall, for parity.
+RANKING = {"steep_share": 0.6, "relief_free_ft": 25, "relief_sf_per_ft": 400, "trailer_sf": 0}
+PROTOTYPE_RANKING = {**RANKING, "trailer_sf": 2000}
 # Per-site search budget (R19). The offline replay of the 33 reference sites
 # needs up to 193 s (#48) and 848 s (the 77.6 ac 115+170 assemblage) on this
 # container; at 120 s #48 would come out with no plan. 900 s lets every
@@ -188,6 +193,19 @@ ATLANTA_PARKING = "market"                 # market | code (1/600 SF, unverified
 MARKET_PARKING_TIERS = ((250_000, 0.55), (100_000, 0.70), (0, 1.0))   # (SF at or above, per 1,000 SF)
 TRAILER_TARGET_TIERS = ((250_000, 0.5), (450_000, 1.0), (None, 1.3))  # (SF below, per dock door)
 PLANNER_PROTOTYPES = ("rear", "cross")     # front-load not drawn (operator decision)
+# Operator decision of 2026-11-17: no underground detention in a market
+# where land is cheap (Atlanta); yes where it is dear (infill Chicago, New
+# Jersey). Off for this county's planner; --underground-detention turns it
+# on for a market that uses it. It changes what the read-out recommends
+# when the surface pond holds the building, not the layout: the planner
+# draws surface ponds only.
+UNDERGROUND_DETENTION = False
+# Operator decision of 2026-11-17 ("tighten all of them", reviews/38): the
+# building stands this far from every lot line that is not a road. The
+# building code's unlimited-area rule wants a 60 ft yard or public way all
+# round a one-storey sprinklered warehouse (40 ft with 3-hour walls on part
+# of the perimeter). Applied to every building, whatever its size.
+OPEN_YARD_RULE_FT = 60
 MARKET_REAR_DEPTHS = (160, 190, 230, 270, 310)   # market comps, operator=False
 MARKET_CROSS_DEPTHS = (470, 600)
 OTHER_EDGE_MIN_PAVE_FT = 10
@@ -237,6 +255,48 @@ JUR_DRAFT: dict[str, dict[str, Any]] = {
                  "pave": {"ROW": 10, "RES_SIDE": 50, "RES_REAR": 50, "OTHER": 5},
                  "cover": ("building", 0.70), "height": 40, "parking": "palmetto", "stall_w": 9, "island": 1.0},
 }
+# Tightened draft values (operator decision of 2026-11-17, reviews/38
+# 02_draft_offsets_check.md): where the codes read so far say more than the
+# draft table did. Default behaviour only; the prototype behaviour keeps
+# JUR_DRAFT as it was. Still DRAFT: none of this is verified against the
+# adopted code.
+#   OTHER_REAR  a rear lot line that is not residential (several codes have
+#               a deeper rear yard than side yard)
+#   COMM        a lot line toward a commercial or institutional parcel
+#               (county tax class C or E)
+#   ag_buffer   agricultural neighbours trigger the residential buffer
+#   truck_space_sf   a code minimum of one truck space per this floor area
+#   row_by_zoning    a deeper front yard in a named district
+#   corridor    a corridor overlay on named state routes
+#   use_check   a reported restriction on the use, to confirm
+JUR_TIGHTENED: dict[str, dict[str, Any]] = {
+    "south fulton": {"ag_buffer": True,
+                     "why": ["agricultural (AG-1) neighbours trigger the 50 / 100 ft buffer, as residential ones do"]},
+    "fulton industrial": {"ag_buffer": True,
+                          "why": ["agricultural (AG-1) neighbours trigger the 50 / 100 ft buffer, as residential ones do"]},
+    "union city": {"ag_buffer": True, "why": ["agricultural neighbours trigger the 75 ft buffer, as residential ones do"]},
+    "fairburn": {"bldg": {"OTHER_REAR": 30, "COMM": 50}, "pave": {"COMM": 50}, "truck_space_sf": 5000,
+                 "why": ["rear yard 30 ft (side stays at the draft 25)",
+                         "50 ft buffer drawn toward commercial and institutional parcels (the code's buffer to other districts)",
+                         "one oversized (truck) space per 5,000 SF of warehouse is a minimum for the trailer count"]},
+    "atlanta": {"bldg": {"RES_SIDE": 31, "RES_REAR": 31},
+                "why": ["31 ft from a residential line: the 20 ft transitional yard plus 11 ft for the 45-degree height "
+                        "plane at a 46 ft building"]},
+    "east point": {"bldg": {"OTHER_REAR": 30, "COMM": 50}, "pave": {"COMM": 50}, "row_by_zoning": {"BP": 45},
+                   "why": ["rear yard 30 ft (2019 text)", "50 ft landscaped strip toward any non-industrial parcel, drawn "
+                           "toward commercial and institutional parcels", "front yard 45 ft in the B-P district"]},
+    "palmetto": {"bldg": {"COMM": 20}, "pave": {"COMM": 20},
+                 "corridor": {"routes": ("SR 14", "SR 154"), "bldg": 95, "pave": 35,
+                              "roads": "US 29 (SR 14), SR 154, Weldon, Johnson and Tommy Lee Cook roads"},
+                 "why": ["20 ft buffer toward commercial parcels (2013 text)",
+                         "arterial corridor overlay: 95 ft building and 35 ft paving at the road on US 29 and SR 154"]},
+    "college park": {"use_check": ("College Park put a moratorium on applications for warehousing and distribution centers in "
+                                   "2024 (a secondary source); what replaced it is not known"),
+                     "why": ["a reported 2024 moratorium on warehouse applications is flagged"]},
+}
+EDGE_KINDS = ("ROW", "RES_SIDE", "RES_REAR", "COMM", "OTHER_REAR", "OTHER")
+# County tax classes (Georgia digest) read off a neighbour's record.
+RES_CLASS, AG_CLASSES, COMM_CLASSES = "R", ("A", "P", "V", "J", "W"), ("C", "E")
 DEFAULT_JURISDICTION = "south fulton"
 ZONING_AUTHORITY = "the root's human-owned zoning rules are the authority"
 
@@ -288,10 +348,15 @@ class PlanOptions:
     atlanta_parking: str = ATLANTA_PARKING
     trailer_tiers: tuple = TRAILER_TARGET_TIERS
     max_seconds: float = MAX_SECONDS_PER_SITE
+    underground: bool = UNDERGROUND_DETENTION
 
     @property
     def fixes(self) -> bool:
         return self.behaviour != "prototype"
+
+    @property
+    def ranking(self) -> dict[str, Any]:
+        return RANKING if self.fixes else PROTOTYPE_RANKING
 
     def decisions(self) -> dict[str, Any]:
         return {"parking_rule": self.parking, "atlanta_parking": self.atlanta_parking,
@@ -301,6 +366,10 @@ class PlanOptions:
                 "market_depths": {"rear": list(MARKET_REAR_DEPTHS), "cross": list(MARKET_CROSS_DEPTHS)},
                 "other_edge_min_pave_ft": OTHER_EDGE_MIN_PAVE_FT,
                 "dual_hsg": DUAL_HSG_USE if self.fixes else "drained (first letter)",
+                "underground_detention": "yes" if self.underground else "no",
+                "ranking": dict(self.ranking),
+                "open_yard_ft": OPEN_YARD_RULE_FT if self.fixes else None,
+                "tightened_rules": self.fixes,
                 "prototype_dims": {k: {d: sitefit.PROTOTYPES[k].get(d) for d in ("W", "L", "min_length_ft")}
                                    for k in PLANNER_PROTOTYPES},
                 "behaviour": self.behaviour}
@@ -320,13 +389,27 @@ def trailer_tiers_from(text: str) -> tuple:
 # ---------------------------------------------------------------------------
 # Program rules
 # ---------------------------------------------------------------------------
-def jur_rules(name: str) -> tuple[str, dict[str, Any], bool]:
-    """(rules name, a copy of the DRAFT rules, defaulted?)."""
+def jur_rules(name: str, tightened: bool = False) -> tuple[str, dict[str, Any], bool]:
+    """(rules name, a copy of the DRAFT rules, defaulted?). tightened (the
+    default behaviour): with JUR_TIGHTENED laid over the draft table, a
+    value for every edge kind, and the open yard at the building."""
     n = (name or "").lower()
-    for k in JUR_DRAFT:
-        if k in n:
-            return k, copy.deepcopy(JUR_DRAFT[k]), False
-    return f"{DEFAULT_JURISDICTION} (default)", copy.deepcopy(JUR_DRAFT[DEFAULT_JURISDICTION]), True
+    key, defaulted = next(((k, False) for k in JUR_DRAFT if k in n), (DEFAULT_JURISDICTION, True))
+    rules = copy.deepcopy(JUR_DRAFT[key])
+    if tightened:
+        extra = copy.deepcopy(JUR_TIGHTENED.get(key, {}))
+        for table in ("bldg", "pave"):
+            rules[table].update(extra.pop(table, {}))
+            rules[table].setdefault("OTHER_REAR", rules[table]["OTHER"])
+            rules[table].setdefault("COMM", max(rules[table]["OTHER"], rules[table]["OTHER_REAR"]))
+        rules["tightened"] = extra.pop("why", [])
+        rules.update(extra)
+        for kind in EDGE_KINDS:
+            if kind != "ROW" and rules["bldg"][kind] < OPEN_YARD_RULE_FT:
+                rules["bldg"][kind] = OPEN_YARD_RULE_FT
+        rules["tightened"].append(f"the building stands {OPEN_YARD_RULE_FT} ft from every lot line that is not a road "
+                                  "(the building code's open yard)")
+    return (f"{DEFAULT_JURISDICTION} (default)" if defaulted else key), rules, defaulted
 
 
 def parking_code(rule: str, sf: float) -> tuple[int, str]:
@@ -620,25 +703,37 @@ def steep_cells(dem: Dem, threshold: float = STEEP_PCT, float_keys: bool = False
 # ---------------------------------------------------------------------------
 # Edge classification and envelopes
 # ---------------------------------------------------------------------------
-def classify_edges(parcel_ft, plane, neighbours, front_ft):
-    """Boundary pieces labelled ROW / RES_SIDE / RES_REAR / OTHER."""
+def classify_edges(parcel_ft, plane, neighbours, front_ft, rules: dict[str, Any] | None = None):
+    """Boundary pieces labelled ROW / RES_SIDE / RES_REAR / OTHER.
+
+    rules (the default behaviour passes its tightened rules; the prototype
+    behaviour passes none and gets the four kinds above): also COMM, a
+    line toward a commercial or institutional parcel, and OTHER_REAR, a
+    rear line that is none of the others; and where the rules say
+    ``ag_buffer``, an agricultural neighbour counts as a residential one.
+    Neighbours are told apart by county tax class, the only thing the
+    county record gives: it is a stand-in for their zoning."""
     edge = parcel_ft.boundary
     out = []
     row = edge.intersection(front_ft.buffer(5)) if front_ft is not None and not front_ft.is_empty else LineString()
     if not row.is_empty:
         out.append(("ROW", row))
     rest = edge.difference(front_ft.buffer(5)) if not row.is_empty else edge
-    res_zone = []
+    res_zone, comm_zone = [], []
+    ag = bool(rules and rules.get("ag_buffer"))
     for a, s in neighbours:
         lu, cls = str(a.get("LUCode") or ""), str(a.get("ClassCode") or "")
-        if lu.startswith("1") or cls.startswith("R"):
+        if lu.startswith("1") or cls.startswith(RES_CLASS) or (ag and cls.startswith(AG_CLASSES)):
             res_zone.append(plane.ft(s).buffer(20))
+        elif rules is not None and cls.startswith(COMM_CLASSES):
+            comm_zone.append(plane.ft(s).buffer(20))
     res_u = unary_union(res_zone) if res_zone else None
+    dmax = (max(row.distance(Point(c)) for q in sitefit.polygon_parts(parcel_ft) for c in q.exterior.coords)
+            if not row.is_empty else None)
     if res_u is not None:
         res = rest.intersection(res_u)
         rest = rest.difference(res_u)
         if not row.is_empty:
-            dmax = max(row.distance(Point(c)) for q in sitefit.polygon_parts(parcel_ft) for c in q.exterior.coords)
             for seg in getattr(res, "geoms", [res]):
                 # Points from touching lines carry no length (the prototype
                 # crashed on them in interpolate).
@@ -649,6 +744,26 @@ def classify_edges(parcel_ft, plane, neighbours, front_ft):
                 out.append((kind, seg))
         else:
             out.append(("RES_REAR", res))
+    if rules is not None:
+        if comm_zone:
+            comm_u = unary_union(comm_zone)
+            comm = unary_union(_lines_of(rest.intersection(comm_u)))
+            rest = rest.difference(comm_u)
+            if not comm.is_empty:
+                out.append(("COMM", comm))
+        if dmax is not None:
+            # each straight stretch of what is left is a side or a rear line,
+            # by how far it lies from the road (the rule the residential lines use)
+            rear, side = [], []
+            for ln in _lines_of(rest):
+                pts = list(ln.coords)
+                for q0, q1 in zip(pts, pts[1:]):
+                    seg = LineString([q0, q1])
+                    if seg.length > 0:
+                        (rear if row.distance(seg.interpolate(0.5, normalized=True)) > 0.5 * dmax else side).append(seg)
+            if rear:
+                out.append(("OTHER_REAR", unary_union(rear)))
+            rest = unary_union(side) if side else LineString()
     if not rest.is_empty:
         out.append(("OTHER", rest))
     return out
@@ -800,6 +915,8 @@ def build(v, L, r, fr: Frame, prog: Program, draw: bool = True) -> Plan:
     cap = max(0, int((L - 2 * END_CLEAR) // DOOR_SP))
     doors = min(round(sf / SF_PER_DOOR), cap * walls)
     target = trailer_target(sf, doors, prog.opts.trailer_tiers)
+    code_min = math.ceil(sf / prog.rules["truck_space_sf"]) if prog.rules.get("truck_space_sf") else 0
+    target = max(target, code_min)       # a draft code minimum of truck spaces, where the rules have one
     if v["type"] == "rear":
         cd = car_rows_layout(r)[1]
         if v["cars"] == "side":
@@ -1690,7 +1807,9 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             # (the yard links took the room); keep the larger ponds and
             # report the volume they were sized for (v_sized).
     if not pond_ok:
-        flags.append(("POND_DOES_NOT_FIT", 1 if fixes else 2, f"{npd} pond(s) of {v_sized / npd:.1f} ac-ft do not fit on the development side: underground detention (vaults) or a smaller building"))
+        way_out = ("underground detention (vaults) or a smaller building" if not fixes or ctx.prog.opts.underground
+                   else "a smaller building or detention off site (underground detention is not used in this market)")
+        flags.append(("POND_DOES_NOT_FIT", 1 if fixes else 2, f"{npd} pond(s) of {v_sized / npd:.1f} ac-ft do not fit on the development side: {way_out}"))
     # grading over the whole module
     mod_pts = pad
     relief = (max(mod_pts) - min(mod_pts)) if len(mod_pts) > 3 else None
@@ -1800,8 +1919,10 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     plane = Plane(g_wgs)
     parcel, seam_sf = site_parcel(plane, g_wgs, inp.assembled, opts)
     meta = inp.meta
-    jname, rules, defaulted = jur_rules(meta.get("jurisdiction", ""))
-    rules["pave"]["OTHER"] = max(rules["pave"].get("OTHER", 0), OTHER_EDGE_MIN_PAVE_FT)
+    jname, rules, defaulted = jur_rules(meta.get("jurisdiction", ""), tightened=opts.fixes)
+    for kind in ("OTHER", "OTHER_REAR", "COMM"):
+        if kind in rules["pave"]:
+            rules["pave"][kind] = max(rules["pave"].get(kind, 0), OTHER_EDGE_MIN_PAVE_FT)
     prog = Program(jname, rules, parking_rule_for(jname, rules, opts), opts)
     hsg, hsg_note = hsg_letter(meta.get("hsg"), opts.fixes)
     if opts.fixes and inp.assembled:
@@ -1854,11 +1975,33 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     fr = inp.frontage
     front_ft = plane.ft(fr.line_wgs) if fr.line_wgs is not None else None
     neigh = [(a, s) for a, s in inp.neighbours if s is not None and not s.equals(g_wgs) and s.intersection(g_wgs).area < 0.5 * s.area]
-    edges = classify_edges(parcel, plane, neigh, front_ft)
+    # A deeper front yard in a named district, and a corridor overlay on
+    # named state routes (the tightened rules; default behaviour only).
+    zone = re.sub(r"[^A-Z0-9]", "", (meta.get("zoning") or "").upper())
+    for prefix, feet in (rules.get("row_by_zoning") or {}).items():
+        if zone.startswith(prefix):
+            rules["bldg"]["ROW"] = max(rules["bldg"]["ROW"], feet)
+            rules["tightened"].append(f"front yard {feet} ft applied: zoned {meta.get('zoning')}")
+    corridor = rules.get("corridor")
+    if corridor:
+        on = [r for r in corridor["routes"] if re.search(rf"\b{re.escape(r)}\b", fr.road or "")]
+        if on:
+            rules["bldg"]["ROW"] = max(rules["bldg"]["ROW"], corridor["bldg"])
+            rules["pave"]["ROW"] = max(rules["pave"]["ROW"], corridor["pave"])
+            late.append(("CORRIDOR_OVERLAY", 2, f"the frontage reads as {on[0]}: the corridor overlay's {corridor['bldg']} ft "
+                         f"building and {corridor['pave']} ft paving setbacks at the road are applied (draft reading)"))
+        else:
+            late.append(("CORRIDOR_OVERLAY", 2, f"a corridor overlay sets {corridor['bldg']} ft building and {corridor['pave']} ft "
+                         f"paving setbacks at the road on {corridor['roads']}; this frontage is not read as one of the state "
+                         "routes, and the county roads carry no name here: check the road"))
+    if rules.get("use_check"):
+        late.append(("USE_RESTRICTION_REPORTED", 2, f"{rules['use_check']}: confirm the use is allowed before relying on this plan"))
+    edges = classify_edges(parcel, plane, neigh, front_ft, rules if opts.fixes else None)
     res_line = unary_union([ln for k, ln in edges if k.startswith("RES")]) if any(k.startswith("RES") for k, _ in edges) else None
     row_line = front_ft if front_ft is not None and not front_ft.is_empty else None
     if res_line is not None:
-        flags.append(("RESIDENTIAL_EDGE", 2, f"about {res_line.length:,.0f} ft of boundary touches residential parcels (county land-use codes); draft buffers applied"))
+        whose = "residential or agricultural parcels (county tax classes)" if rules.get("ag_buffer") else "residential parcels (county land-use codes)"
+        flags.append(("RESIDENTIAL_EDGE", 2, f"about {res_line.length:,.0f} ft of boundary touches {whose}; draft buffers applied"))
     P = clean(envelope(parcel, edges, rules["pave"]).difference(wet_buf).difference(cut))
     B = clean(envelope(parcel, edges, rules["bldg"]).difference(wet_buf).difference(trans).difference(cut))
     dem = inp.dem
@@ -1912,7 +2055,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
 
             def prelim(q):
                 st = q.module.intersection(steep).area / q.module.area if not steep.is_empty else 0.0
-                return q.sf * (1 - RANKING["steep_share"] * st)
+                return q.sf * (1 - opts.ranking["steep_share"] * st)
             fits.sort(key=prelim, reverse=True)
             picked, seen = [], set()
             for q in fits:
@@ -2003,14 +2146,16 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                        cut_short=search.exceeded), None
 
     def rank_sf(q, o, st, rel):
-        return (q.sf * (1 - RANKING["steep_share"] * st) - RANKING["relief_sf_per_ft"] * max(rel - RANKING["relief_free_ft"], 0)
-                - RANKING["trailer_sf"] * max(0, q.trailers_target - o["trailers"]))
+        rk = opts.ranking
+        return (q.sf * (1 - rk["steep_share"] * st) - rk["relief_sf_per_ft"] * max(rel - rk["relief_free_ft"], 0)
+                - rk["trailer_sf"] * max(0, q.trailers_target - o["trailers"]))
 
     def score(t):
         q, o = t
         st = o["steep_module_pct"] / 100
         rel = (o["relief"] or 0)
-        return (o["ok"], not o["route_problem"], rank_sf(q, o, st, rel))
+        # the trailer shortfall last: it only settles a tie in floor area
+        return (o["ok"], not o["route_problem"], rank_sf(q, o, st, rel), -max(0, q.trailers_target - o["trailers"]))
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]
     second = None
@@ -2053,7 +2198,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
     try:
         _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
-                  [_alternative(q, o, gross_ac) for q, o in pond_limited])
+                  [_alternative(q, o, gross_ac) for q, o in pond_limited], opts)
     except Exception as exc:        # noqa: BLE001 - the read-out is advisory: it must never cost a plan
         # The plan above is complete without it. Say what is missing, and
         # keep the part of the read-out that needs only the record.
@@ -2083,7 +2228,7 @@ def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
 
 
 def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], parcel, P, edges, rules: dict[str, Any],
-              res_line, fr: FrontageInput, pond_limited: list[dict[str, Any]]) -> None:
+              res_line, fr: FrontageInput, pond_limited: list[dict[str, Any]], opts: PlanOptions) -> None:
     """Add the read-out of siteplan_assess to a drawn plan's record: where
     the land goes, the plan against its draft rules, a takeoff, why this
     layout, and the assessment. Derived from the finished plan only; it
@@ -2115,10 +2260,12 @@ def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], p
             rules, edges, layouts, clear_ft=rec["building"]["clear_height_ft"], clear_assumed_ft=p.clear,
             roof_allowance_ft=ROOF_ALLOWANCE_FT, cover=cover, building_pct=100 * bldg_area / parcel.area,
             impervious_pct=rec["coverage"]["impervious_pct"], cars_required=rec["cars"]["required"],
-            cars_provided=rec["cars"]["provided"], cars_basis=rec["cars"]["basis"], gated=rec["gated"])}
+            cars_provided=rec["cars"]["provided"], cars_basis=rec["cars"]["basis"], gated=rec["gated"],
+            truck_spaces=((math.ceil(sum(q.sf for q, _ in layouts) / rules["truck_space_sf"]),
+                           sum(oo["trailers"] for _, oo in layouts)) if rules.get("truck_space_sf") else None))}
     rec["quantities"] = assess.quantities(shapes, layouts, building_sf=rec["total_sf_if_access"], frontage_ft=fr.feet,
                                           residential_edge_ft=res_line.length if res_line is not None else 0.0, net_ac=net_ac)
-    rec["selection"] = assess.selection(rec["alternatives"], RANKING, pond_limited)
+    rec["selection"] = assess.selection(rec["alternatives"], opts.ranking, pond_limited, underground=opts.underground)
     rec["assessment"] = assess.assessment(rec, COMP_BAND_SF_PER_AC)
 
 
@@ -2140,7 +2287,9 @@ def _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, 
 def _base_record(inp: SiteInputs, jname: str, rules: dict[str, Any], opts: PlanOptions) -> dict[str, Any]:
     return {"id": inp.key, "key": inp.key, "rank": inp.rank, "parcel_ids": list(inp.parcel_ids), "title": inp.title,
             "zoning": {"name": jname, "status": "draft", "source": rules.get("source"),
-                       "values": {k: rules[k] for k in ("bldg", "pave", "cover", "height", "parking", "stall_w", "island")}},
+                       "values": {k: rules[k] for k in ("bldg", "pave", "cover", "height", "parking", "stall_w", "island")},
+                       # what the default behaviour draws beyond the draft table, and why (still draft)
+                       **({"tightened": list(rules["tightened"])} if rules.get("tightened") else {})},
             "operator_decisions": opts.decisions()}
 
 
@@ -2201,7 +2350,9 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
         hc = [f for f in cflags if f[0] == "HEIGHT_CAP"]
         flags += hc
     if o["trailers"] < p.trailers_target:
-        flags.append(("TRAILER_SHORT", 2, f"{o['trailers']} trailer stalls against a target of {p.trailers_target}"))
+        floor = (f" (the draft code minimum here is one truck space per {rules['truck_space_sf']:,} SF)"
+                 if rules.get("truck_space_sf") else "")
+        flags.append(("TRAILER_SHORT", 2, f"{o['trailers']} trailer stalls against a target of {p.trailers_target}{floor}"))
     for c in p.courts + p.rows:
         if res_line is not None and c.distance(res_line) < 150:
             flags.append(("LOADING_FACES_RES", 2, "a truck court or trailer row is within 150 ft of a residential edge (50 ft loading strip and screening likely)"))
@@ -2510,6 +2661,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--parking", choices=("max", "code", "market"), default=PARKING_RULE)
     ap.add_argument("--atlanta-parking", choices=("market", "code"), default=ATLANTA_PARKING)
     ap.add_argument("--trailer-ratio", default=None, help="trailer stalls per door: one number, or three (below 250k, below 450k, above)")
+    ap.add_argument("--underground-detention", action="store_true",
+                    help="a market where land is dear enough for underground detention: the read-out prices it; the layout still draws surface ponds")
     ap.add_argument("--prototype-behaviour", action="store_true", help="reproduce the v4 prototype exactly (parity)")
     return ap
 
@@ -2528,7 +2681,7 @@ def main(argv: list[str] | None = None) -> int:
         opts = PlanOptions(behaviour="prototype" if args.prototype_behaviour else "fixes", parking=args.parking,
                            atlanta_parking=args.atlanta_parking,
                            trailer_tiers=trailer_tiers_from(args.trailer_ratio) if args.trailer_ratio else TRAILER_TARGET_TIERS,
-                           max_seconds=args.max_seconds_per_site)
+                           max_seconds=args.max_seconds_per_site, underground=args.underground_detention)
         ranks = [r.strip() for r in args.ranks.split(",") if r.strip()]
         for r in ranks:
             if not re.fullmatch(r"\d{1,6}", r):

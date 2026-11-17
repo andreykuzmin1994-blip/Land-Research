@@ -50,12 +50,13 @@ class Playbook(unittest.TestCase):
         found = set(re.findall(r'\(\s*"([A-Z][A-Z0-9_]{3,})",\s*(?:[123]|sev|1 if|max\()', src))
         found |= set(re.findall(r'"flag":\s*"([A-Z][A-Z0-9_]{3,})"', src))
         found |= set(sp.NOT_CHECKED_FLAGS) | set(sp.GATE_FLAGS) | set(sp.RESCUE_FLAGS) | set(sp.LENGTH_INDEPENDENT_FLAGS)
-        return found
+        return found - set(sp.EDGE_KINDS)                       # an edge kind is not a flag
 
     def test_every_planner_flag_has_an_action(self):
         flags = self.planner_flags()
         self.assertGreater(len(flags), 40)                      # the scan found the planner's flags
-        for must in ("ACCESS_NONE", "NO_FIT", "ZONING_DRAFT", "TRAILER_SHORT", "HSG_ASSUMED", "PLAN_BUDGET_EXCEEDED"):
+        for must in ("ACCESS_NONE", "NO_FIT", "ZONING_DRAFT", "TRAILER_SHORT", "HSG_ASSUMED", "PLAN_BUDGET_EXCEEDED",
+                     "CORRIDOR_OVERLAY", "USE_RESTRICTION_REPORTED"):
             self.assertIn(must, flags)
         self.assertEqual(sorted(f for f in flags if f not in assess.PLAYBOOK), [])
 
@@ -194,11 +195,11 @@ class Selection(unittest.TestCase):
     def test_upside_names_only_what_it_has_more_of(self):
         chosen = alt(100000, steep=18, relief=46)
         bigger = alt(110000, trailers=0, target=9, steep=18, relief=46)
-        s = assess.selection([chosen, bigger], sp.RANKING)
+        s = assess.selection([chosen, bigger], sp.PROTOTYPE_RANKING)
         self.assertEqual((s["upside"]["sf"], s["upside"]["gain_sf"], s["upside"]["gain_pct"]), (110000, 10000, 10))
         self.assertEqual(len(s["upside"]["reasons"]), 1)                    # the ground is the same: not a reason
         self.assertIn("none of its 9 target trailer stalls", s["basis"])
-        self.assertIn(f"{sp.RANKING['trailer_sf']:,} SF", s["basis"])
+        self.assertIn(f"{sp.PROTOTYPE_RANKING['trailer_sf']:,} SF", s["basis"])
         self.assertIn("higher-yield scheme", s["basis"])
         steeper = alt(110000, steep=40, relief=46)
         s2 = assess.selection([chosen, steeper], sp.RANKING)
@@ -206,13 +207,53 @@ class Selection(unittest.TestCase):
         self.assertIn("steep ground (40% against 18%)", s2["basis"])
         self.assertNotIn("higher-yield scheme", s2["basis"])
 
-    def test_without_pond(self):
-        s = assess.selection([alt(58000), alt(68000, trailers=0)], sp.RANKING, [alt(96000, ok=False, trailers=0), alt(60000, ok=False)])
+    def test_default_ranking_has_no_trailer_mark(self):
+        # operator decision of 2026-11-17: a trailer stall is not worth floor area
+        self.assertEqual(sp.RANKING["trailer_sf"], 0)
+        self.assertEqual(sp.PROTOTYPE_RANKING["trailer_sf"], 2000)
+        self.assertEqual(sp.PlanOptions().ranking, sp.RANKING)
+        self.assertEqual(sp.PlanOptions(behaviour="prototype").ranking, sp.PROTOTYPE_RANKING)
+        # so a larger layout short of trailers is not marked down for it
+        s = assess.selection([alt(100000), alt(110000, trailers=0, target=9)], sp.RANKING)
+        self.assertEqual(s["upside"]["reasons"], [])
+
+    def test_plan_short_of_trailers_names_the_layout_that_is_not(self):
+        chosen = alt(68000, trailers=0, target=7)
+        s = assess.selection([chosen, alt(58000, trailers=6, target=6), alt(50000, trailers=5, target=5)], sp.RANKING)
+        self.assertEqual((s["with_trailers"]["sf"], s["with_trailers"]["gain_sf"], s["with_trailers"]["trailers"]), (58000, -10000, 6))
+        self.assertIn("0 of its 7 target trailer stalls", s["basis"])
+        self.assertIn("does not trade floor area for trailer stalls", s["basis"])
+        none = assess.selection([chosen, alt(58000, trailers=1, target=6)], sp.RANKING)
+        self.assertIsNone(none["with_trailers"])
+        self.assertIn("No layout tried meets its trailer target", none["basis"])
+        self.assertIsNone(assess.selection([alt(68000)], sp.RANKING)["with_trailers"])       # not short: nothing to say
+
+    def test_without_pond_by_market(self):
+        args = ([alt(58000), alt(68000, trailers=0)], sp.PROTOTYPE_RANKING, [alt(96000, ok=False, trailers=0), alt(60000, ok=False)])
+        s = assess.selection(*args)                               # the default: no underground detention here
         self.assertEqual((s["without_pond"]["sf"], s["without_pond"]["gain_sf"]), (96000, 38000))
+        self.assertIs(s["without_pond"]["underground"], False)
         self.assertIn("passed every layout check but the pond", s["basis"])
         self.assertIn("0 of its 10 target trailer stalls", s["basis"])
-        # a pond-limited layout no larger than a passing one is not an unlock
+        self.assertIn("Underground detention is not used in this market", s["basis"])
+        self.assertNotIn("price that", s["basis"])
+        dear = assess.selection(*args, underground=True)          # a market where land is dear
+        self.assertIs(dear["without_pond"]["underground"], True)
+        self.assertIn("underground or off site: price that against the floor area", dear["basis"])
+        # a pond-limited layout no larger than a passing one, or a step under 5%, is not reported
         self.assertIsNone(assess.selection([alt(58000), alt(68000)], sp.RANKING, [alt(66000, ok=False)])["without_pond"])
+        self.assertIsNone(assess.selection([alt(67000)], sp.RANKING, [alt(68000, ok=False)])["without_pond"])
+
+    def test_pond_action_by_market(self):
+        cheap = flags_rec(sev1=["POND_DOES_NOT_FIT"], total_sf=0, operator_decisions={"underground_detention": "no"})
+        dear = flags_rec(sev1=["POND_DOES_NOT_FIT"], total_sf=0, operator_decisions={"underground_detention": "yes"})
+        a, b = assess.conditions(cheap)[0]["action"], assess.conditions(dear)[0]["action"]
+        self.assertIn("not used in this market", a)
+        self.assertNotIn("underground detention against", a)
+        self.assertIn("price underground detention", b)
+        self.assertIs(sp.UNDERGROUND_DETENTION, False)
+        self.assertEqual(sp.PlanOptions().decisions()["underground_detention"], "no")
+        self.assertEqual(sp.PlanOptions(underground=True).decisions()["underground_detention"], "yes")
 
     def test_no_layout_passed_and_empty(self):
         s = assess.selection([alt(50000, ok=False, blocking=["ROUTE_INFEASIBLE"])], sp.RANKING)
@@ -431,26 +472,159 @@ class PlannedSite(ts.Offline):
         self.assertIn("No layout passed", rec["selection"]["basis"])
 
 
+# ---------------------------------------------------------------------------
+# The tightened draft rules (operator decision of 2026-11-17, reviews/38)
+# ---------------------------------------------------------------------------
+class TightenedRules(ts.Offline):
+
+    def test_table_and_prototype(self):
+        # the prototype behaviour reads the draft table as it was
+        for name in sp.JUR_DRAFT:
+            _, proto, _ = sp.jur_rules(name)
+            self.assertEqual(proto, sp.JUR_DRAFT[name])
+            self.assertNotIn("OTHER_REAR", proto["bldg"])
+        self.assertLessEqual(set(sp.JUR_TIGHTENED), set(sp.JUR_DRAFT))
+        want = {"fairburn": ("OTHER_REAR", 30, 30), "east point": ("OTHER_REAR", 30, 30), "atlanta": ("RES_SIDE", 31, 31),
+                "palmetto": ("COMM", 20, 20)}
+        for name, (kind, code, _) in want.items():
+            self.assertEqual(sp.JUR_TIGHTENED[name]["bldg"][kind], code)
+        for name in sp.JUR_DRAFT:
+            _, r, _ = sp.jur_rules(name, tightened=True)
+            self.assertEqual(set(r["bldg"]), set(sp.EDGE_KINDS))
+            self.assertEqual(set(r["pave"]), set(sp.EDGE_KINDS))
+            for kind in sp.EDGE_KINDS:
+                if kind != "ROW":                                   # the open yard at the building
+                    self.assertGreaterEqual(r["bldg"][kind], sp.OPEN_YARD_RULE_FT, (name, kind))
+                self.assertGreaterEqual(r["bldg"][kind], sp.JUR_DRAFT[name]["bldg"].get(kind, 0))      # never looser
+                self.assertGreaterEqual(r["pave"][kind], sp.JUR_DRAFT[name]["pave"].get(kind, 0))
+            self.assertTrue(r["tightened"])
+        _, fair, _ = sp.jur_rules("Fairburn", tightened=True)
+        self.assertEqual((fair["pave"]["COMM"], fair["truck_space_sf"], fair["pave"]["OTHER_REAR"]), (50, 5000, 5))
+        _, ep, _ = sp.jur_rules("East Point", tightened=True)
+        self.assertEqual((ep["pave"]["COMM"], ep["row_by_zoning"]), (50, {"BP": 45}))
+        for name in ("South Fulton", "Union City"):
+            self.assertTrue(sp.jur_rules(name, tightened=True)[1]["ag_buffer"])
+        self.assertNotIn("ag_buffer", sp.jur_rules("Atlanta", tightened=True)[1])
+
+    def edges_of(self, neighbours, rules):
+        inp = ts.site(600, 700, neighbours=neighbours)
+        plane = sp.Plane(inp.geometry)
+        parcel, _ = sp.site_parcel(plane, inp.geometry, False, sp.PlanOptions())
+        front = plane.ft(inp.frontage.line_wgs)
+        return {k: round(ln.length) for k, ln in sp.classify_edges(parcel, plane, neighbours, front, rules)}
+
+    def test_edge_kinds(self):
+        shop = ({"ClassCode": "C3"}, ts.wgs(box(600, 0, 800, 700)))          # east side
+        farm = ({"ClassCode": "A5"}, ts.wgs(box(-200, 0, 0, 700)))           # west side
+        _, sf, _ = sp.jur_rules("South Fulton", tightened=True)
+        _, atl, _ = sp.jur_rules("Atlanta", tightened=True)
+        got = self.edges_of([shop, farm], sf)
+        self.assertGreater(got["COMM"], 600)                                  # the shop's line
+        self.assertGreater(got.get("RES_SIDE", 0) + got.get("RES_REAR", 0), 600)      # the farm counts as residential here
+        self.assertGreater(got["OTHER_REAR"], 500)                            # the back line, far from the road
+        atl_got = self.edges_of([shop, farm], atl)
+        self.assertNotIn("RES_SIDE", atl_got)                                 # not where the code has no such rule
+        # the prototype behaviour: the four old kinds only
+        old = self.edges_of([shop, farm], None)
+        self.assertEqual(set(old), {"ROW", "OTHER"})
+        self.assertAlmostEqual(sum(got.values()), sum(old.values()), delta=5)         # the same boundary, re-labelled
+
+    def test_open_yard_is_a_layout_rule(self):
+        for key, kw in (("basic", dict(w=600, h=700)), ("fair_yard", dict(w=900, h=800, jur="Fairburn")),
+                        ("ep_yard", dict(w=700, h=800, jur="East Point", zoning="I-2X"))):
+            rec, d = ts.planned(key, lambda kw=kw: ts.site(**kw))
+            self.assertTrue(rec["fits"], key)
+            lines = sp.unary_union([ln for k, ln in d.edges if k != "ROW"])
+            self.assertGreaterEqual(d.p.building.distance(lines), sp.OPEN_YARD_RULE_FT - 1, key)
+            yard = [r for r in rec["compliance"]["rows"] if r["item"].startswith("Open yard")][0]
+            self.assertEqual(yard["status"], "meets", key)
+            self.assertEqual(rec["operator_decisions"]["open_yard_ft"], sp.OPEN_YARD_RULE_FT)
+            self.assertTrue(rec["zoning"]["tightened"])
+        proto, _ = ts.planned("basic", lambda: ts.site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertIsNone(proto["operator_decisions"]["open_yard_ft"])
+        self.assertNotIn("tightened", proto["zoning"])
+        self.assertGreater(proto["building"]["sf"], ts.planned("basic", lambda: ts.site(600, 700))[0]["building"]["sf"])
+
+    def test_fairburn_truck_space_minimum(self):
+        rec, _ = ts.planned("fair_yard", lambda: ts.site(900, 800, jur="Fairburn"))
+        sf = rec["building"]["sf"]
+        self.assertGreaterEqual(rec["trailers"]["target"], sf // 5000)        # the floor under the market target
+        row = [r for r in rec["compliance"]["rows"] if r["item"] == "Truck spaces"][0]
+        self.assertEqual(row["status"], "meets" if rec["trailers"]["total"] >= int(row["required"].split()[0]) else "short")
+        if rec["trailers"]["total"] < rec["trailers"]["target"]:
+            note = [f["note"] for f in rec["flags"][2] if f["flag"] == "TRAILER_SHORT"][0]
+            self.assertIn("5,000 SF", note)
+        other, _ = ts.planned("basic", lambda: ts.site(600, 700))
+        self.assertFalse([r for r in other["compliance"]["rows"] if r["item"] == "Truck spaces"])
+
+    def test_palmetto_corridor_and_college_park(self):
+        on, _ = ts.planned("palm_sr14", lambda: ts.site(900, 900, jur="Palmetto", road="minor arterial, SR 14"))
+        note = [f["note"] for f in on["flags"][2] if f["flag"] == "CORRIDOR_OVERLAY"][0]
+        self.assertIn("are applied", note)
+        self.assertEqual((on["zoning"]["values"]["bldg"]["ROW"], on["zoning"]["values"]["pave"]["ROW"]), (95, 35))
+        rows = {r["item"]: r for r in on["compliance"]["rows"]}
+        self.assertEqual(rows["Building setback, road"]["required"], "95 ft")
+        self.assertEqual(rows["Building setback, road"]["status"], "meets")
+        off, _ = ts.planned("palm_local", lambda: ts.site(900, 900, jur="Palmetto", road="local road, GDOT route 1121200054600"))
+        note = [f["note"] for f in off["flags"][2] if f["flag"] == "CORRIDOR_OVERLAY"][0]
+        self.assertIn("check the road", note)
+        self.assertEqual(off["zoning"]["values"]["bldg"]["ROW"], 50)
+        self.assertNotIn("SR 140", "SR 14")                                    # and a longer route number is not SR 14:
+        sr140, _ = ts.planned("palm_sr140", lambda: ts.site(900, 900, jur="Palmetto", road="minor arterial, SR 140"))
+        self.assertEqual(sr140["zoning"]["values"]["bldg"]["ROW"], 50)
+        cp, _ = ts.planned("cp_use", lambda: ts.site(800, 900, jur="College Park"))
+        self.assertIn("USE_RESTRICTION_REPORTED", ts.names(cp, 2))
+        self.assertIn("moratorium", [c for c in cp["assessment"]["conditions"] if c["flag"] == "USE_RESTRICTION_REPORTED"][0]["action"])
+        proto, _ = ts.planned("cp_use", lambda: ts.site(800, 900, jur="College Park"), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("USE_RESTRICTION_REPORTED", ts.names(proto))
+        self.assertNotIn("CORRIDOR_OVERLAY", ts.names(ts.planned("basic", lambda: ts.site(600, 700))[0]))
+
+    def test_east_point_business_park_front_yard(self):
+        bp, _ = ts.planned("ep_bp", lambda: ts.site(700, 800, jur="East Point", zoning="B-P"))
+        self.assertEqual(bp["zoning"]["values"]["bldg"]["ROW"], 45)
+        i2, _ = ts.planned("ep_yard", lambda: ts.site(700, 800, jur="East Point", zoning="I-2X"))
+        self.assertEqual(i2["zoning"]["values"]["bldg"]["ROW"], 40)
+
+    def test_atlanta_stands_back_from_homes(self):
+        homes = ts.wgs(box(600, 0, 800, 700))
+        rec, d = ts.planned("atl_homes", lambda: ts.site(600, 700, jur="Atlanta", neighbours=[({"LUCode": "101"}, homes)]))
+        self.assertEqual(rec["zoning"]["values"]["bldg"]["RES_SIDE"], max(31, sp.OPEN_YARD_RULE_FT))
+        self.assertEqual(rec["zoning"]["values"]["pave"]["RES_SIDE"], 20)
+        if rec["fits"]:
+            res = sp.unary_union([ln for k, ln in d.edges if k.startswith("RES")])
+            self.assertGreaterEqual(d.p.building.distance(res), 31)
+
+
 @unittest.skipUnless(ts.FIXTURES.is_dir(), "no reference fixtures")
 class ReferenceSite(ts.Offline):
     angles = False          # the real search angles, as in test_siteplan.ReferenceSites
 
-    def test_reference_site_reports_the_larger_layouts(self):
-        # reference site #21 (a real parcel shape): a court-only layout that
-        # passed ranks below the plan drawn, and one passed all but the pond
+    def test_reference_site_reports_the_other_layouts(self):
+        # reference site #21 (a real parcel shape). With no trailer mark in
+        # the ranking the largest passing layout is drawn; the read-out says
+        # what meeting the trailer target would cost and what the pond holds.
         inp, _ = ts.load_fixture("rank21")
         rec, d = sp.plan_site(inp)
         sel = rec["selection"]
-        self.assertGreater(sel["upside"]["sf"], rec["building"]["sf"])
-        self.assertTrue(any("trailer stalls" in r for r in sel["upside"]["reasons"]))
-        self.assertGreater(sel["without_pond"]["sf"], sel["upside"]["sf"])
-        self.assertEqual(rec["total_sf"], rec["building"]["sf"])              # neither is counted
-        self.assertIn("Without a surface pond", " ".join(rec["assessment"]["yield"]["notes"]))
+        self.assertIs(rec["feasible"], True)
+        self.assertIn("TRAILER_SHORT", ts.names(rec, 2))
+        self.assertIsNone(sel["upside"])                                     # the plan drawn is the largest that passed
+        self.assertLess(sel["with_trailers"]["sf"], rec["building"]["sf"])
+        self.assertGreaterEqual(sel["with_trailers"]["trailers"], 1)
+        self.assertGreater(sel["without_pond"]["sf"], rec["building"]["sf"])
+        self.assertIs(sel["without_pond"]["underground"], False)
+        self.assertEqual(rec["total_sf"], rec["building"]["sf"])              # only the plan drawn is counted
+        notes = " ".join(rec["assessment"]["yield"]["notes"])
+        self.assertIn("Underground detention is not used in this market", notes)
+        self.assertIn("Meeting the trailer target would cost floor area", notes)
+        row = assess.pipeline_row(rec)
+        self.assertEqual((row["meets_trailer_target_sf"], row["without_pond_sf"]), (sel["with_trailers"]["sf"], sel["without_pond"]["sf"]))
         svg = sr.render(d, rec)
-        self.assertIn("passed every layout check but the pond", sel["basis"])
         self.assertIn("surface pond", svg)
         self.assertIn("RESIDENTIAL EDGE", svg)
-        self.assertIn("DROP YARD", svg)
+        # the open yard at the building: 60 ft or more on a plan the default behaviour draws
+        yard = [r for r in rec["compliance"]["rows"] if r["item"].startswith("Open yard")][0]
+        self.assertEqual(yard["status"], "meets")
 
 
 # ---------------------------------------------------------------------------

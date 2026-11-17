@@ -153,9 +153,15 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                                "govern the combined site (annexation or rezoning), then plan it again under that code.",
                                "planning staff's answer on the governing code"),
     # stormwater, grading, environmental
-    "POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer test underground detention or a smaller building, and ask "
-                          "whether a regional or off-site pond serves the site.",
+    "POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer test a smaller building, and ask whether a regional or "
+                          "off-site pond serves the site. Underground detention is not used in this market.",
                           "a detention concept sized under the local ordinance"),
+    "CORRIDOR_OVERLAY": (W_ZONING, "desk", "Check whether the road is in the corridor overlay. On an overlay road the front "
+                         "setbacks are much deeper and the yield falls; the plan applies them only on the state routes it "
+                         "can read.", "the overlay map or the code's list of roads"),
+    "USE_RESTRICTION_REPORTED": (W_ZONING, "desk", "Ask planning staff whether warehousing is allowed here today and what "
+                                 "replaced the moratorium. Do not rely on this plan until that is answered.",
+                                 "planning staff's answer, or the adopted text amendment"),
     "POND_SITE_FROM_LIDAR": (W_STORM, "diligence", "Have the civil engineer confirm the pond location, outfall and volume under "
                              "the local ordinance. The size here is a screening estimate.", "a stormwater concept"),
     "HSG_ASSUMED": (W_STORM, "diligence", "The soil group behind the pond size was assumed. Run the soil check for this parcel, "
@@ -209,6 +215,13 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
     "PLAN_BUDGET_EXCEEDED": _BUDGET, "SECOND_BUILDING_NOT_SEARCHED": _BUDGET, "SMALLER_LAYOUTS_NOT_ALL_TRIED": _BUDGET,
 }
 _UNKNOWN = (W_DATA, "desk", "Read this flag against the drawing.", "")
+# Where the market uses underground detention (an operator decision, off by
+# default: not in a cheap land market).
+PLAYBOOK_UNDERGROUND: dict[str, tuple[str, str, str, str]] = {
+    "POND_DOES_NOT_FIT": (W_STORM, "offer", "Have a civil engineer price underground detention against the floor area it "
+                          "frees, and ask whether a regional or off-site pond serves the site.",
+                          "a detention concept sized under the local ordinance, with a vault cost"),
+}
 # A flag raised at two severities for two different facts.
 PLAYBOOK_AT_SEVERITY: dict[tuple[str, int], tuple[str, str, str, str]] = {
     ("ASSEMBLAGE_MIXED_RULES", 2): (W_ZONING, "desk", "The members are zoned differently within one jurisdiction, and the draft "
@@ -217,10 +230,12 @@ PLAYBOOK_AT_SEVERITY: dict[tuple[str, int], tuple[str, str, str, str]] = {
 }
 
 
-def playbook_for(flag: str, severity: int | None = None) -> tuple[str, str, str, str]:
+def playbook_for(flag: str, severity: int | None = None, underground: bool = False) -> tuple[str, str, str, str]:
     """The playbook entry of a flag. A second building's flag
     (``SECOND_<flag>``) takes the entry of the flag it repeats."""
     base = flag[7:] if flag.startswith("SECOND_") and flag[7:] in PLAYBOOK else flag
+    if underground and base in PLAYBOOK_UNDERGROUND:
+        return PLAYBOOK_UNDERGROUND[base]
     if (base, severity) in PLAYBOOK_AT_SEVERITY:
         return PLAYBOOK_AT_SEVERITY[(base, severity)]
     return PLAYBOOK.get(base, _UNKNOWN)
@@ -311,7 +326,8 @@ def land_budget(parcel: BaseGeometry, P: BaseGeometry, envelope0_sf: float,
     }
 
 
-EDGE_LABELS = (("ROW", "road"), ("RES_SIDE", "residential side"), ("RES_REAR", "residential rear"), ("OTHER", "other lot lines"))
+EDGE_LABELS = (("ROW", "road"), ("RES_SIDE", "residential side"), ("RES_REAR", "residential rear"),
+               ("COMM", "commercial or institutional"), ("OTHER_REAR", "rear lot line"), ("OTHER", "other lot lines"))
 SETBACK_TOL_FT = 1.0
 SETBACK_REACH_FT = 1600.0     # past this a shape is not in front of the lot line at all
 
@@ -417,7 +433,7 @@ def open_yard_row(edges: list[tuple[str, BaseGeometry]], buildings: BaseGeometry
 def compliance(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], layouts: list[tuple[Any, dict[str, Any]]],
                *, clear_ft: int, clear_assumed_ft: int, roof_allowance_ft: int, cover: tuple[str, float, float] | None,
                building_pct: float, impervious_pct: float, cars_required: int, cars_provided: int, cars_basis: str,
-               gated: list[str]) -> list[dict[str, Any]]:
+               gated: list[str], truck_spaces: tuple[int, int] | None = None) -> list[dict[str, Any]]:
     """The plan against the DRAFT zoning values it was drawn under, one row
     per rule: item, the draft value, what the plan provides, the margin and
     a status (meets, short, over, limited, gate, verify, no draft value).
@@ -453,6 +469,10 @@ def compliance(rules: dict[str, Any], edges: list[tuple[str, BaseGeometry]], lay
                      "provided": f"building {building_pct:.0f}%, impervious {impervious_pct:.0f}%", "status": "no draft value"})
     rows.append({"item": "Car parking" + one, "required": f"{cars_required} stalls", "provided": f"{cars_provided} stalls",
                  "status": "meets" if cars_provided >= cars_required else "short", "note": cars_basis})
+    if truck_spaces:
+        need, got = truck_spaces
+        rows.append({"item": "Truck spaces", "required": f"{need} spaces", "provided": f"{got} trailer stalls",
+                     "status": "meets" if got >= need else "short", "note": "a draft code minimum, apart from the trailer target"})
     if gated:
         rows.append({"item": "Use", "required": "use permit (draft reading)", "provided": "not in hand", "status": "gate"})
     else:
@@ -502,6 +522,7 @@ def _marks(a: dict[str, Any], w: dict[str, Any]) -> dict[str, float]:
 
 
 MARK_MIN_SF = 500      # a mark-down smaller than this is not named as a reason
+POND_GAIN_MIN = 1.05   # a layout held only by the pond is reported from this multiple of the plan drawn
 
 
 def _reasons(a: dict[str, Any], chosen: dict[str, Any], w: dict[str, Any]) -> list[str]:
@@ -534,21 +555,26 @@ def _fail_text(a: dict[str, Any]) -> str:
 
 
 def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
-              pond_limited: Iterable[dict[str, Any]] = ()) -> dict[str, Any]:
-    """Why the plan drawn (the first alternative) ranks first, the largest
-    layout that passed its checks when it is larger, and what the surface
-    pond costs.
+              pond_limited: Iterable[dict[str, Any]] = (), underground: bool = False) -> dict[str, Any]:
+    """Why the plan drawn (the first alternative) ranks first; the largest
+    layout that passed its checks when it is larger; the largest that
+    meets its trailer target when the plan drawn does not; and what the
+    surface pond costs.
 
-    weights: the ranking's own numbers (``siteplan.RANKING``), so the
-    trade is stated in the ranking's terms. pond_limited: layouts that
-    passed every check but the surface pond, at the length first tried."""
+    weights: the ranking's own numbers (``siteplan.RANKING``), so a trade
+    is stated in the ranking's terms. pond_limited: layouts that passed
+    every layout check but the surface pond, at the length first tried.
+    underground: whether the market uses underground detention (an
+    operator decision); it decides what is said about the pond, nothing
+    else."""
     alts = [a for a in alternatives if isinstance(a, dict)]
+    out: dict[str, Any] = {"basis": "", "upside": None, "with_trailers": None, "without_pond": None, "larger_failed": 0}
     if not alts:
-        return {"basis": "", "upside": None, "without_pond": None, "larger_failed": 0}
+        return out
     chosen = alts[0]
     larger_ok = [a for a in alts[1:] if a.get("geometry_ok") and (a.get("sf") or 0) > (chosen.get("sf") or 0)]
     larger_bad = [a for a in alts[1:] if not a.get("geometry_ok") and (a.get("sf") or 0) > (chosen.get("sf") or 0)]
-    out: dict[str, Any] = {"upside": None, "without_pond": None, "larger_failed": len(larger_bad)}
+    out["larger_failed"] = len(larger_bad)
     if not chosen.get("geometry_ok"):
         out["basis"] = "No layout passed its own checks; the plan drawn is the one that ranks best of those tried."
         return out
@@ -566,13 +592,30 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
         if why:
             text += " because " + _listed(why)
         else:
-            text += " on the ranking's marks for steep ground, relief and trailers, by a small margin"
+            text += " on the ranking's marks for steep ground and relief, by a small margin"
         text += "."
         if trailer:
             text += " If the tenant does not need that trailer storage, it is the higher-yield scheme."
         parts.append(text)
     else:
         parts.append("The plan drawn is the largest layout tried that passed its own checks.")
+    short = (chosen.get("trailers_target") or 0) - (chosen.get("trailers") or 0)
+    if short > 0:
+        # The ranking gives no floor area for trailer stalls (an operator
+        # decision), so say what meeting the target would cost.
+        full = [a for a in alts[1:] if a.get("geometry_ok") and (a.get("trailers") or 0) >= (a.get("trailers_target") or 0)]
+        text = (f"It has {chosen.get('trailers') or 0} of its {chosen.get('trailers_target')} target trailer stalls; the "
+                "ranking does not trade floor area for trailer stalls.")
+        if full:
+            wt = max(full, key=lambda a: a.get("sf") or 0)
+            loss = (wt.get("sf") or 0) - (chosen.get("sf") or 0)
+            out["with_trailers"] = {"variant": wt.get("variant"), "sf": wt.get("sf"), "gain_sf": loss,
+                                    "trailers": wt.get("trailers")}
+            text += (f" The largest layout tried that meets its trailer target is {wt.get('variant')}, {wt.get('sf'):,} SF "
+                     f"({loss:+,} SF), with {wt.get('trailers')} stalls.")
+        else:
+            text += " No layout tried meets its trailer target."
+        parts.append(text)
     if larger_bad:
         counts: dict[str, int] = {}
         for a in larger_bad:
@@ -580,19 +623,26 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
         listed = "; ".join(f"{k} ({n})" for k, n in sorted(counts.items(), key=lambda t: (-t[1], t[0])))
         parts.append(f"{len(larger_bad)} larger layout{'s' if len(larger_bad) != 1 else ''} failed: {listed}.")
     best_ok = max([chosen.get("sf") or 0] + [a.get("sf") or 0 for a in larger_ok])
-    no_pond = [a for a in pond_limited if isinstance(a, dict) and (a.get("sf") or 0) > best_ok]
+    # worth a line only when it is a real step up (5% of the plan drawn)
+    no_pond = [a for a in pond_limited if isinstance(a, dict)
+               and (a.get("sf") or 0) > best_ok and (a.get("sf") or 0) >= POND_GAIN_MIN * (chosen.get("sf") or 0)]
     if no_pond:
         np_ = max(no_pond, key=lambda a: a.get("sf") or 0)
         gain = np_["sf"] - (chosen.get("sf") or 0)
         pct = 100 * gain / chosen["sf"] if chosen.get("sf") else 0.0
         out["without_pond"] = {"variant": np_.get("variant"), "sf": np_["sf"], "gain_sf": gain, "gain_pct": round(pct),
                                "detention_acft": np_.get("detention_acft"), "trailers": np_.get("trailers"),
-                               "trailers_target": np_.get("trailers_target")}
-        short = (np_.get("trailers_target") or 0) - (np_.get("trailers") or 0)
-        parts.append(f"The surface pond is what holds the building: {np_.get('variant')} at {np_['sf']:,} SF ({gain:+,} SF, "
-                     f"{pct:+.0f}%) passed every layout check but the pond"
-                     + (f", with {np_.get('trailers') or 0} of its {np_.get('trailers_target')} target trailer stalls" if short > 0 else "")
-                     + f". Its {np_.get('detention_acft')} ac-ft would have to go underground or off site.")
+                               "trailers_target": np_.get("trailers_target"), "underground": bool(underground)}
+        np_short = (np_.get("trailers_target") or 0) - (np_.get("trailers") or 0)
+        text = (f"The surface pond is what holds the building: {np_.get('variant')} at {np_['sf']:,} SF ({gain:+,} SF, "
+                f"{pct:+.0f}%) passed every layout check but the pond"
+                + (f", with {np_.get('trailers') or 0} of its {np_.get('trailers_target')} target trailer stalls" if np_short > 0 else "")
+                + ".")
+        text += (f" Its {np_.get('detention_acft')} ac-ft would have to go underground or off site: price that against the "
+                 "floor area." if underground else
+                 " Underground detention is not used in this market (operator decision), so the plan drawn stands; "
+                 "a pond off site would be the only way to that floor area.")
+        parts.append(text)
     out["basis"] = " ".join(parts)
     return out
 
@@ -634,10 +684,11 @@ def conditions(rec: dict[str, Any]) -> list[dict[str, Any]]:
     # behaviour a severity-1 flag does not always make a plan infeasible,
     # and a plan the record counts has no blocking condition.
     counted = rec.get("feasible") is True
+    underground = (rec.get("operator_decisions") or {}).get("underground_detention") == "yes"
     for level in (1, 2, 3):
         for f in _sev(rec, level):
             name = f["flag"]
-            ws, stage, action, closes = playbook_for(name, level)
+            ws, stage, action, closes = playbook_for(name, level, underground)
             if level == 1:
                 kind = "gate" if name in GATE_FLAGS else ("site" if counted else "blocking")
             else:
@@ -722,8 +773,14 @@ def yield_notes(rec: dict[str, Any], comp_band: tuple[int, int]) -> dict[str, An
             notes.append(f"A {up['sf']:,} SF layout ({up['gain_sf']:+,} SF) passed its checks but ranks lower.")
         np_ = (rec.get("selection") or {}).get("without_pond")
         if np_:
-            notes.append(f"Without a surface pond, {np_['sf']:,} SF ({np_['gain_sf']:+,} SF) passed every other layout check: "
-                         "price underground or off-site detention against that floor area.")
+            notes.append(f"The surface pond sets the size: without it {np_['sf']:,} SF ({np_['gain_sf']:+,} SF) passed every "
+                         "other layout check. " + ("Price underground or off-site detention against that floor area."
+                                                   if np_.get("underground") else
+                                                   "Underground detention is not used in this market, so that is not on offer."))
+        wt = (rec.get("selection") or {}).get("with_trailers")
+        if wt:
+            notes.append(f"Meeting the trailer target would cost floor area: {wt['sf']:,} SF ({wt['gain_sf']:+,} SF) is the "
+                         "largest layout tried that does.")
     return {"sf_per_gross_ac": sfa, "comp_band": [lo, hi], "position": position, "notes": notes}
 
 
@@ -795,7 +852,8 @@ PIPELINE_COLUMNS = (
     "site", "parcel_ids", "rules", "status", "counted_sf", "drawn_sf", "layout", "length_ft", "depth_ft", "clear_ft",
     "dock_doors", "trailer_stalls", "trailer_target", "car_stalls", "gross_ac", "net_ac", "sf_per_gross_ac", "far",
     "impervious_pct", "detention_acft", "ponds", "relief_ft", "max_cut_ft", "max_fill_ft", "earthwork_cy",
-    "unused_net_ac", "larger_passing_sf", "without_pond_sf", "blocking", "site_conditions", "first_step")
+    "unused_net_ac", "larger_passing_sf", "meets_trailer_target_sf", "without_pond_sf", "blocking", "site_conditions",
+    "first_step")
 
 
 def pipeline_row(rec: dict[str, Any]) -> dict[str, Any]:
@@ -823,6 +881,7 @@ def pipeline_row(rec: dict[str, Any]) -> dict[str, Any]:
         # a larger layout that passed its checks but ranks lower, and the
         # largest that passed every check but the surface pond
         "larger_passing_sf": (sel.get("upside") or {}).get("sf"),
+        "meets_trailer_target_sf": (sel.get("with_trailers") or {}).get("sf"),
         "without_pond_sf": (sel.get("without_pond") or {}).get("sf"),
         "blocking": " ".join(c["flag"] for c in conds if c["kind"] in ("blocking", "gate")),
         "site_conditions": " ".join(c["flag"] for c in conds if c["kind"] == "site"),
