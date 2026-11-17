@@ -47,6 +47,8 @@ from typing import Any
 
 from shapely.affinity import translate
 from shapely.geometry import LineString, Point, box
+from shapely import make_valid
+from shapely.errors import GEOSException
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import substring, unary_union
 
@@ -184,11 +186,12 @@ def contours(dem: Any, region: BaseGeometry, chaikin: int = 2) -> tuple[int, lis
     sample missing at a corner is skipped; a saddle is split by the
     mean of the four corners), the pieces joined into lines and
     smoothed by corner cutting (Chaikin). (0, []) when there is too
-    little to draw."""
+    little to draw (no samples, or ground flat within one interval)."""
     if dem is None or not getattr(dem, "elev", None) or region is None or region.is_empty:
         return 0, []
     pts = {(int(round(i)), int(round(j))): p for (i, j), p in dem.points.items()}
-    z = {(int(round(i)), int(round(j))): float(v) for (i, j), v in dem.elev.items()}
+    z = {(int(round(i)), int(round(j))): float(v) for (i, j), v in dem.elev.items()
+         if isinstance(v, (int, float)) and math.isfinite(v)}
     inside = [v for k, v in z.items() if k in pts and region.contains(Point(pts[k]))]
     if len(inside) < 4:
         return 0, []
@@ -234,7 +237,7 @@ def contours(dem: Any, region: BaseGeometry, chaikin: int = 2) -> tuple[int, lis
             g = LineString(line).intersection(region)
             if not g.is_empty and g.length > 0:
                 out.append((float(level), g))
-    return step, out
+    return (step, out) if out else (0, [])
 
 
 def _chains(segs: list) -> list[list[tuple[float, float]]]:
@@ -430,10 +433,18 @@ def render(d: Drawing, rec: dict) -> str:
     marks = [q for q in (o["tpt"], o["cpt"]) if q is not None]
     pc = parcel.centroid
     # the neighbouring county parcels, in outline (residential ones tinted)
+    drawn_ctx = 0
     for kind, g in sorted(d.context or [], key=lambda t: t[0]):
-        if g is not None and not g.is_empty:
-            out.append(poly(g.intersection(view).difference(parcel), C["ctx_res"] if kind == "RES" else C["ctx"], C["ctx_s"], 0.7,
-                            extra='stroke-linejoin="round"'))
+        if g is None or g.is_empty:
+            continue
+        try:
+            shown_g = make_valid(g).intersection(view).difference(parcel)
+        except GEOSException:          # a shape GEOS cannot cut is context: leave it out, never the sheet
+            continue
+        piece = poly(shown_g, C["ctx_res"] if kind == "RES" else C["ctx"], C["ctx_s"], 0.7, extra='stroke-linejoin="round"')
+        if piece:
+            out.append(piece)
+            drawn_ctx += 1
     # the street: an asphalt band outside the parcel along the frontage
     runs = ([ln for ln in getattr(front_ft, "geoms", [front_ft]) if ln.geom_type == "LineString" and ln.length > 1]
             if front_ft is not None and not front_ft.is_empty else [])
@@ -442,10 +453,16 @@ def render(d: Drawing, rec: dict) -> str:
     street = (unary_union(body).buffer(STREET_FT, cap_style=2, join_style=2).difference(parcel.buffer(0.5)) if body else None)
     out.append(poly(street, C["street"]))
     if body:
-        # its centre line, dashed yellow, without the short cross pieces at its ends
-        mid = (unary_union(body).buffer(STREET_FT / 2, cap_style=2, join_style=2).boundary
-               .difference(parcel.buffer(STREET_FT / 4)).intersection(view))
-        mid = [ln for ln in getattr(mid, "geoms", [mid]) if ln.geom_type == "LineString" and ln.length > 2 * STREET_FT]
+        # its centre line, dashed yellow: each run moved half the street's
+        # width to the side away from the parcel, kept only on the street
+        mid = []
+        for ln in body:
+            sides = [ln.offset_curve(k * STREET_FT / 2, join_style=2) for k in (1, -1)]
+            sides = [g for g in sides if not g.is_empty]
+            if sides:
+                far = max(sides, key=lambda g: parcel.distance(g.interpolate(0.5, normalized=True)))
+                cl = far.intersection(street.buffer(0.5)).intersection(view) if street is not None else far
+                mid += [x for x in getattr(cl, "geoms", [cl]) if x.geom_type == "LineString" and x.length > 2 * STREET_FT]
         if mid:
             out.append(f'<path d="{lpath(unary_union(mid))}" stroke="{C["centre"]}" stroke-width="1.1" stroke-dasharray="9 7" '
                        f'fill="none"/>')
@@ -478,7 +495,9 @@ def render(d: Drawing, rec: dict) -> str:
     # implies reads through) and under the buildings
     every: int = 0
     lines_z: list[tuple[float, BaseGeometry]] = []
-    if d.dem is not None and getattr(d.dem, "elev", None):
+    dem_state = getattr(d.dem, "state", None) if d.dem is not None else None
+    if dem_state == "checked" and getattr(d.dem, "elev", None):
+        # (a partial answer is not drawn: unsampled ground would read as level)
         every, lines_z = contours(d.dem, parcel)
     # their labels only on open ground, clear of the paving and its labels
     keep_off = unary_union([g.buffer(10) for pp, oo in plans
@@ -494,7 +513,8 @@ def render(d: Drawing, rec: dict) -> str:
             if piece.geom_type == "LineString" and piece.length * s >= 120:
                 for f in (0.5, 0.3, 0.7, 0.15, 0.85):
                     q = piece.interpolate(f, normalized=True)
-                    if not keep_off.contains(q):
+                    room = (text_width(f"{z:.0f}", 7.5, True) / 2 + 4) / s
+                    if not keep_off.intersects(q.buffer(room)):
                         q0 = piece.interpolate(max(f - 0.03, 0), normalized=True)
                         q1 = piece.interpolate(min(f + 0.03, 1), normalized=True)
                         contour_labels.append(label(X(q.x), Y(q.y), [(f"{z:.0f}", 7.5, "bold")],
@@ -902,9 +922,12 @@ def render(d: Drawing, rec: dict) -> str:
               (C["court"], "truck court, truck roads and truck route"), (C["trailer"], "trailer stalls / drop yard"),
               (C["car"], "car parking and car route"), (C["pond"], "detention pond (grassed rim around)"),
               ("url(#gx)", "open ground"), (C["street"], "street along the GDOT road frontage; T/C driveways"),
-              (C["ctx"], "neighbouring parcel (county parcel map)"), (C["ctx_res"], "neighbouring parcel, residential land-use code"),
+              *([(C["ctx"], "neighbouring parcel (county parcel map)"),
+                 (C["ctx_res"], "neighbouring parcel buffered as residential (county land-use / tax class)")] if drawn_ctx else []),
               ("contour", f"existing ground contour (lidar, every {every} ft; index labelled)" if every
-               else "existing ground contour (lidar; none drawn: no samples)"),
+               else "existing ground contour: none drawn (" + ("lidar incomplete" if dem_state in ("partial", "not_checked")
+                                                               else "no lidar samples" if not getattr(d.dem, "elev", None)
+                                                               else "ground level within one interval") + ")"),
               ("url(#wx)", "floodplain, wetlands, easements, protected land"), ("url(#tx)", "transmission corridor (assumed width)"),
               ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
               ("prop", "property line (county parcel map)"), ("dash", "paving setback line (draft; 25 ft from water)"),
@@ -936,8 +959,10 @@ def render(d: Drawing, rec: dict) -> str:
     basis_lines = [f"Detention: {de.get('basis')}" if de.get("basis") else "", f"Grading: {gr.get('basis')}" if gr.get("basis") else "",
                    f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}",
                    (f"Contours: existing ground every {every} ft, traced from the lidar samples on a {d.dem.step:.0f} ft grid and "
-                    "smoothed (indicative; not a topographic survey); neighbouring parcels from the county parcel map")
-                   if every else "", DISCLAIMER,
+                    "smoothed, stopping about half a grid step inside the property line (indicative; not a topographic survey)")
+                   if every else "",
+                   ("Neighbours: county parcel map; the tint is the planner's residential-edge test (residential land-use or tax "
+                    "class, and agricultural where the draft rules buffer it), not zoning") if drawn_ctx else "", DISCLAIMER,
                    f"Sheet SP-{rec.get('key', '')}"]
     for line in basis_lines:
         for seg_ in _wrap(line, W - 2 * M, 10) if line else []:
