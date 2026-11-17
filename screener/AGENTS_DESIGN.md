@@ -9,7 +9,24 @@ across several counties, produced in the cloud with about 15 minutes of
 human time a week. The tool stops at the lead. Contacting owners, changing
 the evaluation and changing zoning facts stay human.
 
-## Next session: start here (updated 2026-11-16)
+## Next session: start here (updated 2026-11-17)
+
+**2026-11-17, on `claude/stoic-keller-r95w17`:** the site planner's
+output was rebuilt as a test-fit sheet with a read-out
+(`screener/siteplan_assess.py`): one status per plan, next steps in
+order, where the land goes, the plan against its draft zoning values,
+the layouts compared with why the plan drawn ranks first, a takeoff with
+no prices, and each flag as a condition with an action. `plans.csv` puts
+the planned sites side by side. The layout search is unchanged. Record:
+`reviews/38_site_plan_read_out/`. It changes `.py` files under
+`screener/`, so the new-baseline step below applies again. Later the
+same day the operator decided three open items, and the default
+behaviour changed: no trailer mark in the ranking, no underground
+detention in this market, and every draft value that read looser than
+the codes tightened, with a 60 ft open yard at the building
+(`03_operator_decisions.md`). The 33-site replay of `reviews/37` under
+the new rules has not been run: its cached inputs are not in the cloud
+container.
 
 **2026-11-16, on `claude/magical-hypatia-htmio2` (not yet merged to
 `main`):** three standalone tools now exist, run by hand after a run.

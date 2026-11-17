@@ -310,7 +310,8 @@ def dem(plane: sp.Plane, parcel_ft: BaseGeometry, fetch: Fetcher, step: float = 
 def frontage_input(g: BaseGeometry, fetch: Fetcher) -> sp.FrontageInput:
     fr = fetch.frontage(g)
     state = {frontage.CHECKED: "checked", frontage.NONE: "none"}.get(fr.state, "not_checked")
-    return sp.FrontageInput(state, fr.line if state == "checked" else None, fr.feet, fr.road, fr.reason)
+    return sp.FrontageInput(state, fr.line if state == "checked" else None, fr.feet, fr.road, fr.reason,
+                            roads=[label for label, _ in fr.roads])
 
 
 def _overlap_wgs(g: BaseGeometry, pj: LocalProjection, total: float, idx: layers.Index) -> BaseGeometry | None:

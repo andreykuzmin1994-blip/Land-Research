@@ -560,7 +560,9 @@ class Plans(Offline):
 
     def test_trailer_ratio_is_consistent(self):
         o = sp.PlanOptions(trailer_tiers=sp.trailer_tiers_from("1.3"))
-        rec, d = planned("tr13", lambda: site(800, 800), o)
+        # 1000 x 1000 ft: the plan drawn has a drop yard (the ranking no longer
+        # trades floor area for trailer stalls, so 800 x 800 draws none)
+        rec, d = planned("tr13c", lambda: site(1000, 1000), o)
         self.assertGreater(rec["trailers"]["drop_yards"], 0)     # the drop-yard branch runs
         self.assertEqual(rec["trailers"]["target"], math.ceil(1.3 * rec["doors"]))
         self.assertEqual(rec["operator_decisions"]["trailer_target_tiers"][0][1], 1.3)
@@ -821,7 +823,7 @@ class Plans(Offline):
         self.assertNotIn("href", low)
         self.assertIsNone(re.search(r"\son[a-z]+\s*=", low))
         self.assertNotIn("<style", low)
-        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)) - {"#tx", "#sx", "#cx"}, set())
+        self.assertEqual(set(re.findall(r"url\(([^)]*)\)", svg)) - {"#tx", "#sx", "#cx", "#wx"}, set())
         self.assertIn("DRAFT", svg)
         tags = {e.tag.split("}")[-1] for e in root.iter()}
         self.assertLessEqual(tags, {"svg", "title", "rect", "defs", "pattern", "line", "path", "circle", "text"})
@@ -1344,7 +1346,7 @@ class ReferenceSites(Offline):
 # ---------------------------------------------------------------------------
 # Static guards
 # ---------------------------------------------------------------------------
-NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py")
+NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py", "siteplan_assess.py")
 
 
 class Static(unittest.TestCase):
@@ -1372,7 +1374,7 @@ class Static(unittest.TestCase):
         return out
 
     def test_pure_modules_do_not_import_the_network(self):
-        for name in ("siteplan.py", "siteplan_render.py"):
+        for name in ("siteplan.py", "siteplan_render.py", "siteplan_assess.py"):
             imps = self.module_level_imports(name)
             for bad in ("requests", ".:arcgis", ".:layers", ".:frontage", ".:checks", ".:siteplan_inputs", ".frontage:check_parcel"):
                 self.assertNotIn(bad, imps, name)
@@ -1823,7 +1825,9 @@ class MultipartParcel(Offline):
         self.assertEqual(len(home), 1)
         for g in d.o["ponds"] + d.o["drops"]:
             self.assertGreater(g.intersection(home[0]).area, 0.99 * g.area)
-        alone, _ = planned("basic", lambda: site(600, 700))
+        # the same west piece on its own, with the same road side (the open
+        # yard applies to the other three sides, so the road side matters)
+        alone, _ = planned("west-piece-alone", lambda: site(600, 700, front=LineString([(600, 0), (600, 700)])))
         self.assertLessEqual(rec["total_sf"], alone["total_sf"] * 1.05)   # the far piece adds no building area
         assembled, _ = planned("multipart-assembled", lambda: site(shapes=shapes, front=fr, assembled=True))
         self.assertNotIn("PARCEL_MULTIPART", names(assembled))
