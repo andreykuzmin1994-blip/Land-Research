@@ -1,0 +1,13 @@
+[Unit]
+Description=Land screener: scheduled county runs with retries and alerts
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=screener
+WorkingDirectory=/home/screener/Land-Research
+ExecStart=/home/screener/Land-Research/ops/screener/supervise.sh
+# Retries sleep for hours inside one run; never time the service out.
+TimeoutStartSec=infinity
+Nice=5
