@@ -346,6 +346,7 @@ POND_FALLBACK_RATIOS = tuple(sorted({k for k, _ in POND_FALLBACK_SHAPES}))
 # uphill of the paving it drains (POND_UPHILL). Up to this much is taken
 # up by digging the pond deeper, inside its own +/-30%.
 POND_UPHILL_TOL_FT = 3.0
+POND_ROOM_KEEP = 3                # plans the pass adds to the results (the best by the ranking)
 DRAIN_FIRST_SPOTS = 2             # pond-first layouts: the lowest pond spots reserved, every cross-section fitted round each
 POND_ROOM_MAX_TRIES = 90          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
 POND_ROOM_MAX_LAYOUTS = 6         # pond-blocked layouts the pass starts from, largest first
@@ -2507,8 +2508,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # Room for the pond (reviews/40): a pass that only adds layouts. The
         # layouts the pond alone blocked, largest first, are tried again
         # with other pond shapes, then moved to leave their pond room. One
-        # that turns its docks to the street or its loading to homes, where
-        # the best plan so far does not, is not taken; nor one with no more
+        # that turns its docks to the street or its loading to homes is
+        # taken only when the best plan does so anyway; nor one with no more
         # floor area that has fewer trailer stalls (a small relief or
         # steep-ground mark alone does not trade them away). The plan drawn
         # is then the best of all by the same ranking: never below the
@@ -2519,13 +2520,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # and adds no plan whose pond is uphill.
         room = PondRoom(search)
         best0 = max(results, key=score)
-        # (allowed only where every layout that passed already does it:
-        # there the site has no other way)
-        passed = [q for q, o in results if o["ok"]] or [best0[0]]
-        b0_street = all(faces_street(q, row_line) for q in passed)
-        b0_homes = all(loading_faces_homes(q, res_line) for q in passed)
-        street_ok = lambda q: (b0_street or not faces_street(q, row_line)) and (b0_homes or not loading_faces_homes(q, res_line))
-
         b0_drains = best0[1].get("drains", True)
 
         def gains(t):
@@ -2554,37 +2548,61 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     or (uphill(o) and score((q, {**o, "drains": True})) > score(best0))):
                 seen_l.add(key)
                 start.append((q, o))
-        found_by: list[list[tuple[Plan, dict[str, Any]]]] = []
-        try:
-            # Pond first, building second: when the best plan's pond does
-            # not drain, or a larger cross-section fitted the open parcel
-            # than the best plan holds.
-            v0 = best0[1]["v_det"] / max(pond_count(best0[1]["v_det"]), 1)
-            target = best0[0].sf if b0_drains else 0
-            if best0[1]["ok"] and any(q.sf > target for q in first[2]):
-                mine0: list[tuple[Plan, dict[str, Any]]] = []
-                found_by.append(mine0)
-                drainage_first(first[2], v0, best0[0].frame.pl.angle_deg, target, P0, B0, ctx_room, row_line, res_line,
-                               room, street_ok, mine0)
-            for q, o in start[:POND_ROOM_MAX_LAYOUTS]:
-                if room.spent:
-                    break
-                room.layouts += 1
-                mine: list[tuple[Plan, dict[str, Any]]] = []
-                found_by.append(mine)
-                if street_ok(q) and room.take():
-                    o2 = finish(q, ctx_room)            # the same layout, its pond on low ground or in another shape
-                    if o2["ok"] and o2.get("drains", True):
-                        mine.append((q, o2))
-                        room.found += 1
-                        continue
-                relocate_for_pond(q, o, P0, B0, ctx_room, row_line, res_line, room, street_ok, mine)
-        except _BudgetExceeded:
-            room.cut_short = True                       # what was found stands; building 1's search was complete
-        # One plan per layout the pass started from, its best: the others
-        # are the same layout a little moved, and would crowd the layouts
-        # compared (the first ten results) out of the read-out.
-        added = [max(ok, key=score) for mine in found_by for ok in [[t for t in mine if gains(t)]] if ok]
+
+        def sweep(keep, best_now):
+            """One round of the pass with the layouts `keep` takes: pond
+            first, then the pond-blocked and uphill layouts. The best plan
+            it found per starting point, of those that gain."""
+            found_by: list[list[tuple[Plan, dict[str, Any]]]] = []
+            try:
+                # Pond first, building second: when the best plan's pond
+                # does not drain, or a larger cross-section fitted the open
+                # parcel than the best plan holds.
+                v0 = best_now[1]["v_det"] / max(pond_count(best_now[1]["v_det"]), 1)
+                target = best_now[0].sf if best_now[1].get("drains", True) else 0
+                if best_now[1]["ok"] and any(q.sf > target for q in first[2]):
+                    mine0: list[tuple[Plan, dict[str, Any]]] = []
+                    found_by.append(mine0)
+                    drainage_first(first[2], v0, best_now[0].frame.pl.angle_deg, target, P0, B0, ctx_room, row_line, res_line,
+                                   room, keep, mine0)
+                for q, o in start[:POND_ROOM_MAX_LAYOUTS]:
+                    if room.spent:
+                        break
+                    room.layouts += 1
+                    mine: list[tuple[Plan, dict[str, Any]]] = []
+                    found_by.append(mine)
+                    if keep(q) and room.take():
+                        o2 = finish(q, ctx_room)        # the same layout, its pond on low ground or in another shape
+                        if o2["ok"] and o2.get("drains", True):
+                            mine.append((q, o2))
+                            room.found += 1
+                            continue
+                    relocate_for_pond(q, o, P0, B0, ctx_room, row_line, res_line, room, keep, mine)
+            except _BudgetExceeded:
+                room.cut_short = True                   # what was found stands; building 1's search was complete
+            # One plan per starting point, its best: the others are the
+            # same layout a little moved.
+            return [max(ok, key=score) for mine in found_by for ok in [[t for t in mine if gains(t)]] if ok]
+
+        # First only layouts with their docks off the street and their
+        # loading away from homes. Layouts that face either are tried
+        # after, and only where the best plan before the pass faced it
+        # already, unless the first round found a plan that faces neither
+        # and is no smaller than that plan. So the pass never turns docks
+        # to the street where the plan before did not, and never gives up
+        # floor area to turn them away where it did.
+        clear_of = lambda q: not faces_street(q, row_line) and not loading_faces_homes(q, res_line)
+        added = sweep(clear_of, best0)
+        best1 = max(results + added, key=score)
+        was_street, was_homes = faces_street(best0[0], row_line), loading_faces_homes(best0[0], res_line)
+        settled = clear_of(best1[0]) and best1[0].sf >= best0[0].sf
+        if (was_street or was_homes) and not settled and not room.spent and not room.cut_short:
+            added += sweep(lambda q: (not clear_of(q) and (was_street or not faces_street(q, row_line))
+                                      and (was_homes or not loading_faces_homes(q, res_line))), best1)
+        # At most three of them go on (the best by the ranking): more
+        # would crowd the layouts compared (the first ten results) out of
+        # the read-out.
+        added = sorted(added, key=score, reverse=True)[:POND_ROOM_KEEP]
         results += added
     results.sort(key=score, reverse=True)
     best_p, best_o = results[0]

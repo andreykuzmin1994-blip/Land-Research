@@ -952,8 +952,8 @@ How to read a plan:
   room (since 2026-11-17, reviews/40; default behaviour only). It only
   adds layouts: the plan drawn is the best of all by the usual ranking.
   It refuses a layout that turns its docks to the street or its
-  loading to homes (unless every passing layout does), or that has no
-  more floor area and fewer trailer stalls. It has 90 tries and half
+  loading to homes where the plan before the pass did not, or that has
+  no more floor area and fewer trailer stalls. It has 90 tries and half
   the remaining time, keeps what it
   found when cut, and is skipped when less than half the site's budget
   is left (time limits: a site near them can plan differently on a

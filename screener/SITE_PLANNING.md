@@ -268,7 +268,7 @@ fit.
   70,000 SF with the pond 24 ft below the pad, the largest such layout
   an exhaustive check found. Reference site #21: 84,000 to 91,000 SF.
   An L-shaped test site: 170,000 SF with every pond 9 ft above the pad,
-  now 147,000 SF that drains (the 170,000 is named in the read-out).
+  now 156,000 SF that drains (the 170,000 is named in the read-out).
 - **Room for the pond (default behaviour; operator request of
   2026-11-17, reviews/40).** Each layout is fitted as long as it goes
   wherever it fits longest, and its pond is placed after; when the pond
@@ -285,9 +285,15 @@ fit.
   worse than without the pass. A layout the pass adds is refused when
   its truck court or trailer row comes within 100 ft of the street (the
   `STREET_FACING_DOCKS` test) or within 150 ft of homes
-  (`LOADING_FACES_RES`), unless every layout that passed already does
-  (reviews/41); and when it has no more floor area than the best plan
-  before it and fewer trailer stalls (a 1 ft relief difference alone
+  (`LOADING_FACES_RES`) and the best plan before the pass did not. Where
+  that plan did, the pass first looks only for layouts that face
+  neither, and takes one that is no smaller than that plan; only
+  failing that does it add layouts that face the street or homes too
+  (reviews/41). So it never turns docks to the street where the plan
+  before did not, and never gives up floor area to turn them away where
+  it did. At most three of its plans go into the results
+  (`POND_ROOM_KEEP`). A layout is also refused when it has no more floor
+  area than the best plan before it and fewer trailer stalls (a 1 ft relief difference alone
   does not trade the stalls away), unless that plan's pond does not
   drain and this one's does. The pass has 90 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
   checks, a count) and half of the search time left after the main
