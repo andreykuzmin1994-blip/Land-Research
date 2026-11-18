@@ -169,14 +169,24 @@ fit.
   reviews/41).** A pond works only if the paving can drain to it. The
   pad is one plane at the module's mean ground, so the check is the
   pond's ground (the mean of the lidar samples on its footprint) against
-  the pad: more than 3 ft above it (`POND_UPHILL_TOL_FT`; up to that is
-  a deeper pond, inside its own ±30%) and the plan says `POND_UPHILL`
-  (severity 2: a pond on the low side, a much deeper and larger pond, or
-  pumping). The record's `detention.pond_over_pad_ft` and
-  `drains_by_gravity` carry it, and the sheet prints the pad elevation
-  on the building and "GROUND n FT BELOW / ABOVE PAD" on the pond. It is
+  the pad: more than 3 ft above it (`POND_UPHILL_TOL_FT`) and the plan
+  says `POND_UPHILL` (severity 2: a pond on the low side, a much deeper
+  and larger pond, or pumping). Up to 3 ft above is taken as a pond dug
+  that much deeper, and from 1 ft the plan says so (`POND_ABOVE_PAD`,
+  information): at 4:1 slopes the deeper pond's footprint is roughly 15
+  to 30% larger than drawn, more with the fall an inlet needs. Each pond
+  is first looked for on ground at least 3 ft below the pad
+  (`POND_GOOD_DROP_FT`), then as before; but a layout whose pond is
+  inside the tolerance is not laid out again to get it lower. The
+  record carries `detention.ponds_over_pad_ft` (each pond against its
+  own building's pad, building 1's first), `pond_over_pad_ft` (the
+  highest) and `drains_by_gravity` (None where a pond was not measured:
+  no pond, or no lidar under it). The sheet prints the pad elevation on
+  the building and "GROUND n FT BELOW / ABOVE PAD" on each pond. It is
   a screening check on one level pad: it does not grade the paving,
-  size a pipe or find the outfall. Reference site #25 falls 4% to the
+  size a pipe or find the outfall. A second building's pond is measured
+  and flagged (`SECOND_POND_UPHILL`), but its choice does not prefer a
+  pond that drains and the pass below is for building 1 only. Reference site #25 falls 4% to the
   north-west, and the plan drawn before had its pond 9 ft above the pad.
 - **Ranking.** Among layouts that pass, one whose pond drains ranks
   before a larger one whose pond does not (after the code truck spaces,
@@ -258,7 +268,10 @@ fit.
   spots a pond could use (`DRAIN_FIRST_SPOTS`) are reserved in turn, and
   every cross-section is fitted round the reserved pond, the ones that
   fit largest on the open parcel first, stopping when no cross-section
-  left can beat what is in hand. Each fit is checked in full with its
+  left is expected to beat what is in hand (the open-parcel fit is
+  nearly always the larger, not always: about 4% of fits round a pond
+  came out longer in the review's runs, #21's among them, so the stop
+  is a rule of thumb that saves tries, not a proof). Each fit is checked in full with its
   pond sited only on ground the pad drains to. It runs when the best
   plan's pond does not drain, or when a cross-section fitted the open
   parcel larger than the best plan. In the pass every pond is sited on
@@ -310,11 +323,11 @@ fit.
   plan drawn came from the pass, and whether it was cut short. The
   ranking gives trailer stalls no floor area (operator decision of
   2026-11-17), so a plan the pass adds may have fewer trailer stalls
-  than the plan it replaces (`TRAILER_SHORT` says so). Reference site
-  #21: 68,000 SF before, 84,000 SF now, the largest layout an exhaustive
-  check of every 3° and a 20 ft position grid found. Reference site #25
-  keeps its plan: the only larger layout found turns its truck court to
-  the arterial and has no trailer stalls.
+  than the plan it replaces (`TRAILER_SHORT` says so); between two of
+  its own plans of the same floor area, the one with more stalls is
+  kept. Reference site #21: 68,000 SF before the pass existed, 84,000 SF
+  with it (reviews/40), 91,000 SF pond first (reviews/41). Reference
+  site #25: above.
 - The alternatives' `geometry_ok` is the layout's own check (routes,
   pond, plan checks, coverage cap), not the site's feasibility.
 - An assemblage is planned under its best-ranked member's draft rules.

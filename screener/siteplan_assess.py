@@ -164,6 +164,9 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
     "POND_UPHILL": (W_STORM, "offer", "The pond is drawn on ground above the building pad, so the paving cannot drain to it "
                     "by gravity. Have a civil engineer lay the site out from its low point: the pond where the water "
                     "leaves, the building above it.", "a stormwater concept that drains by gravity, with pad and pond elevations"),
+    "POND_ABOVE_PAD": (W_STORM, "diligence", "The pond is drawn on ground a little above the building pad. Have the civil "
+                       "engineer set the pad and pond elevations; a deeper pond takes more room than is drawn.",
+                       "a stormwater concept with pad and pond elevations"),
     "POND_SITE_FROM_LIDAR": (W_STORM, "diligence", "Have the civil engineer confirm the pond location, outfall and volume under "
                              "the local ordinance. The size here is a screening estimate.", "a stormwater concept"),
     "HSG_ASSUMED": (W_STORM, "diligence", "The soil group behind the pond size was assumed. Run the soil check for this parcel, "
@@ -799,7 +802,9 @@ def yield_notes(rec: dict[str, Any], comp_band: tuple[int, int]) -> dict[str, An
     if rec.get("feasible") is not None and not rec.get("hypothetical"):
         up = (rec.get("selection") or {}).get("upside")
         if up:
-            notes.append(f"A {up['sf']:,} SF layout ({up['gain_sf']:+,} SF) passed its checks but ranks lower.")
+            why = [r for r in up.get("reasons") or [] if r.startswith("its pond stands above")]
+            notes.append(f"A {up['sf']:,} SF layout ({up['gain_sf']:+,} SF) passed its checks but ranks lower"
+                         + (": " + why[0] + "." if why else "."))
         np_ = (rec.get("selection") or {}).get("without_pond")
         if np_:
             market = {True: " Price underground or off-site detention against that floor area.",

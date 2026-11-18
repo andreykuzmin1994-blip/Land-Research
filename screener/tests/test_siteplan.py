@@ -1480,9 +1480,12 @@ class PondRoom(Offline):
         with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
             off, _ = sp.plan_site(mk())
         on, _ = sp.plan_site(mk())
+        self.assertEqual((off["building"]["sf"], off["trailers"]["total"]), (205000, 21))
         self.assertIs(off["detention"]["drains_by_gravity"], True)
-        self.assertTrue(on["building"]["sf"] > off["building"]["sf"]
-                        or on["trailers"]["total"] >= off["trailers"]["total"])
+        # the pass found the same 211,000 SF with 21 stalls and with none
+        # (2 ft less relief): the one with the stalls is drawn (41/02)
+        self.assertEqual((on["building"]["sf"], on["trailers"]["total"]), (211000, 21))
+        self.assertIs(on["detention"]["drains_by_gravity"], True)
         self.assertNotIn("STREET_FACING_DOCKS", names(on))
 
 
@@ -1502,6 +1505,26 @@ class Drainage(Offline):
         self.assertIsNone(sp.pond_over_pad([], dem, 910.0))
         self.assertIsNone(sp.pond_over_pad([low], dem, None))
         self.assertIsNone(sp.pond_over_pad([box(1000, 1000, 1100, 1100)], dem, 910.0))
+        each = sp.ponds_over_pad([low, box(1000, 1000, 1100, 1100), high], dem, 910.0)
+        self.assertEqual([None if x is None else round(x) for x in each], [-8, None, 6])    # each pond its own figure
+
+    def test_the_record_covers_every_pond(self):
+        # building 1's ponds then a second building's; None where nothing was measured
+        one = {"pond_over_each": [-5.2, -1.0]}
+        rec = sp._drainage_record(one, None)
+        self.assertEqual(rec, {"pond_over_pad_ft": -1, "ponds_over_pad_ft": [-5, -1], "drains_by_gravity": True})
+        two = sp._drainage_record(one, (None, {"pond_over_each": [9.4]}))
+        self.assertEqual((two["pond_over_pad_ft"], two["ponds_over_pad_ft"], two["drains_by_gravity"]), (9, [-5, -1, 9], False))
+        self.assertIsNone(sp._drainage_record({"pond_over_each": [-5.0, None]}, None)["drains_by_gravity"])
+        self.assertEqual(sp._drainage_record({}, None), {"pond_over_pad_ft": None, "ponds_over_pad_ft": [], "drains_by_gravity": None})
+
+    def test_nothing_measured_is_not_a_pond_that_drains(self):
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(600, 700, dem_state="not_checked"))
+        self.assertIsNone(rec["detention"]["drains_by_gravity"])
+        self.assertIsNone(rec["detention"]["pond_over_pad_ft"])
+        self.assertNotIn("POND_UPHILL", names(rec))
+        self.assertNotIn("FT BELOW PAD", sr.render(d, rec))
 
     def test_a_pond_is_not_sited_above_the_ceiling(self):
         dem = sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(12) for j in range(12)},
@@ -1546,7 +1569,7 @@ class Drainage(Offline):
         self.assertIn(False, [a.get("drains") for a in rec["alternatives"]])
 
     def test_an_uphill_pond_is_flagged_when_nothing_drains(self):
-        with mock.patch.object(sp, "pond_over_pad", lambda ponds, dem, pad_z: 9.0 if ponds else None), \
+        with mock.patch.object(sp, "ponds_over_pad", lambda ponds, dem, pad_z: [9.0] * len(ponds)), \
                 mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
             rec, d = sp.plan_site(site(600, 700))
             proto, _ = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
@@ -1559,6 +1582,57 @@ class Drainage(Offline):
         self.assertIn("low point", cond["action"])
         self.assertIn("FT ABOVE PAD", sr.render(d, rec))
         self.assertNotIn("POND_UPHILL", names(proto))                    # the prototype behaviour says nothing
+        self.assertNotIn("drains_by_gravity", proto["detention"])
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            _, dp = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("PAD EL", sr.render(dp, proto))                 # nor does its sheet
+
+    def test_a_pond_a_little_above_the_pad_is_a_note(self):
+        with mock.patch.object(sp, "ponds_over_pad", lambda ponds, dem, pad_z: [2.0] * len(ponds)), \
+                mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertIn("POND_ABOVE_PAD", names(rec, 3))
+        self.assertNotIn("POND_UPHILL", names(rec))
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+
+    @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+    def test_the_pass_sites_no_pond_above_the_pad(self):
+        # the 67,000 SF layout of #25 has its pond 9 ft above the pad; given
+        # to the pass's own check (ctx.pond_room) its pond goes on ground
+        # the pad drains to, or it has no pond: never an uphill one
+        inp, _ = load_fixture("rank25")
+        seen = {}
+        real = sp.finish
+
+        def spy(p, ctx, others=None):
+            o = real(p, ctx, others)
+            if o["ok"] and o.get("drains") is False and p.sf == 67200:
+                seen.setdefault("uphill", (p, ctx))
+            return o
+        with mock.patch.object(sp, "finish", spy), mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+            sp.plan_site(inp)
+        p, ctx = seen["uphill"]
+        o = sp.finish(p, sp.dataclass_replace(ctx, pond_room=True, search=sp.Search(1e9)))
+        self.assertFalse(o["pond_ok"] and o["pond_over_pad"] > sp.POND_UPHILL_TOL_FT)
+
+    def test_docks_face_the_street_only_where_they_did(self):
+        # an L-shaped site whose every layout faced the street, each with its
+        # pond 9 ft above the pad: the first round finds 115,000 SF off the
+        # street, smaller than the plan before the pass (170,000 SF), so the
+        # second round may face the street and finds 156,000 SF that drains
+        mk = lambda: site(shapes=[box(0, 0, 1000, 400), box(0, 400, 450, 1000)], front=LineString([(0, 0), (1000, 0)]),
+                          z=lambda x, y: 930 + 0.01 * x - 0.02 * y)
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+                off, _ = sp.plan_site(mk())
+            on, _ = sp.plan_site(mk())
+        self.assertEqual(off["building"]["sf"], 170000)
+        self.assertIn("POND_UPHILL", names(off, 2))
+        self.assertIn("STREET_FACING_DOCKS", names(off))
+        self.assertEqual(on["building"]["sf"], 156000)
+        self.assertIs(on["detention"]["drains_by_gravity"], True)
+        self.assertIn("STREET_FACING_DOCKS", names(on))
+        self.assertEqual(on["inputs"]["pond_room"]["layouts"], 3)        # each starting layout counted once
 
 
 class PondRoomOnlyAdds(Offline):

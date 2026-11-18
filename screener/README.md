@@ -939,13 +939,15 @@ How to read a plan:
   larger parcel does not read worse than a smaller one inside it.
 - **Drainage** (since 2026-11-18, reviews/41; default behaviour only).
   A pond on ground more than 3 ft above the building pad cannot fill by
-  gravity: the plan says `POND_UPHILL`, and a layout whose pond drains
+  gravity: the plan says `POND_UPHILL` (from 1 ft, `POND_ABOVE_PAD`, for
+  information: a deeper pond takes more room than is drawn), and a layout whose pond drains
   ranks before a larger one whose pond does not. The pass below starts
   pond first: the lowest pond spots are reserved and every cross-section
   is fitted round them. The sheet prints the pad elevation and how far
   the pond's ground is below (or above) the pad;
-  `detention.pond_over_pad_ft` and `drains_by_gravity` are in
-  `plans.json`. Reference site #25 went from a 67,000 SF plan whose pond
+  `detention.ponds_over_pad_ft` (each pond), `pond_over_pad_ft` and
+  `drains_by_gravity` (empty where nothing was measured) are in
+  `plans.json`. One level pad only: no paving grades, pipes or outfall. Reference site #25 went from a 67,000 SF plan whose pond
   stood 9 ft above the pad to 70,000 SF with the pond 24 ft below it.
 - After the search, a pass takes the layouts the pond alone blocked and
   tries them with other pond proportions and moved to leave the pond
@@ -958,7 +960,7 @@ How to read a plan:
   found when cut, and is skipped when less than half the site's budget
   is left (time limits: a site near them can plan differently on a
   slower machine; `inputs.pond_room` says so).
-  Reference site #21 went from 68,000 to 84,000 SF. A plan it adds may
+  Reference site #21 went from 68,000 to 91,000 SF. A plan it adds may
   have fewer trailer stalls (the ranking gives them no floor area).
   `inputs.pond_room` in `plans.json` says what it did.
 - **The planner does not check whether a parcel is built.** Run the built

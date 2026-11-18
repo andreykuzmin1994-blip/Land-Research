@@ -581,10 +581,11 @@ def render(d: Drawing, rec: dict) -> str:
             lines = [(name, 10, "bold"), (f"{rnd(pp.sf, 1000):,} SF", 16, "bold")]
             if clear:
                 lines.append((f"{clear} FT CLEAR", 9.5, "normal"))
-            pad_el = gr.get("pad_elev_ft") if i == 1 else None
+            # (the default behaviour's sheet: the record then carries the ponds' ground against the pad)
+            pad_el = gr.get("pad_elev_ft") if i == 1 and "ponds_over_pad_ft" in de else None
             if pad_el is not None and short_px >= 104:
                 # the level pad's elevation, to read against the contours and the pond
-                lines.append((f"PAD EL {pad_el:,.0f}", 8.5, "normal"))
+                lines.append((f"PAD EL {pad_el:.0f}", 8.5, "normal"))
             labels.append(label(X(bc.x), Y(bc.y), lines, 0.0 if short_px >= 104 else ang))
         else:
             labels.append(label(X(bc.x), Y(bc.y), [(f"{rnd(pp.sf, 1000):,} SF", 12, "bold")], ang if long_px >= 70 else 0.0))
@@ -636,8 +637,11 @@ def render(d: Drawing, rec: dict) -> str:
             each = oo["v_det"] / max(len(oo["ponds"]), 1)
             if lp >= 80 and sp_ >= 34:
                 pond_lines = [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")]
-                over = de.get("pond_over_pad_ft") if i == 1 else None
-                if over is not None and sp_ >= 60:
+                # this pond's own figure: building 1's ponds, then a second building's, in the record's order
+                overs = de.get("ponds_over_pad_ft") or []
+                k_pond = sum(len(o_["ponds"]) for _, o_ in plans[:i - 1]) + oo["ponds"].index(g)
+                over = overs[k_pond] if k_pond < len(overs) else None
+                if over is not None and sp_ >= 60 and lp >= 115:
                     # where the pond's ground stands against the pad: the paving drains to it only from above
                     pond_lines.append((f"GROUND {abs(over):.0f} FT {'ABOVE' if over > 0 else 'BELOW'} PAD" if over else "GROUND LEVEL WITH PAD",
                                        8, "normal"))
