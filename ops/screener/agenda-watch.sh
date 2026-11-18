@@ -59,22 +59,28 @@ agenda_ready() {  # prints why the watch can't run, if it can't
   fi
 }
 
-# One alert when a streak of a problem begins, not one a day.
+# One alert when a streak of a problem begins, and again each week it
+# lasts: not one a day, and not once and then silence for good.
 agenda_problem() {  # KEY TITLE TEXT
   local mark="$AGENDA_STATE/problem-$1"
   log "agenda watch: $3"
-  [ -e "$mark" ] && return 0
+  if [ -e "$mark" ] && [ -z "$(find "$mark" -mtime +6 2>/dev/null)" ]; then return 0; fi
   date -u +%FT%TZ >"$mark"
-  notify "$2" "$3 This is said once; the watch tries again every day." high
+  notify "$2" "$3 The watch tries again every day; this is said again each week it lasts." high
 }
 agenda_fine() { [ -e "$AGENDA_STATE/problem-$1" ] && unlink "$AGENDA_STATE/problem-$1"; return 0; }
 
 agenda_main() {
+  umask 027      # before the first line is logged: the log is not for everyone
   mkdir -p "$AGENDA_STATE" || exit 0
   exec 8>"$AGENDA_STATE/wrapper.lock"
   if ! flock -n 8; then log "agenda watch: another one is running; exiting"; exit 0; fi
-  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet screener-supervise.service 2>/dev/null; then
-    log "agenda watch: a screener run is active; skipped today"; exit 0
+  # A oneshot service is "activating" for as long as its run lasts (and
+  # is-active says no to that), so ask for the state itself.
+  if command -v systemctl >/dev/null 2>&1; then
+    case "$(systemctl show -p ActiveState --value screener-supervise.service 2>/dev/null)" in
+      active|activating|deactivating|reloading) log "agenda watch: a screener run is active; skipped today"; exit 0 ;;
+    esac
   fi
   if [ ! -f "$AGENDA_SOURCES" ]; then
     log "agenda watch: no sources file at $AGENDA_SOURCES; nothing to watch"; exit 0
@@ -113,14 +119,16 @@ agenda_main() {
     { sandbox_remove "${copy:-}" "${AGENDA_AS[@]}"
       agenda_problem sandbox "Screener: agenda watch not run" "Its handover folder could not be prepared."; exit 0; }
   trap 'kill_user "$AGENDA_USER"; sandbox_remove "$copy" "${AGENDA_AS[@]}"' EXIT
+  # What the scan account prints is cut at 1 MB: it must not fill the disk
+  # or flood the log the alerts point to.
   (cd "$copy" && timeout -k 1m "$AGENDA_TIMEOUT" "${AGENDA_AS[@]}" "$SYS_PYTHON" -I "$copy/agenda_watch.py" \
-      scan "$copy/job.json" "$copy/out/result.json" </dev/null) >>"$MAIN_LOG" 2>&1
-  rc=$?
+      scan "$copy/job.json" "$copy/out/result.json" </dev/null) 2>&1 | head -c 1000000 >>"$MAIN_LOG"
+  rc="${PIPESTATUS[0]}"
   log "agenda watch: scan exit $rc"
   local took=1
   if kill_user "$AGENDA_USER"; then
     [ -e "$result" ] && unlink "$result"
-    "$PYTHON" "$HERE/lead_queue.py" take "$copy/out" result.json "$result" --max-bytes 2000000 >>"$MAIN_LOG" 2>&1
+    "$PYTHON" "$HERE/lead_queue.py" take "$copy/out" result.json "$result" --max-bytes 4000000 >>"$MAIN_LOG" 2>&1
     took=$?
   else
     log "agenda watch: scan processes still running; its result is not read"
@@ -136,7 +144,7 @@ agenda_main() {
   agenda_fine scan
   if ! "$PYTHON" "$HERE/agenda_watch.py" report --job "$job" --result "$result" --state "$AGENDA_STATE" >>"$MAIN_LOG" 2>&1; then
     agenda_problem report "Screener: agenda watch did not finish" \
-      "The scan's result was refused; the reason is in the agenda log on the server. Nothing was recorded as seen."
+      "The result could not be reported; the reason is in the agenda log on the server. Nothing was recorded as seen."
     exit 0
   fi
   agenda_fine report
@@ -145,17 +153,19 @@ agenda_main() {
   local n
   n="$("$PYTHON" -c 'import json,sys
 c = json.load(open(sys.argv[1]))
-print(*(int(c.get(k, 0)) for k in ("read", "parcel_hits", "zoning_hits", "partly", "not_read", "gave_up", "scans",
-                                    "failing", "recovered", "stale", "storms", "no_watch_list", "sources")))' \
+print(*(min(max(int(c.get(k, 0)), 0), 999999) for k in (
+    "read", "parcel_hits", "street_hits", "zoning_hits", "partly", "not_read", "gave_up", "scans", "failing",
+    "recovered", "stale", "storms", "no_watch_list", "sources")))' \
         "$AGENDA_STATE/summary.json" 2>>"$MAIN_LOG")" || n=""
-  local read_n parcel zoning partly not_read gave_up scans failing recovered stale storms nowatch sources
-  read -r read_n parcel zoning partly not_read gave_up scans failing recovered stale storms nowatch sources <<<"$n"
-  [[ "${sources:-}" =~ ^[0-9]+$ ]] || { log "agenda watch: no counts to report"; exit 0; }
-  log "agenda watch: $read_n read, $parcel parcel hits, $zoning zoning, $((partly + not_read + gave_up + scans)) unread, $failing failing"
+  local read_n parcel street zoning partly not_read gave_up scans failing recovered stale storms nowatch sources
+  read -r read_n parcel street zoning partly not_read gave_up scans failing recovered stale storms nowatch sources <<<"$n"
+  [[ "$n" =~ ^[0-9]+(\ [0-9]+){13}$ ]] || { log "agenda watch: no counts to report"; exit 0; }
+  log "agenda watch: $read_n read, $parcel parcel hits, $street street titles, $zoning zoning, $((partly + not_read + gave_up + scans)) unread, $failing failing"
   local text="" prio=default
   if [ "$parcel" -gt 0 ]; then
-    text="$parcel new agenda item(s) name a parcel you watch or its street."; prio=high
+    text="$parcel new agenda item(s) name a parcel you watch, by its id or its address."; prio=high
   fi
+  [ "$street" -gt 0 ] && text="$text $street new title(s) name a street your parcels are on (most will be about another lot)."
   [ "$zoning" -gt 0 ] && text="$text $zoning new zoning case(s) or document(s) with industrial zoning words."
   [ $((gave_up + scans + partly)) -gt 0 ] && [ -n "$text" ] &&
     text="$text $((gave_up + scans + partly)) new document(s) could not be searched in full (scans or unreadable)."

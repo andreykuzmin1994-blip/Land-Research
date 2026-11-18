@@ -34,9 +34,14 @@ def read(url=doc, hits=()):
             "pages": 9, "text_pages": 9, "hits": list(hits)}
 if mode == "crash":
     print("Traceback: boom"); sys.exit(1)
+if mode == "noisy":
+    sys.stdout.write("x" * 5_000_000 + "\n")
 body = {
     "hit": result([read(hits=[hit])]),
     "quiet": result([]),
+    "noisy": result([]),
+    "street": result([], titles=[{"url": doc, "title": "Z26-030 Spence Road", "hits": [
+        {"kind": "same street, in a title", "parcel_id": "14 0064  LL0047", "page": 0, "text": "Z26-030 Spence Road"}]}]),
     "offhost": result([read(url="https://evil.example/AgendaCenter/ViewFile/Agenda/_1", hits=[hit])]),
     "stranger": result([read(hits=[{**hit, "parcel_id": "NOT ON THE LIST"}])]),
     "down": result([], problem="index page not read: HTTP 503"),
@@ -46,7 +51,7 @@ body = {
 if mode == "link":
     os.symlink("/etc/hostname", out)
 elif mode == "big":
-    open(out, "w").write("x" * 3_000_000)
+    open(out, "w").write("x" * 5_000_000)
 elif mode != "none":
     json.dump(body, open(out, "w"))
 FAKE
@@ -98,7 +103,7 @@ check "exit 0" '[ $rc -eq 0 ]'
 check "the report names the parcel and the document" 'md | grep -q "09F070000320927" && md | grep -q "_11172026-9"'
 check "the tax-roll owner is withheld and the text is inert" '! md | grep -q -e QUARTERMAINE -e "](" -e "evil.example"'
 check "the state remembers the document" '[ "$(seen)" = 1 ]'
-check "one alert, with counts" '[ "$(alerts | grep -c "Screener: agenda watch")" = 1 ] && alerts | grep -q "1 new agenda item(s) name a parcel you watch or its street"'
+check "one alert, with counts" '[ "$(alerts | grep -c "Screener: agenda watch")" = 1 ] && alerts | grep -q "1 new agenda item(s) name a parcel you watch, by its id or its address"'
 check "the alert is high priority" 'grep -q "\[high\] Screener: agenda watch" $CASE/state/logs/alerts.log'
 check "the alert names no parcel, street, owner or source" '! alerts | grep -q -e 09F07 -e Spence -e QUARTERMAINE -e "City council" -e city.example'
 check "the scan ran isolated, from its own folder" 'grep -q "^$CASE/agendadir/scan\.[A-Za-z0-9]* :: -I $CASE/agendadir/scan\.[A-Za-z0-9]*/agenda_watch.py scan $CASE/agendadir/scan\.[A-Za-z0-9]*/job.json $CASE/agendadir/scan\.[A-Za-z0-9]*/out/result.json$" $CASE/fake/scan-args'
@@ -144,8 +149,10 @@ for kind in crash none link big junk; do
   check "sandbox folder empty" '[ -z "$(ls -A $CASE/agendadir)" ]'
   FAKE_SCAN=$kind "$WATCH" 2>/dev/null
   check "not said again the next day" '[ "$(alerts | grep -c "agenda watch did not finish")" = 1 ]'
+  for mark in "$CASE"/state/agenda/problem-*; do touch -d "8 days ago" "$mark"; done; FAKE_SCAN=$kind "$WATCH" 2>/dev/null
+  check "said again after a week of it" '[ "$(alerts | grep -c "agenda watch did not finish")" = 2 ]'
   FAKE_SCAN=quiet "$WATCH" 2>/dev/null; FAKE_SCAN=$kind "$WATCH" 2>/dev/null
-  check "said again after it had worked in between" '[ "$(alerts | grep -c "agenda watch did not finish")" = 2 ]'
+  check "and again after it had worked in between" '[ "$(alerts | grep -c "agenda watch did not finish")" = 3 ]'
 done
 
 for kind in offhost stranger; do
@@ -169,15 +176,37 @@ done
 check "one alert, on the third day" '[ "$(alerts | grep -c "have not answered for days")" = 1 ]'
 check "the report says no hit from it means nothing" 'md | grep -q "No hit from it means nothing"'
 
+echo "a title that only names a street is not a high-priority alert"
+new_case street; FAKE_SCAN=street "$WATCH" 2>/dev/null
+check "alert says a street, at normal priority" 'alerts | grep -q "1 new title(s) name a street your parcels are on" && grep -q "\[default\] Screener: agenda watch" $CASE/state/logs/alerts.log'
+check "not worded as a parcel hit" '! alerts | grep -q "name a parcel you watch, by its id"'
+
+echo "what the scan prints cannot flood the log"
+new_case noisy; FAKE_SCAN=noisy "$WATCH" 2>/dev/null
+check "the log stays small" '[ "$(cat $CASE/state/logs/agenda-*.log | wc -c)" -lt 1100000 ]'
+check "and the watch still finished" 'md | grep -q "No hit does not mean no item"'
+
+echo "counts that are not plain numbers send no alert"
+new_case oddcounts; FAKE_SCAN=quiet "$WATCH" 2>/dev/null
+echo '{"read": "1; touch /tmp/x", "sources": 1}' >"$CASE/state/agenda/summary.json"
+check "summary.json is rewritten with whole numbers by the next run" 'FAKE_SCAN=quiet "$WATCH" 2>/dev/null; python3 -c "import json,sys; c=json.load(open(sys.argv[1])); sys.exit(not all(isinstance(v,int) for v in c.values()))" $CASE/state/agenda/summary.json'
+
 echo "a scanned document is counted, not passed over"
 new_case scanned; FAKE_SCAN=scan "$WATCH" 2>/dev/null
 check "the report lists it" 'md | grep -q "1 documents are scans without text"'
 check "no alert for a scan alone" '[ -z "$(alerts)" ]'
 
 echo "while a screener run is active the watch skips the day"
-new_case busy; printf '#!/bin/sh\n[ "$1" = is-active ] && exit 0\nexit 1\n' >"$ROOT/bin/systemctl"; chmod +x "$ROOT/bin/systemctl"
-"$WATCH" 2>/dev/null; rc=$?
-check "exit 0, no scan, no alert" '[ $rc -eq 0 ] && [ ! -f $CASE/fake/scan-args ] && [ -z "$(alerts)" ]'
+# A oneshot service is "activating" while its run lasts, and is-active says no to that.
+for state in activating active deactivating; do
+  new_case "busy-$state"
+  printf '#!/bin/sh\n[ "$1" = show ] && { echo %s; exit 0; }\nexit 3\n' "$state" >"$ROOT/bin/systemctl"; chmod +x "$ROOT/bin/systemctl"
+  "$WATCH" 2>/dev/null; rc=$?
+  check "$state: exit 0, no scan, no alert" '[ $rc -eq 0 ] && [ ! -f $CASE/fake/scan-args ] && [ -z "$(alerts)" ]'
+done
+new_case idle; printf '#!/bin/sh\n[ "$1" = show ] && { echo inactive; exit 0; }\nexit 3\n' >"$ROOT/bin/systemctl"
+"$WATCH" 2>/dev/null
+check "when no run is active the watch runs" '[ -f $CASE/fake/scan-args ]'
 unlink "$ROOT/bin/systemctl"
 
 echo "a second watch does not run beside the first"

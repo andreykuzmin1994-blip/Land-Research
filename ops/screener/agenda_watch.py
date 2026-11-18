@@ -55,11 +55,15 @@ read or were only partly text (scans), and says when a source stops
 answering or stops posting.
 
 A document counts as seen only once its text was searched; one that
-cannot be read is tried on three runs and then listed for you to open.
-A source seen for the first time has its list noted and only its first
-few documents read; a source whose list is suddenly mostly new (its
-addresses changed) is noted, not crawled, and said so. An agenda that is
-amended under the same address after it was read is not read again.
+cannot be read is tried on three runs and then listed for you to open,
+and one sent on to an address that is not a document of the source (a
+sign-in page) is not read. A source seen for the first time has its list
+noted and only its first few documents read; a source whose list is
+suddenly mostly new (its addresses changed) is noted, not crawled, and
+said so; more new documents than a run reads wait their turn. An agenda
+that is amended under the same address after it was read is not read
+again. Links the watch does not take (a query string the source does not
+list) are counted in the report.
 
 Fetching is the quote checker's own (`screener/quotecheck.py`, loaded by
 its path): GET only, public https addresses only, robots.txt read first
@@ -70,8 +74,9 @@ caps on documents, requests and bytes per run.
 
 ``agenda-watch.md`` shows a few words of the document around each hit,
 reduced to plain text. They are public record and can name an applicant
-or an owner; tax-roll owner names of the runs are withheld where they are
-found in roll spelling, no more. The alert line holds counts only.
+or an owner; a tax-roll owner name of three words or more is withheld
+where it is found in roll spelling, no more. The alert line holds counts
+only.
 Nothing here changes a score, grade, rank, screen or decision. Stdlib
 only. Exit codes: 0 done (also when a source failed: the counts say so);
 2 refused (the message says why).
@@ -99,6 +104,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import urllib.parse
 from html.parser import HTMLParser
@@ -111,17 +117,20 @@ MD_NAME, STATE_NAME, SUMMARY_NAME, LOCK_NAME = "agenda-watch.md", "state.json", 
 SCHEMA = 1
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,39}")
 PREFIX_RE = re.compile(r"/[A-Za-z0-9._~/-]{1,200}")
-URL_RE = re.compile(r"https://[A-Za-z0-9.-]{1,200}(?::\d{1,5})?/[A-Za-z0-9._~/-]{1,500}")
+URL_RE = re.compile(r"https://[A-Za-z0-9.-]{1,200}/[A-Za-z0-9._~/%(),+-]{1,300}(?:\?[A-Za-z0-9=&_-]{1,60})?")
+QUERY_RE = re.compile(r"[A-Za-z0-9=&_-]{1,60}")
 SHA_RE = re.compile(r"[0-9a-f]{64}")
 MAX_SOURCES = 20
 MAX_NEW_DEFAULT, MAX_NEW_LIMIT = 6, 10      # new documents read per source per run
 FIRST_SIGHT = 3                             # documents read from a source seen for the first time
 MAX_REQUESTS = 80                           # every request of a run: robots.txt, index pages, documents, redirects
 MAX_BYTES = 300_000_000                     # downloaded per run
-STORM_COUNT, STORM_SHARE = 20, 0.5          # this many, or this share, of a known source's links new at once
+STORM_COUNT, STORM_SHARE = 20, 0.5          # this many new at once on a known source, or this share
+STORM_SHARE_FROM = 40                       # of an index of at least this many links
+SCAN_SECONDS = 1500                         # after this the scan starts nothing new and writes what it has
 DOC_BYTES = 60_000_000
 INDEX_LINKS = 5_000                         # links read from one index page
-SEEN_KEPT = 4_000                           # documents remembered per source
+SEEN_KEPT = 8_000                           # documents remembered per source (more than one index page lists)
 HITS_KEPT = 300                             # hits kept in the report
 HITS_PER_DOC = 12
 MAX_TRIES = 3                               # runs a document that cannot be read is tried on
@@ -136,7 +145,7 @@ PARTLY = 0.2                                # more than this share of pages with
 FAIL_DAYS, FAIL_REPEAT_DAYS = 3, 30         # alert after this many failed days, then every so many
 STALE_DAYS = 45                             # a source with no new document for this long
 OLD_RUN_DAYS = 15
-RESULT_BYTES = 2_000_000
+RESULT_BYTES = 4_000_000
 GRADES = ("A", "B")
 MARKS = ("pursue", "maybe")
 KINDS = ("parcel id", "possible address", "industrial zoning words",
@@ -145,10 +154,18 @@ TITLE_KINDS = (KINDS[1], KINDS[3], KINDS[4])
 PARCEL_KINDS = (KINDS[0], KINDS[1], KINDS[3])   # hits that name a parcel you watch, or its street
 TITLES_PER_SOURCE = 200                     # titles with a hit kept from one source in one run
 TITLE_MAX_AGE_DAYS = 400                    # a document dated older than this in its address: title not reported
-DATE_IN_URL = re.compile(r"(?<!\d)(?:(?P<m>\d{2})(?P<d>\d{2})(?P<y>20\d{2})|(?P<y2>20\d{2})-?(?P<m2>\d{2})-?(?P<d2>\d{2}))(?!\d)")
+# Only the two shapes that are surely a date: _MMDDYYYY- and YYYY-MM-DD.
+# A bare run of eight digits is as likely an item number.
+DATE_IN_URL = re.compile(r"_(?P<m>\d{2})(?P<d>\d{2})(?P<y>20\d{2})-|(?<!\d)(?P<y2>20\d{2})-(?P<m2>\d{2})-(?P<d2>\d{2})(?!\d)")
+# A case number, or a word for a zoning action. Not the bare word "zoning"
+# or "annex": every "Planning and Zoning Commission" agenda and "City Hall
+# Annex" would be one.
 ZONING_TITLE = re.compile(r"(?<![A-Za-z0-9])(?:Z|RZ|ZM|U|SUP|CUP|CDP|CV|ANX)-?\d{2,4}-\d{2,4}(?![A-Za-z0-9])|"
-                          r"\b(?:rezon\w*|annex\w*|use permit|moratorium|zoning)\b", re.I)
+                          r"\b(?:rezon\w*|annexation|use permit|moratorium)\b", re.I)
 DOC_STATES = ("read", "partly read", "not read")
+DIRECTIONS = frozenset("N S E W NE NW SE SW NORTH SOUTH EAST WEST".split())
+STREET_TYPE = (r"(?:RD|ROAD|ST|STREET|DR|DRIVE|BLVD|BOULEVARD|AVE|AVENUE|HWY|HIGHWAY|PKWY|PARKWAY|LN|LANE|CT|COURT|"
+               r"CIR|CIRCLE|WAY|PL|PLACE|TER|TERRACE|TRL|TRAIL|CONN|CONNECTOR)")
 STREET_ENDS = frozenset(
     "RD ROAD ST STREET DR DRIVE BLVD BOULEVARD AVE AVENUE HWY HIGHWAY PKWY PARKWAY LN LANE CT COURT "
     "CIR CIRCLE WAY PL PLACE TER TERRACE TRL TRAIL CONN CONNECTOR EXT REAR N S E W NE NW SE SW".split())
@@ -218,10 +235,13 @@ def plain(text: Any, limit: int = 400) -> str:
     """Document or page text as inert text on one line: letters, digits and
     plain punctuation, nothing that reads as markup or as an address."""
     out = re.sub(r"[\s_]+", " ", str(text if text is not None else ""))
-    out = re.sub(r"(?i)\b(?:https?|ftp|file|mailto)\s*:\s*/*", "", out)
-    out = re.sub(r"(?i)\bwww\.", "www ", out)
+    # The characters first: an address must not come together again out of
+    # what the filter removed ('htt"ps://' is 'https://' once the quote is gone).
     out = re.sub(r"[^A-Za-z0-9 .,;:()'%$/&#-]", "", out)
-    out = re.sub(r"\.(?=[A-Za-z])", ". ", out)
+    out = re.sub(r"(?i)\b(?:https?|ftps?|file|mailto)\s*:\s*/*", "", out)
+    out = re.sub(r":/+", ": ", out)                        # no scheme is left to open
+    out = re.sub(r"(?i)\bwww\.", "www ", out)
+    out = re.sub(r"\.(?=[A-Za-z0-9])", ". ", out)          # no dotted host, by name or by number
     out = re.sub(r"^[#\s-]+", "", out.strip())             # never a heading or a list item
     return out if len(out) <= limit else out[:limit].rstrip() + " ..."
 
@@ -278,7 +298,8 @@ def check_source(item: Any, what: str, names: set[str]) -> dict[str, Any]:
     """One source, as the fixed fields this tool uses."""
     def bad(why: str) -> Refuse:
         return Refuse(f"{what}: {why}")
-    allowed = {"name", "index_url", "path_prefixes", "max_new", "jurisdictions", "expect_every_days", "note"}
+    allowed = {"name", "index_url", "path_prefixes", "max_new", "jurisdictions", "expect_every_days",
+               "allow_queries", "pdf_only", "note"}
     if not isinstance(item, dict) or set(item) - allowed:
         raise bad("fields are " + ", ".join(sorted(allowed)))
     name, url, prefixes = item.get("name"), item.get("index_url"), item.get("path_prefixes")
@@ -302,19 +323,36 @@ def check_source(item: Any, what: str, names: set[str]) -> dict[str, Any]:
     every = item.get("expect_every_days", STALE_DAYS)
     if isinstance(every, bool) or not isinstance(every, int) or not 7 <= every <= 400:
         raise bad("expect_every_days must be a whole number from 7 to 400")
+    queries = item.get("allow_queries", [])
+    if not isinstance(queries, list) or len(queries) > 5 or not all(isinstance(q, str) and QUERY_RE.fullmatch(q) for q in queries):
+        raise bad('allow_queries must be up to 5 exact query strings such as "packet=true"')
+    pdf_only = item.get("pdf_only", False)
+    if not isinstance(pdf_only, bool):
+        raise bad("pdf_only must be true or false")
     return {"name": name, "index_url": url, "path_prefixes": prefixes, "max_new": max_new,
-            "jurisdictions": [c.strip().lower() for c in cities], "expect_every_days": every}
+            "jurisdictions": [c.strip().lower() for c in cities], "expect_every_days": every,
+            "allow_queries": queries, "pdf_only": pdf_only}
 
 
-def link_allowed(url: str, src: dict[str, Any]) -> bool:
+def same_site(a: str, b: str) -> bool:
+    """One site: the same host, with or without a leading www."""
+    return a.lower().removeprefix("www.") == b.lower().removeprefix("www.")
+
+
+def link_allowed(url: Any, src: dict[str, Any]) -> bool:
     """Whether an address is a document of this source: https, the index
-    page's own host, a path under one of its prefixes, nothing else in it."""
+    page's own site, a path under one of its prefixes, and a query string
+    only if the source lists it."""
     if not isinstance(url, str) or not URL_RE.fullmatch(url):
         return False
     parts, home = urllib.parse.urlsplit(url), urllib.parse.urlsplit(src["index_url"])
-    path = parts.path
-    return (parts.netloc.lower() == home.netloc.lower() and ".." not in path and "//" not in path
-            and any(path.startswith(p) and len(path) > len(p) for p in src["path_prefixes"]))
+    path = urllib.parse.unquote(parts.path)                # what a server would read
+    if ".." in path or "//" in path or "\\" in path or any(ord(c) < 32 or ord(c) == 127 for c in path):
+        return False
+    if parts.query and parts.query not in (src.get("allow_queries") or []):
+        return False
+    return (same_site(parts.netloc, home.netloc)
+            and any(parts.path.startswith(p) and len(parts.path) > len(p) for p in src["path_prefixes"]))
 
 
 class _Links(HTMLParser):
@@ -345,28 +383,36 @@ class _Links(HTMLParser):
             self._open = None
 
 
-def document_links(page_url: str, html: str, src: dict[str, Any]) -> list[tuple[str, str]]:
-    """(address, title) of the documents an index page links, in page
-    order, each address once, without query string or fragment."""
+def document_links(page_url: str, html: str, src: dict[str, Any]) -> tuple[list[tuple[str, str]], int]:
+    """([(address, title)] of the documents an index page links, in page
+    order, each address once, without fragment; and how many more links
+    sit under the source's prefixes on its site but were not taken (a
+    query string the source does not list, characters an address here may
+    not have): those are documents this watch does not read."""
     parser = _Links()
     try:
         parser.feed(html)
     except Exception:                      # a page the parser cannot finish: what it read so far
         pass
     out: dict[str, str] = {}
+    passed: set[str] = set()
+    home = urllib.parse.urlsplit(src["index_url"]).netloc
     for href, title in parser.links:
         try:
             parts = urllib.parse.urlsplit(urllib.parse.urljoin(page_url, href.strip()))
         except ValueError:
             continue
-        if parts.scheme != "https" or parts.query:
+        if parts.scheme != "https":
             continue
-        url = urllib.parse.urlunsplit(("https", parts.netloc, parts.path, "", ""))
+        url = urllib.parse.urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
         if not link_allowed(url, src):
+            if same_site(parts.netloc, home) and any(parts.path.startswith(p) for p in src["path_prefixes"]) \
+                    and len(parts.path) > min(map(len, src["path_prefixes"])):
+                passed.add(url[:300])
             continue
         if not out.get(url):
             out[url] = plain(title, 80)
-    return list(out.items())
+    return list(out.items()), len(passed - set(out))
 
 
 # -------------------------------------------------------------- watch list
@@ -411,18 +457,25 @@ def marks_of(decisions: Path | None) -> dict[str, str]:
 
 
 def street_words(address: str) -> list[str] | None:
-    """The street's own name of a site address ("0 SPENCE RD REAR" gives
-    SPENCE), or None when there is no name to tell it by."""
-    words = re.findall(r"[A-Za-z0-9]+", address.upper())
+    """The street's own name of a site address ("0 N SPENCE RD REAR" gives
+    SPENCE; "0 HWY 92" gives HWY 92), or None when there is no name to tell
+    it by."""
+    words = re.findall(r"[A-Za-z0-9]+", address.upper().replace("'", ""))
     if len(words) < 2 or not words[0].isdigit():
         return None
+    rest = words[1:]
+    if len(rest) > 1 and rest[0] in DIRECTIONS:
+        rest = rest[1:]                    # "100 N MAIN ST": the street is MAIN
+    if rest[0] in ("HWY", "HIGHWAY") and len(rest) > 1 and rest[1].isdigit():
+        return ["HWY", rest[1]]
     name: list[str] = []
-    for word in words[1:]:
+    for word in rest:
         if word in STREET_ENDS and name:
             break
         name.append(word)
     name = name[:4]
-    if not name or not any(len(w) >= 4 and not w.isdigit() for w in name):
+    ordinal = len(name) == 1 and re.fullmatch(r"\d+(?:ST|ND|RD|TH)", name[0])
+    if not name or not (ordinal or any(len(w) >= 4 and not w.isdigit() for w in name)):
         return None
     return name
 
@@ -468,18 +521,36 @@ def watch_list(run_dirs: list[Path], decisions: Path | None = None, top: int = T
 
 # ----------------------------------------------------------------- matching
 
-def squeeze(text: str) -> tuple[str, list[int]]:
-    """The text's ASCII letters and digits, upper case, and where each was."""
-    chars, at = [], []
-    for i, ch in enumerate(text):
-        if ch.isascii() and ch.isalnum():
-            chars.append(ch.upper())
-            at.append(i)
-    return "".join(chars), at
+def id_pattern(key: str) -> re.Pattern[str]:
+    """A parcel id as documents write it: its letters and digits in order,
+    with at most two spaces, dots or dashes between any two of them, on
+    one line, and not inside a longer run of letters and digits. ("(770)
+    555-1234" is not the id 7705551234: a bracket is not a separator.)"""
+    return re.compile(r"(?<![A-Za-z0-9])" + r"[ .\-]{0,2}".join(map(re.escape, key)) + r"(?![A-Za-z0-9])", re.I)
+
+
+def _word(word: str) -> str:
+    return "(?:HWY|HIGHWAY)" if word in ("HWY", "HIGHWAY") else re.escape(word)
+
+
+def street_pattern(name: list[str]) -> str:
+    """A street's name words, however an apostrophe or a hyphen splits them
+    (O'HARA, OHARA and O HARA are one name)."""
+    return r"[\s,.'’\-]*".join(_word(w) for w in name)
 
 
 def address_pattern(words: list[str]) -> re.Pattern[str]:
-    return re.compile(r"(?<![A-Za-z0-9])" + r"[\s,.]+".join(map(re.escape, words)) + r"(?![A-Za-z0-9])", re.I)
+    """House number, an optional direction, the street's name."""
+    return re.compile(r"(?<![A-Za-z0-9])" + re.escape(words[0]) + r"[\s,.]+(?:(?:N|S|E|W|NE|NW|SE|SW|NORTH|SOUTH|"
+                      r"EAST|WEST)\.?\s+)?" + street_pattern(words[1:]) + r"(?![A-Za-z0-9])", re.I)
+
+
+def street_title_pattern(name: list[str]) -> re.Pattern[str]:
+    """A street's name followed by a street word ("Spence Road", "Old
+    National Hwy"; a highway number stands alone). The street word is what
+    keeps "Union City Council" from matching a parcel on Union Rd."""
+    tail = "" if name[0] == "HWY" else r"[\s,.]+" + STREET_TYPE + r"\b"
+    return re.compile(r"(?<![A-Za-z0-9])" + street_pattern(name) + tail, re.I)
 
 
 def snippet(text: str, start: int, end: int) -> str:
@@ -493,32 +564,22 @@ def find_hits(pages: list[tuple[int, str]], watch: list[dict[str, Any]], src: di
     seen: set[tuple[str, str]] = set()
     zoning_pages = 0
     cities = src.get("jurisdictions") or []
-    patterns = {w["parcel_id"]: address_pattern(w["address"]) for w in watch
-                if w.get("address") and (not cities or w.get("jurisdiction") in cities)}
+    ids = {w["parcel_id"]: id_pattern(w["id_key"]) for w in watch if w.get("id_key")}
+    addresses = {w["parcel_id"]: address_pattern(w["address"]) for w in watch
+                 if w.get("address") and (not cities or w.get("jurisdiction") in cities)}
     for number, raw in pages:
         text = unicodedata.normalize("NFKC", raw)
-        flat, at = squeeze(text)
-        for w in watch:
-            pid = w["parcel_id"]
-            if w.get("id_key") and ("id", pid) not in seen:
-                i = flat.find(w["id_key"])
-                while i >= 0:
-                    a, b = at[i], at[i + len(w["id_key"]) - 1]
-                    # Not a piece of a longer run of letters and digits.
-                    inside = ((a > 0 and text[a - 1].isascii() and text[a - 1].isalnum())
-                              or (b + 1 < len(text) and text[b + 1].isascii() and text[b + 1].isalnum()))
-                    if not inside:
-                        seen.add(("id", pid))
-                        hits.append({"kind": KINDS[0], "parcel_id": pid, "page": number,
-                                     "text": snippet(text, a, b + 1)})
-                        break
-                    i = flat.find(w["id_key"], i + 1)
-            if pid in patterns and ("address", pid) not in seen:
-                m = patterns[pid].search(text)
+        # For a street's name an apostrophe is no letter: O'Hara is OHARA on the roll.
+        bare = text.replace("'", "").replace("\u2019", "")
+        for kind, patterns, where in ((KINDS[0], ids, text), (KINDS[1], addresses, bare)):
+            for pid, pattern in patterns.items():
+                if (kind, pid) in seen:
+                    continue
+                m = pattern.search(where)
                 if m:
-                    seen.add(("address", pid))
-                    hits.append({"kind": KINDS[1], "parcel_id": pid, "page": number,
-                                 "text": snippet(text, m.start(), m.end())})
+                    seen.add((kind, pid))
+                    hits.append({"kind": kind, "parcel_id": pid, "page": number,
+                                 "text": snippet(where, m.start(), m.end())})
         if zoning_pages < 3:
             for act in ZONING_ACT.finditer(text):
                 m = INDUSTRIAL.search(text, max(0, act.start() - NEAR), act.end() + NEAR)
@@ -549,17 +610,20 @@ def title_hits(title: str, watch: list[dict[str, Any]], src: dict[str, Any]) -> 
     """What a document's title on the index page holds: a watched parcel's
     address, a street that watched parcels are on, a zoning case."""
     hits: list[dict[str, Any]] = []
-    text = unicodedata.normalize("NFKC", title).replace("_", " ")
+    text = unicodedata.normalize("NFKC", title).replace("_", " ").replace("'", "").replace("\u2019", "")
     cities = src.get("jurisdictions") or []
     mine = [w for w in watch if not cities or w.get("jurisdiction") in cities]
+    # A street named like the city or the source ("Union" in Union City)
+    # would match every one of its agendas.
+    own = " ".join([src.get("name", ""), *cities]).upper()
     streets: dict[tuple[str, ...], list[str]] = {}
     for w in mine:
         if w.get("address") and address_pattern(w["address"]).search(text):
             hits.append({"kind": KINDS[1], "parcel_id": w["parcel_id"], "page": 0, "text": plain(title, 80), "others": 0})
-        elif w.get("street"):
+        elif w.get("street") and not re.search(r"(?<![A-Z0-9])" + street_pattern(w["street"]) + r"(?![A-Z0-9])", own):
             streets.setdefault(tuple(w["street"]), []).append(w["parcel_id"])
     for name, parcels in streets.items():
-        if address_pattern(list(name)).search(text):
+        if street_title_pattern(list(name)).search(text):
             hits.append({"kind": KINDS[3], "parcel_id": parcels[0], "page": 0, "text": plain(title, 80),
                          "others": len(parcels) - 1})
     if ZONING_TITLE.search(text):
@@ -578,13 +642,15 @@ def _pdf_limits() -> None:
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 
-def document_pages(qc: Any, body: bytes, ctype: str) -> tuple[list[tuple[int, str]], int, str]:
+def document_pages(qc: Any, body: bytes, ctype: str, pdf_only: bool = False
+                   ) -> tuple[list[tuple[int, str]], int, str, str]:
     """([(page number or 0, text)], pages in the document, why there is no
-    text). A PDF's text comes from pdftotext under hard limits."""
+    text, why the text is not all of it). A PDF's text comes from
+    pdftotext under hard limits."""
     if b"%PDF-" in body[:1024] or "pdf" in ctype:
         tool = shutil.which("pdftotext")
         if tool is None:
-            return [], 0, "a PDF, and pdftotext is not installed"
+            return [], 0, "a PDF, and pdftotext is not installed", ""
         with tempfile.TemporaryDirectory() as tmp:
             source, target = Path(tmp) / "document.pdf", Path(tmp) / "document.txt"
             source.write_bytes(body)
@@ -595,38 +661,56 @@ def document_pages(qc: Any, body: bytes, ctype: str) -> tuple[list[tuple[int, st
                                       env={"PATH": "/usr/bin:/bin", "LC_ALL": "C.UTF-8", "HOME": tmp})
                 text = target.read_bytes()[:PDF_TEXT_BYTES].decode("utf-8", "replace") if target.is_file() else ""
             except (OSError, subprocess.SubprocessError) as exc:
-                return [], 0, f"pdftotext failed ({type(exc).__name__})"
+                return [], 0, f"pdftotext failed ({type(exc).__name__})", ""
         if done.returncode != 0 and not text.strip():
-            return [], 0, f"pdftotext failed (exit {done.returncode})"
+            return [], 0, f"pdftotext failed (exit {done.returncode})", ""
         every = text.split("\f")
         if every and not every[-1].strip():
             every = every[:-1]                 # the form feed after the last page
         pages = [(n, t) for n, t in enumerate(every, 1) if t.strip()]
-        return (pages, len(every), "") if pages else ([], len(every), "no text in it (a scan without text)")
+        if not pages:
+            return [], len(every), "no text in it (a scan without text)", ""
+        partial = ""
+        if done.returncode != 0:               # stopped by a limit or an error part-way
+            partial = f"pdftotext stopped early (exit {done.returncode}): only part of the text was read"
+        elif len(every) >= PDF_PAGES:
+            partial = f"only its first {PDF_PAGES} pages were read"
+        return pages, len(every), "", partial
     markup = "html" in ctype or "xml" in ctype
+    if pdf_only:
+        # A page in place of the document ("not available yet", a sign-in).
+        return [], 0, "not a PDF (a notice or sign-in page in its place?)", ""
     raw = body.decode(qc._charset(body, ctype, markup), "replace")
     text = qc.html_text(raw) if markup else raw
-    return ([(0, text)], 1, "") if text.strip() else ([], 1, "no text in it")
+    return ([(0, text)], 1, "", "") if text.strip() else ([], 1, "no text in it", "")
 
 
 class Meter:
     """Counts every request and byte of a run, at the fetcher's own door
-    (robots.txt and redirects too), and stops at the run's allowance."""
+    (robots.txt and redirects too), and stops at the run's allowance or
+    its time."""
 
-    def __init__(self, qc: Any, fetcher: Any, requests: int, size: int) -> None:
+    def __init__(self, qc: Any, fetcher: Any, requests: int, size: int, seconds: float = SCAN_SECONDS) -> None:
         self.requests, self.bytes, self._qc = 0, 0, qc
         self._max_requests, self._max_bytes = requests, size
+        self._clock = lambda: time.monotonic()
+        self._until = self._clock() + seconds
         self._open = fetcher.open_once
         fetcher.open_once = self._counted
 
     def spent(self) -> bool:
-        return self.requests >= self._max_requests or self.bytes >= self._max_bytes
+        return self.requests >= self._max_requests or self.bytes >= self._max_bytes or self._clock() >= self._until
 
     def _counted(self, url: str, cap: int) -> Any:
         if self.spent():
-            raise self._qc.FetchError("the run's allowance of requests or bytes is used up")
+            raise self._qc.FetchError("the run's allowance of requests, bytes or time is used up")
         self.requests += 1
-        status, headers, body = self._open(url, cap)
+        try:
+            status, headers, body = self._open(url, cap)
+        except self._qc.FetchError as exc:
+            if str(exc).startswith("larger than"):
+                self.bytes += cap              # it was downloaded up to the cap before being refused
+            raise
         self.bytes += len(body)
         return status, headers, body
 
@@ -634,46 +718,62 @@ class Meter:
 def scan_source(qc: Any, fetcher: Any, meter: Meter, src: dict[str, Any], watch: list[dict[str, Any]]) -> dict[str, Any]:
     """One source: its index page, then its new documents. Returns what
     was found; the state is the report step's to change."""
-    out: dict[str, Any] = {"problem": "", "links": 0, "storm": False, "noted": [], "docs": [], "left": 0,
-                           "titles": []}
-    home = urllib.parse.urlsplit(src["index_url"]).netloc.lower()
+    out: dict[str, Any] = {"problem": "", "skipped": False, "links": 0, "not_taken": 0, "storm": False,
+                           "noted": [], "queued": [], "gone": [], "docs": [], "left": 0, "titles": []}
+    if meter.spent():
+        out["skipped"] = True              # not the source's failure: the run had nothing left
+        return out
+    home = urllib.parse.urlsplit(src["index_url"]).netloc
     try:
         got = fetcher.fetch(src["index_url"], cap=qc.MAX_HTML_BYTES)
         if got.status != 200:
             raise qc.FetchError(f"HTTP {got.status}")
-        if urllib.parse.urlsplit(got.final_url).netloc.lower() != home:
+        if not same_site(urllib.parse.urlsplit(got.final_url).netloc, home):
             raise qc.FetchError("the index page answered from another host")
     except qc.FetchError as exc:
-        out["problem"] = f"index page not read: {plain(exc, 160)}"
+        if meter.spent():
+            out["skipped"] = True
+        else:
+            out["problem"] = f"index page not read: {plain(exc, 160)}"
         return out
     html = got.body.decode(qc._charset(got.body, got.ctype, True), "replace")
-    links = document_links(got.final_url, html, src)
+    links, out["not_taken"] = document_links(got.final_url, html, src)
     out["links"] = len(links)
     if not links:
         out["problem"] = "the index page lists no document under the path prefixes"
         return out
+    listed = {url for url, _ in links}
     done, pending = set(src.get("seen") or []), dict(src.get("pending") or {})
+    # A document that waited to be read and is no longer on the list.
+    out["gone"] = sorted(u for u in pending if u not in listed)
     new = [(url, title) for url, title in links if url not in done]
     fresh = [x for x in new if x[0] not in pending]
+    first_sight = not src.get("known")
     # The titles of everything new, whether or not the document is read.
     for url, title in fresh:
         age = days_between(date_in(url), src.get("now", ""))
-        if age is not None and age > TITLE_MAX_AGE_DAYS:
+        if first_sight and age is not None and age > TITLE_MAX_AGE_DAYS:
             continue                       # an old document on a list seen for the first time
         found = title_hits(title, watch, src)
         if found and len(out["titles"]) < TITLES_PER_SOURCE:
             out["titles"].append({"url": url, "title": title, "hits": found})
     limit = src["max_new"]
-    if not src.get("known"):
+    if first_sight:
         # First sight: note the list, read only the first few.
         limit = min(limit, FIRST_SIGHT)
         out["noted"] = [url for url, _ in new[limit:]]
         new = new[:limit]
-    elif len(fresh) > STORM_COUNT or (len(links) >= 8 and len(fresh) > STORM_SHARE * len(links)):
+    elif len(fresh) > STORM_COUNT or (len(links) >= STORM_SHARE_FROM and len(fresh) > STORM_SHARE * len(links)):
         # A known source whose list is suddenly mostly new: its addresses
         # changed, or a large batch was posted. Noted, not crawled.
         out["storm"], out["noted"] = True, [url for url, _ in fresh]
         new = [x for x in new if x[0] in pending]
+    else:
+        # More new documents than one run reads: the rest wait their turn,
+        # by name, so they are not "new" again tomorrow.
+        out["queued"] = [url for url, _ in new[limit:] if url not in pending]
+    # Those that have waited longest first.
+    new.sort(key=lambda x: -pending.get(x[0], -1))
     for url, title in new[:limit]:
         if meter.spent():
             break
@@ -683,17 +783,24 @@ def scan_source(qc: Any, fetcher: Any, meter: Meter, src: dict[str, Any], watch:
             got = fetcher.fetch(url, cap=DOC_BYTES)
             if got.status != 200:
                 raise qc.FetchError(f"HTTP {got.status}")
+            if not link_allowed(got.final_url, src):
+                # Sent on to an address that is not a document of this source
+                # (a sign-in page, say): its text is not the document's.
+                raise qc.FetchError("it redirects to an address that is not a document of this source")
             doc["sha256"] = hashlib.sha256(got.body).hexdigest()
-            pages, total, why = document_pages(qc, got.body, got.ctype)
+            pages, total, why, partial = document_pages(qc, got.body, got.ctype, bool(src.get("pdf_only")))
         except qc.FetchError as exc:
-            pages, total, why = [], 0, f"not fetched: {plain(exc, 120)}"
-        doc["pages"], doc["text_pages"], doc["why"] = total, len(pages), plain(why, 160)
+            if meter.spent():
+                break                      # the run ran out, not the document: try it next time
+            pages, total, why, partial = [], 0, f"not fetched: {plain(exc, 120)}", ""
+        doc["pages"], doc["text_pages"], doc["why"] = total, len(pages), plain(why or partial, 160)
         if pages:
-            doc["state"] = DOC_STATES[1] if total and (total - len(pages)) / total > PARTLY else DOC_STATES[0]
+            scans = total and (total - len(pages)) / total > PARTLY
+            doc["state"] = DOC_STATES[1] if scans or partial else DOC_STATES[0]
             doc["hits"] = find_hits(pages, watch, src)
         out["docs"].append(doc)
-    read = {d["url"] for d in out["docs"]} | set(out["noted"])
-    out["left"] = sum(1 for url, _ in links if url not in done and url not in read)
+    handled = {d["url"] for d in out["docs"]} | set(out["noted"])
+    out["left"] = sum(1 for url in listed if url not in done and url not in handled)
     return out
 
 
@@ -734,6 +841,9 @@ def read_state(path: Path) -> dict[str, Any]:
     return state
 
 
+WAITING = ("pending", "queued")     # seen on the list, not yet read: tried again
+
+
 def prepare(sources: list[dict[str, Any]], run_dirs: list[Path], decisions: Path | None, state_dir: Path,
             now: str | None = None) -> dict[str, Any]:
     """The job: the sources with what each has seen, and the watch list."""
@@ -747,9 +857,9 @@ def prepare(sources: list[dict[str, Any]], run_dirs: list[Path], decisions: Path
         st = state["sources"].get(src["name"]) or {}
         seen = st.get("seen") or {}
         job_sources.append({**src, "known": bool(st.get("known")),
-                            "seen": sorted(u for u, r in seen.items() if r.get("state") != "pending"),
+                            "seen": sorted(u for u, r in seen.items() if r.get("state") not in WAITING),
                             "pending": {u: int(r.get("tries", 0)) for u, r in seen.items()
-                                        if r.get("state") == "pending"}})
+                                        if r.get("state") in WAITING}})
     return {"schema": SCHEMA, "now": now, "sources": job_sources, "watch": watch,
             "runs": [str(d) for d in run_dirs]}
 
@@ -762,72 +872,98 @@ def scan_view(job: dict[str, Any]) -> dict[str, Any]:
                       for w in job["watch"]]}
 
 
+def _list(value: Any, most: int) -> list[Any]:
+    return value[:most] if isinstance(value, list) else []
+
+
+def _whole(value: Any, most: int) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= most else 0
+
+
+def checked_hit(h: dict[str, Any], pid: str) -> dict[str, Any]:
+    return {"kind": h["kind"], "parcel_id": pid, "page": _whole(h.get("page"), 100_000),
+            "others": _whole(h.get("others"), 100_000), "text": plain(h.get("text"), 2 * SNIPPET + 80)}
+
+
+def checked_hits(hits: Any, kinds: tuple[str, ...], watched: set[str]) -> list[dict[str, Any]]:
+    out = []
+    for h in _list(hits, HITS_PER_DOC):
+        if not isinstance(h, dict) or h.get("kind") not in kinds:
+            continue
+        if h["kind"] in (KINDS[2], KINDS[4]):
+            out.append(checked_hit(h, ""))
+        elif isinstance(h.get("parcel_id"), str) and h["parcel_id"] in watched:
+            out.append(checked_hit(h, h["parcel_id"]))
+    return out
+
+
 def checked_result(result: Any, job: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """The scan's result, kept only as far as it fits the job: this job's
-    sources, addresses on a source's own host and paths, parcels of the
+    sources, addresses on a source's own site and paths, parcels of the
     watch list, the fixed kinds and states, text reduced again. Anything
-    else is dropped; a result that is not one at all is refused."""
+    else is dropped; a result that is not one at all is refused.
+
+    The scanning account may have been taken over by a document it read.
+    What it can still do is bounded here: it cannot report a hit off the
+    watch list or a link off the source; it can mark at most a source's
+    `max_new` documents a run as read; and it can have a list "noted"
+    (seen, never read) only where the report then says so aloud, on a
+    source's first sight or a storm. That last is the price of the split:
+    such a scan can hide a batch of documents once, and the alert names it."""
     if not isinstance(result, dict) or result.get("schema") != SCHEMA or not isinstance(result.get("sources"), dict):
         raise Refuse("the scan's result is not a result file")
     watched = {w["parcel_id"] for w in job["watch"]}
     out: dict[str, dict[str, Any]] = {}
     for src in job["sources"]:
         got = result["sources"].get(src["name"])
+        blank = {"problem": "", "skipped": False, "links": 0, "not_taken": 0, "storm": False, "noted": [],
+                 "queued": [], "gone": [], "docs": [], "left": 0, "titles": []}
         if not isinstance(got, dict):
-            out[src["name"]] = {"problem": "the scan gave no answer for this source", "links": 0, "storm": False,
-                                "noted": [], "docs": [], "left": 0, "titles": []}
+            out[src["name"]] = {**blank, "problem": "the scan gave no answer for this source"}
             continue
-        docs = []
-        for d in (got.get("docs") if isinstance(got.get("docs"), list) else [])[:MAX_NEW_LIMIT]:
-            if not isinstance(d, dict) or not link_allowed(d.get("url"), src) or d.get("state") not in DOC_STATES:
-                continue
-            hits = []
-            for h in (d.get("hits") if isinstance(d.get("hits"), list) else [])[:HITS_PER_DOC]:
-                if not isinstance(h, dict) or h.get("kind") not in KINDS[:3]:
-                    continue
-                pid = h.get("parcel_id") if h["kind"] != KINDS[2] else ""
-                if h["kind"] != KINDS[2] and pid not in watched:
-                    continue
-                page = h.get("page")
-                hits.append(checked_hit(h, pid))
-            def count(key: str) -> int:
-                v = d.get(key)
-                return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 1_000_000 else 0
+        docs: dict[str, dict[str, Any]] = {}
+        for d in _list(got.get("docs"), 4 * MAX_NEW_LIMIT):
+            if (not isinstance(d, dict) or not link_allowed(d.get("url"), src) or d.get("state") not in DOC_STATES
+                    or d["url"] in docs or len(docs) >= src["max_new"]):
+                continue                   # each address once, and no more than a run may read
             sha = d.get("sha256")
-            docs.append({"url": d["url"], "title": plain(d.get("title"), 80), "state": d["state"],
-                         "why": plain(d.get("why"), 160), "sha256": sha if isinstance(sha, str) and SHA_RE.fullmatch(sha) else "",
-                         "pages": count("pages"), "text_pages": count("text_pages"), "hits": hits})
-        noted = [u for u in (got.get("noted") if isinstance(got.get("noted"), list) else [])[:INDEX_LINKS]
-                 if link_allowed(u, src)]
+            docs[d["url"]] = {"url": d["url"], "title": plain(d.get("title"), 80), "state": d["state"],
+                              "why": plain(d.get("why"), 160),
+                              "sha256": sha if isinstance(sha, str) and SHA_RE.fullmatch(sha) else "",
+                              "pages": _whole(d.get("pages"), 1_000_000),
+                              "text_pages": _whole(d.get("text_pages"), 1_000_000),
+                              "hits": checked_hits(d.get("hits"), KINDS[:3], watched)}
+        storm = got.get("storm") is True and bool(src.get("known"))
+        addresses = lambda key: list(dict.fromkeys(  # noqa: E731
+            u for u in _list(got.get(key), INDEX_LINKS) if link_allowed(u, src) and u not in docs))
+        # A list is noted (seen, never read) only on first sight or a storm.
+        noted = addresses("noted") if storm or not src.get("known") else []
+        queued = addresses("queued") if src.get("known") and not storm else []
+        gone = [u for u in _list(got.get("gone"), INDEX_LINKS) if isinstance(u, str) and u in src.get("pending", {})]
         titles = []
-        for t in (got.get("titles") if isinstance(got.get("titles"), list) else [])[:TITLES_PER_SOURCE]:
-            if not isinstance(t, dict) or not link_allowed(t.get("url"), src):
-                continue
-            hits = []
-            for h in (t.get("hits") if isinstance(t.get("hits"), list) else [])[:HITS_PER_DOC]:
-                if not isinstance(h, dict) or h.get("kind") not in TITLE_KINDS:
-                    continue
-                pid = h.get("parcel_id") if h["kind"] != KINDS[4] else ""
-                if h["kind"] != KINDS[4] and pid not in watched:
-                    continue
-                hits.append(checked_hit(h, pid))
-            if hits:
-                titles.append({"url": t["url"], "title": plain(t.get("title"), 80), "hits": hits})
-        def number(key: str) -> int:
-            v = got.get(key)
-            return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= INDEX_LINKS else 0
-        out[src["name"]] = {"problem": plain(got.get("problem"), 200), "links": number("links"),
-                            "storm": got.get("storm") is True, "noted": noted, "docs": docs,
-                            "left": number("left"), "titles": titles}
+        for t in _list(got.get("titles"), TITLES_PER_SOURCE):
+            if isinstance(t, dict) and link_allowed(t.get("url"), src):
+                hits = checked_hits(t.get("hits"), TITLE_KINDS, watched)
+                if hits:
+                    titles.append({"url": t["url"], "title": plain(t.get("title"), 80), "hits": hits})
+        out[src["name"]] = {"problem": plain(got.get("problem"), 200), "skipped": got.get("skipped") is True,
+                            "links": _whole(got.get("links"), INDEX_LINKS),
+                            "not_taken": _whole(got.get("not_taken"), INDEX_LINKS), "storm": storm,
+                            "noted": noted, "queued": queued, "gone": gone, "docs": list(docs.values()),
+                            "left": _whole(got.get("left"), INDEX_LINKS), "titles": titles}
     return out
 
 
-def checked_hit(h: dict[str, Any], pid: str) -> dict[str, Any]:
-    def whole(key: str, most: int) -> int:
-        v = h.get(key)
-        return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= most else 0
-    return {"kind": h["kind"], "parcel_id": pid, "page": whole("page", 100_000),
-            "others": whole("others", 100_000), "text": plain(h.get("text"), 2 * SNIPPET + 80)}
+def forget_oldest(seen: dict[str, Any]) -> None:
+    """Keep the list bounded: first the addresses only ever noted, oldest
+    first, then the oldest of those read. Never one that waits to be read."""
+    over = len(seen) - SEEN_KEPT
+    if over <= 0:
+        return
+    order = sorted((u for u, r in seen.items() if r.get("state") not in WAITING),
+                   key=lambda u: (seen[u].get("state") != "noted", seen[u].get("first", "")))
+    for url in order[:over]:
+        del seen[url]
 
 
 def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
@@ -838,15 +974,21 @@ def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
     state = read_state(state_dir / STATE_NAME)
     by_pid = {w["parcel_id"]: w for w in job["watch"]}
     counts = {"sources": len(job["sources"]), "watched": len(job["watch"]), "read": 0, "partly": 0,
-              "not_read": 0, "gave_up": 0, "scans": 0, "noted": 0, "left": 0, "failed": 0, "failing": 0,
-              "recovered": 0,
-              "stale": 0, "storms": 0, "parcel_hits": 0, "zoning_hits": 0, "no_watch_list": int(not job["watch"])}
+              "not_read": 0, "gave_up": 0, "scans": 0, "noted": 0, "left": 0, "not_taken": 0, "failed": 0,
+              "failing": 0, "recovered": 0, "skipped": 0, "stale": 0, "storms": 0, "parcel_hits": 0,
+              "street_hits": 0, "zoning_hits": 0, "no_watch_list": int(not job["watch"])}
     notes, new_hits = [], []
     said = {(h.get("url"), h.get("kind"), h.get("parcel_id")) for h in state["hits"]}
     for position, src in enumerate(job["sources"], 1):
         name, got = ch.cell(src["name"]), found[src["name"]]
         st = state["sources"].setdefault(src["name"], {})
         seen: dict[str, Any] = st.setdefault("seen", {})
+        if got["skipped"]:
+            counts["skipped"] += 1
+            notes.append(f"Source {position} ({name}) was not looked at this run: the run's allowance of "
+                         "requests, bytes or time was used up before its turn. Another source goes first "
+                         "tomorrow.")
+            continue
         if got["problem"]:
             if st.get("fail_day") != now[:10]:             # one strike a day, however often it is run
                 st["failures"], st["fail_day"] = int(st.get("failures", 0)) + 1, now[:10]
@@ -860,18 +1002,33 @@ def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
         if int(st.get("failures", 0)) >= FAIL_DAYS:
             counts["recovered"] += 1
             notes.append(f"Source {position} ({name}) answers again after {st['failures']} failed days.")
+        first_sight = not st.get("known")
         st["failures"], st["known"] = 0, True
         for url in got["noted"]:
             seen.setdefault(url, {"first": now, "state": "noted"})
+        for url in got["queued"]:
+            seen.setdefault(url, {"first": now, "state": "queued", "tries": 0})
         counts["noted"] += len(got["noted"])
         if got["storm"]:
             counts["storms"] += 1
             notes.append(f"Source {position} ({name}): {len(got['noted'])} documents were suddenly new at once "
                          "and were noted, not read. Either its addresses changed or a large batch was posted: "
                          "open its index page yourself.")
-        elif got["noted"]:
+        elif got["noted"] and first_sight:
             notes.append(f"Source {position} ({name}) is new to the watch: {len(got['noted'])} documents already "
                          "on its list were noted, not read.")
+        if got["not_taken"]:
+            counts["not_taken"] += got["not_taken"]
+            notes.append(f"Source {position} ({name}): {got['not_taken']} links under its path prefixes were "
+                         "not taken (a query string the source does not list, or an address this watch does "
+                         "not accept). Those documents are not read.")
+        gone = [u for u in got["gone"] if seen.get(u, {}).get("state") in WAITING]
+        for url in gone:
+            seen[url].update(state="gave up", why="no longer on the source's list")
+        if gone:
+            counts["gave_up"] += len(gone)
+            notes.append(f"Source {position} ({name}): {len(gone)} documents left its list before they could "
+                         "be read.")
         for t in got["titles"]:
             for h in t["hits"]:
                 if (t["url"], h["kind"], h["parcel_id"]) in said:
@@ -902,8 +1059,9 @@ def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
                 counts["read" if d["state"] == DOC_STATES[0] else "partly"] += 1
                 st["last_new"] = now
                 if d["state"] == DOC_STATES[1]:
-                    notes.append(f"Source {position} ({name}): only {d['text_pages']} of {d['pages']} pages of a "
-                                 f"document hold text (the rest are scans): {link(d['url'])}")
+                    notes.append(f"Source {position} ({name}): a document was only partly read ("
+                                 + (d["why"] or f"{d['text_pages']} of {d['pages']} pages hold text, the rest "
+                                    "are scans") + f"): {link(d['url'])}")
                 for h in d["hits"]:
                     w = by_pid.get(h["parcel_id"], {})
                     new_hits.append({**h, "why": w.get("why", ""), "where": w.get("where", ""),
@@ -912,7 +1070,11 @@ def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
         if scans:
             notes.append(f"Source {position} ({name}): {len(scans)} documents are scans without text and could "
                          "not be searched (their titles were): " + ", ".join(scans))
-        counts["left"] += got["left"]
+        waiting = sum(1 for r in seen.values() if r.get("state") in WAITING)
+        counts["left"] += waiting
+        if waiting:
+            notes.append(f"Source {position} ({name}): {waiting} new documents wait to be read, "
+                         f"{src['max_new']} a run.")
         st.setdefault("last_new", st.get("first_seen", now))
         st.setdefault("first_seen", now)
         quiet = days_between(st["last_new"], now)
@@ -922,26 +1084,30 @@ def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
                 st["stale_said"] = st["last_new"]
             notes.append(f"Source {position} ({name}): no new document for {quiet} days (expected at least every "
                          f"{src['expect_every_days']}). Is its index page still the right one?")
-        for url in sorted(seen, key=lambda u: seen[u].get("first", ""))[:max(0, len(seen) - SEEN_KEPT)]:
-            del seen[url]
-    counts["parcel_hits"] = sum(1 for h in new_hits if h["kind"] in PARCEL_KINDS)
-    counts["zoning_hits"] = sum(1 for h in new_hits if h["kind"] not in PARCEL_KINDS)
+        forget_oldest(seen)
+    counts["parcel_hits"] = sum(1 for h in new_hits if h["kind"] in KINDS[:2])
+    counts["street_hits"] = sum(1 for h in new_hits if h["kind"] == KINDS[3])
+    counts["zoning_hits"] = sum(1 for h in new_hits if h["kind"] in (KINDS[2], KINDS[4]))
     state["hits"] = (new_hits + state["hits"])[:HITS_KEPT]
     state["last_run"], state["runs"] = now, int(state.get("runs", 0)) + 1
     if not job["watch"]:
         notes.insert(0, "There is no watch list: no finished full run was found. Only industrial zoning words "
                         "are looked for.")
-    for run_dir in job.get("runs", []):
-        age = days_between(datetime.datetime.fromtimestamp(
-            ch.run_time(Path(run_dir), ch.meta_of(Path(run_dir))), datetime.timezone.utc).strftime("%Y-%m-%d"), now)
-        if age is not None and age > OLD_RUN_DAYS:
-            notes.append(f"The watch list comes from run `{ch.cell(Path(run_dir).name)}`, {age} days old.")
-    # Full tax-roll names only (three words or more): a two-word form such
-    # as "BUTNER ROAD", left of "BUTNER ROAD LLC", would blank a street in
-    # a zoning title, and the documents are public record.
-    owners = [words for words in ch.owner_strings(
-        [ch.read_rows(Path(d) / name) for d in job.get("runs", []) for name in ("ranked.csv", "rejected.csv")])
-        if len(words) >= 3]
+    try:
+        for run_dir in job.get("runs", []):
+            age = days_between(datetime.datetime.fromtimestamp(
+                ch.run_time(Path(run_dir), ch.meta_of(Path(run_dir))), datetime.timezone.utc).strftime("%Y-%m-%d"), now)
+            if age is not None and age > OLD_RUN_DAYS:
+                notes.append(f"The watch list comes from run `{ch.cell(Path(run_dir).name)}`, {age} days old.")
+        # Tax-roll names of three words or more only: a two-word form such as
+        # "BUTNER ROAD" (what is left of "BUTNER ROAD LLC") would blank a
+        # street in a zoning title, and the documents are public record.
+        owners = [words for words in ch.owner_strings(
+            [ch.read_rows(Path(d) / name) for d in job.get("runs", []) for name in ("ranked.csv", "rejected.csv")])
+            if len(words) >= 3]
+    except OSError:
+        raise Refuse("a run folder of the watch list is gone since the job was written; nothing was recorded, "
+                     "and the next run makes a new list") from None
     text, _ = ch.withhold_owners(render(state, job, counts, notes), owners)
     state_dir.mkdir(parents=True, exist_ok=True)
     write(state_dir / STATE_NAME, json.dumps(state, indent=1))
@@ -967,13 +1133,14 @@ def render(state: dict[str, Any], job: dict[str, Any], counts: dict[str, int], n
              f"Last run {job['now']}. Watching {len(watch):,} parcels: {by_id:,} by parcel id, {by_address:,} "
              f"also by site address, {neither:,} by neither (no usable id or address).", "",
              f"This run: {counts['read']} new documents read; {counts['parcel_hits']} hits on a parcel you "
-             f"watch or its street, {counts['zoning_hits']} zoning cases or documents with industrial zoning "
-             "words.", "",
-             f"**No hit does not mean no item.** {unread} documents were not read or only partly text this "
-             f"run ({counts['scans']} of them scans), {counts['failed']} of {counts['sources']} sources did "
-             f"not answer, and {counts['left']} new "
-             "documents wait for the next run. A scan without text cannot be searched, and an agenda amended "
-             "under the same address after it was read is not read again.", ""]
+             f"watch, {counts['street_hits']} titles naming a street your parcels are on, "
+             f"{counts['zoning_hits']} zoning cases or documents with industrial zoning words.", "",
+             f"**No hit does not mean no item.** {unread} documents were not read or only partly read this "
+             f"run ({counts['scans']} of them scans), {counts['failed'] + counts['skipped']} of "
+             f"{counts['sources']} sources did not answer or were not reached, {counts['left']} new documents "
+             f"wait for a later run, and {counts['not_taken']} links were not taken at all. A scan without "
+             "text cannot be searched, an agenda amended under the same address after it was read is not read "
+             "again, and a parcel id made of digits only can coincide with another number.", ""]
     lines += [f"- {n}" for n in notes] + ([""] if notes else [])
     lines += ["A hit says the words are in that document on that page. It does not say the item is about "
               "the parcel (an id can be listed as a neighbour), that the document is current, or what was "
@@ -1039,9 +1206,9 @@ def one_run(state_dir: Path):
 def summary_line(counts: dict[str, int]) -> str:
     unread = counts["partly"] + counts["not_read"] + counts["gave_up"] + counts["scans"]
     return (f"{counts['read']} new documents read from {counts['sources']} sources: {counts['parcel_hits']} "
-            f"hits on a parcel you watch or its street, {counts['zoning_hits']} zoning cases or documents "
-            f"with industrial zoning words; {unread} not read or only partly text ({counts['scans']} scans); "
-            f"{counts['failed']} sources did not answer.")
+            f"hits on a parcel you watch, {counts['street_hits']} titles naming a street your parcels are on, "
+            f"{counts['zoning_hits']} zoning cases or documents with industrial zoning words; {unread} not read "
+            f"or only partly read ({counts['scans']} scans); {counts['failed']} sources did not answer.")
 
 
 def main(argv: list[str] | None = None) -> int:
