@@ -21,7 +21,10 @@ on:
 jobs:
   offline-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The screener suite alone now takes about five minutes: at the old
+    # limit of 5 the job was cancelled before it could report (the runs on
+    # main after pull requests 49 and 50 were).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

@@ -117,7 +117,13 @@ else
 fi
 exit 0
 FAKE
-chmod +x "$ROOT/fakepy" "$ROOT/fakeclaude" "$ROOT/syspy"
+# The stage asks for pdftotext before it starts. These tests fetch nothing
+# and read no PDF, so a stand-in on PATH keeps them independent of what
+# the machine has installed (a CI runner has no poppler-utils).
+mkdir -p "$ROOT/bin"
+printf '#!/bin/sh\necho "stand-in pdftotext: not for real PDFs" >&2\nexit 1\n' >"$ROOT/bin/pdftotext"
+chmod +x "$ROOT/fakepy" "$ROOT/fakeclaude" "$ROOT/syspy" "$ROOT/bin/pdftotext"
+export PATH="$ROOT/bin:$PATH"
 
 # new_case NAME: fresh repo + state; exports the supervisor's config.
 new_case() {
@@ -195,6 +201,15 @@ echo "a run with warnings is not checked"
 new_case warned; FAKE_RUN=warn "$SUP" 2>/dev/null
 check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
 check "warning alert" 'alerts | grep -q "done with warnings"'
+
+echo "without pdftotext the lead checks say so and do not start"
+new_case nopdf
+mkdir -p "$CASE/bin"; for t in bash sh env python3 git find sed awk grep cut sort head tail cat ls date mktemp mkdir chmod cp tee flock timeout sha256sum df id dirname basename tr wc stat touch printf sleep unlink rmdir mapfile pgrep pkill; do
+  p="$(PATH="${PATH#"$ROOT/bin:"}" command -v "$t" 2>/dev/null)" && [ -x "$p" ] && ln -sf "$p" "$CASE/bin/$t"; done
+PATH="$CASE/bin" "$SUP" 2>/dev/null; rc=$?
+check "exit 0" '[ $rc -eq 0 ]'
+check "alert names pdftotext" 'alerts | grep -q "pdftotext is not installed"'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
 
 echo "not set up: an alert, no agents, the run still counts as ok"
 new_case unready; LEAD_DIR="$CASE/nowhere" "$SUP" 2>/dev/null; rc=$?
