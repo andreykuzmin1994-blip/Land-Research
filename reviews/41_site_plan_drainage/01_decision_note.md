@@ -81,11 +81,11 @@ are not in this change.
 | Exhaustive check, #25 | Every 3° x a 20 ft position grid x 4 flips, each through `finish` with ponds sited low, docks off the street: the largest layout that drains is 70,400 SF (rear-load 160, 440 ft). The planner now draws it (70,000 SF, pond 24 ft below the pad). |
 | The 23 sites against PR #51's code | Table below. No site less feasible, none with a new severity-1 flag, none newly street-facing. One smaller by design (the L-shape: every pond was uphill). |
 | Sheets | #21 and #25 redrawn and read: pond on the low ground, building above it, docks off the street. |
-| Tests | New class `Drainage` (5 tests); `PondRoom` re-pointed (the reference sites planned once per process); the #21 read-out test uses the search's own plan for its pond note. Full suite: in `02_review.md`. |
+| Tests | New class `Drainage` (12 tests); `PondRoom` re-pointed (the reference sites planned once per process); the #21 read-out test uses the search's own plan for its pond note. Full suite: 992 OK in 514 s (`03_recheck.md`). |
 
 ### The 23 sites, default behaviour (floor area / trailer stalls)
 
-Before = PR #51's code; after = `8ff329e` (the review's fixes in).
+Before = PR #51's code; after = `591c03a` (the review's and the re-check's fixes in).
 `ang` = the tests' two-angle patch. Rows not listed plan the same.
 
 | Site | Before | After | Note |
