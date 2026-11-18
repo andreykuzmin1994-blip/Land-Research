@@ -31,6 +31,23 @@ additions asked for by the operator. Record: `reviews/39_screener_autonomy/`.
   verify first and what is accepted. The agents get an owner-free lead
   card, not the brief.
 
+**2026-11-18, same branch:** three more pieces, record in
+`reviews/41_screener_tally_agenda_whatif/`.
+
+- **Why leads fail** (`ops/screener/lead_tally.py`): counts the reasons in
+  the checked lead folders and says which screen to look at. On the 29
+  leads checked so far, 27 were still grade A or B in the run of
+  2026-11-13; the largest groups are land held by an operating company
+  (14) and land a developer already holds (11).
+- **Agenda watch** (`ops/screener/agenda_watch.py`, `agenda-watch.sh`): a
+  daily, model-free look at the agenda pages the operator lists. Run by
+  hand against South Fulton's page; not yet run on a server under its own
+  account.
+- **More Fulton years in the answer key: measured, not built.** The 2020
+  and 2021 as-of years add no site (still 45), and the county's 2026
+  snapshot has no improvement values. No change to the key is proposed
+  (`01_answer_key_whatif.md`).
+
 Open after this branch:
 
 1. Merging changes `screener/decide.py` and `screener/viewer_template.html`,
@@ -43,10 +60,14 @@ Open after this branch:
    is an edit on that branch, which this session did not make.
 3. The lead checks need a first supervised run on the server
    (`INVESTIGATE_MAX=1`), then a decision on whether they stay on.
-4. Not built: a tally of why leads were killed, as proposals for the
-   screens (`screens.py` stays human-owned); a watcher for council and
-   planning agendas between runs; more Fulton as-of years in the answer
-   key (a human-only rebuild).
+4. The tally names where leads get through; acting on it is a change to
+   `screens.py` or `settings.toml`, the operator's. The built check
+   (`screener.builtcheck`) is not yet part of a run.
+5. The agenda watch needs a sources file per city (the operator reads
+   each site's robots.txt and terms first) and a first run on the server.
+   South Fulton's index lists scanned ordinances: pages with text PDFs
+   (planning commission packets, staff reports) would make its parcel-id
+   search useful.
 
 **2026-11-17, on `claude/stoic-keller-r95w17`:** the site planner's
 output was rebuilt as a test-fit sheet with a read-out

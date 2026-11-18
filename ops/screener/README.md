@@ -381,13 +381,19 @@ the documents that are new, and searches for
 - a watched parcel's **site address** (a possible match, only in the
   sources that cover its city);
 - in the **titles** the index page gives its documents: a street that
-  watched parcels are on, and zoning case numbers;
+  watched parcels are on (the name followed by a street word, "Spence
+  Road"; never a street named like the city itself), and zoning case
+  numbers;
 - **industrial zoning words** close together on a page.
 
 The watch list is the grade A and B leads, the parcels marked pursue or
 maybe (in the run or since, in `decisions.csv`), and the top 50, of each
 county's newest full run. It writes `~/screener-ops/agenda/agenda-watch.md`
-and sends an alert only when there is something to say.
+and sends an alert only when there is something to say: at high priority
+when a document names a watched parcel by its id or its address, or a
+source has stopped answering; at normal priority for a title that names a
+street your parcels are on (most will be about another lot) and for
+zoning cases.
 
 **What it is worth.** A hit says the words are in that document. It does
 not say the item is about your parcel, that it is current, or what was
@@ -413,7 +419,10 @@ by hand.
    `agenda_sources.example.json` and `chmod 600` it. Per source: a name,
    the index page, the path prefixes its documents sit under, the cities
    it covers as `ranked.csv` writes them, and how often you expect it to
-   post. **Before you list a site, read its robots.txt and terms
+   post. Optional: `pdf_only` (a page that answers in place of a PDF is
+   then "not read", not the document) and `allow_queries` (exact query
+   strings a document link may carry, such as `"packet=true"` for the
+   full packet; without it such links are counted as not taken). **Before you list a site, read its robots.txt and terms
    yourself.** The watch honours robots.txt and never works around a
    wall (a site that refuses it is reported as not answering).
 3. A trial by hand, as `screener`, in one process (no sandbox):
@@ -443,15 +452,23 @@ Until the sources file exists the timer does nothing and says nothing.
   requests and 300 MB a run.
 - A source seen for the first time has its list noted and three documents
   read. A known source whose list is suddenly mostly new is noted, not
-  crawled, and you are told. A document counts as seen only once its text
-  was searched; one that cannot be read is tried on three runs and then
-  listed for you.
+  crawled, and you are told. More new documents than a run reads wait
+  their turn. A document counts as seen only once its text was searched;
+  one that cannot be read is tried on three runs and then listed for you;
+  one whose text was cut short, or that was sent on to a sign-in page, is
+  not recorded as read.
+- If the scan account were taken over by a document it read, the run
+  user still believes only what fits the job: no hit off the watch list,
+  no link off the source, at most a run's share of documents marked read.
+  It could have one batch of documents "noted" unread, and only in a way
+  the report and an alert say aloud. It can also send the parcel ids and
+  addresses it was given anywhere: that account has the network.
 - It never opens the supervisor's lock; it skips a day on which a
   screener run is active. It writes nothing into the checkout.
 - The alert holds counts only. `agenda-watch.md` shows a few words of the
   document around a hit, as plain text: they are public record and can
-  name an applicant or an owner. Tax-roll owner names of the runs are
-  withheld where they appear in roll spelling, no more.
+  name an applicant or an owner. A tax-roll owner name of three words or
+  more is withheld where it appears in roll spelling, no more.
 
 Not verified: a run on a server under the `screener-agenda` account. The
 offline tests run the wrapper as one user with a stand-in for the scan;
