@@ -84,6 +84,12 @@ class ReasonTests(Base):
             "The lot is a curved strip; it cannot hold a warehouse.": ["shape"],
             "A cemetery shares the north lot line.": ["neighbour"],
             "The seller has not been tested.": [],
+            "It is neither vacant nor idle: two buildings stand on this parcel.": ["built"],
+            "The site is operated by a waste hauler.": ["operator"],
+            "It would need a rezoning: its use list bars wholesaling.": ["zoning"],
+            "Single-family homes and apartments line the east side.": ["neighbour"],
+            "The rest is a wooded, sloping strip.": [],
+            "It is the site of a data center project that is permitted, not built.": [],
         }
         for objection, want in cases.items():
             self.assertEqual(self.reasons(objection)[0], want, objection)
@@ -101,6 +107,10 @@ class ReasonTests(Base):
         words, _ = self.reasons("Nothing found shows a building, a developer or a sale on this parcel, "
                                 "and the maps still show Industrial future land use. But it is a narrow wedge.")
         self.assertEqual(words, ["shape"])
+        # ...but what follows ", so" is the skeptic's own finding again.
+        words, _ = self.reasons("No document found (site plan, permit) shows what the owner plans, so "
+                                "'expansion or buffer land, not available' is still an inference.")
+        self.assertEqual(words, ["operator"])
 
     def test_reasons_from_the_checked_sections(self):
         _, by = self.reasons("", market="signs_under_contract", plans="against", zoning="rezoning_needed",
@@ -139,9 +149,9 @@ class TallyTests(Base):
         self.assertIn("6 leads have a document check: 1 killed, 3 weakened, 1 survives, 1 without a skeptic verdict.", text)
         self.assertIn("1 of the 4 killed or weakened leads are still grade A or B there.", text)
         self.assertEqual(self.row("Not raw land"), "| Not raw land: a building, a yard or an operating site "
-                         "is on it | 1 | 1 | n/a | 1 |")
-        self.assertIn("| 0 | 1 | 1 | 0 |", self.row("A developer or investor"))
-        self.assertIn("| No pattern matched | 0 | 1 | n/a | 0 |", text)
+                         "is on it | 1 | 1 | 2 / n/a | 1 |")
+        self.assertIn("| 0 | 1 | 1 / 1 | 0 |", self.row("A developer or investor"))
+        self.assertIn("| No reason found | 0 | 1 | n/a | 0 |", text)
         first = out.splitlines()[0]
         self.assertIn("6 leads checked so far: 1 killed, 3 weakened, 1 survive.", first)
         self.assertIn("(2 leads, 1 still grade A or B)", first)
@@ -153,7 +163,8 @@ class TallyTests(Base):
         text = self.text()
         what = text[text.index("## What to look at"):text.index("## Every lead")]
         self.assertIn("### Not raw land", what)
-        self.assertIn("2 leads (1 killed); 1 of them still grade A or B in the newest run: the gap is open.", what)
+        self.assertIn("2 leads (1 killed); 1 of them still come through as grade A or B in the newest run "
+                      "that has them.", what)
         self.assertIn("built_min_building_sf", what)
         self.assertIn("`A 1` (still A/B), `A2`.", what)
         self.assertNotIn("### A developer", what)              # one lead only
@@ -176,11 +187,44 @@ class TallyTests(Base):
         self.assertIn("rank 4, grade A (fulton-2026-11-10)", next(l for l in text.splitlines() if l.startswith("| `A7`")))
 
     def test_a_reason_already_closed_reads_as_closed(self):
-        closed = self.run_dir("fulton-2026-11-24", [], [{"parcel_id": "A 1", "reasons": "already built on"},
+        closed = self.run_dir("fulton-2026-11-24", [{"rank": 1, "parcel_id": "OTHER", "lead_grade": "A"}],
+                              [{"parcel_id": "A 1", "reasons": "already built on"},
                                                         {"parcel_id": "A2", "reasons": "already built on"}])
         run_main(self.leads, "--run", closed)
-        self.assertIn("none of them is grade A or B in the newest run: the screens may already cover it.",
-                      self.text())
+        self.assertIn("none of them is grade A or B in the newest run that has them: screened out, "
+                      "regraded, or marked.", self.text())
+        rc, out, _ = run_main(self.leads, "--run", closed)
+        self.assertNotIn("still coming through", out)             # nothing of it comes through
+
+    def test_a_reason_from_a_checked_section_alone_is_counted(self):
+        # reviews/41: such a lead was in no row at all.
+        self.lead("S1", "weakened", "The seller has not been tested.", owner="operator")
+        self.lead("S2", "killed", "", owner="operator")
+        run_main(self.leads, "--run", self.run)
+        self.assertIn("| 1 | 1 | 0 / 2 | 0 (2 in none of the runs) |", self.row("Held by an operating company"))
+        self.assertIn("| No reason found | 0 | 1 | n/a | 0 |", self.text())
+        self.assertIn("none of them is in the runs given, so nothing can be said about today.", self.text())
+
+    def test_leads_in_none_of_the_runs_are_not_read_as_screened_out(self):
+        elsewhere = self.run_dir("cobb-2026-11-17", [{"rank": 1, "parcel_id": "ZZ", "lead_grade": "A"}])
+        run_main(self.leads, "--run", elsewhere)
+        self.assertIn("| 1 | 1 | 2 / n/a | 0 (2 in none of the runs) |", self.row("Not raw land"))
+        self.assertIn("none of them is in the runs given", self.text())
+
+    def test_runs_are_ordered_by_their_date_whatever_the_county(self):
+        self.run_dir("cobb-2026-11-24", [{"rank": 7, "parcel_id": "A3", "lead_grade": "A"}])
+        run_main(self.leads, "--run", self.tmp / "output" / "cobb-2026-11-24", "--run", self.run)
+        self.assertIn("rank 7, grade A (cobb-2026-11-24)", next(l for l in self.text().splitlines()
+                                                                 if l.startswith("| `A3`")))
+
+    def test_a_run_that_lists_no_parcel_is_refused(self):
+        for name, text in (("fulton-2026-12-01", ""), ("fulton-2026-12-02", "rank,lead_grade\n1,A\n")):
+            d = self.tmp / "output" / name
+            d.mkdir(parents=True)
+            (d / "ranked.csv").write_text(text)
+            rc, _, err = run_main(self.leads, "--run", d)
+            self.assertEqual(rc, 2)
+            self.assertIn("lists no parcel", err)
 
 
 class SafetyTests(Base):
@@ -201,6 +245,10 @@ class SafetyTests(Base):
         self.assertEqual(lead_tally.plain("a\nb  c", 50), "a b c")
         self.assertEqual(lead_tally.plain("x" * 400, 10), "x" * 10 + " ...")
         self.assertEqual(lead_tally.plain("visit http://a.b/c now", 80), "visit a. b/c now")
+        for hostile in ('see https"://203.0.113.5/login now', "ht*tps://3405803781/x", "h_t_t_p://evil.example",
+                        "ftps://x.y", "see www.evil.example", "a://b"):
+            got = lead_tally.plain(hostile, 80)
+            self.assertNotRegex(got, r"://|www\.|\d\.\d", hostile)
         self.assertEqual(lead_tally.plain(None, 10), "")
 
     def test_a_long_objection_is_cut(self):
@@ -242,6 +290,43 @@ class SafetyTests(Base):
         self.assertIn("| no skeptic |", row)
         self.assertIn("unknown / unknown / unknown / unknown / unknown", row)
 
+    def test_run_and_reject_text_is_plain_too(self):
+        self.lead("M1", "killed", "This is not raw land.")
+        self.lead("M2", "weakened", "This is not raw land.")
+        d = self.tmp / "output" / "fulton-2026-11-17 [x](http:evil) `c`"
+        d.mkdir(parents=True)
+        (d / "ranked.csv").write_text("rank,parcel_id,lead_grade\n1 | [r](u),M1,A <b>\n")
+        (d / "rejected.csv").write_text('parcel_id,reasons\nM2,"built | <i>x</i> [l](https://evil.example) ~~s~~ &#124;"\n')
+        self.assertEqual(run_main(self.leads, "--run", d)[0], 0)
+        text = self.text()
+        for bad in ("](", "<b>", "<i>", "evil.example", "~~", "&#124;"):
+            self.assertNotIn(bad, text, bad)
+        head = next(l for l in text.splitlines() if l.startswith("| Parcel |"))
+        for pid in ("M1", "M2"):
+            self.assertEqual(next(l for l in text.splitlines() if l.startswith(f"| `{pid}`")).count("|"), head.count("|"))
+
+    def test_an_odd_section_verdict_cannot_be_emphasis(self):
+        d = self.lead("V2", "killed", "x")
+        doc = json.loads((d / "findings.checked.json").read_text())
+        doc["sections"]["zoning"]["verdict"] = "_a_"
+        doc["sections"]["plans"]["verdict"] = "x" * 41
+        (d / "findings.checked.json").write_text(json.dumps(doc))
+        run_main(self.leads)
+        self.assertIn("unknown / unknown / unknown / unknown / unknown",
+                      next(l for l in self.text().splitlines() if l.startswith("| `V2`")))
+
+    def test_the_output_is_never_written_over_something_that_is_not_a_file(self):
+        self.lead("W1", "killed", "x")
+        folder = self.tmp / "afolder"
+        folder.mkdir()
+        self.assertEqual(run_main(self.leads, "--out", folder)[0], 2)
+        (self.leads / lead_tally.FILE_NAME).mkdir()
+        self.assertEqual(run_main(self.leads)[0], 2)
+        (self.leads / lead_tally.FILE_NAME).rmdir()
+        self.assertEqual(run_main(self.leads)[0], 0)
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), ["afolder", "leads"])
+        self.assertEqual(sorted(p.name for p in self.leads.iterdir()), ["W1", lead_tally.FILE_NAME])
+
     def test_refusals_write_nothing(self):
         self.assertEqual(run_main(self.leads)[0], 2)                       # no lead at all
         self.assertFalse((self.leads / lead_tally.FILE_NAME).exists())
@@ -254,11 +339,15 @@ class SafetyTests(Base):
         self.lead("R1", "killed", "x")
         target = self.tmp / "target.md"
         target.write_text("mine")
-        os.symlink(target, self.leads / (lead_tally.FILE_NAME + ".tmp"))
+        os.symlink(target, self.leads / lead_tally.FILE_NAME)
         self.assertEqual(run_main(self.leads)[0], 2)
         self.assertEqual(target.read_text(), "mine")
-        os.unlink(self.leads / (lead_tally.FILE_NAME + ".tmp"))
+        os.unlink(self.leads / lead_tally.FILE_NAME)
+        # an old temp file of the same name is not written through either
+        os.link(target, self.leads / (lead_tally.FILE_NAME + ".tmp"))
         self.assertEqual(run_main(self.leads)[0], 0)
+        self.assertEqual(target.read_text(), "mine")
+        os.unlink(self.leads / (lead_tally.FILE_NAME + ".tmp"))
         self.assertEqual(sorted(p.name for p in self.leads.iterdir()), ["R1", lead_tally.FILE_NAME])
 
     def test_the_tally_file_is_not_a_lead_folder_name(self):

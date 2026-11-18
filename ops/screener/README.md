@@ -344,9 +344,10 @@ python ops/screener/lead_tally.py screener/leads --run screener/output/fulton-20
   the skeptic's own words by fixed word patterns. The second is a reading
   aid, not a measurement: every lead is listed so a count can be checked
   against its `lead.md`.
-- With `--run`, each reason says how many of its leads the newest run
-  still ranks grade A or B: a reason whose leads are already screened out
-  reads as closed, one whose leads still come through reads as open.
+- With `--run`, each reason says how many of its leads still come through
+  as grade A or B in the newest run that has them, and how many are in
+  none of the runs given. A run made before a lead was checked could not
+  know of the check: the count says what the screens let through.
 - No model proposes anything: "what to look at" is fixed text per reason.
   `screens.py` and `settings.toml` stay yours, and a change to them needs
   a new evaluation baseline.
@@ -356,10 +357,18 @@ python ops/screener/lead_tally.py screener/leads --run screener/output/fulton-20
 
 On the 29 leads checked by hand up to 2026-11-13, measured against the run
 of that day: 27 of the 29 killed or weakened leads were still grade A or B.
-The reasons, most common first: held by an operating company as buffer or
-expansion land (9 leads), a developer or investor already holds or pursues
-it (8), the adopted plan is against it or the screener read a superseded
-land-use layer (8), not raw land (7), industrial use not by right (6).
+By number of leads (a lead can have several reasons): held by an operating
+company as buffer or expansion land (14), industrial use not by right
+(12), neighbours or the road (12), a developer or investor already holds
+or pursues it (11), the adopted plan is against it or the screener read a
+superseded land-use layer (11), not raw land (8), a shape that cannot
+hold a building (2).
+
+An independent reader checked the word patterns against all 29
+objections before they were last adjusted: about 9 in 10 of the reasons
+they assigned were right, and they found about 7 in 10 of the reasons the
+text states (8 in 10 with the checked sections). Treat a count as "about
+this many", and read the leads.
 
 ## Agenda watch
 
