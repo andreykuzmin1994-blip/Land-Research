@@ -174,10 +174,12 @@ fit.
   and larger pond, or pumping). Up to 3 ft above is taken as a pond dug
   that much deeper, and from 1 ft the plan says so (`POND_ABOVE_PAD`,
   information): at 4:1 slopes the deeper pond's footprint is roughly 15
-  to 30% larger than drawn, more with the fall an inlet needs. Each pond
-  is first looked for on ground at least 3 ft below the pad
-  (`POND_GOOD_DROP_FT`), then as before; but a layout whose pond is
-  inside the tolerance is not laid out again to get it lower. The
+  to 30% larger than drawn, more with the fall an inlet needs. A layout
+  whose pond is inside the tolerance is not laid out again to get it
+  lower, and outside the pass a pond is sited as before (low and near
+  the building: a rule that first looked 3 ft below the pad moved one
+  site's pond onto the ground of its second building and helped
+  nowhere, review 41/03). The
   record carries `detention.ponds_over_pad_ft` (each pond against its
   own building's pad, building 1's first), `pond_over_pad_ft` (the
   highest) and `drains_by_gravity` (None where a pond was not measured:

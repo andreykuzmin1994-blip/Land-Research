@@ -344,9 +344,9 @@ POND_FALLBACK_SHAPES = ((1.5, False), (3.0, False), (4.0, False), (2.0, True), (
 POND_FALLBACK_RATIOS = tuple(sorted({k for k, _ in POND_FALLBACK_SHAPES}))
 # Drainage (reviews/41): a pond on ground more than this above the pad is
 # uphill of the paving it drains (POND_UPHILL). Up to this much is taken
-# up by digging the pond deeper, inside its own +/-30%.
+# as a pond dug deeper (its footprint then 15 to 30% larger than drawn:
+# POND_ABOVE_PAD says so from 1 ft).
 POND_UPHILL_TOL_FT = 3.0
-POND_GOOD_DROP_FT = 3.0           # a pond is first looked for on ground at least this far below the pad
 POND_ROOM_KEEP = 3                # plans the pass adds to the results (the best by the ranking)
 DRAIN_FIRST_SPOTS = 2             # pond-first layouts: the lowest pond spots reserved, every cross-section fitted round each
 POND_ROOM_MAX_TRIES = 90          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
@@ -2034,21 +2034,13 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     # can drain to them: on ground no higher than the pad plus what a
     # deeper pond takes up.
     max_z = pad_z + POND_UPHILL_TOL_FT if (ctx.pond_room and pad_z is not None) else None
-    # Default behaviour: a pond clearly below the pad first, wherever one
-    # fits (review 41/02, finding 4: inside the tolerance nothing looked
-    # for lower ground); then as before.
-    low_z = pad_z - POND_GOOD_DROP_FT if (fixes and pad_z is not None) else None
 
     def site_ponds(region, n, Lf_, Wf_, v_each):
         """[(pond, bottom length / width)]."""
         out = []
         for _k in range(n):
             ctx.search.check()
-            r, k_used = None, 2.0
-            if low_z is not None:
-                r = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints, max_z=low_z)
-            if r is None:
-                r = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints, max_z=max_z)
+            r, k_used = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints, max_z=max_z), 2.0
             if r is None and ctx.pond_room and not problem:
                 # The room-for-the-pond pass only (reviews/40): no 2:1 pond
                 # fits at the samples, so the same volume in other
@@ -2608,8 +2600,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 if ok:
                     top = max(ok, key=score)
                     out.append(top)
-                    full = [t for t in ok if t[1]["trailers"] >= t[0].trailers_target and t is not top]
-                    if full:
+                    full = [t for t in ok if t[1]["trailers"] >= t[0].trailers_target]
+                    if full and top[1]["trailers"] < top[0].trailers_target:
                         out.append(max(full, key=score))
             return out
 
@@ -2631,15 +2623,18 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # No stalls traded between the pass's own plans (review 41/02,
         # finding 1): a plan gives way to another of the pass with at
         # least its floor area and more trailer stalls.
+        # (only to one that itself ranks above the plan before the pass:
+        # otherwise neither would be drawn and the gain lost)
         added = [t for t in added
-                 if not any(u is not t and u[0].sf >= t[0].sf and u[1]["trailers"] > t[1]["trailers"] for u in added)]
+                 if not any(u is not t and u[0].sf >= t[0].sf and u[1]["trailers"] > t[1]["trailers"] and score(u) > score(best0)
+                            for u in added)]
         # At most three of them go on (the best by the ranking): more
         # would crowd the layouts compared (the first ten results) out of
         # the read-out.
         added = sorted(added, key=score, reverse=True)
         with_stalls = [t for t in added if t[1]["trailers"] >= t[0].trailers_target]
         kept = added[:POND_ROOM_KEEP]
-        if with_stalls and not any(t in kept for t in with_stalls):
+        if with_stalls and not any(t is k for t in with_stalls for k in kept):
             kept = kept[:POND_ROOM_KEEP - 1] + [with_stalls[0]]     # the read-out's "meets its trailer target" layout
         added = kept
         results += added
@@ -2717,9 +2712,14 @@ def _drainage_record(o: dict[str, Any], second: tuple | None) -> dict[str, Any]:
     pond, no lidar under it): not a pond that drains."""
     each = list(o.get("pond_over_each") or []) + (list(second[1].get("pond_over_each") or []) if second else [])
     measured = [x for x in each if x is not None]
+    placed = o.get("pond_ok", True) and (second[1].get("pond_ok", True) if second else True)
+    if measured and max(measured) > POND_UPHILL_TOL_FT:
+        drains: bool | None = False                 # one pond above its pad is enough
+    else:
+        drains = True if (measured and len(measured) == len(each) and placed) else None
     return {"pond_over_pad_ft": round(max(measured)) if measured else None,
             "ponds_over_pad_ft": [round(x) if x is not None else None for x in each],
-            "drains_by_gravity": (max(measured) <= POND_UPHILL_TOL_FT) if measured and len(measured) == len(each) else None}
+            "drains_by_gravity": drains}
 
 
 def _pond_shape_text(o: dict[str, Any], second: tuple | None) -> str:
@@ -2946,7 +2946,8 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
         q, o2 = second
         rec["second_building"] = {"configuration": q.v["name"], "L_ft": q.L, "D_ft": q.v["D"], "sf": rnd(q.sf, 1000), "doors": q.doors,
                                   "trailers": o2["trailers"], "trailers_target": q.trailers_target, "cars_capacity": q.car_cap, "cars_required": q.cars_required,
-                                  "own_driveways": not o2["shared_access"], "route_ft": round(sum(ln.length for k, ln in o2["routes"] if k == "truck"))}
+                                  "own_driveways": not o2["shared_access"], "route_ft": round(sum(ln.length for k, ln in o2["routes"] if k == "truck")),
+                                  **({"pad_elev_ft": round(o2["pad_elev"])} if fixes and o2.get("pad_elev") is not None else {})}
         rec["totals_both_buildings"] = {"doors": p.doors + q.doors, "trailers": o["trailers"] + o2["trailers"],
                                         "trailers_target": p.trailers_target + q.trailers_target, "cars_capacity": p.car_cap + q.car_cap}
     return rec

@@ -1516,6 +1516,8 @@ class Drainage(Offline):
         two = sp._drainage_record(one, (None, {"pond_over_each": [9.4]}))
         self.assertEqual((two["pond_over_pad_ft"], two["ponds_over_pad_ft"], two["drains_by_gravity"]), (9, [-5, -1, 9], False))
         self.assertIsNone(sp._drainage_record({"pond_over_each": [-5.0, None]}, None)["drains_by_gravity"])
+        self.assertIs(sp._drainage_record({"pond_over_each": [9.0, None]}, None)["drains_by_gravity"], False)   # one uphill is enough
+        self.assertIsNone(sp._drainage_record({"pond_over_each": [-5.0], "pond_ok": False}, None)["drains_by_gravity"])  # not all placed
         self.assertEqual(sp._drainage_record({}, None), {"pond_over_pad_ft": None, "ponds_over_pad_ft": [], "drains_by_gravity": None})
 
     def test_nothing_measured_is_not_a_pond_that_drains(self):
@@ -1614,6 +1616,22 @@ class Drainage(Offline):
         p, ctx = seen["uphill"]
         o = sp.finish(p, sp.dataclass_replace(ctx, pond_room=True, search=sp.Search(1e9)))
         self.assertFalse(o["pond_ok"] and o["pond_over_pad"] > sp.POND_UPHILL_TOL_FT)
+
+    def test_the_pond_does_not_take_the_second_buildings_ground(self):
+        # review 41/03: a rule that first looked for a pond 3 ft below the
+        # pad moved this site's pond (already 1 ft below, beside the
+        # building) onto the ground of its second building: 543,000 SF in
+        # two buildings became 428,000 SF in one. Outside the pass the pond
+        # is sited as before.
+        two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(1600, 1000, front=two, z=lambda x, y: 930 - 0.00008 * (y - 500) ** 2))
+        self.assertIn("second_building", rec)
+        self.assertEqual(rec["total_sf"], 543000)
+        self.assertEqual(len(rec["detention"]["ponds_over_pad_ft"]), rec["detention"]["ponds"])
+        # the second building's pond reads against its own pad, which the sheet prints too
+        self.assertIn("pad_elev_ft", rec["second_building"])
+        self.assertEqual(sr.render(d, rec).count(">PAD EL "), 4)         # two labels, each over its halo
 
     def test_docks_face_the_street_only_where_they_did(self):
         # an L-shaped site whose every layout faced the street, each with its

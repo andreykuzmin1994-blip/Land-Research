@@ -582,8 +582,8 @@ def render(d: Drawing, rec: dict) -> str:
             if clear:
                 lines.append((f"{clear} FT CLEAR", 9.5, "normal"))
             # (the default behaviour's sheet: the record then carries the ponds' ground against the pad)
-            pad_el = gr.get("pad_elev_ft") if i == 1 and "ponds_over_pad_ft" in de else None
-            if pad_el is not None and short_px >= 104:
+            pad_el = ((gr.get("pad_elev_ft") if i == 1 else (sb or {}).get("pad_elev_ft")) if "ponds_over_pad_ft" in de else None)
+            if pad_el is not None and short_px >= 70:
                 # the level pad's elevation, to read against the contours and the pond
                 lines.append((f"PAD EL {pad_el:.0f}", 8.5, "normal"))
             labels.append(label(X(bc.x), Y(bc.y), lines, 0.0 if short_px >= 104 else ang))
