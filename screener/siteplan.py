@@ -342,7 +342,12 @@ RELOCATE_ROUNDS = 3        # re-sizing the reserved pond for the building that f
 # for the civil engineer, not checked here).
 POND_FALLBACK_SHAPES = ((1.5, False), (3.0, False), (4.0, False), (2.0, True), (1.5, True), (3.0, True), (4.0, True))
 POND_FALLBACK_RATIOS = tuple(sorted({k for k, _ in POND_FALLBACK_SHAPES}))
-POND_ROOM_MAX_TRIES = 60          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
+# Drainage (reviews/41): a pond on ground more than this above the pad is
+# uphill of the paving it drains (POND_UPHILL). Up to this much is taken
+# up by digging the pond deeper, inside its own +/-30%.
+POND_UPHILL_TOL_FT = 3.0
+DRAIN_FIRST_SPOTS = 2             # pond-first layouts: the lowest pond spots reserved, every cross-section fitted round each
+POND_ROOM_MAX_TRIES = 90          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
 POND_ROOM_MAX_LAYOUTS = 6         # pond-blocked layouts the pass starts from, largest first
 POND_ROOM_TIME_SHARE = 0.5        # of the time left after the search: the rest stays for the second building
 POND_ROOM_MIN_LEFT = 0.5          # the pass runs only with this share of the site's budget still left (a slow site plans as before)
@@ -1238,6 +1243,48 @@ def pond_spots(ctx: "Ctx", P: BaseGeometry, near_angle: float, v_acft: float) ->
     return out
 
 
+def drainage_first(fits0: list, v_each: float, near_angle: float, target_sf: float, P: BaseGeometry, B: BaseGeometry,
+                   ctx: "Ctx", row_line, res_line, room: PondRoom, keep: Callable[["Plan"], bool], out: list) -> None:
+    """Pond first, building second (reviews/41): the order a civil engineer
+    works in. The lowest open spots a pond could use (pond_spots, at most
+    DRAIN_FIRST_SPOTS) are reserved in turn, and every cross-section is
+    fitted round the reserved pond, the ones that fit largest on the open
+    parcel first (`fits0`, the search's own fits: an upper bound on what
+    fits round a pond). Each fit larger than `target_sf` (and than what
+    this pass has found) that `keep` takes is checked in full, its pond
+    sited only where the pad drains to it; when the pond then needs more
+    room than was reserved, the spot is reserved again at that size and
+    the fit tried once more. Plans that pass with a pond that drains are
+    appended to `out` as they are found."""
+    order = sorted(fits0, key=lambda q: -q.sf)
+    best_sf = target_sf
+    for x, y, a in pond_spots(ctx, P, near_angle, v_each)[:DRAIN_FIRST_SPOTS]:
+        for q0 in order:
+            if q0.sf <= best_sf:
+                break                           # no later cross-section can beat what is in hand
+            v_try = v_each
+            for _round in range(2):
+                if not room.take():
+                    return
+                hold = pond_rect(x, y, a, v_try).buffer(25)
+                P2, B2 = clean(P.difference(hold)), clean(B.difference(hold))
+                q = fit_variant(q0.v, P2, B2, ctx.prog, row_line, res_line, room.search)
+                if q is None or q.sf <= best_sf or not keep(q):
+                    break
+                if not room.take():
+                    return
+                o2 = finish(q, ctx)
+                if o2["ok"] and o2.get("drains", True):
+                    out.append((q, o2))
+                    room.found += 1
+                    best_sf = q.sf
+                    break
+                v_next = o2["v_det"] / max(pond_count(o2["v_det"]), 1)
+                if o2["pond_ok"] or v_next <= v_try + 0.01:
+                    break                       # not the reserved room that failed it
+                v_try = v_next
+
+
 def relocate_for_pond(cur: "Plan", o: dict[str, Any], P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
                       room: PondRoom, keep: Callable[["Plan"], bool], out: list) -> None:
     """The same layout, moved to leave room for its pond; every plan found
@@ -1496,14 +1543,15 @@ def checked_route(start, goal, walk, ctx: "Ctx"):
     return rt
 
 
-def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max_pts=700, fine=False):
+def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max_pts=700, fine=False, max_z=None):
     """Best pond rectangle (Lf x Wf) in region: low, close to `near`, on the
     same side of `barrier` (mapped wetlands). Distinct from
     detention.place_pond, which places the screener's fixed pond.
     `fine` also tries each centre moved half a sample step (20 ft) each
     way, at that sample's elevation: a tight piece of ground often holds
     the pond only between two samples (the lowest max_pts samples, nine
-    positions each)."""
+    positions each). `max_z`: no pond centred on ground above it (the
+    drainage-first pass: a pond the paving can drain to)."""
     if region.is_empty:
         return None
     base = box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2)
@@ -1516,6 +1564,8 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
         minx, miny, maxx, maxy = region.bounds
         pts = [(0.0, (x, y)) for x in range(int(minx), int(maxx), 40) for y in range(int(miny), int(maxy), 40) if inside.contains(Point(x, y))]
     pts.sort(key=lambda t: t[0])
+    if max_z is not None:
+        pts = [t for t in pts if t[0] <= max_z]
     pts = pts[:max_pts]
     if fine:
         h = dem.step / 2
@@ -1536,6 +1586,21 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
                 best = (score, r)
             break
     return best[1] if best else None
+
+
+def pond_over_pad(ponds: list, dem: Dem, pad_z: float | None) -> float | None:
+    """How far the highest pond's ground (the mean of the lidar samples on
+    its footprint) stands above the pad, in ft; negative when every pond
+    is below it. None with no pond, no pad elevation or no samples."""
+    if not ponds or pad_z is None:
+        return None
+    over = []
+    for r in ponds:
+        inside = prep(r)
+        zs = [z for (x, y), z in dem.coords() if inside.contains(Point(x, y))]
+        if zs:
+            over.append(sum(zs) / len(zs) - pad_z)
+    return max(over) if over else None
 
 
 def throat_zone(pt, parcel, avoid=None):
@@ -1958,13 +2023,17 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     if others is not None:
         region0 = region0.difference(others["blocked"])
     angles = [0, 90, 45, 135, p.frame.pl.angle_deg, p.frame.pl.angle_deg + 90]
+    # The drainage-first pass (reviews/41) sites ponds only where the pad
+    # can drain to them: on ground no higher than the pad plus what a
+    # deeper pond takes up.
+    max_z = pad_z + POND_UPHILL_TOL_FT if (ctx.pond_room and pad_z is not None) else None
 
     def site_ponds(region, n, Lf_, Wf_, v_each):
         """[(pond, bottom length / width)]."""
         out = []
         for _k in range(n):
             ctx.search.check()
-            r, k_used = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints), 2.0
+            r, k_used = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints, max_z=max_z), 2.0
             if r is None and ctx.pond_room and not problem:
                 # The room-for-the-pond pass only (reviews/40): no 2:1 pond
                 # fits at the samples, so the same volume in other
@@ -1972,7 +2041,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
                 # route already fails.
                 for k, fine in POND_FALLBACK_SHAPES:
                     _, Lk, Wk, _ = pond_dims(v_each, ratio=k)
-                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=fine)
+                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=fine, max_z=max_z)
                     if r is not None:
                         k_used = k
                         break
@@ -2035,6 +2104,15 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             # else: smaller ponds did not fit where the larger ones are
             # (the yard links took the room); keep the larger ponds and
             # report the volume they were sized for (v_sized).
+    # Gravity (reviews/41): the paving drains to the pond only if the pond
+    # is lower. The pad is one plane at the module's mean ground; a pond
+    # on ground well above it cannot fill by gravity as drawn.
+    pond_over = pond_over_pad(ponds, dem, pad_z)
+    uphill = pond_ok and pond_over is not None and pond_over > POND_UPHILL_TOL_FT
+    if uphill and fixes:
+        flags.append(("POND_UPHILL", 2, f"the pond stands on ground about {pond_over:.0f} ft above the building pad, so the paving "
+                                        "cannot drain to it by gravity as drawn: a pond on the low side of the site, a much "
+                                        "deeper and larger pond, or pumping"))
     if not pond_ok:
         way_out = ("underground detention (vaults) or a smaller building" if not fixes or ctx.prog.opts.underground
                    else "a smaller building or detention off site (underground detention is not used in this market)")
@@ -2063,6 +2141,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
          "pad_elev": pad_elev, "max_cut": max_cut, "max_fill": max_fill, "disturbed_ac": disturbed}
     if fixes:
         o["pond_ratios"] = [k for _, k in placed]
+        o["pond_over_pad"], o["drains"] = pond_over, not uphill
     o["violations"] = check_plan(p, o, ctx, others)
     if fixes:
         for viol in o["violations"]:
@@ -2415,8 +2494,11 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # the rules have one) before one that does not, as code car
         # parking is met by every layout; then floor area. The shortfall
         # against the market target comes last: it only settles a tie.
-        return (o["ok"], not o["route_problem"], o["trailers"] >= q.code_trailers, rank_sf(q, o, st, rel),
-                -max(0, q.trailers_target - o["trailers"]))
+        # A pond the paving can drain to by gravity before one it cannot
+        # (reviews/41): floor area drawn round a pond that stands above
+        # the pad is not buildable as drawn.
+        return (o["ok"], not o["route_problem"], o["trailers"] >= q.code_trailers, o.get("drains", True),
+                rank_sf(q, o, st, rel), -max(0, q.trailers_target - o["trailers"]))
     room = None
     added: list[tuple[Plan, dict[str, Any]]] = []
     room_skipped = bool(opts.fixes and first is not None and not search.exceeded
@@ -2431,13 +2513,27 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # steep-ground mark alone does not trade them away). The plan drawn
         # is then the best of all by the same ranking: never below the
         # plan without the pass.
+        # Drainage first (reviews/41): the pass also starts from layouts
+        # that passed with their pond above the pad. It sites ponds only on
+        # ground the pad can drain to (ctx.pond_room), lowest spots first,
+        # and adds no plan whose pond is uphill.
         room = PondRoom(search)
         best0 = max(results, key=score)
-        b0_street, b0_homes = faces_street(best0[0], row_line), loading_faces_homes(best0[0], res_line)
+        # (allowed only where every layout that passed already does it:
+        # there the site has no other way)
+        passed = [q for q, o in results if o["ok"]] or [best0[0]]
+        b0_street = all(faces_street(q, row_line) for q in passed)
+        b0_homes = all(loading_faces_homes(q, res_line) for q in passed)
         street_ok = lambda q: (b0_street or not faces_street(q, row_line)) and (b0_homes or not loading_faces_homes(q, res_line))
+
+        b0_drains = best0[1].get("drains", True)
 
         def gains(t):
             q, o = t
+            if not o.get("drains", True):
+                return False
+            if not b0_drains:
+                return True                 # a pond that drains, where the best plan's does not
             return q.sf > best0[0].sf or (q.sf == best0[0].sf and o["trailers"] >= best0[1]["trailers"])
         ctx_room = dataclass_replace(ctx, pond_room=True, search=room.search)
         P0, B0 = first[0], first[1]
@@ -2445,14 +2541,31 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         def pond_only(o):
             return ({f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS == {"POND_DOES_NOT_FIT"}
                     and not o["route_problem"])
+
+        def uphill(o):
+            return o["ok"] and not o.get("drains", True)
         start, seen_l = [], set()
-        for q, o in sorted(pond_limited + [t for t in results if pond_only(t[1])], key=lambda t: -t[0].sf):
+        for q, o in sorted(pond_limited + [t for t in results if pond_only(t[1]) or uphill(t[1])], key=lambda t: -t[0].sf):
             key = (q.v["name"], q.L, q.r, tuple(round(c, 1) for c in q.module.bounds))
-            if pond_only(o) and key not in seen_l and score((q, {**o, "ok": True})) > score(best0):
+            if key in seen_l:
+                continue
+            # worth a try: it would rank above the best plan so far with its pond placed
+            if ((pond_only(o) and score((q, {**o, "ok": True, "drains": True})) > score(best0))
+                    or (uphill(o) and score((q, {**o, "drains": True})) > score(best0))):
                 seen_l.add(key)
                 start.append((q, o))
         found_by: list[list[tuple[Plan, dict[str, Any]]]] = []
         try:
+            # Pond first, building second: when the best plan's pond does
+            # not drain, or a larger cross-section fitted the open parcel
+            # than the best plan holds.
+            v0 = best0[1]["v_det"] / max(pond_count(best0[1]["v_det"]), 1)
+            target = best0[0].sf if b0_drains else 0
+            if best0[1]["ok"] and any(q.sf > target for q in first[2]):
+                mine0: list[tuple[Plan, dict[str, Any]]] = []
+                found_by.append(mine0)
+                drainage_first(first[2], v0, best0[0].frame.pl.angle_deg, target, P0, B0, ctx_room, row_line, res_line,
+                               room, street_ok, mine0)
             for q, o in start[:POND_ROOM_MAX_LAYOUTS]:
                 if room.spent:
                     break
@@ -2460,8 +2573,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 mine: list[tuple[Plan, dict[str, Any]]] = []
                 found_by.append(mine)
                 if street_ok(q) and room.take():
-                    o2 = finish(q, ctx_room)            # the same layout, another pond shape
-                    if o2["ok"]:
+                    o2 = finish(q, ctx_room)            # the same layout, its pond on low ground or in another shape
+                    if o2["ok"] and o2.get("drains", True):
                         mine.append((q, o2))
                         room.found += 1
                         continue
@@ -2560,7 +2673,8 @@ def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
             "detention_acft": round(o["v_det"], 1), "pond_fits": o["pond_ok"],
             "relief_ft": round(o["relief"]) if o["relief"] else None, "steep_pct": round(o["steep_module_pct"]),
             "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
-            "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1})}
+            "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1}),
+            **({"drains": o["drains"]} if "drains" in o else {})}
 
 
 def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], parcel, P, edges, rules: dict[str, Any],
@@ -2745,6 +2859,8 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
                      "impervious_ac": round(imp_total, 1), "impervious_pct": round(imp_total / gross * 100), "paving_envelope_ac": round(P.area / SQFT_PER_AC, 1)},
         "detention": {"storage_acft": round(v_total, 1), "ponds": len(o["ponds"]) + (len(second[1]["ponds"]) if second else 0),
                       "fits": o["pond_ok"] if fixes else o["ok"],
+                      **({"pond_over_pad_ft": round(o["pond_over_pad"]) if o.get("pond_over_pad") is not None else None,
+                          "drains_by_gravity": o.get("drains", True)} if fixes else {}),
                       "basis": f"1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG {_hsg_basis(meta, fixes, inp.assembled)}; 6 ft deep, 4:1 slopes, {_pond_shape_text(o, second)}, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"},
         "access": {"truck_driveway": o["tpt"] is not None, "car_driveway": o["cpt"] is not None, "frontage_ft": fr.feet, "road": fr.road,
                    "frontage_state": fr.state,

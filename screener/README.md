@@ -937,13 +937,24 @@ How to read a plan:
 - When the pond or a route blocks every plan the search tried first, it
   also tries shorter lengths and the shallower layouts it left out, so a
   larger parcel does not read worse than a smaller one inside it.
+- **Drainage** (since 2026-11-18, reviews/41; default behaviour only).
+  A pond on ground more than 3 ft above the building pad cannot fill by
+  gravity: the plan says `POND_UPHILL`, and a layout whose pond drains
+  ranks before a larger one whose pond does not. The pass below starts
+  pond first: the lowest pond spots are reserved and every cross-section
+  is fitted round them. The sheet prints the pad elevation and how far
+  the pond's ground is below (or above) the pad;
+  `detention.pond_over_pad_ft` and `drains_by_gravity` are in
+  `plans.json`. Reference site #25 went from a 67,000 SF plan whose pond
+  stood 9 ft above the pad to 70,000 SF with the pond 24 ft below it.
 - After the search, a pass takes the layouts the pond alone blocked and
   tries them with other pond proportions and moved to leave the pond
   room (since 2026-11-17, reviews/40; default behaviour only). It only
   adds layouts: the plan drawn is the best of all by the usual ranking.
-  It refuses a layout that newly turns its docks to the street or its
-  loading to homes, or that has no more floor area and fewer trailer
-  stalls. It has 60 tries and half the remaining time, keeps what it
+  It refuses a layout that turns its docks to the street or its
+  loading to homes (unless every passing layout does), or that has no
+  more floor area and fewer trailer stalls. It has 90 tries and half
+  the remaining time, keeps what it
   found when cut, and is skipped when less than half the site's budget
   is left (time limits: a site near them can plan differently on a
   slower machine; `inputs.pond_room` says so).

@@ -1386,49 +1386,65 @@ class PondShapes(unittest.TestCase):
         self.assertIn("a 2:1 pond did not fit", txt)
 
 
+_REF: dict = {}
+
+
+def ref_plan(name, behaviour="default", **consts):
+    """One plan of a reference site per test process, with the real search
+    angles and the named planner constants patched (they are deterministic,
+    and #21 takes half a minute)."""
+    k = (name, behaviour, tuple(sorted(consts.items())))
+    if k not in _REF:
+        inp, _ = load_fixture(name)
+        patches = [mock.patch.object(sp, c, v) for c, v in consts.items()]
+        for pt in patches:
+            pt.start()
+        try:
+            _REF[k] = sp.plan_site(inp, sp.PlanOptions(behaviour=behaviour))
+        finally:
+            for pt in patches:
+                pt.stop()
+    return _REF[k]
+
+
 @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
 class PondRoom(Offline):
     angles = False          # the real search angles, as in ReferenceSites
 
-    def test_the_building_moves_to_leave_its_pond_room(self):
+    def test_the_pond_goes_first_and_the_building_round_it(self):
         # reference site #21: the longest fit left the pond no room and the
-        # building used to be shortened where it stood (68,000 SF); the
-        # same layout moved leaves the pond room at 440 ft (reviews/40)
-        inp, _ = load_fixture("rank21")
-        rec, _ = sp.plan_site(inp)
+        # building used to be shortened where it stood (68,000 SF). With the
+        # pond reserved on the low ground first, the same cross-section
+        # holds 480 ft (reviews/40: 84,000 SF moved; reviews/41: 91,000 SF)
+        rec, _ = ref_plan("rank21")
         self.assertIs(rec["feasible"], True)
-        self.assertEqual((rec["building"]["L_ft"], rec["building"]["D_ft"], rec["building"]["sf"]), (440.0, 190, 84000))
+        self.assertEqual((rec["building"]["L_ft"], rec["building"]["D_ft"], rec["building"]["sf"]), (480.0, 190, 91000))
         self.assertEqual(rec["configuration"], "rear-load 190 deep, court only, cars along office wall")
         self.assertIs(rec["inputs"]["pond_room"]["drawn"], True)
         self.assertEqual(rec["detention"]["ponds"], 1)
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        self.assertLess(rec["detention"]["pond_over_pad_ft"], 0)
+        self.assertNotIn("STREET_FACING_DOCKS", names(rec))
         # without the pass, the old plan
-        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
-            old, _ = sp.plan_site(inp)
+        old, _ = ref_plan("rank21", POND_ROOM_MAX_TRIES=0)
         self.assertEqual(old["building"]["sf"], 68000)
         self.assertEqual(old["inputs"]["pond_room"]["tries"], 0)
 
-    def test_a_move_does_not_turn_the_docks_to_the_street(self):
-        # reference site #25: a 72,000 SF layout exists with its truck court
-        # on the arterial and no trailer stalls; the planner keeps its plan
-        inp, _ = load_fixture("rank25")
-        rec, _ = sp.plan_site(inp)
-        self.assertEqual((rec["building"]["sf"], rec["trailers"]["total"]), (67000, 7))
-        self.assertEqual(rec["configuration"], "rear-load 160 deep, court + trailer row, cars along office wall")
-
     def test_the_prototype_behaviour_does_not_move(self):
         inp, exp = load_fixture("rank21")
-        rec, _ = sp.plan_site(inp, sp.PlanOptions(behaviour="prototype"))
+        rec, _ = ref_plan("rank21", "prototype")
         self.assertEqual(rec["building"]["sf"], exp["sf"])
         self.assertNotIn("pond_room", rec["inputs"])
+        self.assertNotIn("drains_by_gravity", rec["detention"])
+        self.assertNotIn("drains", rec["alternatives"][0])
 
     def test_the_allowance_is_a_count(self):
-        inp, _ = load_fixture("rank21")
+        inp, _ = load_fixture("rank25")
         with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 5):
             rec, _ = sp.plan_site(inp)
             again, _ = sp.plan_site(inp)
         self.assertLessEqual(rec["inputs"]["pond_room"]["tries"], 5)
         self.assertEqual(json.dumps(rec, sort_keys=True, default=str), json.dumps(again, sort_keys=True, default=str))
-
 
     def test_a_slow_site_plans_as_before(self):
         # under half the budget left after the search: no pass at all
@@ -1447,28 +1463,102 @@ class PondRoom(Offline):
 
     def test_a_cut_pass_is_not_a_flag(self):
         # the pass out of its own time at once: the search's plan, no flag
-        inp, _ = load_fixture("rank21")
-        with mock.patch.object(sp, "POND_ROOM_TIME_SHARE", 0.0):
-            rec, _ = sp.plan_site(inp)
+        rec, _ = ref_plan("rank21", POND_ROOM_TIME_SHARE=0.0)
         self.assertIs(rec["inputs"]["pond_room"]["cut_short"], True)
         self.assertEqual(rec["building"]["sf"], 68000)
         self.assertIs(rec["feasible"], True)
         self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
         self.assertNotIn("SECOND_BUILDING_NOT_SEARCHED", names(rec))
 
-
     def test_no_stalls_traded_for_nothing(self):
         # review 40/02, re-check finding 1: a 211,000 SF plan with 21/21
         # stalls was replaced by a moved 211,000 SF plan with none, on a
         # 1 ft relief difference. A plan the pass adds needs more floor
-        # area, or the same with as many stalls.
+        # area, or the same with as many stalls (or a pond that drains
+        # where the plan before it had none: reviews/41).
         mk = lambda: site(800, 900, z=lambda x, y: 900 + 0.02 * x + 0.03 * y)
         with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
             off, _ = sp.plan_site(mk())
         on, _ = sp.plan_site(mk())
-        self.assertEqual((off["building"]["sf"], off["trailers"]["total"]), (211000, 21))
+        self.assertIs(off["detention"]["drains_by_gravity"], True)
         self.assertTrue(on["building"]["sf"] > off["building"]["sf"]
                         or on["trailers"]["total"] >= off["trailers"]["total"])
+        self.assertNotIn("STREET_FACING_DOCKS", names(on))
+
+
+class Drainage(Offline):
+    """A pond the paving can drain to (reviews/41): the pond's ground
+    against the pad, the flag, the ranking, the pond-first layouts."""
+
+    angles = False
+
+    def test_pond_over_pad(self):
+        dem = sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(10) for j in range(10)},
+                     elev={(i, j): 900.0 + 2 * i for i in range(10) for j in range(10)}, state="checked")
+        low, high = box(0, 0, 120, 400), box(280, 0, 400, 400)           # ground 900-904 and 914-918
+        self.assertAlmostEqual(sp.pond_over_pad([low], dem, 910.0), -8.0)
+        self.assertAlmostEqual(sp.pond_over_pad([high], dem, 910.0), 6.0)
+        self.assertAlmostEqual(sp.pond_over_pad([low, high], dem, 910.0), 6.0)   # the highest pond decides
+        self.assertIsNone(sp.pond_over_pad([], dem, 910.0))
+        self.assertIsNone(sp.pond_over_pad([low], dem, None))
+        self.assertIsNone(sp.pond_over_pad([box(1000, 1000, 1100, 1100)], dem, 910.0))
+
+    def test_a_pond_is_not_sited_above_the_ceiling(self):
+        dem = sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(12) for j in range(12)},
+                     elev={(i, j): 900.0 + 2 * i for i in range(12) for j in range(12)}, state="checked")
+        high_ground = box(240, 0, 480, 480)                              # samples at 912 and up
+        near = box(0, 0, 100, 480)
+        self.assertIsNotNone(sp.place_sized_pond(high_ground, 200, 140, dem, [0, 90], near, 905.0, None))
+        self.assertIsNone(sp.place_sized_pond(high_ground, 200, 140, dem, [0, 90], near, 905.0, None, max_z=908.0))
+        got = sp.place_sized_pond(box(0, 0, 480, 480), 200, 140, dem, [0, 90], near, 905.0, None, max_z=908.0)
+        self.assertLessEqual(got.centroid.x, 180)                        # on the low side
+
+    @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+    def test_the_pond_goes_where_the_water_leaves(self):
+        # reference site #25 falls about 4% to the north-west. The plan
+        # drawn before had its pond on ground 9 ft ABOVE the pad (the truck
+        # court had the low side). Now the pond is on the low ground and
+        # the building above it, docks away from the street.
+        rec, d = ref_plan("rank25")
+        self.assertEqual(rec["building"]["sf"], 70000)
+        self.assertEqual(rec["configuration"], "rear-load 160 deep, court only, cars along office wall")
+        self.assertIs(rec["feasible"], True)
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        self.assertLess(rec["detention"]["pond_over_pad_ft"], -10)
+        self.assertNotIn("POND_UPHILL", names(rec))
+        self.assertNotIn("STREET_FACING_DOCKS", names(rec))
+        self.assertIs(rec["inputs"]["pond_room"]["drawn"], True)
+        svg = sr.render(d, rec)
+        self.assertIn("FT BELOW PAD", svg)
+        self.assertIn("PAD EL ", svg)
+
+    @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+    def test_a_draining_layout_ranks_before_a_larger_one_that_does_not(self):
+        # the ranking alone (no pass): the 67,000 SF layout with its pond
+        # above the pad is no longer drawn; the read-out names it and why
+        rec, _ = ref_plan("rank25", POND_ROOM_MAX_TRIES=0)
+        self.assertEqual(rec["building"]["sf"], 61000)
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        up = rec["selection"]["upside"]
+        self.assertEqual(up["sf"], 67000)
+        self.assertIn("its pond stands above the pad it would drain", " ".join(up["reasons"]))
+        self.assertIs(rec["alternatives"][0]["drains"], True)
+        self.assertIn(False, [a.get("drains") for a in rec["alternatives"]])
+
+    def test_an_uphill_pond_is_flagged_when_nothing_drains(self):
+        with mock.patch.object(sp, "pond_over_pad", lambda ponds, dem, pad_z: 9.0 if ponds else None), \
+                mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(600, 700))
+            proto, _ = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertIn("POND_UPHILL", names(rec, 2))
+        self.assertIs(rec["feasible"], True)                             # a condition to clear, not a blocked plan
+        self.assertIs(rec["detention"]["drains_by_gravity"], False)
+        self.assertEqual(rec["detention"]["pond_over_pad_ft"], 9)
+        cond = [c for c in rec["assessment"]["conditions"] if c["flag"] == "POND_UPHILL"][0]
+        self.assertEqual(cond["workstream"], sp.assess.W_STORM)
+        self.assertIn("low point", cond["action"])
+        self.assertIn("FT ABOVE PAD", sr.render(d, rec))
+        self.assertNotIn("POND_UPHILL", names(proto))                    # the prototype behaviour says nothing
 
 
 class PondRoomOnlyAdds(Offline):
@@ -1493,8 +1583,10 @@ class PondRoomOnlyAdds(Offline):
             on, _ = planned(f"{name}-on", mk)
             self.assertEqual(off["feasible"], on["feasible"], name)
             if on["building"]["sf"] < off["building"]["sf"]:
-                # only for a plan that ranks higher (the code truck spaces first)
-                self.assertGreater(on["trailers"]["total"], off["trailers"]["total"], name)
+                # only for a plan that ranks higher: the code truck spaces
+                # first, or a pond that drains where the other's does not
+                self.assertTrue(on["trailers"]["total"] > off["trailers"]["total"]
+                                or (on["detention"]["drains_by_gravity"] and not off["detention"]["drains_by_gravity"]), name)
             if "STREET_FACING_DOCKS" not in names(off):
                 self.assertNotIn("STREET_FACING_DOCKS", names(on), name)
             if not on["inputs"]["pond_room"]["drawn"]:

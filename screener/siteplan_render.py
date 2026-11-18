@@ -581,6 +581,10 @@ def render(d: Drawing, rec: dict) -> str:
             lines = [(name, 10, "bold"), (f"{rnd(pp.sf, 1000):,} SF", 16, "bold")]
             if clear:
                 lines.append((f"{clear} FT CLEAR", 9.5, "normal"))
+            pad_el = gr.get("pad_elev_ft") if i == 1 else None
+            if pad_el is not None and short_px >= 104:
+                # the level pad's elevation, to read against the contours and the pond
+                lines.append((f"PAD EL {pad_el:,.0f}", 8.5, "normal"))
             labels.append(label(X(bc.x), Y(bc.y), lines, 0.0 if short_px >= 104 else ang))
         else:
             labels.append(label(X(bc.x), Y(bc.y), [(f"{rnd(pp.sf, 1000):,} SF", 12, "bold")], ang if long_px >= 70 else 0.0))
@@ -631,7 +635,13 @@ def render(d: Drawing, rec: dict) -> str:
             cc = g.centroid
             each = oo["v_det"] / max(len(oo["ponds"]), 1)
             if lp >= 80 and sp_ >= 34:
-                labels.append(label(X(cc.x), Y(cc.y), [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")], an, C["pond_s"]))
+                pond_lines = [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")]
+                over = de.get("pond_over_pad_ft") if i == 1 else None
+                if over is not None and sp_ >= 60:
+                    # where the pond's ground stands against the pad: the paving drains to it only from above
+                    pond_lines.append((f"GROUND {abs(over):.0f} FT {'ABOVE' if over > 0 else 'BELOW'} PAD" if over else "GROUND LEVEL WITH PAD",
+                                       8, "normal"))
+                labels.append(label(X(cc.x), Y(cc.y), pond_lines, an, C["pond_s"]))
             elif lp >= 40:
                 labels.append(label(X(cc.x), Y(cc.y), [("POND", 9, "bold")], an, C["pond_s"]))
     if res_lines:

@@ -161,6 +161,9 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
     "USE_RESTRICTION_REPORTED": (W_ZONING, "desk", "Ask planning staff whether warehousing is allowed here today and what "
                                  "replaced the moratorium. Do not rely on this plan until that is answered.",
                                  "planning staff's answer, or the adopted text amendment"),
+    "POND_UPHILL": (W_STORM, "offer", "The pond is drawn on ground above the building pad, so the paving cannot drain to it "
+                    "by gravity. Have a civil engineer lay the site out from its low point: the pond where the water "
+                    "leaves, the building above it.", "a stormwater concept that drains by gravity, with pad and pond elevations"),
     "POND_SITE_FROM_LIDAR": (W_STORM, "diligence", "Have the civil engineer confirm the pond location, outfall and volume under "
                              "the local ordinance. The size here is a screening estimate.", "a stormwater concept"),
     "HSG_ASSUMED": (W_STORM, "diligence", "The soil group behind the pond size was assumed. Run the soil check for this parcel, "
@@ -539,6 +542,8 @@ def _reasons(a: dict[str, Any], chosen: dict[str, Any], w: dict[str, Any]) -> li
         # the one trailer count that still steers the choice: a draft code minimum
         out.append(f"it has {a.get('trailers') or 0} of the {code} truck spaces the draft code asks for, and a layout that "
                    "meets that minimum is drawn first")
+    if a.get("drains") is False and chosen.get("drains", True):
+        out.append("its pond stands above the pad it would drain, and a layout that drains by gravity is drawn first")
     if mine["trailer"] - theirs["trailer"] >= MARK_MIN_SF:
         target, got = a.get("trailers_target") or 0, a.get("trailers") or 0
         out.append((f"it has none of its {target} target trailer stalls" if not got

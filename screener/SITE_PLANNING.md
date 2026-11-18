@@ -165,6 +165,24 @@ fit.
   layout a route already fails.
 - Ponds go on low lidar ground near the building, on its side of any
   mapped wetland, outside water buffers and transmission corridors.
+- **Drainage (default behaviour; operator request of 2026-11-18,
+  reviews/41).** A pond works only if the paving can drain to it. The
+  pad is one plane at the module's mean ground, so the check is the
+  pond's ground (the mean of the lidar samples on its footprint) against
+  the pad: more than 3 ft above it (`POND_UPHILL_TOL_FT`; up to that is
+  a deeper pond, inside its own ±30%) and the plan says `POND_UPHILL`
+  (severity 2: a pond on the low side, a much deeper and larger pond, or
+  pumping). The record's `detention.pond_over_pad_ft` and
+  `drains_by_gravity` carry it, and the sheet prints the pad elevation
+  on the building and "GROUND n FT BELOW / ABOVE PAD" on the pond. It is
+  a screening check on one level pad: it does not grade the paving,
+  size a pipe or find the outfall. Reference site #25 falls 4% to the
+  north-west, and the plan drawn before had its pond 9 ft above the pad.
+- **Ranking.** Among layouts that pass, one whose pond drains ranks
+  before a larger one whose pond does not (after the code truck spaces,
+  before floor area): floor area drawn round a pond that cannot fill is
+  not buildable as drawn. The read-out names the larger layout and the
+  reason (`selection.upside`).
 - The impervious area, and so the pond, is worked out again after the
   drop-yard links are drawn, and only placed yards count. The ponds are
   then re-sized to that volume, larger or smaller, so the storage
@@ -235,6 +253,22 @@ fit.
   then no longer reads infeasible while a smaller parcel inside it reads
   feasible (the prototype read 700 × 700 ft infeasible next to a
   feasible 600 × 700 ft).
+- **Pond first, building second (default behaviour; reviews/41).** The
+  pass below begins the way a civil engineer does: the two lowest open
+  spots a pond could use (`DRAIN_FIRST_SPOTS`) are reserved in turn, and
+  every cross-section is fitted round the reserved pond, the ones that
+  fit largest on the open parcel first, stopping when no cross-section
+  left can beat what is in hand. Each fit is checked in full with its
+  pond sited only on ground the pad drains to. It runs when the best
+  plan's pond does not drain, or when a cross-section fitted the open
+  parcel larger than the best plan. In the pass every pond is sited on
+  ground the pad drains to, and no plan with an uphill pond is added.
+  The pass also starts from layouts that passed with an uphill pond.
+  Reference site #25: 67,000 SF with a pond that could not drain, now
+  70,000 SF with the pond 24 ft below the pad, the largest such layout
+  an exhaustive check found. Reference site #21: 84,000 to 91,000 SF.
+  An L-shaped test site: 170,000 SF with every pond 9 ft above the pad,
+  now 147,000 SF that drains (the 170,000 is named in the read-out).
 - **Room for the pond (default behaviour; operator request of
   2026-11-17, reviews/40).** Each layout is fitted as long as it goes
   wherever it fits longest, and its pond is placed after; when the pond
@@ -251,10 +285,11 @@ fit.
   worse than without the pass. A layout the pass adds is refused when
   its truck court or trailer row comes within 100 ft of the street (the
   `STREET_FACING_DOCKS` test) or within 150 ft of homes
-  (`LOADING_FACES_RES`) and the best plan before it did not; and when it
-  has no more floor area than that plan and fewer trailer stalls (a
-  1 ft relief difference alone does not trade the stalls away). The
-  pass has 60 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
+  (`LOADING_FACES_RES`), unless every layout that passed already does
+  (reviews/41); and when it has no more floor area than the best plan
+  before it and fewer trailer stalls (a 1 ft relief difference alone
+  does not trade the stalls away), unless that plan's pond does not
+  drain and this one's does. The pass has 90 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
   checks, a count) and half of the search time left after the main
   search (`POND_ROOM_TIME_SHARE`; the rest stays for the second
   building, which can therefore have less time than before); cut by the
