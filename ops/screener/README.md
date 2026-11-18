@@ -377,13 +377,14 @@ planning agenda pages you list, once a day, for the parcels of the newest
 run. No AI model is involved: fixed code fetches the index pages, reads
 the documents that are new, and searches for
 
-- a watched parcel's **id** (whatever separates its characters);
+- a watched parcel's **id**, however the document spaces it (up to three
+  spaces, dots or dashes between any two characters, on one line);
 - a watched parcel's **site address** (a possible match, only in the
   sources that cover its city);
 - in the **titles** the index page gives its documents: a street that
   watched parcels are on (the name followed by a street word, "Spence
-  Road"; never a street named like the city itself), and zoning case
-  numbers;
+  Road", so "Union City Council" is not a parcel on Union Rd; a highway
+  by its number), and zoning case numbers;
 - **industrial zoning words** close together on a page.
 
 The watch list is the grade A and B leads, the parcels marked pursue or
@@ -391,9 +392,9 @@ maybe (in the run or since, in `decisions.csv`), and the top 50, of each
 county's newest full run. It writes `~/screener-ops/agenda/agenda-watch.md`
 and sends an alert only when there is something to say: at high priority
 when a document names a watched parcel by its id or its address, or a
-source has stopped answering; at normal priority for a title that names a
-street your parcels are on (most will be about another lot) and for
-zoning cases.
+source has stopped answering or has not been reached for three days
+running; at normal priority for a title that names a street your parcels
+are on (most will be about another lot) and for zoning cases.
 
 **What it is worth.** A hit says the words are in that document. It does
 not say the item is about your parcel, that it is current, or what was
@@ -449,7 +450,8 @@ Until the sources file exists the timer does nothing and says nothing.
   Crawl-delay, public https addresses only, no redirect to another host.
   On top: only links found on the listed index page, on its host, under
   the listed path prefixes; at most 10 new documents a source a run, 80
-  requests and 300 MB a run.
+  requests and 300 MB a run, four minutes a request and 25 minutes a
+  scan. What a run does not get to waits by name for the next one.
 - A source seen for the first time has its list noted and three documents
   read. A known source whose list is suddenly mostly new is noted, not
   crawled, and you are told. More new documents than a run reads wait

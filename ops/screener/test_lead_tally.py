@@ -250,6 +250,10 @@ class SafetyTests(Base):
             got = lead_tally.plain(hostile, 80)
             self.assertNotRegex(got, r"://|www\.|\d\.\d", hostile)
         self.assertEqual(lead_tally.plain(None, 10), "")
+        # reviews/41, second look: an entity is an address or a column to whatever renders the file.
+        for hostile in ("&#104;ttps&#58;//evil.example/a", "a &#124; b", "&lt;b&gt;"):
+            self.assertNotIn("&", lead_tally.plain(hostile, 80), hostile)
+        self.assertEqual(lead_tally.plain("Smith & Sons", 80), "Smith and Sons")
 
     def test_a_long_objection_is_cut(self):
         self.lead("X1", "killed", "This is not raw land. " + "word " * 500)

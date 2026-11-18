@@ -121,9 +121,14 @@ agenda_main() {
   trap 'kill_user "$AGENDA_USER"; sandbox_remove "$copy" "${AGENDA_AS[@]}"' EXIT
   # What the scan account prints is cut at 1 MB: it must not fill the disk
   # or flood the log the alerts point to.
+  # Through a side process, not a pipeline: bash does not wait for it, so
+  # a leftover of the scan that keeps its output open cannot hold the
+  # wrapper before kill_user runs. What is past 1 MB is read and dropped,
+  # so a scan that prints a lot is not stopped by a closed pipe.
   (cd "$copy" && timeout -k 1m "$AGENDA_TIMEOUT" "${AGENDA_AS[@]}" "$SYS_PYTHON" -I "$copy/agenda_watch.py" \
-      scan "$copy/job.json" "$copy/out/result.json" </dev/null) 2>&1 | head -c 1000000 >>"$MAIN_LOG"
-  rc="${PIPESTATUS[0]}"
+      scan "$copy/job.json" "$copy/out/result.json" </dev/null) \
+      > >({ head -c 1000000 >>"$MAIN_LOG"; cat >/dev/null; }) 2>&1
+  rc=$?
   log "agenda watch: scan exit $rc"
   local took=1
   if kill_user "$AGENDA_USER"; then

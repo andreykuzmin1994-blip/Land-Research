@@ -361,6 +361,10 @@ class SafetyTests(Base):
     def test_bare_addresses_in_county_text_are_not_links(self):
         self.assertEqual(changes.cell("see http://evil.example and WWW.evil.example"),
                          "see http: evil.example and www evil.example")
+        # reviews/41, second look: "&#124;" is a pipe to whatever renders the file.
+        for hostile in ("a &#124; b", "&#104;ttps&#58;//evil.example", "&lt;b&gt;"):
+            self.assertNotIn("&", changes.cell(hostile), hostile)
+        self.assertEqual(changes.cell("SMITH & SONS LLC"), "SMITH and SONS LLC")
 
     def test_refusals_write_nothing(self):
         empty = self.root / "fulton-2026-11-15"

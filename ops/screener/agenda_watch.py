@@ -11,9 +11,11 @@ No AI model reads anything here. Fixed code fetches the agenda index
 pages the operator listed, reads the documents that are new since the
 last time, and searches their text for
 
-- **a parcel id** of the watch list, compared with every character that
-  is not a letter or a digit removed on both sides (`09F-0700-0032-092-7`
-  is `09F070000320927`). Ids under 10 letters and digits are not searched;
+- **a parcel id** of the watch list, however a document spaces it: its
+  letters and digits in order with up to three spaces, dots or dashes
+  between any two, on one line (`09F-0700-0032-092-7` is
+  `09F070000320927`). Ids under 10 letters and digits are not searched,
+  and an id of digits only can coincide with another number;
 - **a site address** of the watch list: the house number and the street's
   name as whole words (`3600 Naturally Fresh`), only in the sources that
   cover the parcel's city when a source says which cities it covers. A
@@ -99,6 +101,7 @@ import os
 import re
 import resource
 import shutil
+import signal
 import socket
 import stat
 import subprocess
@@ -127,7 +130,9 @@ MAX_REQUESTS = 80                           # every request of a run: robots.txt
 MAX_BYTES = 300_000_000                     # downloaded per run
 STORM_COUNT, STORM_SHARE = 20, 0.5          # this many new at once on a known source, or this share
 STORM_SHARE_FROM = 40                       # of an index of at least this many links
+QUEUE_MOST = 40                             # addresses one run may add to those that wait
 SCAN_SECONDS = 1500                         # after this the scan starts nothing new and writes what it has
+REQUEST_SECONDS = 240                       # one request, start to finish, however slowly the bytes come
 DOC_BYTES = 60_000_000
 INDEX_LINKS = 5_000                         # links read from one index page
 SEEN_KEPT = 8_000                           # documents remembered per source (more than one index page lists)
@@ -165,10 +170,13 @@ ZONING_TITLE = re.compile(r"(?<![A-Za-z0-9])(?:Z|RZ|ZM|U|SUP|CUP|CDP|CV|ANX)-?\d
 DOC_STATES = ("read", "partly read", "not read")
 DIRECTIONS = frozenset("N S E W NE NW SE SW NORTH SOUTH EAST WEST".split())
 STREET_TYPE = (r"(?:RD|ROAD|ST|STREET|DR|DRIVE|BLVD|BOULEVARD|AVE|AVENUE|HWY|HIGHWAY|PKWY|PARKWAY|LN|LANE|CT|COURT|"
-               r"CIR|CIRCLE|WAY|PL|PLACE|TER|TERRACE|TRL|TRAIL|CONN|CONNECTOR)")
+               r"CIR|CIRCLE|WAY|PL|PLACE|TER|TERRACE|TRL|TRAIL|CONN|CONNECTOR|PIKE|XING|CROSSING|LOOP|RUN|ROW|"
+               r"SQ|SQUARE|EXPY|EXPRESSWAY)")
 STREET_ENDS = frozenset(
     "RD ROAD ST STREET DR DRIVE BLVD BOULEVARD AVE AVENUE HWY HIGHWAY PKWY PARKWAY LN LANE CT COURT "
-    "CIR CIRCLE WAY PL PLACE TER TERRACE TRL TRAIL CONN CONNECTOR EXT REAR N S E W NE NW SE SW".split())
+    "CIR CIRCLE WAY PL PLACE TER TERRACE TRL TRAIL CONN CONNECTOR PIKE XING CROSSING LOOP RUN ROW SQ SQUARE "
+    "EXPY EXPRESSWAY EXT REAR N S E W NE NW SE SW".split())
+AFTER_A_STREET = frozenset("EXT REAR N S E W NE NW SE SW".split())   # what follows a street's name
 ZONING_ACT = re.compile(r"\b(?:rezon\w*|zoning map amendment|annex\w*|(?:special |conditional )?use permit|"
                         r"moratorium|variance)\b", re.I)
 INDUSTRIAL = re.compile(r"\b(?:M-?[12]\b|I-?[12]\b|light industrial|heavy industrial|industrial district|"
@@ -237,7 +245,9 @@ def plain(text: Any, limit: int = 400) -> str:
     out = re.sub(r"[\s_]+", " ", str(text if text is not None else ""))
     # The characters first: an address must not come together again out of
     # what the filter removed ('htt"ps://' is 'https://' once the quote is gone).
-    out = re.sub(r"[^A-Za-z0-9 .,;:()'%$/&#-]", "", out)
+    # "&" goes too: "&#104;ttps&#58;//" is "https://" to whatever renders it.
+    out = re.sub(r"[^A-Za-z0-9 .,;:()'%$/#-]", "", out.replace("&", " and "))
+    out = re.sub(r" {2,}", " ", out)
     out = re.sub(r"(?i)\b(?:https?|ftps?|file|mailto)\s*:\s*/*", "", out)
     out = re.sub(r":/+", ": ", out)                        # no scheme is left to open
     out = re.sub(r"(?i)\bwww\.", "www ", out)
@@ -406,8 +416,8 @@ def document_links(page_url: str, html: str, src: dict[str, Any]) -> tuple[list[
             continue
         url = urllib.parse.urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
         if not link_allowed(url, src):
-            if same_site(parts.netloc, home) and any(parts.path.startswith(p) for p in src["path_prefixes"]) \
-                    and len(parts.path) > min(map(len, src["path_prefixes"])):
+            if same_site(parts.netloc, home) and len(parts.path) > min(map(len, src["path_prefixes"])) \
+                    and any(parts.path.lower().startswith(p.lower()) for p in src["path_prefixes"]):
                 passed.add(url[:300])
             continue
         if not out.get(url):
@@ -468,9 +478,12 @@ def street_words(address: str) -> list[str] | None:
         rest = rest[1:]                    # "100 N MAIN ST": the street is MAIN
     if rest[0] in ("HWY", "HIGHWAY") and len(rest) > 1 and rest[1].isdigit():
         return ["HWY", rest[1]]
-    name: list[str] = []
-    for word in rest:
-        if word in STREET_ENDS and name:
+    # The name ends at the last street word ("0 DEER RUN TRL" is DEER RUN,
+    # "0 SPENCE RD REAR" is SPENCE); with none, at the first direction.
+    last = max((i for i, w in enumerate(rest) if i and w in STREET_ENDS and w not in AFTER_A_STREET), default=0)
+    name = rest[:last]
+    for word in () if last else rest:
+        if word in AFTER_A_STREET and name:
             break
         name.append(word)
     name = name[:4]
@@ -523,10 +536,16 @@ def watch_list(run_dirs: list[Path], decisions: Path | None = None, top: int = T
 
 def id_pattern(key: str) -> re.Pattern[str]:
     """A parcel id as documents write it: its letters and digits in order,
-    with at most two spaces, dots or dashes between any two of them, on
-    one line, and not inside a longer run of letters and digits. ("(770)
-    555-1234" is not the id 7705551234: a bracket is not a separator.)"""
-    return re.compile(r"(?<![A-Za-z0-9])" + r"[ .\-]{0,2}".join(map(re.escape, key)) + r"(?![A-Za-z0-9])", re.I)
+    with at most three spaces, dots or dashes between any two of them
+    ("09F - 0700"), on one line, and not inside a longer run of letters
+    and digits. ("(770) 555-1234" is not the id 7705551234: a bracket is
+    not a separator.)"""
+    return re.compile(r"(?<![A-Za-z0-9])" + r"[ .\-]{0,3}".join(map(re.escape, key)) + r"(?![A-Za-z0-9])", re.I)
+
+
+# Dashes and blanks as documents typeset them, read as the plain ones.
+_TYPESET = str.maketrans({**{c: "-" for c in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"},
+                          "\t": " ", "\u00a0": " ", "\u2007": " ", "\u202f": " "})
 
 
 def _word(word: str) -> str:
@@ -547,9 +566,10 @@ def address_pattern(words: list[str]) -> re.Pattern[str]:
 
 def street_title_pattern(name: list[str]) -> re.Pattern[str]:
     """A street's name followed by a street word ("Spence Road", "Old
-    National Hwy"; a highway number stands alone). The street word is what
-    keeps "Union City Council" from matching a parcel on Union Rd."""
-    tail = "" if name[0] == "HWY" else r"[\s,.]+" + STREET_TYPE + r"\b"
+    National Hwy"; a highway number stands alone, and ends where its
+    digits end). The street word is what keeps "Union City Council" from
+    matching a parcel on Union Rd."""
+    tail = r"(?![A-Za-z0-9])" if name[0] == "HWY" else r"[\s,.]+" + STREET_TYPE + r"\b"
     return re.compile(r"(?<![A-Za-z0-9])" + street_pattern(name) + tail, re.I)
 
 
@@ -568,7 +588,7 @@ def find_hits(pages: list[tuple[int, str]], watch: list[dict[str, Any]], src: di
     addresses = {w["parcel_id"]: address_pattern(w["address"]) for w in watch
                  if w.get("address") and (not cities or w.get("jurisdiction") in cities)}
     for number, raw in pages:
-        text = unicodedata.normalize("NFKC", raw)
+        text = unicodedata.normalize("NFKC", raw).translate(_TYPESET)
         # For a street's name an apostrophe is no letter: O'Hara is OHARA on the roll.
         bare = text.replace("'", "").replace("\u2019", "")
         for kind, patterns, where in ((KINDS[0], ids, text), (KINDS[1], addresses, bare)):
@@ -613,14 +633,11 @@ def title_hits(title: str, watch: list[dict[str, Any]], src: dict[str, Any]) -> 
     text = unicodedata.normalize("NFKC", title).replace("_", " ").replace("'", "").replace("\u2019", "")
     cities = src.get("jurisdictions") or []
     mine = [w for w in watch if not cities or w.get("jurisdiction") in cities]
-    # A street named like the city or the source ("Union" in Union City)
-    # would match every one of its agendas.
-    own = " ".join([src.get("name", ""), *cities]).upper()
     streets: dict[tuple[str, ...], list[str]] = {}
     for w in mine:
         if w.get("address") and address_pattern(w["address"]).search(text):
             hits.append({"kind": KINDS[1], "parcel_id": w["parcel_id"], "page": 0, "text": plain(title, 80), "others": 0})
-        elif w.get("street") and not re.search(r"(?<![A-Z0-9])" + street_pattern(w["street"]) + r"(?![A-Z0-9])", own):
+        elif w.get("street"):
             streets.setdefault(tuple(w["street"]), []).append(w["parcel_id"])
     for name, parcels in streets.items():
         if street_title_pattern(list(name)).search(text):
@@ -706,13 +723,36 @@ class Meter:
             raise self._qc.FetchError("the run's allowance of requests, bytes or time is used up")
         self.requests += 1
         try:
-            status, headers, body = self._open(url, cap)
+            with self._deadline():
+                status, headers, body = self._open(url, cap)
         except self._qc.FetchError as exc:
             if str(exc).startswith("larger than"):
                 self.bytes += cap              # it was downloaded up to the cap before being refused
             raise
         self.bytes += len(body)
         return status, headers, body
+
+    @contextlib.contextmanager
+    def _deadline(self):
+        """A server that drips bytes resets every read's own timeout and
+        could hold one request for hours: stop it by the clock, as a
+        failed fetch of that document (a try), not as a lost run. Only
+        where a timer signal can be used (the main thread, as in the scan)."""
+        qc = self._qc
+
+        def stop(signum, frame):
+            raise qc.FetchError(f"took longer than {REQUEST_SECONDS} s")
+        try:
+            old = signal.signal(signal.SIGALRM, stop)
+        except ValueError:                     # not the main thread: no timer here
+            yield
+            return
+        signal.setitimer(signal.ITIMER_REAL, REQUEST_SECONDS)
+        try:
+            yield
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, old)
 
 
 def scan_source(qc: Any, fetcher: Any, meter: Meter, src: dict[str, Any], watch: list[dict[str, Any]]) -> dict[str, Any]:
@@ -768,10 +808,6 @@ def scan_source(qc: Any, fetcher: Any, meter: Meter, src: dict[str, Any], watch:
         # changed, or a large batch was posted. Noted, not crawled.
         out["storm"], out["noted"] = True, [url for url, _ in fresh]
         new = [x for x in new if x[0] in pending]
-    else:
-        # More new documents than one run reads: the rest wait their turn,
-        # by name, so they are not "new" again tomorrow.
-        out["queued"] = [url for url, _ in new[limit:] if url not in pending]
     # Those that have waited longest first.
     new.sort(key=lambda x: -pending.get(x[0], -1))
     for url, title in new[:limit]:
@@ -799,7 +835,12 @@ def scan_source(qc: Any, fetcher: Any, meter: Meter, src: dict[str, Any], watch:
             doc["state"] = DOC_STATES[1] if scans or partial else DOC_STATES[0]
             doc["hits"] = find_hits(pages, watch, src)
         out["docs"].append(doc)
-    handled = {d["url"] for d in out["docs"]} | set(out["noted"])
+    # Every new document this run did not get to (more than a run reads,
+    # or the allowance ran out) waits its turn by name: it is not "new"
+    # again tomorrow, and it is not lost.
+    tried = {d["url"] for d in out["docs"]}
+    out["queued"] = [url for url, _ in new if url not in tried and url not in pending]
+    handled = tried | set(out["noted"])
     out["left"] = sum(1 for url in listed if url not in done and url not in handled)
     return out
 
@@ -938,7 +979,8 @@ def checked_result(result: Any, job: dict[str, Any]) -> dict[str, dict[str, Any]
             u for u in _list(got.get(key), INDEX_LINKS) if link_allowed(u, src) and u not in docs))
         # A list is noted (seen, never read) only on first sight or a storm.
         noted = addresses("noted") if storm or not src.get("known") else []
-        queued = addresses("queued") if src.get("known") and not storm else []
+        # No honest run has more waiting than a storm starts at.
+        queued = addresses("queued")[:QUEUE_MOST] if not storm else []
         gone = [u for u in _list(got.get("gone"), INDEX_LINKS) if isinstance(u, str) and u in src.get("pending", {})]
         titles = []
         for t in _list(got.get("titles"), TITLES_PER_SOURCE):
@@ -985,10 +1027,15 @@ def report(job: dict[str, Any], result: Any, state_dir: Path) -> dict[str, int]:
         seen: dict[str, Any] = st.setdefault("seen", {})
         if got["skipped"]:
             counts["skipped"] += 1
-            notes.append(f"Source {position} ({name}) was not looked at this run: the run's allowance of "
-                         "requests, bytes or time was used up before its turn. Another source goes first "
-                         "tomorrow.")
+            if st.get("skip_day") != now[:10]:
+                st["skips"], st["skip_day"] = int(st.get("skips", 0)) + 1, now[:10]
+            if st["skips"] == FAIL_DAYS or (st["skips"] > FAIL_DAYS and (st["skips"] - FAIL_DAYS) % FAIL_REPEAT_DAYS == 0):
+                counts["failing"] += 1         # not reached for days is as blind as not answering
+            notes.append(f"Source {position} ({name}) was not looked at this run ({st['skips']} days running): "
+                         "the run's allowance of requests, bytes or time was used up before its turn. Another "
+                         "source goes first tomorrow; if this goes on, list fewer sources or lower max_new.")
             continue
+        st["skips"] = 0
         if got["problem"]:
             if st.get("fail_day") != now[:10]:             # one strike a day, however often it is run
                 st["failures"], st["fail_day"] = int(st.get("failures", 0)) + 1, now[:10]

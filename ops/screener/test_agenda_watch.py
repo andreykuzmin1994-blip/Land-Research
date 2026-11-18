@@ -241,6 +241,18 @@ class WatchListTests(Base):
         self.assertEqual(aw.street_words("5000 HIGHWAY 92 SW"), ["HWY", "92"])
         self.assertEqual(aw.street_words("12 5TH AVE"), ["5TH"])
         self.assertEqual(aw.street_words("100 O'HARA RD"), ["OHARA"])
+        # A street word inside a name is part of the name: the name ends at the last one.
+        self.assertEqual(aw.street_words("0 DEER RUN TRL"), ["DEER", "RUN"])
+        self.assertEqual(aw.street_words("12 INDIAN TRAIL RD NW"), ["INDIAN", "TRAIL"])
+        self.assertEqual(aw.street_words("7 PARK PLACE DR REAR"), ["PARK", "PLACE"])
+        self.assertEqual(aw.street_words("0 SPENCE RD REAR"), ["SPENCE"])
+        self.assertEqual(aw.street_words("81 POOLE CREEK RD SE"), ["POOLE", "CREEK"])
+        self.assertEqual(aw.street_words("0 JONESBORO PIKE"), ["JONESBORO"])
+        self.assertEqual(aw.street_words("300 BROADWAY SE"), ["BROADWAY"])
+        self.assertEqual(aw.street_words("5 SOUTH FULTON PKWY"), ["FULTON"])
+        self.assertEqual(aw.street_words("9 SQUARE LAKE RD"), ["SQUARE", "LAKE"])
+        self.assertEqual(aw.street_words("40 NEW WEST DR"), ["NEW", "WEST"])       # a direction inside a name
+        self.assertEqual(aw.street_words("0 BASIE LOOP"), ["BASIE"])
         self.assertIsNone(aw.street_words("0 RD"))
         self.assertIsNone(aw.street_words("LOT 4"))
         def hit(roll, text):
@@ -303,7 +315,7 @@ class MatchTests(Base):
 
     def test_not_inside_a_longer_number_and_not_a_short_id(self):
         for text in ("order 9909F0700003209270 shipped", "X09F070000320927", "parcel 07 1234 and 071234",
-                     "09F07000032 0927x", "09F0700\n00320927", "09F0700   00320927", "09F0700(0032)0927",
+                     "09F07000032 0927x", "09F0700\n00320927", "09F0700    00320927", "09F0700(0032)0927",
                      "09F0700/0032/0927"):
             self.assertEqual(self.hits(text), [], text)
         # reviews/41: a phone number is not a parcel id of the same digits.
@@ -311,6 +323,13 @@ class MatchTests(Base):
                   "jurisdiction": "union city"}]
         self.assertEqual(self.hits("call (770) 555-1234 today", watch=phone), [])
         self.assertEqual(len(self.hits("parcel 770-555-1234", watch=phone)), 1)
+
+    def test_an_id_as_documents_typeset_it(self):
+        # reviews/41, second look: a dash that is not the keyboard's, a tab, a spaced dash.
+        for text in ("PIN 09F\u20130700\u20130032\u2013092\u20137", "09F\u20140700\u2014 0032 \u2212 0927",
+                     "09F\t0700\t0032\t0927", "09F - 0700 - 0032 - 092 - 7", "09F\u00a00700\u20110032 0927",
+                     "09F   0700 . 0032"  " 0927"):
+            self.assertEqual([h["kind"] for h in self.hits(text)], ["parcel id"], repr(text))
 
     def test_an_address_is_a_possible_match_in_its_own_city_only(self):
         got = self.hits("the property at 3600 Naturally Fresh Boulevard, zoned")
@@ -351,18 +370,42 @@ class MatchTests(Base):
                          "Council Meeting, City Hall Annex", "City Council Regular Meeting Agenda"):
             self.assertEqual(kinds(ordinary), [], ordinary)
 
-    def test_a_street_named_like_the_city_is_not_matched_in_its_agendas(self):
-        # reviews/41: "Union City Council" is not a hit for a parcel on Union Rd.
+    def test_a_city_in_a_title_is_not_a_street_but_a_street_named_like_it_is(self):
+        # reviews/41: "Union City Council" is not a hit for a parcel on Union Rd: no street word follows.
+        # Second look: a street named like the city or the source is still that street.
         run = self.make_run("fulton-2026-11-16", [parcel(1, "UNION0000001", "0 UNION RD", "A"),
-                                                  parcel(2, "PARK00000001", "250 PARK AVE", "A", city="College Park")],
+                                                  parcel(2, "PARK00000001", "250 PARK AVE", "A", city="College Park"),
+                                                  parcel(3, "SFP000000001", "0 SOUTH FULTON PKWY", "A",
+                                                         city="South Fulton")],
                             when="2026-11-16T12:00:00+0000")
         watch = aw.scan_view(aw.prepare(self.sources, [run], None, self.state, now="2026-11-18T10:00:00Z"))["watch"]
-        park = aw.check_source({"name": "College Park council", "index_url": INDEX, "path_prefixes": [PREFIX],
-                                "jurisdictions": ["College Park"]}, "t", set())
+        source = lambda name, city: aw.check_source({"name": name, "index_url": INDEX, "path_prefixes": [PREFIX],  # noqa: E731
+                                                     "jurisdictions": [city]}, "t", set())
+        park, fulton = source("College Park council", "College Park"), source("South Fulton council", "South Fulton")
         for title, src in (("Union City Council Regular Meeting Agenda", self.sources[0]),
-                           ("Union Road widening", self.sources[0]),      # a street named like the city: never
-                           ("College Park Work Session", park), ("Park Avenue closure", park)):
+                           ("College Park Work Session", park), ("City of South Fulton Council Minutes", fulton)):
             self.assertEqual(aw.title_hits(title, watch, src), [], title)
+        for title, src, pid in (("Union Road widening", self.sources[0], "UNION0000001"),
+                                ("Park Avenue closure", park, "PARK00000001"),
+                                ("Z26-011 South Fulton Parkway overlay", fulton, "SFP000000001")):
+            got = [(h["kind"], h["parcel_id"]) for h in aw.title_hits(title, watch, src)]
+            self.assertIn(("same street, in a title", pid), got, title)
+
+    def test_a_highway_number_ends_where_its_digits_end_and_more_street_words(self):
+        run = self.make_run("fulton-2026-11-16", [parcel(1, "HWY000000092", "0 HWY 92", "A"),
+                                                  parcel(2, "PIKE00000001", "0 JONESBORO PIKE", "A"),
+                                                  parcel(3, "XING00000001", "0 MILL CREEK XING", "A")],
+                            when="2026-11-16T12:00:00+0000")
+        watch = aw.scan_view(aw.prepare(self.sources, [run], None, self.state, now="2026-11-18T10:00:00Z"))["watch"]
+        pids = lambda t: [h["parcel_id"] for h in aw.title_hits(t, watch, self.sources[0])  # noqa: E731
+                          if h["kind"] == "same street, in a title"]
+        self.assertEqual(pids("Hwy 920 widening"), [])
+        self.assertEqual(pids("Highway 92A signal"), [])
+        self.assertEqual(pids("Highway 92 corridor study"), ["HWY000000092"])
+        self.assertEqual(pids("RES2026-01 Hwy 92."), ["HWY000000092"])
+        self.assertEqual(pids("Jonesboro Pike sidewalk"), ["PIKE00000001"])
+        self.assertEqual(pids("Mill Creek Crossing plat"), ["XING00000001"])
+        self.assertEqual(pids("Jonesboro family day"), [])
 
     def test_the_date_in_an_address(self):
         self.assertEqual(aw.date_in(HOST + PREFIX + "_10272026-1904"), "2026-10-27")
@@ -505,6 +548,12 @@ class RunTests(Base):
         self.assertEqual(counts["not_taken"], 2)
         self.assertIn("2 links under its path prefixes were not taken", self.md())
 
+    def test_a_link_under_the_prefix_in_other_letters_is_counted_not_taken(self):
+        self.site.index([(PREFIX + "_11102026-1", "Agenda"), (PREFIX.lower() + "_11102026-2", "Other case")])
+        self.site.doc("_11102026-1", "<p>x</p>")
+        counts, _, _ = self.go()
+        self.assertEqual((counts["read"], counts["not_taken"]), (1, 1))
+
     def test_a_source_the_run_did_not_reach_is_not_a_failed_day(self):
         other = aw.check_source({"name": "Second", "index_url": HOST + "/Second", "path_prefixes": [PREFIX]}, "t", set())
         self.site_with(1)
@@ -575,10 +624,73 @@ class RunTests(Base):
             counts, _, result = self.go()
         self.assertEqual(result["requests"], 3)
         self.assertEqual(counts["read"], 1)
-        self.assertEqual(self.seen().get(HOST + PREFIX + "_11102026-2"), None)   # not read, so not seen
+        # Not read, so not "read": it waits by name (second look, N1).
+        self.assertEqual(sorted(r["state"] for r in self.seen().values()), ["queued", "queued", "read"])
         with mock.patch.object(aw, "MAX_BYTES", 10):
             _, _, result = self.go(now="2026-11-19T10:00:00Z")
         self.assertLessEqual(result["requests"], 2)
+        counts, _, _ = self.go(now="2026-11-20T10:00:00Z")
+        self.assertEqual((counts["read"], counts["left"]), (2, 0))
+        self.assertTrue(all(r["state"] == "read" for r in self.seen().values()))
+
+    def test_new_documents_the_allowance_did_not_reach_are_not_lost(self):
+        """Second look, N1: on a known source, new documents the run ran out
+        before were neither read nor queued, so nothing remembered them."""
+        self.site_with(2)
+        self.go()
+        self.site_with(7, first=1)                                              # five new ones
+        with mock.patch.object(aw, "MAX_REQUESTS", 3):                          # robots.txt, the index, one document
+            counts, _, result = self.go(now="2026-11-19T10:00:00Z")
+        self.assertEqual((counts["read"], counts["storms"]), (1, 0))
+        self.assertEqual(len(result["sources"]["City council"]["queued"]), 4)
+        self.assertEqual(sorted(r["state"] for r in self.seen().values()), ["queued"] * 4 + ["read"] * 3)
+        self.assertIn("4 new documents wait for a later run", self.md())
+        counts, _, _ = self.go(now="2026-11-20T10:00:00Z")
+        self.assertEqual((counts["read"], counts["storms"], counts["left"]), (4, 0, 0))
+
+    def test_one_slow_request_is_stopped_by_the_clock(self):
+        """Second look, N3: bytes that drip reset every read's own timeout."""
+        import signal
+        import time
+        self.site_with(2)
+        self.go()
+        self.site_with(4)
+        answer = self.site.open_once
+        def drip(url, cap):
+            if url.endswith("_11102026-3"):
+                time.sleep(5)
+            return answer(url, cap)
+        self.site.open_once = drip
+        before = signal.getsignal(signal.SIGALRM)
+        started = time.monotonic()
+        with mock.patch.object(aw, "REQUEST_SECONDS", 0.2):
+            counts, _, result = self.go(now="2026-11-19T10:00:00Z")
+        self.assertLess(time.monotonic() - started, 4)
+        docs = {d["url"][-1]: d for d in result["sources"]["City council"]["docs"]}
+        self.assertEqual((docs["3"]["state"], docs["4"]["state"]), ("not read", "read"))
+        self.assertIn("took longer than", docs["3"]["why"])
+        self.assertEqual(self.seen()[HOST + PREFIX + "_11102026-3"]["state"], "pending")   # a try, not a lost run
+        self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
+        self.assertIs(signal.getsignal(signal.SIGALRM), before)
+
+    def test_a_source_not_reached_for_days_is_said_like_a_failing_one(self):
+        """Second look, N8: skipped day after day, a source was silently blind."""
+        other = aw.check_source({"name": "Second", "index_url": HOST + "/Second", "path_prefixes": [PREFIX]}, "t", set())
+        self.site_with(1)
+        self.site.index([(PREFIX + "_11102026-1", "x")], url=HOST + "/Second")
+        failing = []
+        with mock.patch.object(aw, "MAX_REQUESTS", 2):                          # robots.txt and one index page
+            for day in (18, 20, 22, 24):                                        # the same source's turn each time
+                counts, _, _ = self.go(now=f"2026-11-{day}T10:00:00Z", sources=[self.sources[0], other])
+                self.assertEqual(counts["skipped"], 1)
+                failing.append(counts["failing"])
+            counts, _, _ = self.go(now="2026-11-24T18:00:00Z", sources=[self.sources[0], other])
+        self.assertEqual(failing, [0, 0, 1, 0])
+        self.assertEqual(counts["failing"], 0)                                   # the same day again: no new strike
+        self.assertIn("days running", self.md())
+        counts, _, _ = self.go(now="2026-11-26T10:00:00Z", sources=[self.sources[0], other])
+        state = json.loads((self.state / aw.STATE_NAME).read_text())["sources"]
+        self.assertEqual([int(s.get("skips", 0)) for s in state.values()], [0, 0])
 
     def test_a_download_refused_for_its_size_still_counts_its_bytes(self):
         f = self.site.fetcher()
@@ -635,6 +747,15 @@ class RunTests(Base):
         result["sources"]["City council"]["problem"] = 'Verify at htt"ps://93.184.216.34/login today'
         aw.report(job, result, self.state)
         self.assertNotRegex(self.md(), r"93\.184|://9")
+
+    def test_an_entity_cannot_spell_an_address_or_a_column(self):
+        # Second look, N5: "&#104;ttps&#58;//" is "https://" to whatever renders the report.
+        for hostile in ("&#104;ttps&#58;//evil.example/a", "&lt;img src=x&gt;", "a &#124; b", "&amp;#124;",
+                        "R&D &num;1 &colon;//x"):
+            got = aw.plain(hostile)
+            self.assertNotIn("&", got, hostile)
+            self.assertNotRegex(got, r"://|[A-Za-z]\.[A-Za-z]", hostile)
+        self.assertEqual(aw.plain("Smith & Sons  Road"), "Smith and Sons Road")
 
     def test_the_report_always_says_what_was_not_read(self):
         self.site_with(1)
@@ -772,6 +893,21 @@ class ResultCheckTests(Base):
         self.assertEqual(counts["storms"], 1)
         self.assertLessEqual(real, set(self.seen()))             # and still pushes no read entry out
 
+    def test_a_result_cannot_make_a_long_queue(self):
+        """Second look, N6: "queued" addresses are never evicted, so a result
+        could fill the state with them; no honest run has that many."""
+        self.site.index([(PREFIX + "_11102026-0", "t")])
+        self.site.doc("_11102026-0", "<p>x</p>")
+        self.go()
+        job = aw.prepare(self.sources, [self.run_dir], None, self.state, now="2026-11-19T10:00:00Z")
+        made_up = [HOST + PREFIX + f"_fake-{i}" for i in range(3000)]
+        result = {"schema": 1, "sources": {"City council": {
+            "problem": "", "links": 3, "storm": False, "left": 0, "noted": [], "queued": made_up + made_up,
+            "docs": [], "titles": [], "gone": []}}}
+        self.assertEqual(len(aw.checked_result(result, job)["City council"]["queued"]), aw.QUEUE_MOST)
+        aw.report(job, result, self.state)
+        self.assertEqual(sum(1 for r in self.seen().values() if r["state"] == "queued"), aw.QUEUE_MOST)
+
     def test_values_of_the_wrong_kind_do_not_stop_the_report(self):
         job = self.job()
         odd = {"schema": 1, "sources": {"City council": {
@@ -838,6 +974,17 @@ class StateTests(Base):
         with mock.patch.object(aw, "SEEN_KEPT", 10), mock.patch.object(aw, "HITS_KEPT", 5):
             self.go()
             self.assertLessEqual(len(self.seen()), 10)
+
+    def test_what_waits_to_be_read_is_never_forgotten(self):
+        seen = {f"q{i}": {"first": "2026-01-01", "state": "queued"} for i in range(4)}
+        seen.update({f"p{i}": {"first": "2026-01-01", "state": "pending"} for i in range(2)})
+        seen.update({f"n{i}": {"first": f"2026-02-{i + 1:02d}", "state": "noted"} for i in range(10)})
+        seen.update({f"r{i}": {"first": f"2026-03-{i + 1:02d}", "state": "read"} for i in range(5)})
+        with mock.patch.object(aw, "SEEN_KEPT", 9):
+            aw.forget_oldest(seen)
+        self.assertEqual(len(seen), 9)
+        self.assertEqual(sorted(u for u in seen if u[0] in "qp"), ["p0", "p1", "q0", "q1", "q2", "q3"])
+        self.assertEqual(sorted(u for u in seen if u[0] == "r"), ["r2", "r3", "r4"])   # the newest of those read
 
     def test_one_run_at_a_time(self):
         with aw.one_run(self.state):

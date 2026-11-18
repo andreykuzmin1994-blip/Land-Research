@@ -148,7 +148,8 @@ def plain(text: Any, limit: int) -> str:
     out = re.sub(r"[\s_]+", " ", str(text if text is not None else ""))
     # The characters first: an address must not come together again out of
     # what the filter removed ('https"://' is 'https://' once the quote is gone).
-    out = re.sub(r"[^A-Za-z0-9 .,;:()'%$/&-]", "", out)
+    # "&" goes too: "&#104;ttps&#58;//" is "https://" to whatever renders it.
+    out = re.sub(r" {2,}", " ", re.sub(r"[^A-Za-z0-9 .,;:()'%$/-]", "", out.replace("&", " and ")))
     out = re.sub(r"(?i)\b(?:https?|ftps?|file|mailto)\s*:\s*/*", "", out)
     out = re.sub(r":/+", ": ", out)                        # no scheme is left to open
     out = re.sub(r"(?i)\bwww\.", "www ", out)

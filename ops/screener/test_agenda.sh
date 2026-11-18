@@ -35,11 +35,19 @@ def read(url=doc, hits=()):
 if mode == "crash":
     print("Traceback: boom"); sys.exit(1)
 if mode == "noisy":
-    sys.stdout.write("x" * 5_000_000 + "\n")
+    # In many writes: a closed pipe after the first megabyte would stop the scan before its result.
+    for _ in range(5000):
+        sys.stdout.write("x" * 1000 + "\n"); sys.stdout.flush()
+if mode == "linger":
+    # A leftover of the scan that keeps the scan's output open.
+    if os.fork() == 0:
+        import time
+        time.sleep(20); os._exit(0)
 body = {
     "hit": result([read(hits=[hit])]),
     "quiet": result([]),
-    "noisy": result([]),
+    "noisy": result([read(hits=[hit])]),
+    "linger": result([]),
     "street": result([], titles=[{"url": doc, "title": "Z26-030 Spence Road", "hits": [
         {"kind": "same street, in a title", "parcel_id": "14 0064  LL0047", "page": 0, "text": "Z26-030 Spence Road"}]}]),
     "offhost": result([read(url="https://evil.example/AgendaCenter/ViewFile/Agenda/_1", hits=[hit])]),
@@ -185,6 +193,11 @@ echo "what the scan prints cannot flood the log"
 new_case noisy; FAKE_SCAN=noisy "$WATCH" 2>/dev/null
 check "the log stays small" '[ "$(cat $CASE/state/logs/agenda-*.log | wc -c)" -lt 1100000 ]'
 check "and the watch still finished" 'md | grep -q "No hit does not mean no item"'
+check "with the result the scan wrote after all that printing" 'md | grep -q "09F070000320927" && [ "$(seen)" = 1 ]'
+
+echo "a leftover of the scan that keeps its output open does not hold the watch"
+new_case linger; started=$SECONDS; FAKE_SCAN=linger "$WATCH" 2>/dev/null; rc=$?
+check "the watch finished without waiting for it" '[ $rc -eq 0 ] && [ $((SECONDS - started)) -lt 12 ] && md | grep -q "No hit does not mean no item"'
 
 echo "counts that are not plain numbers send no alert"
 new_case oddcounts; FAKE_SCAN=quiet "$WATCH" 2>/dev/null

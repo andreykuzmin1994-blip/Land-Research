@@ -66,8 +66,9 @@ DATE_IN_NAME = re.compile(r"-\d{4}-\d{2}-\d{2}")
 # cap is not a failure and is not listed.
 NOT_RUN = re.compile(r"FAILURES|FAILED|[Rr]e-run")
 
+# "&" too: "&#124;" is a pipe, and "&#104;ttps..." an address, to whatever renders the file.
 _MARKUP = str.maketrans({"|": "/", "[": "(", "]": ")", "<": "(", ">": ")", "`": "'",
-                         "*": "", "_": " ", "\\": "/"})
+                         "*": "", "_": " ", "\\": "/", "&": " and "})
 
 
 class Refuse(Exception):
