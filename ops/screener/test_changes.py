@@ -247,6 +247,15 @@ class OwnerTextTests(Base):
         for t in (text, out):
             self.assertNotIn("QUARTERMAINE", t)
 
+    def test_the_site_name_is_dropped_in_every_wording_the_grade_uses(self):
+        for found, want in (
+                ("a listed contamination site 1,350 ft away (ACME SOLVENTS (FORMER) TRUST); no pond room",
+                 "found: a listed contamination site 1,350 ft away (named in the brief); no pond room"),
+                ("a bordering parcel holds a listed contamination site (ACME SOLVENTS INC)",
+                 "found: a bordering parcel holds a listed contamination site (named in the brief)"),
+                ("a listed contamination site is on the parcel", "found: a listed contamination site is on the parcel")):
+            self.assertEqual(changes.open_items({"lead_found": found}), want)
+
     def test_an_owner_string_in_any_other_text_is_withheld(self):
         make_run(self.root, "fulton-2026-11-08", [parcel(1, "X1", "A", decision="pursue")],
                  run_time="2026-11-08T12:00:00+0000")

@@ -43,6 +43,7 @@ CHECK_USER="${CHECK_USER-screener-check}"           # empty: run as this user (t
 CHECK_DIR="${CHECK_DIR:-/srv/screener-check}"
 SYS_PYTHON="${SYS_PYTHON:-/usr/bin/python3}"        # root-owned; never a sandbox user's own
 LEAD_MIN_FREE_MB="${LEAD_MIN_FREE_MB:-5000}"         # asked before each agent and each quote check
+INVESTIGATE_QUICK_FAIL="${INVESTIGATE_QUICK_FAIL:-120}"  # an agent error sooner than this: it never ran
 SUDO_TIMEOUT="${SUDO_TIMEOUT:-120}"                 # seconds for a housekeeping command as a sandbox user
 INVESTIGATE_SAME_USER_OK="${INVESTIGATE_SAME_USER_OK:-0}"  # 1 only in the offline tests
 MAX_LEAD_FILE_KB="${MAX_LEAD_FILE_KB:-1024}"        # findings.json / skeptic.json
@@ -61,13 +62,17 @@ INV_QUEUE="$HERE/lead_queue.py"
 # is an error: the caller must not read files a live process could swap.
 # Whether anything is left is asked by this user's own pgrep: exit 1 means
 # "none", and nothing else does (a sudo that cannot run is not "none").
+# And where this user cannot see other accounts' processes (/proc mounted
+# with hidepid), that pgrep sees nothing: so the sandbox user's own count
+# must also read 0. A sudo that fails prints no count.
 kill_user() {
   [ -n "$1" ] || return 0
-  local i rc
+  local i rc own
   for i in 1 2 3 4 5 6 7 8 9 10; do
     (cd / && timeout -k 5 20 sudo -n -u "$1" -H -- pkill -KILL -u "$1") >/dev/null 2>&1
     pgrep -u "$1" >/dev/null 2>&1; rc=$?
-    [ "$rc" -eq 1 ] && return 0
+    own="$(cd / && timeout -k 5 20 sudo -n -u "$1" -H -- pgrep -c -u "$1" 2>/dev/null)"
+    [ "$rc" -eq 1 ] && [ "$own" = 0 ] && return 0
     $SLEEP 0.2
   done
   return 1
@@ -77,8 +82,14 @@ kill_user() {
 # one agent's notes never wait there for the next.
 sweep_tmp() {
   [ -n "$1" ] || return 0
-  (cd / && timeout -k 5 "$SUDO_TIMEOUT" sudo -n -u "$1" -H -- \
-     find /tmp /var/tmp /dev/shm -xdev -user "$1" -delete) >/dev/null 2>&1
+  local d
+  for d in /tmp /var/tmp /dev/shm /run/lock /dev/mqueue; do
+    [ -d "$d" ] || continue
+    (cd / && timeout -k 5 "$SUDO_TIMEOUT" sudo -n -u "$1" -H -- \
+       find "$d" -xdev -user "$1" -type d -exec chmod u+rwx {} +) >/dev/null 2>&1
+    (cd / && timeout -k 5 "$SUDO_TIMEOUT" sudo -n -u "$1" -H -- \
+       find "$d" -xdev -user "$1" -delete) >/dev/null 2>&1
+  done
   return 0
 }
 
@@ -116,6 +127,7 @@ sandbox_remove() {
   (cd / && timeout -k 5 "$SUDO_TIMEOUT" "$@" find "$d" -mindepth 1 -delete) >>"$MAIN_LOG" 2>&1
   # Only ever a folder inside one of the two handover folders.
   case "$d" in
+    */..|*/../*|*/.|*/./*) log "    not a plain sandbox folder, left alone: $d"; return 1 ;;
     "${LEAD_DIR:?}"/?*|"${CHECK_DIR:?}"/?*) find "$d" -depth -delete >>"$MAIN_LOG" 2>&1 ;;
     *) log "    not a sandbox folder, left alone: $d"; return 1 ;;
   esac
@@ -160,12 +172,14 @@ lead_settings_sum() {
   local out
   # shellcheck disable=SC2016
   out="$(cd / && timeout -k 5 "$SUDO_TIMEOUT" "${LEAD_AS[@]}" /bin/sh -c '
-      cd "$1" || exit 9; shift
+      # Under sudo -H, HOME is the home of the account: LEAD_HOME must be it.
+      [ "$2" = any ] || [ "$1" = "$HOME" ] || exit 7
+      cd "$1" || exit 9; shift; shift
       for p in "$@"; do
         [ -e "$p" ] || [ -L "$p" ] || continue
         find "$p" -xdev \( -type f -exec sha256sum {} + \) -o \( -type l -printf "link %p -> %l\n" \) \
              -o \( ! -type d -printf "other %y %p\n" \) || exit 8
-      done' sh "$LEAD_HOME" "${LEAD_WATCH[@]}" 2>>"$MAIN_LOG")" || return 1
+      done' sh "$LEAD_HOME" "$([ -n "$LEAD_USER" ] && echo own || echo any)" "${LEAD_WATCH[@]}" 2>>"$MAIN_LOG")" || return 1
   printf '%s\n' "$out" | sort | sha256sum | cut -d' ' -f1
 }
 
@@ -183,9 +197,16 @@ inv_ready() {  # prints why the lead checks can't run, if they can't
     # as this user. Only the offline tests may ask for that.
     [ "$INVESTIGATE_SAME_USER_OK" = 1 ] ||
       { echo "LEAD_USER and CHECK_USER must name the two lead-check accounts"; return 1; }
-  elif [ "$LEAD_USER" = "$CHECK_USER" ] || [ "$LEAD_USER" = "${FIX_USER:-}" ] || [ "$CHECK_USER" = "${FIX_USER:-}" ] ||
-       [ "$LEAD_USER" = "$(id -un)" ] || [ "$CHECK_USER" = "$(id -un)" ]; then
-    echo "the lead-check users must differ from each other, from this user and from the fix hand-off's user"; return 1
+  else
+    # By number, not by name: two names can be one account, and "#0" is root.
+    local lead_id check_id fix_id me
+    me="$(id -u)"; fix_id="$(id -u "${FIX_USER:-}" 2>/dev/null || echo none)"
+    lead_id="$(id -u "$LEAD_USER" 2>/dev/null)" && check_id="$(id -u "$CHECK_USER" 2>/dev/null)" ||
+      { echo "'$LEAD_USER' or '$CHECK_USER' is not an account here (run install.sh --lead-checks)"; return 1; }
+    if [ "$lead_id" = "$check_id" ] || [ "$lead_id" = "$fix_id" ] || [ "$check_id" = "$fix_id" ] ||
+       [ "$lead_id" = "$me" ] || [ "$check_id" = "$me" ] || [ "$lead_id" = 0 ] || [ "$check_id" = 0 ]; then
+      echo "the lead-check users must differ from each other, from this user and from the fix hand-off's user, and neither may be root"; return 1
+    fi
   fi
   for user in "$LEAD_USER" "$CHECK_USER"; do
     [ -z "$user" ] || (cd / && timeout -k 5 20 sudo -n -u "$user" -H -- true) 2>/dev/null ||
@@ -206,6 +227,7 @@ run_lead_agent() {
   local model_args=() turn_args=()
   [ -n "$LEAD_MODEL" ] && model_args=(--model "$LEAD_MODEL")
   [ -n "$INVESTIGATE_MAX_TURNS" ] && turn_args=(--max-turns "$INVESTIGATE_MAX_TURNS")
+  local began; began="$(date +%s)"
   (cd "$copy" && timeout -k 2m "$INVESTIGATE_TIMEOUT" "${LEAD_AS[@]}" env \
       "LEAD_FETCH_COUNT_FILE=$copy/$leaf/.requests" "LEAD_FETCH_MAX=$INVESTIGATE_REQUESTS" \
       DISABLE_AUTOUPDATER=1 \
@@ -216,7 +238,8 @@ run_lead_agent() {
       --disallowedTools "WebFetch" \
       </dev/null) >>"$alog" 2>&1
   local rc=$?
-  log "    $role agent exit $rc"
+  INV_AGENT_SECS=$(( $(date +%s) - began ))
+  log "    $role agent exit $rc after ${INV_AGENT_SECS}s"
   return "$rc"
 }
 
@@ -250,7 +273,11 @@ quote_check() {
   fi
   sweep_tmp "$CHECK_USER"
   sandbox_remove "$copy" "${CHECK_AS[@]}" || { log "    could not remove $copy"; return 4; }
-  [ "$rc" -eq 0 ] || return 1
+  case "$rc" in
+    0) return 0 ;;
+    1|2|124|137) return 1 ;;   # refused these findings, or ran out of time on them: a try of this lead
+    *) return 7 ;;             # the checker itself failed: not the lead's doing
+  esac
 }
 
 enough_disk() {  # the quote checker keeps a copy of every page it fetches until its folder is removed
@@ -312,10 +339,12 @@ EOF
 #   4 a sandbox folder could not be emptied, made or removed, or a process
 #     of the sandbox user could not be stopped;
 #   5 too little free disk;
-#   6 the agent ended with an error and left nothing (it did not run).
+#   6 the agent ended with an error within moments and left nothing (it
+#     did not run).
+# quote_check adds 7: the checker itself failed.
 lead_step() {
   local role="$1" stage="$2" slug="$3" pid="$4" run_name="$5" file="$6" kind="$7" alog="$8" before="$9"
-  local leaf="screener/leads/$slug" copy arc took removed now
+  local leaf="screener/leads/$slug" copy arc removed now
   enough_disk || return 5
   sweep_tmp "$LEAD_USER"
   sandbox_empty "$LEAD_DIR" "${LEAD_AS[@]}" || { log "    $LEAD_DIR is not empty"; return 4; }
@@ -330,10 +359,15 @@ lead_step() {
     sandbox_seal "$copy" "$leaf" || return 4
   run_lead_agent "$role" "$copy" "$leaf" "$(lead_prompt "$role" "$copy" "$leaf" "$pid" "$run_name")" "$alog"
   arc=$?
-  kill_user "$LEAD_USER" || { log "    agent processes still running"; return 4; }
-  "$PYTHON" "$INV_QUEUE" take "$copy/$leaf" "$file" "$stage/$file" \
-      --max-bytes $((MAX_LEAD_FILE_KB * 1024)) --kind "$kind" --parcel "$pid" --run "$run_name" >>"$alog" 2>&1
-  took=$?
+  # A process that could not be stopped could still swap the file: then
+  # nothing is taken. The settings are compared all the same, below.
+  local alive=0 took=1
+  kill_user "$LEAD_USER" || { log "    agent processes still running"; alive=1; }
+  if [ "$alive" -eq 0 ]; then
+    "$PYTHON" "$INV_QUEUE" take "$copy/$leaf" "$file" "$stage/$file" \
+        --max-bytes $((MAX_LEAD_FILE_KB * 1024)) --kind "$kind" --parcel "$pid" --run "$run_name" >>"$alog" 2>&1
+    took=$?
+  fi
   sweep_tmp "$LEAD_USER"
   sandbox_remove "$copy" "${LEAD_AS[@]}"; removed=$?
   # The watch before anything else: whatever also went wrong, a changed
@@ -343,12 +377,15 @@ lead_step() {
     unlink "${stage:?}/${file:?}" 2>/dev/null
     return 3
   fi
+  [ "$alive" -eq 0 ] || return 4
   [ "$removed" -eq 0 ] || { log "    could not remove $copy"; return 4; }
   if [ "$took" -ne 0 ]; then
     log "    no usable $file"
-    # Ended with an error (not the time limit) and left nothing: the agent
-    # did not run at all (its login expired, an option was refused).
-    if [ "$arc" -ne 0 ] && [ "$arc" -ne 124 ] && [ "$arc" -ne 137 ]; then return 6; fi
+    # Ended with an error within moments and left nothing: the agent did
+    # not run at all (its login expired, an option was refused). An error
+    # after real work is this lead's own failure, and a try of it.
+    if [ "$arc" -ne 0 ] && [ "$arc" -ne 124 ] && [ "$arc" -ne 137 ] &&
+       [ "${INV_AGENT_SECS:-0}" -lt "$INVESTIGATE_QUICK_FAIL" ]; then return 6; fi
     return 1
   fi
 }
@@ -422,6 +459,11 @@ investigate_stage() {
   trap 'inv_cleanup; exit 143' TERM INT
   for entry in "${RUN_DIRS[@]}"; do
     county="${entry%%$'\t'*}"; run_dir="${entry#*$'\t'}"
+    # The county's name becomes a folder name here and in the logs.
+    if ! [[ "$county" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$ ]]; then
+      log "lead checks: a county name that cannot be a folder name; skipped"
+      queue_failed=$((queue_failed + 1)); continue
+    fi
     stage="$INV_STATE/$STAMP/$county"
     local slugs=()
     mkdir -p "$stage"
@@ -460,6 +502,7 @@ investigate_stage() {
         3) date -u +%FT%TZ >"$INV_HOLD"; stop="settings"; failed_n=$((failed_n + 1)) ;;
         5) stop="disk"; left_n=$((left_n + 1)) ;;
         6) stop="agent"; failed_n=$((failed_n + 1)) ;;
+        7) stop="check"; failed_n=$((failed_n + 1)) ;;
         *) stop="sandbox"; failed_n=$((failed_n + 1)) ;;   # 4, and anything unforeseen
       esac
     done
@@ -478,12 +521,13 @@ investigate_stage() {
     time) text="$text Stopped at the time limit." ;;
     disk) text="$text Stopped: under $LEAD_MIN_FREE_MB MB of free disk." ;;
     agent) text="$text STOPPED: the agent ended with an error before writing anything. Check that Claude Code still runs and is logged in for the lead-check user; the lead's log on the server has its output. No try was counted." ;;
+    check) text="$text STOPPED: the quote checker itself failed (not a refusal of the findings). Its output is in the lead's log on the server. No try was counted." ;;
     sandbox) text="$text STOPPED: a sandbox folder could not be emptied or removed, or a sandbox process could not be stopped. Lead checks will stop here on every run until the handover folders are empty (README, Lead checks). No try was counted." ;;
     settings) text="$text STOPPED: a check changed the lead-check user's own settings. Lead checks are on hold until you look at that account and remove the HOLD file (README, Lead checks)." ;;
   esac
   local prio=default
   if [ "$failed_n" -gt 0 ] || [ "$queue_failed" -gt 0 ]; then prio=high; fi
-  case "$stop" in settings|sandbox|agent) prio=urgent ;; esac
+  case "$stop" in settings|sandbox|agent|check) prio=urgent ;; esac
   if [ $((done_n + failed_n + left_n + queue_failed)) -gt 0 ]; then
     notify "Screener: lead checks" "$text Read each lead.md in the leads folder on the server before acting on it." "$prio"
   elif [ "$gave_up" -gt 0 ]; then

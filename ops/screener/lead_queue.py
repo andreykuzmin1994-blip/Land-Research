@@ -80,7 +80,7 @@ NEVER = ("owner", "owner_mailing", "owner_state", "flags", "why_seller", "decisi
          "last_sale_price", "land_value")
 # The grade names a listed contamination site, often after the company that
 # owns the parcel: the name is not for the card.
-SITE_NAME = re.compile(r"(contamination site) \([^)]*\)")
+SITE_NAME = re.compile(r"(contamination site(?: [\d,.]+ ft away)?) \(.*?\)(?=; |$)")
 COORDS = re.compile(r"[?&]query=(-?\d{1,3}\.\d{1,8}),(-?\d{1,3}\.\d{1,8})$")
 
 
@@ -266,6 +266,7 @@ def publish(stage_lead: Path, leads: Path, slug: str) -> Path:
     try:
         for name in RESULT_FILES:
             (temp / name).write_bytes((stage_lead / name).read_bytes())
+            os.chmod(temp / name, 0o644)    # whatever the caller's umask: read like any run output
         os.chmod(temp, 0o755)
         # A folder that appeared since the check above stops this, unless it
         # is empty (an empty folder holds nothing to lose).

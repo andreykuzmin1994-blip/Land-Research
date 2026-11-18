@@ -245,8 +245,13 @@ clearance. Read `lead.md` before acting on a lead.
   look counts as a change.
 - The stage also stops, with an urgent alert and without counting a try,
   when a sandbox folder cannot be emptied or a sandbox process cannot be
-  stopped, and when the agent ends with an error before writing anything
-  (an expired login, an option Claude Code no longer accepts).
+  stopped, when the agent ends with an error within two minutes and
+  leaves nothing (an expired login, an option Claude Code no longer
+  accepts), and when the quote checker itself fails. A refusal of the
+  findings by the checker, a time limit, or an agent error after real
+  work is a try of that lead.
+- `LEAD_HOME` must be the home of `LEAD_USER`, and the accounts are told
+  apart by number: two names for one account, or root, are refused.
 
 ### Turning it on
 
@@ -260,8 +265,10 @@ clearance. Read `lead.md` before acting on a lead.
    agents' own output and the quote checker's) and the lead's `lead.md`.
 
 Lead checks are skipped for a run given extra arguments (a `--limit`
-trial), a run that finished with warnings, and when a part is missing
-(an alert says which).
+trial), a run that finished with warnings, a run whose output folder was
+already there before the supervisor started (a second run on one day
+writes into the first one's folder), and when a part is missing (an
+alert says which).
 
 ### Not verified, and what is accepted
 
@@ -308,8 +315,11 @@ Accepted, because closing them needs more than this script:
   addresses are public, once to connect). The agents' fetch tool pins
   the name to the addresses it checked; the checker itself
   (`screener/quotecheck.py`, also used by hand) does not yet.
-- The request counter of the fetch tool sits in the agent's own folder: it
-  stops drift, not an agent set on cheating. The time limit bounds that.
+- The request counter of the fetch tool, and the lock that makes two
+  calls follow one another, sit in the agent's own folder: they stop
+  drift, not an agent set on cheating. The time limit bounds that. Each
+  call waits a second first; a site's own longer Crawl-delay holds
+  inside one call, not from one call to the next.
 - The search tool is the provider's: it can show a snippet of any site,
   and the rule against CoStar, LoopNet and Crexi there rests on the
   agent's instructions. The fetch tool and the quote checker refuse those

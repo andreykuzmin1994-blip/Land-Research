@@ -32,6 +32,8 @@ Exit codes: 0 text printed; 1 not fetched (the reason is printed);
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import importlib.util
 import os
 import re
@@ -100,6 +102,11 @@ def pin_names() -> None:
 
     def pinned(host, port, *args, **kwargs):
         key = host.decode("ascii", "replace").lower() if isinstance(host, bytes) else str(host).lower()
+        # "name." is the same host as "name": the fetcher checks the one and
+        # the connection may ask for the other.
+        key = key.rstrip(".")
+        if "%" in key:
+            raise socket.gaierror(socket.EAI_NONAME, "a host name with % in it is not looked up")
         if key not in first:
             first[key] = sorted({info[4][0] for info in real(host, None)})
         answers = []
@@ -108,6 +115,27 @@ def pin_names() -> None:
         return answers
 
     socket.getaddrinfo = pinned
+
+
+@contextlib.contextmanager
+def one_at_a_time():
+    """Hold a lock beside the request counter for the length of a fetch, so
+    two calls started together follow one another and the pause before
+    each one is a pause between them."""
+    name = os.environ.get("LEAD_FETCH_COUNT_FILE", "")
+    if not name:
+        yield
+        return
+    try:
+        fd = os.open(name + ".lock", os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    except OSError:
+        yield                      # no lock to be had: the pause alone
+        return
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
 
 
 def page_units(url: str) -> tuple[list[tuple[int, str]], str, str]:
@@ -167,12 +195,13 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         first, last = int(m.group(1)), int(m.group(2) or m.group(1))
     limit = max(1, min(args.max_chars, HARD_MAX_CHARS))
-    why = count_request()
-    if why:
-        print(why)
-        return 1
     pin_names()
-    units, about, problem = page_units(args.url)
+    with one_at_a_time():          # the count and the fetch, one call at a time
+        why = count_request()
+        if why:
+            print(why)
+            return 1
+        units, about, problem = page_units(args.url)
     if problem:
         print(problem)
         return 1

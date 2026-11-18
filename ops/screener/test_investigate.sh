@@ -50,6 +50,10 @@ FAKE
 cat >"$ROOT/syspy" <<FAKE
 #!/usr/bin/env bash
 echo "\$PWD :: \$*" >>"\$FAKE_STATE/syspy-args"
+case "\$*" in *quotecheck.py*)
+  [ "\${FAKE_CHECK:-}" = crash ] && { echo "Traceback (most recent call last): boom"; exit 3; }
+  [ "\${FAKE_CHECK:-}" = refuse ] && { echo "refused: the file has a field it may not have"; exit 2; } ;;
+esac
 exec "$REAL_PY" "\$@"
 FAKE
 
@@ -129,7 +133,7 @@ new_case() {
          INVESTIGATE=1 LEAD_USER="" CHECK_USER="" LEAD_DIR="$d/leaddir" CHECK_DIR="$d/checkdir" \
          LEAD_HOME="$d/leadhome" LEAD_CLAUDE_BIN="$ROOT/fakeclaude" SYS_PYTHON="$ROOT/syspy" \
          INVESTIGATE_SAME_USER_OK=1 LEAD_MIN_FREE_MB=0 INVESTIGATE_MAX=5 INVESTIGATE_GRADES="A B" INVESTIGATE_MAX_TRIES=2
-  unset LEADS_DIR FAKE_RUN FAKE_LEAD FAKE_SKEPTIC
+  unset LEADS_DIR FAKE_RUN FAKE_LEAD FAKE_SKEPTIC FAKE_CHECK INVESTIGATE_QUICK_FAIL
   CASE="$d"
 }
 alerts() { cat "$CASE/state/logs/alerts.log" 2>/dev/null; }
@@ -169,6 +173,7 @@ check "changes.md shows the document checks" 'grep -q "0 survives, 0 weakened, 3
 check "changes.md has no owner name" '! grep -q -e QUARTERMAINE -e "SECRET MAILING" $(run_dir)/changes.md'
 check "the summary alert carries the digest counts" 'alerts | grep -q "first run, nothing to compare. Grade A 3, grade B 1"'
 check "no HOLD" '[ ! -e $CASE/state/investigate/HOLD ]'
+check "a published file reads like any run output, whatever the stage's umask" '[ "$(stat -c %a $CASE/repo/screener/leads/14F_1/lead.md $CASE/repo/screener/leads/14F_1 | tr "\n" " ")" = "644 755 " ]'
 
 echo "the next run checks nothing twice and reports what changed"
 FAKE_SKEPTIC=killed "$SUP" 2>/dev/null
@@ -216,6 +221,12 @@ new_case stalerun; "$SUP" 2>/dev/null; rm -rf "$CASE/repo/screener/leads" "$CASE
 touch -d "2 hours ago" "$CASE"/repo/screener/output/fake-2026-11-11/ranked.csv
 FAKE_RUN=nowrite "$SUP" 2>/dev/null; rc=$?
 check "exit 0" '[ $rc -eq 0 ]'
+check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
+check "no lead folder" '[ -z "$(leads)" ]'
+
+echo "nor is one whose file only looks newer (a clock set back)"
+rm -f "$CASE"/fake/*; touch -d "+1 hour" "$CASE"/repo/screener/output/fake-2026-11-11/ranked.csv
+FAKE_RUN=nowrite "$SUP" 2>/dev/null
 check "agents not called" '[ ! -f $CASE/fake/args-investigator ]'
 check "no lead folder" '[ -z "$(leads)" ]'
 
@@ -303,6 +314,24 @@ check "only the first lead was started" '[ "$(wc -l <$CASE/fake/pids-investigato
 check "urgent alert names the login" 'grep -q "\[urgent\] Screener: lead checks" $CASE/state/logs/alerts.log && alerts | grep -q "STOPPED: the agent ended with an error"'
 check "no try counted" '[ -z "$(ls -A $CASE/state/investigate/attempts)" ]'
 check "the agent's own words are in its log, not in the alert" 'grep -q "Invalid API key" $CASE/state/logs/lead-*.log && ! alerts | grep -q "Invalid API key"'
+
+echo "an agent error after real work is a try of that lead, not a stop"
+new_case lateerror; INVESTIGATE_MAX=1 INVESTIGATE_QUICK_FAIL=0 FAKE_LEAD=crash "$SUP" 2>/dev/null
+check "the try is counted" '[ "$(cat $CASE/state/investigate/attempts/14F_1)" = 1 ]'
+check "not a stop" '! alerts | grep -q "STOPPED"'
+
+echo "the quote checker failing is not the lead's doing"
+new_case checkcrash; FAKE_CHECK=crash "$SUP" 2>/dev/null; rc=$?
+check "exit 0" '[ $rc -eq 0 ]'
+check "stage stopped after the first lead" '[ "$(wc -l <$CASE/fake/pids-investigator)" = 1 ]'
+check "urgent alert says the checker failed" 'grep -q "\[urgent\] Screener: lead checks" $CASE/state/logs/alerts.log && alerts | grep -q "STOPPED: the quote checker itself failed"'
+check "no try counted, nothing published" '[ -z "$(ls -A $CASE/state/investigate/attempts)" ] && [ -z "$(leads)" ]'
+check "sandbox folders empty" '[ "$(leftovers)" = 0 ]'
+
+echo "the quote checker refusing the findings is a try of that lead"
+new_case checkrefuse; INVESTIGATE_MAX=1 FAKE_CHECK=refuse "$SUP" 2>/dev/null
+check "the try is counted" '[ "$(cat $CASE/state/investigate/attempts/14F_1)" = 1 ]'
+check "not a stop, nothing published" '! alerts | grep -q "STOPPED" && [ -z "$(leads)" ]'
 
 echo "an agent stopped at its time limit is a try of that lead"
 new_case timelimit; INVESTIGATE_MAX=1 FAKE_LEAD=timeout "$SUP" 2>/dev/null

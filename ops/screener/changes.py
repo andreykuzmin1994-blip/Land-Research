@@ -54,7 +54,7 @@ ITEM_CAP = 160                # characters of a lead's open items shown in a cel
 GRADES = ("A", "B")           # the grades leads.md lists
 MARKS = ("pursue", "maybe")   # decisions that keep a parcel in the list
 SKEPTIC_VERDICTS = ("survives", "weakened", "killed")
-SITE_NAME = re.compile(r"(contamination site) \([^)]*\)")
+SITE_NAME = re.compile(r"(contamination site(?: [\d,.]+ ft away)?) \(.*?\)(?=; |$)")
 WITHHELD = "(name withheld)"
 OWNER_MIN_CHARS = 7           # shorter owner strings are too common to search for
 COMPANY_WORDS = frozenset({"LLC", "INC", "LP", "LLLP", "LLP", "CORP", "CORPORATION", "CO", "COMPANY",

@@ -180,12 +180,13 @@ report_success() {
   if [ -n "$out" ] && [ -f "$out/ranked.csv" ] && [ -f "$HERE/changes.py" ]; then
     local lead_args=()
     [ -d "${LEADS_DIR:-}" ] && lead_args=(--leads "$LEADS_DIR")
-    changed="$("$PYTHON" "$HERE/changes.py" "$out" "${lead_args[@]}" 2>>"$MAIN_LOG" | head -1 | cut -c1-600)" ||
+    changed="$("$PYTHON" "$HERE/changes.py" "$out" "${lead_args[@]}" 2>>"$MAIN_LOG" | sed -n 1p | cut -c1-600)" ||
       changed=""
     [ -n "$changed" ] || log "$county: no changes.md written (see the log)"
     # Lead checks only for a run that is plain (no extra arguments), clean
     # (no warnings) and made by this supervisor run.
-    if [ "$PLAIN_RUN" = 1 ] && [ -z "$warn" ] && [ "$out/ranked.csv" -nt "$START_MARK" ]; then
+    if [ "$PLAIN_RUN" = 1 ] && [ -z "$warn" ] && [ "$out/ranked.csv" -nt "$START_MARK" ] &&
+       ! grep -qxF -- "$out" "$START_MARK"; then
       RUN_DIRS+=("$county"$'\t'"$out")
     fi
   fi
@@ -467,7 +468,10 @@ main() {
   exec 9>"$STATE_DIR/supervise.lock"
   if ! flock -n 9; then log "another supervisor run is active; exiting"; exit 0; fi
   [ "$#" -gt 0 ] && PLAIN_RUN=0
-  : >"$START_MARK"   # after the lock: only the running supervisor writes it
+  # After the lock, so only the running supervisor writes it: the output
+  # folders that are there before this run. Lead checks are for a folder
+  # this run made, with a ranked.csv newer than this file.
+  find "$REPO_DIR/screener/output" -mindepth 1 -maxdepth 1 -type d 2>/dev/null >"$START_MARK"
   find "$LOG_DIR" -type f -mtime +"$LOG_KEEP_DAYS" -delete 2>/dev/null
   log "supervisor start; counties: $COUNTIES; args: ${*:-none}"
   update_code
