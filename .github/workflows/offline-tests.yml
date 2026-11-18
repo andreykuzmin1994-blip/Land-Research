@@ -52,3 +52,4 @@ jobs:
           python -m unittest discover -s ops/screener -p 'test_*.py' -v
           bash ops/screener/test_supervise.sh
           bash ops/screener/test_investigate.sh
+          bash ops/screener/test_agenda.sh

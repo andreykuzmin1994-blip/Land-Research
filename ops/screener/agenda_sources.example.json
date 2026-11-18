@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {
+      "name": "South Fulton council",
+      "index_url": "https://www.cityofsouthfultonga.gov/AgendaCenter",
+      "path_prefixes": ["/AgendaCenter/ViewFile/Agenda/"],
+      "jurisdictions": ["South Fulton / unincorporated"],
+      "max_new": 6,
+      "expect_every_days": 45,
+      "note": "Checked 2026-11-18: robots.txt allows /AgendaCenter for general crawlers with Crawl-delay 10. Most documents here are scanned ordinances and resolutions without text: the titles are what gets searched."
+    }
+  ]
+}

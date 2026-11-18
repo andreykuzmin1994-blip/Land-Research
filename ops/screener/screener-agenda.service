@@ -1,0 +1,16 @@
+[Unit]
+Description=Land screener: daily watch of council and planning agendas
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=screener
+WorkingDirectory=/home/screener
+ExecStart=/home/screener/Land-Research/ops/screener/agenda-watch.sh
+# A watch reads a handful of documents: stop one that hangs, and keep it
+# from crowding a screener run.
+TimeoutStartSec=45min
+MemoryMax=2G
+CPUQuota=60%
+Nice=10

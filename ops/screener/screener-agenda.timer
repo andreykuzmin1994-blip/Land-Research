@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily agenda watch for the land screener
+
+[Timer]
+# 10:20 UTC every day: early morning in Georgia, and hours away from the
+# weekly screener run (Sunday 15:00 UTC). The watch also skips a day on
+# which a screener run is active.
+OnCalendar=*-*-* 10:20:00 UTC
+RandomizedDelaySec=20m
+# Not Persistent: a watch missed while the server was off is simply the
+# next day's; after a boot the weekly run may be catching up.
+
+[Install]
+WantedBy=timers.target

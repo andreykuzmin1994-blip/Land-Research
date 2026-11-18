@@ -328,6 +328,127 @@ Accepted, because closing them needs more than this script:
   account owns nothing, but a flaw in `pdftotext` would still run code on
   the server.
 
+## Why leads fail (the tally)
+
+`lead_tally.py` reads every lead folder's checked findings and writes
+`screener/leads/_tally.md`: how many leads the skeptic killed, weakened or
+let stand, the reasons with their leads, and for a reason that keeps
+coming up, which screen or grade setting to look at.
+
+```bash
+python ops/screener/lead_tally.py screener/leads --run screener/output/fulton-2026-11-17
+```
+
+- A reason is read two ways: from the checked sections' verdicts (fixed
+  values the quote checker kept only with a quote behind them), and from
+  the skeptic's own words by fixed word patterns. The second is a reading
+  aid, not a measurement: every lead is listed so a count can be checked
+  against its `lead.md`.
+- With `--run`, each reason says how many of its leads the newest run
+  still ranks grade A or B: a reason whose leads are already screened out
+  reads as closed, one whose leads still come through reads as open.
+- No model proposes anything: "what to look at" is fixed text per reason.
+  `screens.py` and `settings.toml` stay yours, and a change to them needs
+  a new evaluation baseline.
+- The file names companies where the skeptic's objection does, like
+  `lead.md`, so it stays in the leads folder. The line it prints holds
+  counts only. The supervisor refreshes it after the lead checks.
+
+On the 29 leads checked by hand up to 2026-11-13, measured against the run
+of that day: 27 of the 29 killed or weakened leads were still grade A or B.
+The reasons, most common first: held by an operating company as buffer or
+expansion land (9 leads), a developer or investor already holds or pursues
+it (8), the adopted plan is against it or the screener read a superseded
+land-use layer (8), not raw land (7), industrial use not by right (6).
+
+## Agenda watch
+
+Between the weekly runs, `agenda_watch.py` looks at the council and
+planning agenda pages you list, once a day, for the parcels of the newest
+run. No AI model is involved: fixed code fetches the index pages, reads
+the documents that are new, and searches for
+
+- a watched parcel's **id** (whatever separates its characters);
+- a watched parcel's **site address** (a possible match, only in the
+  sources that cover its city);
+- in the **titles** the index page gives its documents: a street that
+  watched parcels are on, and zoning case numbers;
+- **industrial zoning words** close together on a page.
+
+The watch list is the grade A and B leads, the parcels marked pursue or
+maybe (in the run or since, in `decisions.csv`), and the top 50, of each
+county's newest full run. It writes `~/screener-ops/agenda/agenda-watch.md`
+and sends an alert only when there is something to say.
+
+**What it is worth.** A hit says the words are in that document. It does
+not say the item is about your parcel, that it is current, or what was
+decided. And no hit does not mean no item: most cities post adopted
+ordinances as scans without text (on South Fulton's page on 2026-11-18,
+the first two documents read were both scans), so for those only the
+title is searched; a source can be down or change its addresses; an
+agenda amended under the same address after it was read is not read
+again. The report counts what was not read, every time.
+
+On that first trial against South Fulton's page, with the run of
+2026-11-13 as the watch list, the titles alone gave four street matches,
+among them the Spence Road rezoning (a lead marked maybe) and the Bishop
+Road case (a grade B lead), which the document checks had earlier found
+by hand.
+
+### Setting it up
+
+1. As root: `ops/screener/install.sh --agenda-watch`. It creates the
+   `screener-agenda` account and `/srv/screener-agenda`, installs
+   `pdftotext` and the daily timer (10:20 UTC).
+2. Write `~/.config/screener-agenda-sources.json` from
+   `agenda_sources.example.json` and `chmod 600` it. Per source: a name,
+   the index page, the path prefixes its documents sit under, the cities
+   it covers as `ranked.csv` writes them, and how often you expect it to
+   post. **Before you list a site, read its robots.txt and terms
+   yourself.** The watch honours robots.txt and never works around a
+   wall (a site that refuses it is reported as not answering).
+3. A trial by hand, as `screener`, in one process (no sandbox):
+
+   ```bash
+   python ops/screener/agenda_watch.py run --sources ~/.config/screener-agenda-sources.json --output-root screener/output --state ~/screener-ops/agenda-trial
+   ```
+
+   Then `systemctl start screener-agenda` and read
+   `~/screener-ops/logs/agenda-*.log`.
+
+Until the sources file exists the timer does nothing and says nothing.
+
+### How it is kept safe and polite
+
+- Agenda packets hold documents that applicants and the public filed. The
+  account that makes the requests and runs `pdftotext` is
+  `screener-agenda`, which owns nothing; `pdftotext` runs under limits on
+  memory, processor time and output. The run user hands it the parcel ids
+  and site addresses to search for (no owner, grade or decision), takes
+  back one result file, and keeps of it only what fits the job: that
+  source's host and paths, parcels of the watch list.
+- Requests go through the quote checker's fetcher: robots.txt and its
+  Crawl-delay, public https addresses only, no redirect to another host.
+  On top: only links found on the listed index page, on its host, under
+  the listed path prefixes; at most 10 new documents a source a run, 80
+  requests and 300 MB a run.
+- A source seen for the first time has its list noted and three documents
+  read. A known source whose list is suddenly mostly new is noted, not
+  crawled, and you are told. A document counts as seen only once its text
+  was searched; one that cannot be read is tried on three runs and then
+  listed for you.
+- It never opens the supervisor's lock; it skips a day on which a
+  screener run is active. It writes nothing into the checkout.
+- The alert holds counts only. `agenda-watch.md` shows a few words of the
+  document around a hit, as plain text: they are public record and can
+  name an applicant or an owner. Tax-roll owner names of the runs are
+  withheld where they appear in roll spelling, no more.
+
+Not verified: a run on a server under the `screener-agenda` account. The
+offline tests run the wrapper as one user with a stand-in for the scan;
+the scan itself is tested against a made-up site and was run by hand
+against South Fulton's page.
+
 ## Pushing fix branches to GitHub (optional)
 
 By default a proposed fix stays on the server (`git -C ~/Land-Research
@@ -355,7 +476,12 @@ pushed so you can review it on GitHub:
 | `lead_queue.py` | Picks the leads, writes their cards, takes files out of a sandbox, publishes a result |
 | `lead_fetch.py` | The agents' one way to read a page, under the quote checker's rules |
 | `test_investigate.sh` | Offline tests of the lead checks: fake agents, the real quote checker |
-| `test_changes.py`, `test_lead_tools.py` | Offline tests of the three Python tools |
+| `lead_tally.py` | `_tally.md`: why leads fail their document check, counted |
+| `agenda_watch.py` | The agenda watch: prepare, scan, report |
+| `agenda-watch.sh`, `screener-agenda.service`, `.timer` | Its daily run on the server, with the scan under its own account |
+| `agenda_sources.example.json` | The shape of the sources file you write |
+| `test_agenda.sh` | Offline tests of the agenda watch's wrapper |
+| `test_changes.py`, `test_lead_tools.py`, `test_lead_tally.py`, `test_agenda_watch.py` | Offline tests of the Python tools |
 
 Tests (offline, from the repository root):
 
@@ -365,6 +491,10 @@ ops/screener/test_supervise.sh
 
 ```bash
 ops/screener/test_investigate.sh
+```
+
+```bash
+ops/screener/test_agenda.sh
 ```
 
 ```bash

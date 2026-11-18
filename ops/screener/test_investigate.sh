@@ -143,7 +143,7 @@ new_case() {
   CASE="$d"
 }
 alerts() { cat "$CASE/state/logs/alerts.log" 2>/dev/null; }
-leads() { ls -A "$CASE/repo/screener/leads" 2>/dev/null; }
+leads() { ls -A "$CASE/repo/screener/leads" 2>/dev/null | grep -v '^_tally\.md$'; }   # the lead folders
 lead_files() { ls -A "$CASE/repo/screener/leads/$1" 2>/dev/null | sort | tr '\n' ' '; }
 run_dir() { ls -1d "$CASE"/repo/screener/output/fake-* | tail -1; }
 leftovers() { ls -A "$CASE/leaddir" "$CASE/checkdir" 2>/dev/null | grep -v ':$' | grep -c .; }
@@ -176,6 +176,7 @@ check "one sandbox folder at a time" '[ "$(cat $CASE/fake/copies-investigator)" 
 check "both sandbox folders are empty afterwards" '[ "$(leftovers)" = 0 ]'
 check "no staging left behind" '[ -z "$(ls -A $CASE/state/investigate | grep -v attempts)" ] && [ -z "$(ls -A $CASE/state/investigate/attempts)" ]'
 check "changes.md shows the document checks" 'grep -q "0 survives, 0 weakened, 3 killed; 1 not checked yet" $(run_dir)/changes.md && grep "14F 1" $(run_dir)/changes.md | grep -q killed'
+check "the tally of why leads fail is written beside the leads" 'grep -q "3 leads have a document check: 3 killed" $CASE/repo/screener/leads/_tally.md'
 check "changes.md has no owner name" '! grep -q -e QUARTERMAINE -e "SECRET MAILING" $(run_dir)/changes.md'
 check "the summary alert carries the digest counts" 'alerts | grep -q "first run, nothing to compare. Grade A 3, grade B 1"'
 check "no HOLD" '[ ! -e $CASE/state/investigate/HOLD ]'

@@ -7,13 +7,18 @@
 #   install.sh --lead-checks    also the two accounts of the lead checks
 #                               (README.md, "Lead checks"); they stay off
 #                               until INVESTIGATE=1 is set in the config
+#   install.sh --agenda-watch   also the account and the daily timer of the
+#                               agenda watch (README.md, "Agenda watch"); it
+#                               does nothing until you write its sources file
 set -euo pipefail
 
 LEAD_CHECKS=0
+AGENDA_WATCH=0
 for arg in "$@"; do
   case "$arg" in
     --lead-checks) LEAD_CHECKS=1 ;;
-    *) echo "usage: $0 [--lead-checks]"; exit 2 ;;
+    --agenda-watch) AGENDA_WATCH=1 ;;
+    *) echo "usage: $0 [--lead-checks] [--agenda-watch]"; exit 2 ;;
   esac
 done
 
@@ -25,6 +30,8 @@ LEAD_USER=screener-lead      # runs the two lead-check agents
 LEAD_DIR=/srv/screener-lead
 CHECK_USER=screener-check    # runs the quote check; no agent ever runs as it
 CHECK_DIR=/srv/screener-check
+AGENDA_USER=screener-agenda  # fetches and reads agenda documents; owns nothing
+AGENDA_DIR=/srv/screener-agenda
 REPO="/home/$RUN_USER/Land-Research"
 
 [ "$(id -u)" -eq 0 ] || { echo "run as root (sudo $0)"; exit 1; }
@@ -119,6 +126,34 @@ install -m 644 "$HERE/screener-supervise.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now screener-supervise.timer
 systemctl list-timers screener-supervise.timer --no-pager
+
+if [ "$AGENDA_WATCH" = 1 ]; then
+  # The account that makes the requests and reads the PDFs: no home, no
+  # shell, nothing of its own, and not an account any other part uses.
+  if ! id "$AGENDA_USER" >/dev/null 2>&1; then
+    adduser --system --group --no-create-home --shell /usr/sbin/nologin "$AGENDA_USER"
+  fi
+  usermod -aG "$AGENDA_USER" "$RUN_USER"
+  install -d "$AGENDA_DIR"
+  chown "$RUN_USER:$AGENDA_USER" "$AGENDA_DIR"
+  chmod 2750 "$AGENDA_DIR"
+  for f in /etc/cron.deny /etc/at.deny; do
+    grep -qx "$AGENDA_USER" "$f" || echo "$AGENDA_USER" >>"$f"
+  done
+  echo "$RUN_USER ALL=($AGENDA_USER) NOPASSWD: ALL" >/etc/sudoers.d/screener-agenda-watch
+  chmod 440 /etc/sudoers.d/screener-agenda-watch
+  visudo -cf /etc/sudoers.d/screener-agenda-watch >/dev/null
+  command -v pdftotext >/dev/null 2>&1 || apt-get install -y poppler-utils ||
+    echo "could not install poppler-utils (pdftotext): install it by hand, the agenda watch needs it"
+  install -m 644 "$HERE/screener-agenda.service" /etc/systemd/system/
+  install -m 644 "$HERE/screener-agenda.timer" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now screener-agenda.timer
+  systemctl list-timers screener-agenda.timer --no-pager
+  echo "agenda watch installed. It does nothing until /home/$RUN_USER/.config/screener-agenda-sources.json"
+  echo "exists: copy $HERE/agenda_sources.example.json there (chmod 600), and check each site's"
+  echo "robots.txt and terms yourself before you list it (README.md, Agenda watch)."
+fi
 
 if [ ! -x "/home/$FIX_USER/.local/bin/claude" ]; then
   echo

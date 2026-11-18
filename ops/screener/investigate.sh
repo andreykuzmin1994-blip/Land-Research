@@ -125,10 +125,12 @@ sandbox_remove() {
   # Twice: the first pass opens folders the sandbox user closed to itself.
   (cd / && timeout -k 5 "$SUDO_TIMEOUT" "$@" chmod -R u+rwx "$d") >>"$MAIN_LOG" 2>&1
   (cd / && timeout -k 5 "$SUDO_TIMEOUT" "$@" find "$d" -mindepth 1 -delete) >>"$MAIN_LOG" 2>&1
-  # Only ever a folder inside one of the two handover folders.
+  # Only ever a folder inside a handover folder (the lead checks' two, or
+  # the agenda watch's).
   case "$d" in
     */..|*/../*|*/.|*/./*) log "    not a plain sandbox folder, left alone: $d"; return 1 ;;
-    "${LEAD_DIR:?}"/?*|"${CHECK_DIR:?}"/?*) find "$d" -depth -delete >>"$MAIN_LOG" 2>&1 ;;
+    "${LEAD_DIR:?}"/?*|"${CHECK_DIR:?}"/?*|"${AGENDA_DIR:-/nonexistent/agenda}"/?*)
+      find "$d" -depth -delete >>"$MAIN_LOG" 2>&1 ;;
     *) log "    not a sandbox folder, left alone: $d"; return 1 ;;
   esac
   [ ! -e "$d" ] && [ ! -L "$d" ]
@@ -535,11 +537,15 @@ investigate_stage() {
   else
     log "lead checks: nothing new to check"
   fi
-  # The digests again, now that the leads have their document checks.
+  # The digests again, now that the leads have their document checks, and
+  # the tally of why leads fail (lead_tally.py: counts and fixed text).
+  local tally_args=()
   for entry in "${RUN_DIRS[@]}"; do
     run_dir="${entry#*$'\t'}"
     "$PYTHON" "$HERE/changes.py" "$run_dir" --leads "$LEADS_DIR" >>"$MAIN_LOG" 2>&1 || true
+    tally_args+=(--run "$run_dir")
   done
+  "$PYTHON" "$HERE/lead_tally.py" "$LEADS_DIR" "${tally_args[@]}" >>"$MAIN_LOG" 2>&1 || true
   umask "$old_umask"
   return 0
 }
