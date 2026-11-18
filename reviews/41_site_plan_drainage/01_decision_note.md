@@ -59,13 +59,17 @@ the pond there, the building above it.
   the first round found none that faces neither and is no smaller.
   At most three of the pass's plans go into the results
   (`POND_ROOM_KEEP`); 90 tries (60 before).
-- **The sheet.** The pad elevation on the building ("PAD EL 917") and the
-  pond's ground against it ("GROUND 8 FT BELOW PAD").
+- **The sheet** (default behaviour). The pad elevation on the building
+  ("PAD EL 917") and each pond's ground against it ("GROUND 8 FT BELOW
+  PAD").
 - Docs: `screener/README.md`, `screener/SITE_PLANNING.md`.
 
 What the check is not: a grading plan. One level pad; no paving slopes,
 pipes, outfall or receiving water; a pond up to 3 ft above the pad is
-taken as dug deeper. The four other priorities (dock side and a court
+taken as dug deeper (from 1 ft the plan says so, `POND_ABOVE_PAD`; the
+deeper pond's footprint is 15 to 30% larger than drawn), and a layout
+inside that tolerance is not laid out again to get its pond lower. A
+second building's pond is measured and flagged but not chosen for. The four other priorities (dock side and a court
 pad below the floor, truck turning, use of the land, structural bays)
 are not in this change.
 
@@ -81,18 +85,18 @@ are not in this change.
 
 ### The 23 sites, default behaviour (floor area / trailer stalls)
 
-Before = PR #51's code. `ang` = the tests' two-angle patch. Rows not
-listed plan the same.
+Before = PR #51's code; after = `8ff329e` (the review's fixes in).
+`ang` = the tests' two-angle patch. Rows not listed plan the same.
 
 | Site | Before | After | Note |
 |---|---|---|---|
 | rank21 | 84,000/0 | **91,000/0** | pond first; new severity-2 `FIRE_SECOND_ACCESS` (driveways a few feet under half the building diagonal apart) |
-| rank25 | 67,000/7, pond 9 ft above the pad | **70,000/0**, pond 24 ft below | the old plan could not drain |
+| rank25 | 67,000/7, pond 9 ft above the pad | **70,000/0**, pond 24 ft below | the old plan could not drain; new `TRAILER_SHORT`, `DROP_YARD_UNREACHABLE` (no stalls) |
 | 1800 x 1900 with homes (both) | 428,000/86 | **520,000/136** | pond first |
-| slope 800 x 900 | 211,000/21, pond uphill | 211,000/0, pond 15 ft below | docks off the street |
-| slope 800 x 900 ang | 205,000/0 | **211,000/21** | |
+| slope 800 x 900 | 211,000/21, pond 9 ft above the pad | 211,000/21, pond 16 ft below | the same floor area and stalls, with a pond that drains |
+| slope 800 x 900 ang | 205,000/0 | **211,000/21** | new `FIRE_SECOND_ACCESS` |
 | low front 700 x 800 ang | 151,000/0 | **157,000/16** | new `FIRE_SECOND_ACCESS` |
-| L-shape (both) | 170,000/17, every pond 9 ft above the pad | 156,000/0, pond 10 ft below | smaller by design; the 170,000 is named in the read-out |
+| L-shape (both) | 170,000/17, every pond 9 ft above the pad | 156,000/0, pond 10 ft below | smaller by design; the 170,000 is named in the read-out; new `TRAILER_SHORT`, `DROP_YARD_UNREACHABLE` |
 
 Run time: #21 26 s (21 s before), the L-shape 20 s (2 s before: it now
 spends all 90 tries), others under 13 s.
