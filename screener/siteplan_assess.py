@@ -619,7 +619,9 @@ def selection(alternatives: list[dict[str, Any]], weights: dict[str, Any],
     if short > 0:
         # The ranking gives no floor area for trailer stalls (an operator
         # decision), so say what meeting the target would cost.
-        full = [a for a in alts[1:] if a.get("geometry_ok") and (a.get("trailers") or 0) >= (a.get("trailers_target") or 0)]
+        full = [a for a in alts[1:] if a.get("geometry_ok") and (a.get("trailers") or 0) >= (a.get("trailers_target") or 0)
+                # not one whose pond cannot drain, when the plan drawn drains
+                and (a.get("drains", True) or not chosen.get("drains", True))]
         text = f"It has {chosen.get('trailers') or 0} of its {chosen.get('trailers_target')} target trailer stalls"
         if weights.get("trailer_sf"):
             text += "."

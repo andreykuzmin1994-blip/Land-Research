@@ -764,8 +764,14 @@ class ReferenceSite(ts.Offline):
         # reference site #21 (a real parcel shape). With no trailer mark in
         # the ranking the largest passing layout is drawn; the read-out says
         # what meeting the trailer target would cost and what the pond holds.
-        inp, _ = ts.load_fixture("rank21")
-        rec, d = sp.plan_site(inp)
+        # (The search's own plan, 68,000 SF: the pond-first pass of
+        # reviews/41 now reaches 91,000 SF on this site, within 5% of what
+        # the pond held back, and the read-out then has no pond line.)
+        rec, d = ts.ref_plan("rank21", POND_ROOM_MAX_TRIES=0)
+        now, _ = ts.ref_plan("rank21")
+        self.assertIsNone(now["selection"]["without_pond"])
+        self.assertTrue(now["selection"]["with_trailers"]["trailers"] >= 1)
+        self.assertIsNot(now["alternatives"][0].get("drains"), False)
         sel = rec["selection"]
         self.assertIs(rec["feasible"], True)
         self.assertIn("TRAILER_SHORT", ts.names(rec, 2))
