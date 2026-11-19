@@ -3217,6 +3217,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                                 lst[k] = got
         try:
             top0 = max(results, key=score)
+            if not ctx.runs:
+                raise LookupError           # no frontage: no driveway, no truck route to lay out
             top = settle()
             if top0[1]["ok"] and top0[1].get("drivable") is False:
                 left = [TRUCK_FIRST_MAX_TRIES]
@@ -3237,6 +3239,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 truck_first_rec["outcome"] = "another_layout"
             else:
                 truck_first_rec["outcome"] = "drivable" if top[1].get("drivable") else "not_judged"
+        except LookupError:
+            truck_first_rec["outcome"] = "no_frontage"
         except _BudgetExceeded:
             search.exceeded = False     # only this step ran out of time: building 1's search was complete
             for _, o_ in results:

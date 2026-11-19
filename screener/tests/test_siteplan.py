@@ -2049,6 +2049,14 @@ class Trucks(Offline):
         self.assertEqual((cond["workstream"], cond["stage"]), (sp.assess.W_ACCESS, "offer"))
         self.assertIn("NO PATH IT CAN STEER", sr.render(d, rec))
 
+    def test_no_frontage_no_truck_design(self):
+        rec, _ = planned("truck_nofront", lambda: site(600, 700, front_state="none"))
+        self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "no_frontage")
+        self.assertEqual(rec["inputs"]["truck_first"]["judged"], 0)
+        self.assertEqual(rec["inputs"]["truck_side"]["outcome"], "no_plan")
+        self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "no truck route"})
+        self.assertFalse({"TRUCK_PATH_NONE", "BLIND_SIDE_BACKING"} & names(rec))
+
     def test_a_design_that_fails_never_costs_the_plan(self):
         base, _ = planned("truck_flat", lambda: site(600, 700))
 
