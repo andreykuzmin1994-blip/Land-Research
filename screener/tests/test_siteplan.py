@@ -1913,21 +1913,31 @@ class Trucks(Offline):
         p = self.fake(box(60, 300, 540, 430))                                # the court north of the building
         west, east = Point(60, 365), Point(540, 365)
         gw, ge = sp.court_goal(p, west), sp.court_goal(p, east)
-        # from the west end the way in runs east, on the truck lane 30 ft beyond the court's middle, 100 ft in
-        self.assertAlmostEqual(math.degrees(gw["dir"]) % 360, 0.0, places=6)
-        self.assertAlmostEqual(gw["goal"][0], 160.0)
-        self.assertAlmostEqual(gw["goal"][1], 365.0 + sp.TRUCK_LANE_FT)
-        self.assertAlmostEqual(math.degrees(ge["dir"]) % 360, 180.0, places=6)
-        self.assertAlmostEqual(ge["goal"][0], 440.0)
-        # heading west the building (south) is on the driver's left: the east end is the sight side
-        self.assertEqual((gw["sight"], ge["sight"]), (False, True))
+        # the truck lane: along the court, 30 ft beyond its middle, 100 ft short of each end
+        (x0, y0), (x1, y1) = gw["lane"]
+        self.assertEqual(sorted((round(x0, 6), round(x1, 6))), [160.0, 440.0])
+        self.assertAlmostEqual(y0, 365.0 + sp.TRUCK_LANE_FT)
+        self.assertAlmostEqual(y1, 365.0 + sp.TRUCK_LANE_FT)
+        self.assertEqual(gw["lane"], ge["lane"])                             # one lane, whichever end the search's route reached
+        # heading west the building (south) is on the driver's left: that way is the sight side,
+        # and it is the way in from the east end
+        west_way = 1 if x1 < x0 else -1
+        self.assertEqual(gw["sight_way"], west_way)
+        self.assertEqual((gw["entry_way"], ge["entry_way"]), (-west_way, west_way))
         self.assertEqual((sp.sight_entry(p, west), sp.sight_entry(p, east)), (False, True))
         # the court on the other side of the building: the other end
         q = self.fake(box(60, -30, 540, 100))
         self.assertEqual((sp.sight_entry(q, Point(60, 35)), sp.sight_entry(q, Point(540, 35))), (True, False))
-        # a short court: the run-in is no more than a third of it
+        # a short court: the lane keeps a third of it clear at each end
         short = self.fake(box(100, 300, 300, 430), box(100, 100, 300, 300))
-        self.assertAlmostEqual(sp.court_goal(short, Point(100, 365))["goal"][0], 100 + 0.35 * 200)
+        (sx0, _), (sx1, _) = sp.court_goal(short, Point(100, 365))["lane"]
+        self.assertEqual(sorted((round(sx0, 6), round(sx1, 6))), [170.0, 230.0])
+        # the side trucks back in on: from the designed path where there is one, else from the end the route reached
+        self.assertEqual(sp.backing_of(p, {"truck_entry": west}), "blind")
+        self.assertEqual(sp.backing_of(p, {"truck_entry": east}), "sight")
+        self.assertEqual(sp.backing_of(p, {"truck_entry": west, "truck_path": {"designed": True, "backing": "sight"}}), "sight")
+        self.assertEqual(sp.backing_of(p, {"truck_entry": east, "truck_path": {"designed": False}}), "sight")
+        self.assertIsNone(sp.backing_of(p, {"truck_entry": None}))
 
     def test_the_dock_zone_is_in_front_of_the_wall_only(self):
         p = self.fake(box(60, 300, 540, 430))
@@ -1955,16 +1965,101 @@ class Trucks(Offline):
         self.assertIsNone(sp.truck_side_refused(p, o0, ok))
         self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_entry=Point(60, 365))))
         self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_entry=None)))
+        # a designed path decides the side, whichever end the search's route reached
+        designed = lambda backing, bends=(): {"designed": True, "backing": backing, "bends": list(bends)}
+        self.assertIsNone(sp.truck_side_refused(p, o0, dict(o0, truck_path=designed("sight"))))
+        self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_path=designed("blind"))))
         self.assertIsNone(sp.truck_side_refused(p, o0, dict(ok, routes=route(600) + route(100, "car"))))
         self.assertIn("trucks' way in", sp.truck_side_refused(p, o0, dict(ok, routes=route(601) + route(100, "car"))))
+        # no loop round to come in from that end (review 43/02, finding 4)
+        self.assertIsNone(sp.truck_side_refused(p, o0, dict(ok, truck_path=designed("sight", [{"deg": 135}]))))
+        self.assertIn("loop round", sp.truck_side_refused(p, o0, dict(ok, truck_path=designed("sight", [{"deg": 90}, {"deg": 150}]))))
         self.assertIn("fewer trailer stalls", sp.truck_side_refused(p, o0, dict(ok, trailers=19)))
         self.assertIn("fails its checks", sp.truck_side_refused(p, o0, dict(ok, ok=False)))
         self.assertIn("adds a condition", sp.truck_side_refused(p, o0, dict(ok, flags=[("FIRE_SECOND_ACCESS", 2, "")])))
         # with the truck road laid out for the first time, the conditions that road states itself are not new
-        new = dict(ok, flags=[("SHORT_THROAT", 2, ""), ("PARKING_SHORT_FOR_LEAD_IN", 2, "")])
+        new = dict(ok, flags=[("SHORT_THROAT", 2, ""), ("PARKING_SHORT_FOR_LEAD_IN", 2, ""), ("TRUCK_ENTRANCE_S_BEND", 2, "")])
         self.assertIsNone(sp.layout_no_worse(o0, new, truck=True))
         self.assertIn("adds a condition", sp.layout_no_worse(o0, new))
         self.assertIn("FIRE_SECOND_ACCESS", sp.layout_no_worse(o0, dict(ok, flags=[("FIRE_SECOND_ACCESS", 2, "")]), truck=True))
+
+    def test_what_a_truck_must_stay_off(self):
+        from types import SimpleNamespace as NS
+        ctx = NS(parcel=box(0, 0, 600, 600), P=box(10, 10, 590, 590), wet_buf=box(500, 500, 600, 600), cut=Polygon())
+        p = NS(building=box(100, 100, 500, 300), cars=[box(100, 20, 500, 100)], rows=[box(150, 430, 450, 485)], courts=[box(60, 300, 540, 430)])
+        o = {"ponds": [box(20, 450, 120, 560)], "drops": [box(300, 500, 400, 580)], "cpt": Point(300, 0), "route_polys": [("car", box(290, 0, 310, 20)), ("truck", box(60, 0, 100, 300))]}
+        kinds = sp.truck_obstacles(p, o, ctx)
+        self.assertEqual(set(kinds), {"the building", "the car parking", "the trailer stalls", "the pond", "the car route",
+                                      "ground where water or the test cut allows no paving", "the paving setback"})
+        self.assertAlmostEqual(kinds["the trailer stalls"].area, 300 * 55 + 100 * 80)      # the row and the drop yard
+        self.assertAlmostEqual(kinds["the pond"].area, 100 * 110)
+        self.assertAlmostEqual(kinds["the car route"].area, 400)             # not the truck's own road
+        self.assertAlmostEqual(kinds["the paving setback"].area, 600 * 600 - 581 * 581, delta=1)     # (the envelope's edge itself is not in it)
+        # with one driveway the car route is no obstacle; another building's plan adds its own
+        self.assertNotIn("the car route", sp.truck_obstacles(p, dict(o, cpt=None), ctx))
+        other = (NS(building=box(100, 400, 200, 440), cars=[], rows=[], courts=[]), {"ponds": [], "drops": [], "cpt": None, "route_polys": []})
+        self.assertAlmostEqual(sp.truck_obstacles(p, o, ctx, other)["the building"].area, 400 * 200 + 100 * 40)
+
+    def test_what_the_record_says_of_a_path(self):
+        from types import SimpleNamespace as NS
+        parcel = box(0, 0, 600, 600)
+        p = NS(building=box(100, 100, 500, 300), cars=[box(100, 20, 500, 100)], rows=[], courts=[box(60, 300, 540, 430)], car_cap=80, cars_required=70)
+        line = LineString([(80, 0), (80, 365), (300, 365)])
+        goal = {"sight_way": 1, "entry_way": 1}
+        kinds = {"the building": p.building, "the car parking": p.cars[0]}
+
+        def rec(got_over=None, pave=None, flags=(), cpt=Point(300, 0), over_cars=False, the_line=line, **got_kw):
+            got = dict({"bends": [], "reverse": 0, "min_radius_ft": None, "clip_ft": 0.0, "clip_at": None, "ok": True, "way": 1}, **got_kw)
+            o = {"flags": list(flags), "routes": [("truck", the_line)], "route_polys": [("truck", pave or the_line.buffer(20))], "cpt": cpt}
+            d = {"got": got if got_over is None else got_over, "goal": goal, "kinds": kinds, "over_cars": over_cars}
+            return sp.truck_record(p, o, d, parcel, 400.0, 16000.0), {f: (sv, note) for f, sv, note in o["flags"]}, o
+        info, fl, _ = rec()
+        self.assertEqual((info["designed"], info["backing"], info["swept_ok"]), (True, "sight", True))
+        self.assertAlmostEqual(info["throat_ft"], 300, delta=5)              # from the street to the court
+        self.assertEqual(fl, {})
+        # the side the path comes onto the lane decides the backing
+        info, fl, _ = rec(way=-1)
+        self.assertEqual(info["backing"], "blind")
+        self.assertEqual(fl["BLIND_SIDE_BACKING"][0], 3)
+        # the grid route's throat and dead-end flags give way to the path's own measure, street to court
+        info, fl, _ = rec(flags=[("SHORT_THROAT", 2, "old"), ("DEAD_END_ACCESS", 2, "old"), ("ZONING_DRAFT", 2, "kept")])
+        self.assertEqual(set(fl), {"ZONING_DRAFT"})
+        short = LineString([(80, 240), (80, 365), (300, 365)])
+        self.assertRegex(rec(the_line=short)[1]["SHORT_THROAT"][1], r"about 6[0-5] ft")
+        far = LineString([(80, -500), (80, 365), (300, 365)])
+        self.assertNotIn("DEAD_END_ACCESS", rec(the_line=far)[1])            # 800 ft, but cars have their own driveway
+        self.assertEqual(rec(the_line=far, cpt=None)[1]["DEAD_END_ACCESS"][0], 2)
+        # a swept path that strays: where, how far, over what
+        info, fl, _ = rec(ok=False, clip_ft=6.4, clip_at=(101, 200))
+        self.assertEqual((info["swept_ok"], info["swept_clips"]), (False, "the building"))
+        self.assertIn("sweeps about 6 ft over the building", fl["TRUCK_SWEPT_PATH"][1])
+        self.assertEqual(fl["TRUCK_SWEPT_PATH"][0], 2)
+        self.assertEqual(rec(ok=False, clip_ft=3.0, clip_at=(-5, 200))[0]["swept_clips"], "the property line")
+        # the lead-in over the car field: the stalls under its pavement and those it cuts off from the rest
+        lead = box(140, 0, 180, 110)                                         # across the field, 40 ft in from its west end
+        info, fl, o = rec(over_cars=True, pave=lead.union(line.buffer(20)))
+        cut_off = (180 + 2 - 100) * 80 / (400 * 80 / 80)                     # the west end and the pavement (with its 2 ft): 82 ft of an 80-stall, 400 ft field
+        self.assertEqual(info["car_stalls_taken"], math.ceil(cut_off))
+        self.assertEqual(o["car_stalls_taken"], info["car_stalls_taken"])
+        self.assertEqual(fl["PARKING_SHORT_FOR_LEAD_IN"][0], 2)              # 63 left of 70 required
+        p.cars_required = 60
+        self.assertEqual(rec(over_cars=True, pave=lead.union(line.buffer(20)))[1]["TRUCK_LEAD_IN_OVER_PARKING"][0], 3)
+        # bends: a reverse bend is a note; a hard S-bend as the truck comes off the street is a condition
+        b = lambda hand, deg, at, R=45.0: {"hand": hand, "deg": deg, "radius_ft": R, "from_start_ft": at}
+        info, fl, _ = rec(bends=[b("left", 45, 200), b("right", 45, 260)], reverse=1)
+        self.assertEqual((fl["TRUCK_REVERSE_BEND"][0], "TRUCK_ENTRANCE_S_BEND" in fl), (3, False))
+        info, fl, _ = rec(bends=[b("right", 90, 0), b("left", 90, 71)], reverse=1)
+        self.assertEqual((fl["TRUCK_ENTRANCE_S_BEND"][0], "TRUCK_REVERSE_BEND" in fl, info["entrance_s_bend"]), (2, False, True))
+        for gentle in ([b("right", 90, 80), b("left", 90, 151)],             # a truck's length in from the street
+                       [b("right", 45, 0), b("left", 90, 40)],               # a slight first bend
+                       [b("right", 90, 0, 90.0), b("left", 90, 150)],        # an easy radius
+                       [b("right", 90, 0), b("right", 90, 71)]):             # the same hand
+            self.assertNotIn("TRUCK_ENTRANCE_S_BEND", rec(bends=gentle, reverse=1)[1])
+        # no path at all: the grid route's own flags stand, and the plan says so
+        o = {"flags": [("SHORT_THROAT", 2, "old")], "routes": [("truck", line)], "route_polys": [], "cpt": None}
+        info = sp.truck_record(p, o, {"got": None, "goal": goal, "kinds": kinds, "over_cars": False}, parcel, 400.0, 16000.0)
+        self.assertEqual((info["designed"], info["reason"], info["backing"]), (False, "no path", "sight"))
+        self.assertEqual([(f, sv) for f, sv, _ in o["flags"]], [("TRUCK_PATH_NONE", 2), ("SHORT_THROAT", 2)])
 
     def test_the_plan_drawn_has_a_way_in_a_wb67_can_drive(self):
         # a flat 600 x 700 ft lot: the driveway must stand 110 ft from the
@@ -1995,13 +2090,17 @@ class Trucks(Offline):
         self.assertLess(pave.intersection(d.p.building).area, 1.0)
         self.assertTrue(all(pond.intersection(pave).area < 1.0 for pond in d.o["ponds"]))     # truck first, then the pond
         self.assertTrue(d.parcel.buffer(1).contains(pave))
+        # ... and inside the paving envelope, but for the driveway's own opening (review 43/02, finding 2)
+        mouth = d.o["tpt"].buffer(sp.DRIVEWAY_MOUTH_FT)
+        self.assertLess(pave.difference(d.P.buffer(0.5)).difference(mouth).area, 1.0)
+        self.assertLessEqual(dict(d.o["route_outside"])["truck"], sp.truck.CLIP_TOL_FT)      # the route's measure: its swept path's stray
         self.assertEqual(rec["plan_checks"], [])
         self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "drivable")
         self.assertIs(rec["alternatives"][0]["drivable"], True)
         assert_invariant(self, rec)
         svg = sr.render(d, rec)
         viewer.sanitise_svg(svg)
-        for text_ in ("Truck path", "WB-67:", "swept path clear", "Truck path: an AASHTO WB-67", "way in as a WB-67 steers it"):
+        for text_ in ("Truck path", "WB-67 clear:", "Truck path: an AASHTO WB-67", "truck path as a WB-67 steers it"):
             self.assertIn(text_, svg, text_)
 
     def test_the_prototype_plans_as_before(self):
@@ -2049,6 +2148,24 @@ class Trucks(Offline):
         self.assertEqual((cond["workstream"], cond["stage"]), (sp.assess.W_ACCESS, "offer"))
         self.assertIn("NO PATH IT CAN STEER", sr.render(d, rec))
 
+    def test_a_much_smaller_layout_is_named_not_drawn(self):
+        # review 43/02, finding 9. The same 1200 x 1200 ft lot on the tests'
+        # two angles, the lead-in over the car field refused: the only
+        # layout found with a way in has half the floor area. The plan
+        # drawn stays the 335,000 SF one, with the condition and the
+        # smaller layout named.
+        mk = lambda: site(1200, 1200, z=lambda x, y: 900 + 0.015 * x + 0.02 * y)
+        real = sp.truck.design
+        with mock.patch.object(sp.truck, "design", lambda *a, **k: None if k.get("dear") is not None else real(*a, **k)):
+            rec, _ = sp.plan_site(mk())
+        tf = rec["inputs"]["truck_first"]
+        self.assertEqual(rec["building"]["sf"], 335000)
+        self.assertEqual(tf["outcome"], "much_smaller")
+        self.assertLess(tf["best_with_a_way_in_sf"], sp.TRUCK_TIER_MIN_SHARE * 335000)
+        note = [f["note"] for f in rec["flags"][2] if f["flag"] == "TRUCK_PATH_NONE"][0]
+        self.assertIn(f"the largest layout found with a way in has {tf['best_with_a_way_in_sf']:,} SF (much smaller: not drawn)", note)
+        self.assertFalse(any(a.get("drivable") is False for a in rec["alternatives"]))       # the ranking stands as it was
+
     def test_no_frontage_no_truck_design(self):
         rec, _ = planned("truck_nofront", lambda: site(600, 700, front_state="none"))
         self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "no_frontage")
@@ -2066,6 +2183,13 @@ class Trucks(Offline):
             rec, _ = sp.plan_site(site(600, 700))
         self.assertEqual((rec["building"]["sf"], rec["feasible"]), (base["building"]["sf"], base["feasible"]))
         self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "RuntimeError: no such turn"})
+        # ... nor does an error inside the design itself, wherever it is called from (review 43/02, finding 3)
+        with mock.patch.object(sp.truck, "design", boom):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertEqual((rec["building"]["sf"], rec["feasible"], rec["trailers"]["total"]),
+                         (base["building"]["sf"], base["feasible"], base["trailers"]["total"]))
+        self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "RuntimeError: no such turn"})
+        self.assertNotIn("TRUCK_PATH_NONE", names(rec))                      # not laid out is not "no way in"
 
     def test_a_second_building_has_its_own_way_in(self):
         two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
@@ -2122,7 +2246,7 @@ class TruckTier(Offline):
         self.assertIs(rec["alternatives"][0]["drivable"], True)
         self.assertIn("no tractor-trailer can drive", json.dumps(rec["selection"]))
         words = " ".join(re.findall(r">([^<]+)</text>", sr.render(d, rec)))     # (the cell wraps)
-        self.assertIn("no way in a truck can drive", words)
+        self.assertIn("passes; no way in for a truck", words)
 
 
 class PondRoomOnlyAdds(Offline):

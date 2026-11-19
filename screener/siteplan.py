@@ -385,6 +385,15 @@ TRUCK_TIER_MAX = 8                  # layouts whose way in is laid out to settle
 TRUCK_FIRST_MAX_TRIES = 48          # fits and full checks of the driveway-first step
 SIGHT_ROUTE = 1.5
 SIGHT_ROUTE_FT = 200.0
+SIGHT_MAX_BEND_DEG = 135.0          # ... and no loop: no one bend of more than this
+# An S-bend at the entrance: two bends to opposite hands, each of this
+# many degrees or more at the minimum radius, the first within a truck's
+# length of the street. A truck can make it at walking speed; it is not
+# an entrance an engineer would leave (TRUCK_ENTRANCE_S_BEND, severity 2).
+ENTRANCE_S_DEG = 60.0
+# The drivable tier changes the plan drawn only for a layout with at least
+# this share of the floor area it would give up (a smaller one is named).
+TRUCK_TIER_MIN_SHARE = 0.8
 # The stepped pad is not figured where the lidar samples cover less than
 # this share of the module (a partial figure would read as a small one).
 STEPPED_MIN_COVER = 0.8
@@ -1724,7 +1733,7 @@ def dock_turn_blocked(q0: "Plan", q: "Plan", B0: BaseGeometry, row_line, res_lin
     return None
 
 
-TRUCK_OWN_FLAGS = {"PARKING_SHORT_FOR_LEAD_IN", "SHORT_THROAT", "DEAD_END_ACCESS"}
+TRUCK_OWN_FLAGS = {"PARKING_SHORT_FOR_LEAD_IN", "TRUCK_ENTRANCE_S_BEND", "SHORT_THROAT", "DEAD_END_ACCESS"}
 
 
 def layout_no_worse(o0: dict[str, Any], o2: dict[str, Any], truck: bool = False) -> str | None:
@@ -1810,25 +1819,43 @@ def dock_zone(p: "Plan") -> BaseGeometry:
 
 
 def court_goal(p: "Plan", entry) -> dict[str, Any]:
-    """Where a truck that reaches `entry` is going: the court nearest it,
-    the direction along that court from its near end, a point on the
-    truck lane COURT_RUN_IN_FT in (TRUCK_LANE_FT beyond the court's
-    middle, away from the dock wall), and whether the docks are then on
-    the driver's side (`sight`: the building on the left of the way in,
-    so the driver backs in seeing the trailer's path)."""
+    """Where a truck that reaches `entry` is going: the court nearest it
+    and that court's truck lane, a segment along the court TRUCK_LANE_FT
+    beyond its middle (away from the dock wall), COURT_RUN_IN_FT short
+    of each end. `sight_way` is the way along the lane (+1 from its first
+    point to its second, -1 back) on which the docks are on the driver's
+    side: the building on the left, so the driver backs in seeing the
+    trailer's path."""
     court = min(p.courts, key=lambda c: c.distance(entry))
     ax, n, length = court_frame(p, court)
     cc = court.centroid
-    if (cc.x - entry.x) * ax[0] + (cc.y - entry.y) * ax[1] < 0:
-        ax = (-ax[0], -ax[1])                       # from the end nearest the entry, inward
-    run = min(COURT_RUN_IN_FT, 0.35 * length)
-    g = (cc.x - ax[0] * (length / 2 - run) + n[0] * TRUCK_LANE_FT, cc.y - ax[1] * (length / 2 - run) + n[1] * TRUCK_LANE_FT)
-    sight = (-ax[1]) * (-n[0]) + ax[0] * (-n[1]) > 0        # the building (at -n) on the left of the way in
-    return {"court": court, "dir": math.atan2(ax[1], ax[0]), "goal": g, "sight": sight, "length": length}
+    half = max(length / 2 - min(COURT_RUN_IN_FT, 0.35 * length), 5.0)
+    mid = (cc.x + n[0] * TRUCK_LANE_FT, cc.y + n[1] * TRUCK_LANE_FT)
+    lane = ((mid[0] - ax[0] * half, mid[1] - ax[1] * half), (mid[0] + ax[0] * half, mid[1] + ax[1] * half))
+    # heading along +ax, the driver's left is (-ax.y, ax.x); the building lies at -n
+    sight_way = 1 if (-ax[1]) * (-n[0]) + ax[0] * (-n[1]) > 0 else -1
+    inward = 1 if (cc.x - entry.x) * ax[0] + (cc.y - entry.y) * ax[1] >= 0 else -1     # the way along the lane from the entry's end
+    return {"court": court, "lane": lane, "sight_way": sight_way, "entry_way": inward, "length": length}
 
 
 def sight_entry(p: "Plan", entry) -> bool:
-    return court_goal(p, entry)["sight"]
+    """Whether a truck that comes into the court from the end nearest
+    `entry` has the docks on the driver's side."""
+    g = court_goal(p, entry)
+    return g["entry_way"] == g["sight_way"]
+
+
+def backing_of(p: "Plan", o: dict[str, Any]) -> str | None:
+    """`sight` or `blind`: the side trucks back in on, from the way the
+    designed path comes onto the truck lane, or (no designed path) from
+    the end of the court the search's route reaches. None with no truck
+    route."""
+    tp = o.get("truck_path") or {}
+    if tp.get("designed") and tp.get("backing"):
+        return tp["backing"]
+    if o.get("truck_entry") is None:
+        return None
+    return "sight" if sight_entry(p, o["truck_entry"]) else "blind"
 
 
 def truck_route_ft(o: dict[str, Any]) -> float:
@@ -1844,11 +1871,13 @@ def truck_side_refused(p: "Plan", o0: dict[str, Any], o2: dict[str, Any]) -> str
     why = layout_no_worse(o0, o2)
     if why:
         return why
-    if o2.get("truck_entry") is None or not sight_entry(p, o2["truck_entry"]):
+    if backing_of(p, o2) != "sight":
         return "no truck route reaches the sight-side end of the court"
     t0, t2 = truck_route_ft(o0), truck_route_ft(o2)
     if t2 > max(SIGHT_ROUTE * t0, t0 + SIGHT_ROUTE_FT):
         return "the trucks' way in would be much longer"
+    if max((b["deg"] for b in (o2.get("truck_path") or {}).get("bends") or []), default=0) > SIGHT_MAX_BEND_DEG:
+        return "the trucks would have to loop round to come in from that end"
     return None
 
 
@@ -1906,13 +1935,15 @@ def truck_design_for(p: "Plan", o: dict[str, Any], ctx: "Ctx", other: tuple | No
         hard = unary_union(list(kinds.values())) if kinds else Polygon()
         keep_off = unary_union([dock_zone(q) for q, _ in [(p, o)] + ([other] if other else [])])
         start = (tpt.x + nx * 12.0, tpt.y + ny * 12.0)
-        got = truck.design(start, math.atan2(ny, nx), goal["goal"], goal["dir"], parcel, hard, keep_off, mouth)
+        # onto the truck lane either way, or (the sight-side step) only the way that puts the docks on the driver's side
+        way = goal["sight_way"] if ctx.sight_first and len(p.courts) == 1 else 0
+        got = truck.design(start, math.atan2(ny, nx), goal["lane"], parcel, hard, keep_off, mouth, way=way)
         over_cars = False
         if (got is None or not got["ok"]) and p.cars:
             # The lead-in over the corner of the car field: where the
             # driveway stands in front of the car parking and to one side
             # of the truck road, the trucks' way in takes the stalls in
-            # its path (counted in apply_truck_path), as an engineer would
+            # its path (counted in truck_record), as an engineer would
             # re-lay the car field before shortening the building.
             own = unary_union(p.cars)
             kinds2 = dict(kinds)
@@ -1920,24 +1951,28 @@ def truck_design_for(p: "Plan", o: dict[str, Any], ctx: "Ctx", other: tuple | No
             if not rest.is_empty:
                 kinds2["the car parking"] = rest
             hard2 = unary_union(list(kinds2.values())) if kinds2 else Polygon()
-            got2 = truck.design(start, math.atan2(ny, nx), goal["goal"], goal["dir"], parcel, hard2, keep_off, mouth, dear=own.buffer(truck.BODY_CLEAR))
-            if got2 is not None and got2["ok"]:
+            got2 = truck.design(start, math.atan2(ny, nx), goal["lane"], parcel, hard2, keep_off, mouth,
+                                dear=own.buffer(truck.BODY_CLEAR), way=way)
+            # taken when it works, and also when it is the only path there is (its clip is then what the plan reports)
+            if got2 is not None and (got2["ok"] or got is None):
                 got, kinds, over_cars = got2, kinds2, True
-        res = {"got": got, "goal": goal, "kinds": kinds, "tpt": tpt, "over_cars": over_cars}
+        res = {"got": got, "goal": goal, "kinds": kinds, "tpt": tpt, "over_cars": over_cars, "mouth": mouth}
     if cache:
         o["_truck"] = res
     return res
 
 
-def truck_line_and_pave(p: "Plan", d: dict[str, Any], parcel: BaseGeometry) -> tuple[LineString, BaseGeometry]:
+def truck_line_and_pave(p: "Plan", d: dict[str, Any], ctx: "Ctx") -> tuple[LineString, BaseGeometry]:
     """The designed way in as the plan carries it: the centreline from the
-    driveway's point on the street, and its pavement (the 40 ft truck
-    road widened to the swept path, off everything a truck's body must
-    stay off)."""
+    driveway's point on the street, and its pavement: the 40 ft truck
+    road widened to the swept path, inside the paving envelope (and the
+    driveway's own opening through the setback), off everything a
+    truck's body must stay off."""
     got, kinds, tpt = d["got"], d["kinds"], d["tpt"]
     line = LineString([(tpt.x, tpt.y)] + list(got["line"].coords))
     solid = unary_union([g for k, g in kinds.items() if k != "the paving setback"]) if kinds else Polygon()
-    pave = unary_union([line.buffer(TRUCK_ROAD / 2, cap_style=2), got["swept"].buffer(2.0)]).intersection(parcel).difference(solid)
+    may = unary_union([ctx.P, d["mouth"]]).intersection(ctx.parcel)
+    pave = unary_union([line.buffer(TRUCK_ROAD / 2, cap_style=2), got["swept"].buffer(2.0)]).intersection(may).difference(solid)
     return line, pave
 
 
@@ -1945,28 +1980,28 @@ def truck_record(p: "Plan", o: dict[str, Any], d: dict[str, Any], parcel: BaseGe
     """Write a layout's truck design onto its plan `o`: `o["truck_path"]`
     for the record and the flags it raises (in place of the grid route's
     SHORT_THROAT and DEAD_END_ACCESS, which are measured again on the
-    path). `o["routes"]` already holds the designed line when one
-    exists."""
+    path, from the street to the court). `o["routes"]` already holds the
+    designed line when one exists."""
     got, goal, kinds = d["got"], d["goal"], d["kinds"]
-    info: dict[str, Any] = {"designed": got is not None, "vehicle": truck.VEHICLE_NAME, "backing": "sight" if goal["sight"] else "blind",
+    way = got["way"] if got is not None else goal["entry_way"]
+    sight = way == goal["sight_way"]
+    info: dict[str, Any] = {"designed": got is not None, "vehicle": truck.VEHICLE_NAME, "backing": "sight" if sight else "blind",
                             "courts": len(p.courts), "grid_route_ft": round(grid_ft)}
     flags = [t for t in o["flags"] if t[0] not in ("SHORT_THROAT", "DEAD_END_ACCESS")]
     if got is None:
         info["reason"] = "no path"
-        flags.append(("TRUCK_PATH_NONE", 2, f"no path a {truck.VEHICLE_NAME} can steer ({truck.R_MIN:.0f} ft radius) from the driveway to the "
-                                            "truck court on the ground this plan leaves: the driveway does not line up with the "
-                                            "truck road, or what stands between them leaves no room to turn; the route drawn is "
-                                            "the search's own line"))
-        flags += [t for t in o["flags"] if t[0] == "SHORT_THROAT"]
-        length = grid_ft
+        flags.append(("TRUCK_PATH_NONE", 2, f"no path a {truck.VEHICLE_NAME} can steer ({truck.R_MIN:.0f} ft radius) was found from the driveway "
+                                            "to the truck court on the ground this plan leaves (usually the driveway does not line up "
+                                            "with the truck road and what stands between them leaves no room to turn); the route "
+                                            "drawn is the search's own line"))
+        flags += [t for t in o["flags"] if t[0] in ("SHORT_THROAT", "DEAD_END_ACCESS")]
     else:
         line = next(ln for k, ln in o["routes"] if k == "truck")
         pave = next(pp for k, pp in o["route_polys"] if k == "truck")
-        length = line.length
         # the throat: from the street to where the path first enters a truck court
         courts_u = unary_union(p.courts)
-        throat = next((line.project(Point(c)) for c in shapely.segmentize(line, 5.0).coords if courts_u.contains(Point(c))), length)
-        info.update({"length_ft": round(length), "throat_ft": round(throat), "bends": got["bends"], "reverse_bends": got["reverse"],
+        throat = next((line.project(Point(c)) for c in shapely.segmentize(line, 5.0).coords if courts_u.contains(Point(c))), line.length)
+        info.update({"length_ft": round(line.length), "throat_ft": round(throat), "bends": got["bends"], "reverse_bends": got["reverse"],
                      "min_radius_ft": got["min_radius_ft"], "swept_clip_ft": round(got["clip_ft"], 1), "swept_ok": got["ok"],
                      "pavement_sf": rnd(pave.area, 100), "grid_pavement_sf": rnd(grid_pave_sf, 100)})
         if not got["ok"]:
@@ -1979,8 +2014,11 @@ def truck_record(p: "Plan", o: dict[str, Any], d: dict[str, Any], parcel: BaseGe
                                                  f"{line.project(at):,.0f} ft from the street its body sweeps about {got['clip_ft']:.0f} ft "
                                                  f"over {what}"))
         if d["over_cars"]:
+            # the stalls under the lead-in's pavement, and those it cuts off from the rest of the car field
             own = unary_union(p.cars)
-            taken = math.ceil(pave.intersection(own).area / (own.area / max(p.car_cap, 1)))
+            rest = own.difference(pave.buffer(2.0))
+            kept = max((g.area for g in getattr(rest, "geoms", [rest]) if g.geom_type == "Polygon"), default=0.0)
+            taken = math.ceil((own.area - kept) / (own.area / max(p.car_cap, 1)) - 1e-6)
             left = p.car_cap - taken
             o["car_stalls_taken"] = taken
             info["car_stalls_taken"] = taken
@@ -1992,15 +2030,24 @@ def truck_record(p: "Plan", o: dict[str, Any], d: dict[str, Any], parcel: BaseGe
                 flags.append(("PARKING_SHORT_FOR_LEAD_IN", 2, f"the trucks' way in from the driveway takes the corner of the car field, about "
                                                               f"{taken} car stalls: {left} are left of the {p.cars_required} required (another "
                                                               "car row, or a shorter building)"))
-        if got["reverse"]:
+        bs = got["bends"]
+        s_bend = next((a for a, b in zip(bs, bs[1:]) if a["hand"] != b["hand"] and a["from_start_ft"] < truck.LENGTH_FT
+                       and min(a["deg"], b["deg"]) >= ENTRANCE_S_DEG and max(a["radius_ft"], b["radius_ft"]) <= truck.R_MIN), None)
+        if s_bend is not None:
+            info["entrance_s_bend"] = True
+            flags.append(("TRUCK_ENTRANCE_S_BEND", 2, "the driveway is to one side of the truck road, so trucks turn hard one way and "
+                                                      f"then the other at the {truck.R_MIN:.0f} ft minimum radius as they come off the street: "
+                                                      "passable at walking speed with the whole entrance to themselves, not an entrance "
+                                                      "to build (a driveway in line with the truck road, or a shorter building at that end)"))
+        elif got["reverse"]:
             flags.append(("TRUCK_REVERSE_BEND", 3, f"{got['reverse']} reverse bend(s) on the trucks' way in with less than "
                                                    f"{truck.REVERSE_MIN_FT:.0f} ft of straight between (a truck's length): passable at "
                                                    "walking speed, better straightened"))
         if throat < THROAT_MIN_FT:
             flags.append(("SHORT_THROAT", 2, f"truck throat about {throat:.0f} ft from the street to the court (100 ft wanted for stacking)"))
-    if o["cpt"] is None and length > 750:
-        flags.append(("DEAD_END_ACCESS", 2, f"single access about {length:,.0f} ft long (over 750 ft needs fire-official approval)"))
-    if len(p.courts) == 1 and not goal["sight"]:
+        if o["cpt"] is None and throat > 750:
+            flags.append(("DEAD_END_ACCESS", 2, f"single access about {throat:,.0f} ft long (over 750 ft needs fire-official approval)"))
+    if len(p.courts) == 1 and not sight:
         flags.append(("BLIND_SIDE_BACKING", 3, "trucks enter the court with the dock doors on their right, so they back in on the "
                                                "blind side; the other end of the court is the driver's side"))
     o["flags"][:] = flags       # in place: finish goes on adding to the same list
@@ -2022,7 +2069,7 @@ def apply_truck_path(p: "Plan", o: dict[str, Any], ctx: "Ctx", other: tuple | No
     old_rt = next(ln for k, ln in o["routes"] if k == "truck")
     old_pave = next(pp for k, pp in o["route_polys"] if k == "truck")
     if d["got"] is not None:
-        line, pave = truck_line_and_pave(p, d, ctx.parcel)
+        line, pave = truck_line_and_pave(p, d, ctx)
         i = next(k for k, t in enumerate(o["routes"]) if t[0] == "truck")
         j = next(k for k, t in enumerate(o["route_polys"]) if t[0] == "truck")
         o["routes"][i] = ("truck", line)
@@ -2476,14 +2523,22 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     # The car route, the ponds and the drop yards below then go round the
     # truck road as it will be built. (Building 1 only; a second building's
     # way in is laid out afterwards, round what stands.)
-    t_design = t_grid = None
+    t_design = t_grid = t_error = None
     if fixes and ctx.truck_design and rt is not None and others is None:
-        t_design = truck_design_for(p, {"tpt": tpt, "truck_entry": t_entry, "routes": routes, "route_polys": [], "ponds": [], "drops": [],
-                                        "cpt": None}, ctx, other=())
-        if t_design is not None and t_design["got"] is not None and t_design["got"]["ok"]:
-            t_grid = (rt.length, route_polys[-1][1].area)
-            rt, t_pave = truck_line_and_pave(p, t_design, parcel)
-            routes[-1], route_polys[-1], route_outside[-1] = ("truck", rt), ("truck", t_pave), ("truck", 0.0)
+        try:
+            t_design = truck_design_for(p, {"tpt": tpt, "truck_entry": t_entry, "routes": routes, "route_polys": [], "ponds": [], "drops": [],
+                                            "cpt": None}, ctx, other=())
+            if t_design is not None and t_design["got"] is not None and t_design["got"]["ok"]:
+                t_line, t_pave = truck_line_and_pave(p, t_design, ctx)
+                t_grid = (rt.length, route_polys[-1][1].area)
+                rt = t_line
+                # (the route's own measure is now how far its swept path strays: within the tolerance, or it is not taken)
+                routes[-1], route_polys[-1], route_outside[-1] = ("truck", rt), ("truck", t_pave), ("truck", t_design["got"]["clip_ft"])
+        except _BudgetExceeded:
+            raise
+        except Exception as exc:        # noqa: BLE001 - the truck design is an extra: it must never cost a plan
+            t_design = t_grid = None
+            t_error = f"{type(exc).__name__}: {str(exc)[:160]}"
     truck_poly = unary_union([pp for _, pp in route_polys]) if route_polys else Polygon()
     start_c = cpt if cpt is not None else tpt
     if start_c is not None:
@@ -2682,6 +2737,8 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         o["stepped"] = stepped
     if fixes and ctx.truck_design and others is None:
         o["truck_ok"] = t_grid is not None
+        if t_error:
+            o["truck_error"] = t_error
         if t_grid is not None:
             truck_record(p, o, t_design, parcel, *t_grid)
     o["violations"] = check_plan(p, o, ctx, others)
@@ -3193,11 +3250,16 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 return q, o2
             # ... or, where the plan is then worse (its pond no longer
             # fits), the way in laid out round the plan as it stands
-            d = truck_design_for(q, o, ctx)
-            if d is not None and d["got"] is not None and d["got"]["ok"]:
-                apply_truck_path(q, o, ctx)
-                o["drivable"] = True
-                return q, o
+            try:
+                d = truck_design_for(q, o, ctx)
+                if d is not None and d["got"] is not None and d["got"]["ok"]:
+                    apply_truck_path(q, o, ctx)
+                    o["drivable"] = True
+                    return q, o
+            except _BudgetExceeded:
+                raise
+            except Exception:           # noqa: BLE001 - as in finish: an extra, never a crash
+                pass
             return None
 
         def settle() -> tuple[Plan, dict[str, Any]]:
@@ -3229,14 +3291,27 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 truck_first_rec.update(tries=TRUCK_FIRST_MAX_TRIES - left[0], found=len(lined_up))
                 results += lined_up
                 top = settle()
-            if top[1]["ok"] and top[1].get("drivable") is not True:
-                # none of the layouts judged has a way in: the ranking stands as it was, and the plan drawn says so
+            def stands(outcome: str) -> None:
+                """The ranking as it was: the plan drawn is the top layout before this step, and says it has no way in."""
                 for _, o_ in results:
                     if o_.get("drivable") is False:
                         del o_["drivable"]
-                truck_first_rec["outcome"] = "none_found"
+                truck_first_rec["outcome"] = outcome
+            if top[1]["ok"] and top[1].get("drivable") is not True:
+                stands("none_found")        # none of the layouts judged has a way in
             elif top0[1].get("drivable") is False:
-                truck_first_rec["outcome"] = "another_layout"
+                # Another layout has a way in. It is drawn in place of the
+                # larger one only when it keeps most of its floor area and
+                # turns no docks to the street or loading to homes that
+                # the larger one did not (review 43/02, finding 9).
+                truck_first_rec["best_with_a_way_in_sf"] = rnd(top[0].sf, 1000)
+                if top[0].sf < TRUCK_TIER_MIN_SHARE * top0[0].sf:
+                    stands("much_smaller")
+                elif ((faces_street(top[0], row_line) and not faces_street(top0[0], row_line))
+                      or (loading_faces_homes(top[0], res_line) and not loading_faces_homes(top0[0], res_line))):
+                    stands("faces_street_or_homes")
+                else:
+                    truck_first_rec["outcome"] = "another_layout"
             else:
                 truck_first_rec["outcome"] = "drivable" if top[1].get("drivable") else "not_judged"
         except LookupError:
@@ -3359,7 +3434,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             truck_side["outcome"] = "no_plan"
         elif len(best_p.courts) != 1:
             truck_side["outcome"] = "courts_on_both_sides"
-        elif sight_entry(best_p, best_o["truck_entry"]):
+        elif backing_of(best_p, best_o) == "sight":
             truck_side["outcome"] = "sight"
         elif search.exceeded:
             truck_side.update(outcome="blind", why="no time left to lay it out")
@@ -3428,6 +3503,11 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     ready(best_p, best_o)
     if second is not None:
         ready(second[0], second[1], (best_p, best_o))
+    if truck_first_rec.get("outcome") in ("much_smaller", "faces_street_or_homes"):
+        # the plan drawn has no way in; the layout that has one was not drawn, and the note says which and why
+        why = ("much smaller" if truck_first_rec["outcome"] == "much_smaller" else "one that turns its docks to the street or its loading to homes")
+        best_o["flags"][:] = [(f, sv, note + (f"; the largest layout found with a way in has {truck_first_rec['best_with_a_way_in_sf']:,} SF "
+                                               f"({why}: not drawn)" if f == "TRUCK_PATH_NONE" else "")) for f, sv, note in best_o["flags"]]
     rec = report(inp, best_p, best_o, second, parcel, P, B, rules, jname, flags, late, fr, hypothetical, res_line, row_line, opts)
     gross_ac = parcel.area / SQFT_PER_AC
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
@@ -3734,7 +3814,8 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
                                   **({"pad_elev_ft": round(o2["pad_elev"])} if fixes and o2.get("pad_elev") is not None else {}),
                                   **({"truck_path": o2["truck_path"]} if fixes and "truck_path" in o2 else {})}
         rec["totals_both_buildings"] = {"doors": p.doors + q.doors, "trailers": o["trailers"] + o2["trailers"],
-                                        "trailers_target": p.trailers_target + q.trailers_target, "cars_capacity": p.car_cap + q.car_cap}
+                                        "trailers_target": p.trailers_target + q.trailers_target,
+                                        "cars_capacity": p.car_cap + q.car_cap - ((o.get("car_stalls_taken", 0) + o2.get("car_stalls_taken", 0)) if fixes else 0)}
     return rec
 
 

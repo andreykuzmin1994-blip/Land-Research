@@ -857,14 +857,17 @@ def render(d: Drawing, rec: dict) -> str:
             # the trucks' way in (default behaviour's record), after the routes' row
             if tp.get("designed"):
                 nb = len(tp.get("bends") or [])
-                txt = (f"{tp['vehicle']}: " + (f"{nb} bend{'s' if nb != 1 else ''}, tightest {_int(tp['min_radius_ft'])} ft radius" if nb else "no bends")
-                       + ("; swept path clear" if tp.get("swept_ok") else f"; SWEEPS {_num(tp.get('swept_clip_ft'))} FT OFF ITS PAVEMENT")
-                       + (f"; takes {tp['car_stalls_taken']} car stalls" if tp.get("car_stalls_taken") else ""))
+                txt = (f"{tp['vehicle']}: SWEEPS {_num(tp.get('swept_clip_ft'))} FT OFF ITS PAVEMENT" if not tp.get("swept_ok")
+                       else f"{tp['vehicle']} clear: " + (f"{nb} bend{'s' if nb != 1 else ''}, min {_int(tp['min_radius_ft'])} ft radius" if nb else "no bends"))
             else:
                 txt = (f"{tp['vehicle']}: NO PATH IT CAN STEER" if tp.get("reason") == "no path" else "not laid out")
             back = {"sight": "backs in on the driver's side", "blind": "backs in on the BLIND side"}.get(tp.get("backing"), "")
             k = [r[0] for r in rows].index("Truck / car route") + 1
-            rows[k:k] = [("Truck path", txt, True)] + ([("Truck court entry", back, False)] if back and tp.get("courts") == 1 else [])
+            rows[k:k] = ([("Truck path", txt, True)]
+                         + ([("Truck lead-in", ("S-BEND AT THE STREET; " if tp.get("entrance_s_bend") else "")
+                              + (f"takes {tp['car_stalls_taken']} car stalls" if tp.get("car_stalls_taken") else "off the car field"), False)]
+                            if tp.get("car_stalls_taken") or tp.get("entrance_s_bend") else [])
+                         + ([("Truck court entry", back, False)] if back and tp.get("courts") == 1 else []))
         st = gr.get("stepped_pad")
         if st:
             # the stepped pad a dock building is graded to (default behaviour's record), after the level pad's rows
@@ -902,7 +905,7 @@ def render(d: Drawing, rec: dict) -> str:
         for k, x in enumerate(alts[:LAYOUTS_SHOWN]):
             ok = x.get("geometry_ok")
             if ok and x.get("drivable") is False:
-                result = ("passes its checks; no way in a truck can drive", C["warn"] if "warn" in C else C["bad"], "normal")
+                result = ("passes; no way in for a truck", C["warn"], "normal")
             elif ok:
                 result = ("passes its checks", C["good"], "bold")
             else:
@@ -992,7 +995,7 @@ def render(d: Drawing, rec: dict) -> str:
               ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
               ("prop", "property line (county parcel map)"), ("dash", "paving setback line (draft; 25 ft from water)"),
               ("dashdot", "building setback line (draft)"), ("res", "boundary toward residential parcels (county land-use codes)"),
-              *([("lane", "trucks' way in as a WB-67 steers it (centreline; pavement widened to its swept path)")] if truck_lines else []),
+              *([("lane", "truck path as a WB-67 steers it (centreline)")] if truck_lines else []),
               ("dim", "dimension, ft")]
     lw = (W - 2 * M) / 4
     for k, (fill, txt) in enumerate(legend):

@@ -59,15 +59,17 @@ MASK = 5.0                          # the ground is sampled on this grid, ft
 ARC_COST = {R_MIN: 1.5, R_EASY: 1.15}       # a tight arc costs more than its length
 NEAR_FT = 25.0                      # ground this near an obstacle (beyond the body's own clearance) costs NEAR_COST
 NEAR_COST = 1.6
+AVOID_COST = 8.0                    # ground round a corner the body cut on an earlier try (swing wide)
 DEAR_COST = 3.0                     # ground the path may take only at a price (car parking given up to the trucks' lead-in)
 BODY_CLEAR = WB67["width"] / 2 + 2.0        # the centreline keeps half a body and 2 ft off every obstacle
-MAX_EXPAND = 120000                 # poses expanded before the search gives up (a fixed count: the same site, the same path)
-GREED = 1.25                        # the straight-line distance still to go counts this much (fewer poses tried; a path at most that much dearer than the best)
+MAX_EXPAND = 200000                 # poses expanded before the search gives up (a fixed count: the same site, the same path)
+GREED = 1.15                        # the distance still to go (round what is in the way) counts this much: fewer poses tried
 BEND_MIN_DEG = 30.0                 # arcs to one hand adding up to less are a lane shift, not a bend
 REVERSE_MIN_FT = LENGTH_FT          # a reverse bend: less straight than this between two bends to opposite hands
 CLIP_TOL_FT = 2.0                   # the swept path may brush an obstacle's edge by this much
 SWING_TRIES = 3                     # tries at a wider line where the body cut a corner
 SWING_FT = 12.0
+SWING_MAX_LONGER = 1.25             # a wider line is at most this much longer than the first; more is a different way round
 
 
 def _rect(a: tuple[float, float], b: tuple[float, float], back: float, fwd: float, w: float) -> list[tuple[float, float]]:
@@ -80,25 +82,29 @@ def _rect(a: tuple[float, float], b: tuple[float, float], back: float, fwd: floa
     return [(a2[0] + px, a2[1] + py), (b2[0] + px, b2[1] + py), (b2[0] - px, b2[1] - py), (a2[0] - px, a2[1] - py)]
 
 
-def sweep(path: LineString, veh: dict[str, float] = WB67, ds: float = 3.0) -> tuple[BaseGeometry, LineString]:
+def sweep(path: LineString, veh: dict[str, float] = WB67, ds: float = 3.0, sub: int = 6) -> tuple[BaseGeometry, LineString]:
     """The swept path of `veh` driving `path` forward (its steer axle's
     centre on the line), and the track of the middle of the trailer's
     axles. The vehicle starts straight, in line with the first leg and
     behind its first point. Each unit trails the one ahead: the drive
     axles stay `wb1` behind the steer axle, the trailer's axles `wb2`
-    behind the fifth wheel (taken over the drive axles)."""
+    behind the fifth wheel (taken over the drive axles). The bodies are
+    drawn every `ds` ft; the trailing is stepped `sub` times finer, so
+    the track does not depend on how often they are drawn."""
     if path is None or path.is_empty or path.length < 1.0:
         return Polygon(), LineString()
     n = max(2, int(math.ceil(path.length / ds)) + 1)
-    pts = [path.interpolate(path.length * k / (n - 1)) for k in range(n)]
-    f = (pts[0].x, pts[0].y)
+    m_ = (n - 1) * sub
+    f = path.interpolate(0.0)
+    f = (f.x, f.y)
     q = path.interpolate(min(1.0, path.length))
     m = math.hypot(q.x - f[0], q.y - f[1]) or 1.0
     ux, uy = (q.x - f[0]) / m, (q.y - f[1]) / m
     r1 = (f[0] - ux * veh["wb1"], f[1] - uy * veh["wb1"])
     r2 = (r1[0] - ux * veh["wb2"], r1[1] - uy * veh["wb2"])
     shapes, prev, track = [], None, [r2]
-    for p in pts:
+    for i in range(m_ + 1):
+        p = path.interpolate(path.length * i / m_)
         f = (p.x, p.y)
         vx, vy = r1[0] - f[0], r1[1] - f[1]
         m = math.hypot(vx, vy) or 1.0
@@ -106,6 +112,8 @@ def sweep(path: LineString, veh: dict[str, float] = WB67, ds: float = 3.0) -> tu
         vx, vy = r2[0] - r1[0], r2[1] - r1[1]
         m = math.hypot(vx, vy) or 1.0
         r2 = (r1[0] + vx / m * veh["wb2"], r1[1] + vy / m * veh["wb2"])
+        if i % sub:
+            continue
         track.append(r2)
         tractor = _rect(r1, f, veh["tail"], veh["front"], veh["width"])
         trailer = _rect(r2, r1, veh["rear"], veh["nose"], veh["width"])
@@ -119,16 +127,17 @@ def sweep(path: LineString, veh: dict[str, float] = WB67, ds: float = 3.0) -> tu
 class _Mask:
     """Where the centreline may go, sampled on a MASK ft grid: 0 not at
     all, 1 freely, 2 near an obstacle (dearer), 3 on ground it may take
-    only at a price."""
+    only at a price, 4 round a corner the body cut on an earlier try."""
 
-    def __init__(self, free: BaseGeometry, near: BaseGeometry | None, dear: BaseGeometry | None = None):
+    def __init__(self, free: BaseGeometry, near: BaseGeometry | None, dear: BaseGeometry | None = None,
+                 avoid: BaseGeometry | None = None):
         self.minx, self.miny, maxx, maxy = free.bounds
         self.nx = int((maxx - self.minx) / MASK) + 2
         self.ny = int((maxy - self.miny) / MASK) + 2
         xs = [self.minx + i * MASK for j in range(self.ny) for i in range(self.nx)]
         ys = [self.miny + j * MASK for j in range(self.ny) for i in range(self.nx)]
         self.v = [1 if a else 0 for a in shapely.contains_xy(free, xs, ys).tolist()]
-        for level, zone in ((2, near), (3, dear)):
+        for level, zone in ((2, near), (3, dear), (4, avoid)):
             if zone is not None and not zone.is_empty:
                 self.v = [level if (a and c) else a for a, c in zip(self.v, shapely.contains_xy(zone, xs, ys).tolist())]
 
@@ -139,7 +148,51 @@ class _Mask:
         return self.v[j * self.nx + i]
 
 
-_COST = (0.0, 1.0, NEAR_COST, DEAR_COST)
+    def reach(self, lane: LineString, lateral: float) -> Any:
+        """How far each spot of the ground is from the goal lane, going
+        round what is in the way: shortest paths on every other sample
+        (10 ft, eight neighbours) from the samples on the lane. Returns
+        a function (x, y) -> ft, or None for a spot no path reaches. It
+        steers the pose search and ends it at once where the goal is cut
+        off."""
+        step = 2 * MASK
+        nx, ny = (self.nx + 1) // 2, (self.ny + 1) // 2
+        ok = [self.v[(2 * j) * self.nx + 2 * i] > 0 for j in range(ny) for i in range(nx)]
+        dist = [math.inf] * (nx * ny)
+        pq = []
+        for j in range(ny):
+            for i in range(nx):
+                if ok[j * nx + i] and lane.distance(Point(self.minx + i * step, self.miny + j * step)) <= lateral + step:
+                    dist[j * nx + i] = 0.0
+                    pq.append((0.0, i, j))
+        heapq.heapify(pq)
+        nb = ((1, 0, step), (-1, 0, step), (0, 1, step), (0, -1, step),
+              (1, 1, step * 1.4142), (1, -1, step * 1.4142), (-1, 1, step * 1.4142), (-1, -1, step * 1.4142))
+        while pq:
+            d, i, j = heapq.heappop(pq)
+            if d > dist[j * nx + i]:
+                continue
+            for di, dj, w in nb:
+                a, b = i + di, j + dj
+                if 0 <= a < nx and 0 <= b < ny and ok[b * nx + a] and d + w < dist[b * nx + a]:
+                    dist[b * nx + a] = d + w
+                    heapq.heappush(pq, (d + w, a, b))
+        minx, miny = self.minx, self.miny
+
+        def h(x: float, y: float) -> float | None:
+            u, w = (x - minx) / step, (y - miny) / step
+            best = math.inf
+            for i in (int(u), int(u) + 1):
+                for j in (int(w), int(w) + 1):
+                    if 0 <= i < nx and 0 <= j < ny:
+                        d = dist[j * nx + i]
+                        if d < best:
+                            best = d
+            return None if best == math.inf else best
+        return h
+
+
+_COST = (0.0, 1.0, NEAR_COST, DEAR_COST, AVOID_COST)
 
 
 def _moves(h0: float) -> list[list[tuple]]:
@@ -163,44 +216,66 @@ def _moves(h0: float) -> list[list[tuple]]:
     return out
 
 
-def drive(start: tuple[float, float], heading: float, goal: tuple[float, float], goal_dir: float,
-          free: BaseGeometry, near: BaseGeometry | None = None, lateral: float = 12.0, along: float = 160.0,
-          max_expand: int = MAX_EXPAND, dear: BaseGeometry | None = None) -> dict[str, Any] | None:
-    """A centreline from the pose (start, heading, radians) to the goal
-    line: a point within `lateral` ft of the line through `goal` along
-    `goal_dir`, no more than `along` ft past it, heading within half a
-    TURN of it. It stays on `free` (dearer on `near`, dearer still on
-    `dear`) and turns no tighter than R_MIN. Returns {"line", "moves", "expanded"} or None when there
-    is no such path within max_expand poses."""
+def drive(start: tuple[float, float], heading: float, lane: tuple[tuple[float, float], tuple[float, float]],
+          free: BaseGeometry, near: BaseGeometry | None = None, lateral: float = 12.0, way: int = 0,
+          max_expand: int = MAX_EXPAND, dear: BaseGeometry | None = None,
+          avoid: BaseGeometry | None = None) -> dict[str, Any] | None:
+    """A centreline from the pose (start, heading, radians) onto the goal
+    lane: the segment `lane`, reached within `lateral` ft of it and
+    heading along it within half a TURN, either way (`way` 0) or only
+    from its first point to its second (+1) or back (-1). It stays on
+    `free` (dearer on `near`, dearer still on `dear`) and turns no tighter
+    than R_MIN; it ends with the small arc that squares it to the lane
+    and a body length of run-on. Returns {"line", "moves", "expanded",
+    "way"} or None when the lane cannot be reached or no such path was
+    found within max_expand poses."""
     if free is None or free.is_empty:
         return None
-    mask = _Mask(free, near, dear)
+    mask = _Mask(free, near, dear, avoid)
     if not mask.at(*start):
         return None
+    (ax, ay), (bx, by) = lane
+    length = math.hypot(bx - ax, by - ay)
+    if length < 1.0:
+        return None
+    gc, gs = (bx - ax) / length, (by - ay) / length
+    lane_dir = math.atan2(gs, gc)
+    reach = mask.reach(LineString(lane), lateral)
+    h0 = reach(*start)
+    if h0 is None:
+        return None                         # the lane is cut off from the start: no pose search will find it
     moves = _moves(heading)
-    gx, gy = goal
-    gc, gs = math.cos(goal_dir), math.sin(goal_dir)
     half = TURN / 2 + 1e-9
 
     def done(x, y, k):
-        d = (heading + k * TURN - goal_dir + math.pi) % (2 * math.pi) - math.pi
-        if abs(d) > half:
-            return False
-        a = (x - gx) * gc + (y - gy) * gs
-        return 0.0 <= a <= along and abs(-(x - gx) * gs + (y - gy) * gc) <= lateral
+        a = (x - ax) * gc + (y - ay) * gs
+        if not (0.0 <= a <= length) or abs(-(x - ax) * gs + (y - ay) * gc) > lateral:
+            return 0
+        d = (heading + k * TURN - lane_dir + math.pi) % (2 * math.pi) - math.pi
+        if abs(d) <= half and way >= 0:
+            return 1
+        if abs(abs(d) - math.pi) <= half and way <= 0:
+            return -1
+        return 0
 
+    # Every pose tried is kept as its own record (place, heading, the pose
+    # it came from, the move that made it) and never changed. A cheaper way
+    # to the same cell and heading makes a new record; what was built on
+    # the old one still points at the old one. So the line built at the
+    # end is exactly the moves that were searched (review 43/02, finding 1).
     key0 = (int(start[0] // CELL), int(start[1] // CELL), 0)
+    nodes: list[tuple] = [(start[0], start[1], 0, -1, -1)]
     best = {key0: 0.0}
-    came: dict[tuple, tuple] = {}
-    pose = {key0: (start[0], start[1], 0)}
-    pq = [(GREED * math.hypot(gx - start[0], gy - start[1]), 0, key0)]
-    n, tick, end = 0, 0, None
+    pq = [(GREED * h0, 0, 0, 0.0)]
+    n, tick, end, went = 0, 0, None, 0
     while pq:
-        _, _, key = heapq.heappop(pq)
-        x, y, k = pose[key]
-        g = best[key]
-        if done(x, y, k):
-            end = key
+        _, _, node, g = heapq.heappop(pq)
+        x, y, k, _, _ = nodes[node]
+        if g > best[(int(x // CELL), int(y // CELL), k)] + 1e-9:
+            continue                        # a cheaper way to this cell and heading was found since
+        went = done(x, y, k)
+        if went:
+            end = node
             break
         n += 1
         if n > max_expand:
@@ -217,32 +292,46 @@ def drive(start: tuple[float, float], heading: float, goal: tuple[float, float],
             if worst == 0:
                 continue
             nx_, ny_, nk = x + dx, y + dy, (k + dk) % HEADINGS
-            ng = g + cost * _COST[worst]
             nkey = (int(nx_ // CELL), int(ny_ // CELL), nk)
+            ng = g + cost * _COST[worst]
             if ng < best.get(nkey, 1e18) - 1e-9:
+                hh = reach(nx_, ny_)
+                if hh is None:
+                    continue
                 best[nkey] = ng
-                pose[nkey] = (nx_, ny_, nk)
-                came[nkey] = (key, idx)
+                nodes.append((nx_, ny_, nk, node, idx))
                 tick += 1
-                heapq.heappush(pq, (ng + GREED * math.hypot(gx - nx_, gy - ny_), tick, nkey))
+                heapq.heappush(pq, (ng + GREED * hh, tick, len(nodes) - 1, ng))
     if end is None:
         return None
     chain = []
-    key = end
-    while key in came:
-        key, idx = came[key]
-        chain.append((pose[key], idx))
+    node = end
+    while nodes[node][3] >= 0:
+        _, _, _, parent, idx = nodes[node]
+        chain.append((nodes[parent][:3], idx))
+        node = parent
     chain.reverse()
     pts, mv = [start], []
     for (x, y, k), idx in chain:
         dx, dy, dk, cost, hand, R, samples = moves[k][idx]
         mv.append((hand, R, STEP if hand == 0 else R * TURN, (x, y)))
         pts += [(x + sx, y + sy) for sx, sy in samples]
-    # run on a body length along the goal's own direction, so the path ends square to it
+    # square to the lane: the last few degrees on an easy arc, then a body length of run-on
+    x, y, k = nodes[end][:3]
+    h_end = heading + k * TURN
+    target = lane_dir if went > 0 else lane_dir + math.pi
+    d = (target - h_end + math.pi) % (2 * math.pi) - math.pi
+    if abs(d) > 1e-6:
+        hand = 1 if d > 0 else -1
+        cx, cy = x + hand * R_EASY * -math.sin(h_end), y + hand * R_EASY * math.cos(h_end)
+        for t in (0.5, 1.0):
+            hh = h_end + d * t
+            pts.append((cx - hand * R_EASY * -math.sin(hh), cy - hand * R_EASY * math.cos(hh)))
+        mv.append((hand, R_EASY, R_EASY * abs(d), (x, y)))
     lx, ly = pts[-1]
-    pts.append((lx + 30.0 * gc, ly + 30.0 * gs))
+    pts.append((lx + 30.0 * math.cos(target), ly + 30.0 * math.sin(target)))
     mv.append((0, 0.0, 30.0, (lx, ly)))
-    return {"line": LineString(pts), "moves": mv, "expanded": n}
+    return {"line": LineString(pts), "moves": mv, "expanded": n, "way": went}
 
 
 def bends(moves: list[tuple]) -> dict[str, Any]:
@@ -259,11 +348,12 @@ def bends(moves: list[tuple]) -> dict[str, Any]:
         if hand == 0:
             gap += length
         else:
+            deg = math.degrees(length / R)
             if cur is not None and cur["hand"] == hand and gap < 2 * STEP:
-                cur["deg"] += math.degrees(TURN)
+                cur["deg"] += deg
                 cur["radius"] = min(cur["radius"], R)
             else:
-                cur = {"hand": hand, "deg": math.degrees(TURN), "radius": R, "at": at, "from_start_ft": dist, "straight_before_ft": gap}
+                cur = {"hand": hand, "deg": deg, "radius": R, "at": at, "from_start_ft": dist, "straight_before_ft": gap}
                 groups.append(cur)
             cur["end_ft"] = dist + length
             gap = 0.0
@@ -297,9 +387,9 @@ def clip(swept: BaseGeometry, allowed: BaseGeometry) -> tuple[float, tuple[float
     return worst, where
 
 
-def design(start: tuple[float, float], heading: float, goal: tuple[float, float], goal_dir: float,
+def design(start: tuple[float, float], heading: float, lane: tuple[tuple[float, float], tuple[float, float]],
            ground: BaseGeometry, hard: BaseGeometry, keep_off: BaseGeometry | None = None,
-           mouth: BaseGeometry | None = None, dear: BaseGeometry | None = None) -> dict[str, Any] | None:
+           mouth: BaseGeometry | None = None, dear: BaseGeometry | None = None, way: int = 0) -> dict[str, Any] | None:
     """One truck path with its check: a centreline from the street to the
     court that a WB-67 can steer, and its swept path in and back out. The
     body must stay on `ground` (the site) and off `hard` (buildings,
@@ -321,23 +411,29 @@ def design(start: tuple[float, float], heading: float, goal: tuple[float, float]
     if mouth is not None and not mouth.is_empty:
         allowed = allowed.union(mouth)
     best = None
+    avoid = None
     for attempt in range(SWING_TRIES + 1):
-        got = drive(start, heading, goal, goal_dir, free, near, dear=dear)
+        got = drive(start, heading, lane, free, near, way=way, dear=dear, avoid=avoid)
         if got is None:
             break
         line = got["line"]
+        if best is not None and line.length > SWING_MAX_LONGER * best["line"].length:
+            break                           # a way round, not a wider line: the corner stays as it was
         s_in, _ = sweep(line)
         s_out, _ = sweep(LineString(list(line.coords)[::-1]))
         swept = unary_union([s_in, s_out])
         depth, where = clip(swept, allowed)
         b = bends(got["moves"])
         cur = {"line": line, "swept": swept, "bends": b["bends"], "reverse": b["reverse"], "min_radius_ft": b["min_radius_ft"],
-               "clip_ft": depth, "clip_at": where, "ok": depth <= CLIP_TOL_FT, "expanded": got["expanded"], "swings": attempt}
+               "clip_ft": depth, "clip_at": where, "ok": depth <= CLIP_TOL_FT, "expanded": got["expanded"], "swings": attempt,
+               "way": got["way"]}
         if best is None or depth < best["clip_ft"] - 0.5:
             best = cur
         if cur["ok"] or where is None:
             break
-        # Swing wide: the body cut a corner there, so the centreline keeps
-        # further from it on the next try (as a driver would).
-        free = free.difference(Point(where).buffer(BODY_CLEAR + depth + SWING_FT * (attempt + 1)))
+        # Swing wide: the body cut a corner there, so the ground round it
+        # is made dear and the centreline keeps further off on the next
+        # try where it can (as a driver would).
+        disc = Point(where).buffer(BODY_CLEAR + depth + SWING_FT * (attempt + 1))
+        avoid = disc if avoid is None else unary_union([avoid, disc])
     return best
