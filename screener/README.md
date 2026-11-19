@@ -945,10 +945,12 @@ How to read a plan:
   that path. Where the driveway must stand in front of the car field,
   the lead-in takes the corner of it and the stalls are counted off
   (`TRUCK_LEAD_IN_OVER_PARKING`, or `PARKING_SHORT_FOR_LEAD_IN` when too
-  few are left). Trucks are sent to the end of the court from which they
+  few are left); a hard S-bend as trucks come off the street is a
+  condition (`TRUCK_ENTRANCE_S_BEND`). Trucks are sent to the end of the court from which they
   back in on the driver's side where that costs nothing else
   (`BLIND_SIDE_BACKING` otherwise). A layout no truck can enter ranks
-  below one it can; where none can, the plan says `TRUCK_PATH_NONE`.
+  below one it can that keeps at least 80% of its floor area; otherwise
+  the plan says `TRUCK_PATH_NONE`.
   `access.truck_path` in `plans.json` has the path's figures. A
   screening check: one vehicle, forward, no backing manoeuvre.
 - **Grading** (since 2026-11-19, reviews/42; default behaviour only).
