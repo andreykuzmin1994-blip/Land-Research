@@ -382,7 +382,7 @@ DRIVEWAY_MOUTH_FT = 60.0
 THROAT_MIN_FT = 100.0
 DRIVEWAY_END_FT = 110.0             # a truck driveway's centre from a frontage run's end (pick_driveways)
 TRUCK_TIER_MAX = 8                  # layouts whose way in is laid out to settle the ranking
-TRUCK_FIRST_MAX_TRIES = 30          # fits and full checks of the driveway-first step
+TRUCK_FIRST_MAX_TRIES = 48          # fits and full checks of the driveway-first step
 SIGHT_ROUTE = 1.5
 SIGHT_ROUTE_FT = 200.0
 # The stepped pad is not figured where the lidar samples cover less than
@@ -2003,7 +2003,7 @@ def truck_record(p: "Plan", o: dict[str, Any], d: dict[str, Any], parcel: BaseGe
     if len(p.courts) == 1 and not goal["sight"]:
         flags.append(("BLIND_SIDE_BACKING", 3, "trucks enter the court with the dock doors on their right, so they back in on the "
                                                "blind side; the other end of the court is the driver's side"))
-    o["flags"] = flags
+    o["flags"][:] = flags       # in place: finish goes on adding to the same list
     o["truck_path"] = info
     return info
 
@@ -2058,16 +2058,21 @@ def truck_first(fits0: list, target_sf: float, P: BaseGeometry, B: BaseGeometry,
     """Driveway first (reviews/43). A truck driveway cannot stand nearer a
     frontage corner than DRIVEWAY_END_FT (its curb radii), and a layout
     whose end road lies nearer the side line than that has no way in a
-    truck can steer. For each end of the frontage the module is kept out
-    of the strip beside that corner, so its end road lines up with a
-    driveway that can be built; every cross-section is fitted to what is
+    truck can steer. For each end of the frontage, then for all of them
+    at once, the module is kept out of the strip beside that corner, so
+    its end road lines up with a driveway that can be built; every cross-section is fitted to what is
     left (largest on the open parcel first, stopping when none left can
     beat what is in hand), finished with its trucks sent to that end, and
     kept when it passes in full, its pond drains and a WB-67 can drive
     it. `tries` ([left]) is this step's own count of fits and checks."""
     order = sorted(fits0, key=lambda q: -q.sf)
     best_sf = target_sf
-    for strip, spot in driveway_strips(ctx.runs, DRIVEWAY_END_FT - TRUCK_ROAD / 2):
+    strips = driveway_strips(ctx.runs, DRIVEWAY_END_FT - TRUCK_ROAD / 2)
+    if len(strips) > 1:
+        # ... and out of every such strip at once: wherever the fit then
+        # stands the module, an end road is in line with a driveway
+        strips.append((unary_union([g for g, _ in strips]), None))
+    for strip, spot in strips:
         P2, B2 = clean(P.difference(strip)), clean(B.difference(strip))
         ctx2 = dataclass_replace(ctx, truck_target=spot, truck_design=True)
         for q0 in order:
@@ -2077,9 +2082,9 @@ def truck_first(fits0: list, target_sf: float, P: BaseGeometry, B: BaseGeometry,
                 return
             tries[0] -= 1
             q = fit_variant(q0.v, P2, B2, ctx.prog, row_line, res_line, ctx.search)
-            if q is None or q.sf <= best_sf or not keep(q):
+            if q is None or q.sf <= best_sf:
                 continue
-            for cand in [q] + q.flips:          # the same fit the other ways round, when its trucks cannot get in this way
+            for cand in [q] + q.flips:          # the same fit the other ways round, when this way faces the street or has no way in
                 if not keep(cand):
                     continue
                 if tries[0] <= 0:

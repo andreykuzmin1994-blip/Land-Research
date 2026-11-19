@@ -937,6 +937,20 @@ How to read a plan:
 - When the pond or a route blocks every plan the search tried first, it
   also tries shorter lengths and the shallower layouts it left out, so a
   larger parcel does not read worse than a smaller one inside it.
+- **Design for the truck** (since 2026-11-19, reviews/43; default
+  behaviour only). The plan drawn has a truck route a tractor-trailer
+  (AASHTO WB-67) can steer, laid out before its pond: turns of 45 ft
+  radius or more, its swept path checked against the building, parked
+  cars and trailers, ponds and setback lines, the pavement widened to
+  that path. Where the driveway must stand in front of the car field,
+  the lead-in takes the corner of it and the stalls are counted off
+  (`TRUCK_LEAD_IN_OVER_PARKING`, or `PARKING_SHORT_FOR_LEAD_IN` when too
+  few are left). Trucks are sent to the end of the court from which they
+  back in on the driver's side where that costs nothing else
+  (`BLIND_SIDE_BACKING` otherwise). A layout no truck can enter ranks
+  below one it can; where none can, the plan says `TRUCK_PATH_NONE`.
+  `access.truck_path` in `plans.json` has the path's figures. A
+  screening check: one vehicle, forward, no backing manoeuvre.
 - **Grading** (since 2026-11-19, reviews/42; default behaviour only).
   Each layout is also graded as a stepped pad: the floor at one level,
   the truck court 4 ft below it, cut equal to fill.

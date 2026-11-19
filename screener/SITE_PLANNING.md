@@ -289,6 +289,88 @@ fit.
   court on the high side (about 10,000 CY more: the other side faces
   the street and homes). It turned one of the 23 review sites (a
   wetland site, 11,000 CY less).
+- **Design for the truck (default behaviour; reviews/43).** The search
+  routes trucks as the shortest line on a 20 ft grid, with nothing that
+  asks whether a tractor-trailer can steer it. `siteplan_truck` adds the
+  design vehicle and two tools:
+  - the vehicle: an AASHTO WB-67 (73.5 ft; 53 ft trailer; 8.5 ft wide);
+  - `sweep`: the ground its body covers when its steer axle follows a
+    line, each unit trailing the one ahead (on the published 41 ft
+    centreline radius the model gives the published 44.8 ft at the outer
+    front wheel and 1.3 ft inside, against 1.9 ft published);
+  - `drive`: a path from the driveway to the truck court that turns no
+    tighter than 45 ft (`R_MIN`), by a search over positions and
+    headings with straight moves and arcs of 45 and 90 ft; ground near
+    an obstacle costs more, so the path keeps clear of corners where
+    there is room. Where the body still cuts a corner the search is run
+    again on a wider line (up to three times).
+
+  **Truck first, then the pond.** For the layout at the top of the
+  ranking the plan is finished again with its truck road laid out first:
+  from the driveway (square to the street) to the truck lane of its
+  court, 30 ft beyond the court's middle and off the 60 ft strip in
+  front of the dock doors, clear of the building, the parked cars and
+  trailers, the setback strips and water. The car route, ponds and drop
+  yards then go round that road, and its pavement (the 40 ft road
+  widened to the swept path) is what detention is sized for. The swept
+  path is checked going in and coming back out.
+
+  **The lead-in over the car field.** A truck driveway cannot stand
+  nearer a frontage corner than 110 ft (its curb radii, `pick_driveways`),
+  while a building's end road lies 20 ft inside the module's edge. Where
+  the module fills the lot's width, the driveway stands in front of the
+  car field and some 50 ft to one side of the end road. The search's own
+  route there ran sideways along the street in a 10 ft strip. The path
+  takes the corner of the car field instead: the stalls in its pavement
+  are counted off the rows (`cars.row_capacity`, `car_stalls_taken`) and
+  the plan says so (`TRUCK_LEAD_IN_OVER_PARKING`, information; or
+  `PARKING_SHORT_FOR_LEAD_IN`, severity 2, where fewer stalls are left
+  than required). On the 23 review sites 11 plans take 2 to 10 stalls
+  this way, three of them falling 2 to 5 short.
+
+  **A layout no truck can enter gives way** (`drivable`, a ranking tier
+  after the pond that drains). Only the layouts that reach the top are
+  judged (at most 8, `TRUCK_TIER_MAX`). Where the top layout has no way
+  in, layouts are first added with the module kept out of the 90 ft
+  strip beside each frontage corner, so an end road lines up with a
+  driveway that can be built (`truck_first`; at most 48 fits and
+  checks), never newly facing the street or homes. Each cross-section
+  is tried at its longest fit only, so a shorter fit turned the other
+  way is not found. The larger layout
+  stays in the layouts compared, marked, and the read-out says why it
+  is not drawn. Where none judged has a way in, the ranking stands and
+  the plan drawn carries `TRUCK_PATH_NONE` (severity 2). None of the 23
+  review sites needed this tier once the lead-in was allowed.
+
+  **Sight-side backing.** A driver backs in seeing the trailer's path
+  when the dock doors are on the left as the truck enters the court.
+  Where the best plan's trucks enter from the other end, the layout is
+  finished once more with its driveway and truck route sent to the
+  sight-side end; it takes the plan's place only when it passes in
+  full, its pond drains, it has no fewer trailer stalls, no new
+  severity-2 flag, no much longer way in for cars or trucks (over 1.5
+  times and 200 ft more), and costs no second building. Otherwise
+  `BLIND_SIDE_BACKING` (information) and `inputs.truck_side.why`. On the
+  review sites 15 of 21 plans enter on the driver's side (2 did before
+  by chance).
+
+  In the record: `access.truck_path` (the vehicle, length, throat,
+  bends with their radii, reverse bends, how far the swept path strays,
+  pavement against the grid route's, the backing side),
+  `inputs.truck_side`, `inputs.truck_first`, `drivable` on the layouts
+  judged. `SHORT_THROAT` is measured on the path, from the street to
+  the court. A second building's way in is laid out after it is placed,
+  round what stands (its pond is not re-sited).
+
+  What it is not: a turning study. One vehicle, forward, at walking
+  speed; no backing manoeuvre into a door, no opposing truck in a bend,
+  no grades, no gate. Headings in 15 degree steps and two radii, so a
+  path can be a little longer or tighter than the best. The driveway is
+  taken square to the street. Only the top layouts are judged: a layout
+  further down may have no way in and not say so. Drop-yard links stay
+  the search's own lines. The wheelbase split (19.5 ft tractor, 45.5 ft
+  kingpin to trailer axles) is the Green Book's as recalled, not read
+  from a page in this work; it reproduces the published turning radii.
 - **Ranking of alternatives.** Plans that pass their own layout checks
   first (`geometry_ok`, below), then plans with a route, then plans that
   meet a draft code minimum of truck spaces where the rules have one

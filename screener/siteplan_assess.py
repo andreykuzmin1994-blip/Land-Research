@@ -118,10 +118,10 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                         "the fire marshal's comment on the concept"),
     "SHORT_THROAT": (W_ACCESS, "diligence", "Have the civil engineer check truck stacking between the street and the court; move "
                      "the gate or lengthen the throat.", "a driveway and gate layout with the stacking length"),
-    "TRUCK_PATH_NONE": (W_ACCESS, "before_offer", "No tractor-trailer can drive from the driveway to the truck court as laid out. "
+    "TRUCK_PATH_NONE": (W_ACCESS, "offer", "No tractor-trailer can drive from the driveway to the truck court as laid out. "
                         "Have the civil engineer lay out the truck entrance: a driveway in line with the truck road, or a "
                         "shorter building at that end.", "a truck-turning layout (WB-67) from the street to the docks"),
-    "TRUCK_SWEPT_PATH": (W_ACCESS, "before_offer", "A tractor-trailer's body sweeps off the truck pavement at a bend on its way "
+    "TRUCK_SWEPT_PATH": (W_ACCESS, "offer", "A tractor-trailer's body sweeps off the truck pavement at a bend on its way "
                          "in. Have the civil engineer widen the bend or move what stands in it.",
                          "a truck-turning layout (WB-67) from the street to the docks"),
     "PARKING_SHORT_FOR_LEAD_IN": (W_PROGRAM, "diligence", "The trucks' way in takes car stalls and leaves fewer than required. Have "

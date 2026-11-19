@@ -30,8 +30,9 @@ from unittest import mock
 import requests
 import shapely
 from shapely.geometry import GeometryCollection, LineString, Point, Polygon, box, mapping, shape
+from shapely.ops import unary_union
 
-from screener import arcgis, frontage, layers, sitefit
+from screener import arcgis, frontage, layers, sitefit, viewer
 from screener import siteplan as sp
 from screener import siteplan_inputs as si
 from screener import siteplan_render as sr
@@ -1897,6 +1898,225 @@ class Grading(Offline):
         self.assertIs(alone["alternatives"][0].get("docks_turned"), True)
 
 
+class Trucks(Offline):
+    """Design for the truck (reviews/43): the plan drawn has a way in a
+    WB-67 can steer, laid out before its pond, with its swept path
+    checked; trucks enter the court on the driver's side where that costs
+    nothing; a layout no truck can enter gives way to one it can."""
+
+    @staticmethod
+    def fake(court, building=box(100, 100, 500, 300)):
+        from types import SimpleNamespace as NS
+        return NS(building=building, courts=[court], rows=[], cars=[])
+
+    def test_where_the_truck_is_going(self):
+        p = self.fake(box(60, 300, 540, 430))                                # the court north of the building
+        west, east = Point(60, 365), Point(540, 365)
+        gw, ge = sp.court_goal(p, west), sp.court_goal(p, east)
+        # from the west end the way in runs east, on the truck lane 30 ft beyond the court's middle, 100 ft in
+        self.assertAlmostEqual(math.degrees(gw["dir"]) % 360, 0.0, places=6)
+        self.assertAlmostEqual(gw["goal"][0], 160.0)
+        self.assertAlmostEqual(gw["goal"][1], 365.0 + sp.TRUCK_LANE_FT)
+        self.assertAlmostEqual(math.degrees(ge["dir"]) % 360, 180.0, places=6)
+        self.assertAlmostEqual(ge["goal"][0], 440.0)
+        # heading west the building (south) is on the driver's left: the east end is the sight side
+        self.assertEqual((gw["sight"], ge["sight"]), (False, True))
+        self.assertEqual((sp.sight_entry(p, west), sp.sight_entry(p, east)), (False, True))
+        # the court on the other side of the building: the other end
+        q = self.fake(box(60, -30, 540, 100))
+        self.assertEqual((sp.sight_entry(q, Point(60, 35)), sp.sight_entry(q, Point(540, 35))), (True, False))
+        # a short court: the run-in is no more than a third of it
+        short = self.fake(box(100, 300, 300, 430), box(100, 100, 300, 300))
+        self.assertAlmostEqual(sp.court_goal(short, Point(100, 365))["goal"][0], 100 + 0.35 * 200)
+
+    def test_the_dock_zone_is_in_front_of_the_wall_only(self):
+        p = self.fake(box(60, 300, 540, 430))
+        z = sp.dock_zone(p)
+        self.assertLess(z.symmetric_difference(box(100, 300, 500, 300 + sp.DOCK_ZONE_FT)).area, 1e-6)
+        # not round the building's corners, where trucks turn in from the end roads
+        self.assertFalse(z.intersects(box(60, 300, 99, 430)))
+
+    def test_the_strips_beside_the_frontage_corners(self):
+        run = LineString([(0, 0), (600, 0)])
+        strips = sp.driveway_strips([run], 90.0)
+        self.assertEqual(len(strips), 2)
+        (w, wspot), (e, espot) = strips
+        self.assertAlmostEqual(wspot.distance(Point(110, 0)), 0.0)
+        self.assertAlmostEqual(espot.distance(Point(490, 0)), 0.0)
+        self.assertTrue(w.contains(Point(89, 500)) and not w.contains(Point(91, 500)))
+        self.assertTrue(e.contains(Point(511, 500)) and not e.contains(Point(509, 500)))
+        self.assertEqual(sp.driveway_strips([LineString([(0, 0), (200, 0)])], 90.0), [])      # too short for a truck driveway
+
+    def test_what_refuses_the_sight_side_layout(self):
+        p = self.fake(box(60, 300, 540, 430))
+        route = lambda ft, kind="truck": [(kind, LineString([(0, 0), (ft, 0)]))]
+        o0 = {"ok": True, "drains": True, "trailers": 20, "flags": [], "routes": route(400) + route(100, "car"), "truck_entry": Point(60, 365)}
+        ok = dict(o0, truck_entry=Point(540, 365))
+        self.assertIsNone(sp.truck_side_refused(p, o0, ok))
+        self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_entry=Point(60, 365))))
+        self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_entry=None)))
+        self.assertIsNone(sp.truck_side_refused(p, o0, dict(ok, routes=route(600) + route(100, "car"))))
+        self.assertIn("trucks' way in", sp.truck_side_refused(p, o0, dict(ok, routes=route(601) + route(100, "car"))))
+        self.assertIn("fewer trailer stalls", sp.truck_side_refused(p, o0, dict(ok, trailers=19)))
+        self.assertIn("fails its checks", sp.truck_side_refused(p, o0, dict(ok, ok=False)))
+        self.assertIn("adds a condition", sp.truck_side_refused(p, o0, dict(ok, flags=[("FIRE_SECOND_ACCESS", 2, "")])))
+        # with the truck road laid out for the first time, the conditions that road states itself are not new
+        new = dict(ok, flags=[("SHORT_THROAT", 2, ""), ("PARKING_SHORT_FOR_LEAD_IN", 2, "")])
+        self.assertIsNone(sp.layout_no_worse(o0, new, truck=True))
+        self.assertIn("adds a condition", sp.layout_no_worse(o0, new))
+        self.assertIn("FIRE_SECOND_ACCESS", sp.layout_no_worse(o0, dict(ok, flags=[("FIRE_SECOND_ACCESS", 2, "")]), truck=True))
+
+    def test_the_plan_drawn_has_a_way_in_a_wb67_can_drive(self):
+        # a flat 600 x 700 ft lot: the driveway must stand 110 ft from the
+        # lot corner, in front of the car field and 50 ft to one side of
+        # the building's end road. The search's own route ran sideways
+        # along the street in a 10 ft strip; the path a truck can steer
+        # takes the corner of the car field instead.
+        rec, d = planned("truck_flat", lambda: site(600, 700))
+        tp = rec["access"]["truck_path"]
+        self.assertEqual((tp["designed"], tp["vehicle"], tp["swept_ok"]), (True, "WB-67", True))
+        self.assertLessEqual(tp["swept_clip_ft"], sp.truck.CLIP_TOL_FT)
+        self.assertGreaterEqual(tp["min_radius_ft"], sp.truck.R_MIN)
+        self.assertEqual(rec["access"]["truck_route_ft"], tp["length_ft"])
+        self.assertGreater(tp["throat_ft"], 100)
+        self.assertNotIn("SHORT_THROAT", names(rec))
+        self.assertNotIn("TRUCK_PATH_NONE", names(rec))
+        # the stalls the lead-in takes come off the rows, and the plan says so
+        taken = tp["car_stalls_taken"]
+        self.assertGreater(taken, 0)
+        self.assertEqual(rec["cars"]["row_capacity"], d.p.car_cap - taken)
+        flag = "TRUCK_LEAD_IN_OVER_PARKING" if rec["cars"]["row_capacity"] >= rec["cars"]["required"] else "PARKING_SHORT_FOR_LEAD_IN"
+        self.assertIn(flag, names(rec, 3 if flag.startswith("TRUCK") else 2))
+        self.assertLessEqual(rec["cars"]["provided"], rec["cars"]["row_capacity"])
+        # the path is the plan's truck route: on the site, off the building, its pond clear of its pavement
+        line = next(ln for k, ln in d.o["routes"] if k == "truck")
+        pave = next(pp for k, pp in d.o["route_polys"] if k == "truck")
+        self.assertLess(line.intersection(d.p.building).length, 0.5)
+        self.assertLess(pave.intersection(d.p.building).area, 1.0)
+        self.assertTrue(all(pond.intersection(pave).area < 1.0 for pond in d.o["ponds"]))     # truck first, then the pond
+        self.assertTrue(d.parcel.buffer(1).contains(pave))
+        self.assertEqual(rec["plan_checks"], [])
+        self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "drivable")
+        self.assertIs(rec["alternatives"][0]["drivable"], True)
+        assert_invariant(self, rec)
+        svg = sr.render(d, rec)
+        viewer.sanitise_svg(svg)
+        for text_ in ("Truck path", "WB-67:", "swept path clear", "Truck path: an AASHTO WB-67", "way in as a WB-67 steers it"):
+            self.assertIn(text_, svg, text_)
+
+    def test_the_prototype_plans_as_before(self):
+        proto, dp = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("truck_path", proto["access"])
+        for key in ("truck_side", "truck_first"):
+            self.assertNotIn(key, proto["inputs"])
+        self.assertFalse({"TRUCK_PATH_NONE", "TRUCK_SWEPT_PATH", "BLIND_SIDE_BACKING", "TRUCK_REVERSE_BEND", "TRUCK_LEAD_IN_OVER_PARKING",
+                          "PARKING_SHORT_FOR_LEAD_IN"} & names(proto))
+        self.assertNotIn("drivable", proto["alternatives"][0])
+        self.assertNotIn("truck_path", dp.o)
+        psvg = sr.render(dp, proto)
+        for text_ in ("Truck path", "WB-67", "as a WB-67 steers it"):
+            self.assertNotIn(text_, psvg)
+
+    def test_trucks_enter_on_the_drivers_side_where_it_costs_nothing(self):
+        rec, d = planned("truck_flat", lambda: site(600, 700))
+        side = rec["inputs"]["truck_side"]
+        self.assertIn(side["outcome"], ("sight", "turned_to_sight"))
+        self.assertEqual(rec["access"]["truck_path"]["backing"], "sight")
+        self.assertNotIn("BLIND_SIDE_BACKING", names(rec))
+        self.assertTrue(sp.sight_entry(d.p, d.o["truck_entry"]))
+        # ... and with that step's layout refused, the plan stays as it was and says why
+        with mock.patch.object(sp, "truck_side_refused", lambda p, o0, o2: "the trucks' way in would be much longer"):
+            blind, _ = sp.plan_site(site(600, 700))
+        self.assertEqual(blind["inputs"]["truck_side"], {"outcome": "blind", "why": "the trucks' way in would be much longer"})
+        self.assertEqual(blind["access"]["truck_path"]["backing"], "blind")
+        self.assertIn("BLIND_SIDE_BACKING", names(blind, 3))
+        self.assertEqual((blind["building"]["sf"], blind["trailers"]["total"]), (rec["building"]["sf"], rec["trailers"]["total"]))
+        cond = [c for c in blind["assessment"]["conditions"] if c["flag"] == "BLIND_SIDE_BACKING"][0]
+        self.assertEqual(cond["workstream"], sp.assess.W_ACCESS)
+
+    def test_where_no_layout_has_a_way_in_the_ranking_stands(self):
+        base, _ = planned("truck_flat", lambda: site(600, 700))
+        with mock.patch.object(sp.truck, "design", lambda *a, **k: None):
+            rec, d = sp.plan_site(site(600, 700))
+        self.assertEqual((rec["building"]["sf"], rec["feasible"]), (base["building"]["sf"], base["feasible"]))
+        self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "none_found")
+        self.assertLessEqual(rec["inputs"]["truck_first"]["judged"], sp.TRUCK_TIER_MAX)
+        self.assertFalse(any("drivable" in a for a in rec["alternatives"]))
+        self.assertIn("TRUCK_PATH_NONE", names(rec, 2))                      # a condition, with its next step
+        tp = rec["access"]["truck_path"]
+        self.assertEqual((tp["designed"], tp["reason"]), (False, "no path"))
+        cond = [c for c in rec["assessment"]["conditions"] if c["flag"] == "TRUCK_PATH_NONE"][0]
+        self.assertEqual((cond["workstream"], cond["stage"]), (sp.assess.W_ACCESS, "offer"))
+        self.assertIn("NO PATH IT CAN STEER", sr.render(d, rec))
+
+    def test_a_design_that_fails_never_costs_the_plan(self):
+        base, _ = planned("truck_flat", lambda: site(600, 700))
+
+        def boom(*a, **k):
+            raise RuntimeError("no such turn")
+        with mock.patch.object(sp, "apply_truck_path", boom), mock.patch.object(sp.truck, "design", lambda *a, **k: None):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertEqual((rec["building"]["sf"], rec["feasible"]), (base["building"]["sf"], base["feasible"]))
+        self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "RuntimeError: no such turn"})
+
+    def test_a_second_building_has_its_own_way_in(self):
+        two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(1600, 1000, front=two, z=lambda x, y: 930 - 0.00008 * (y - 500) ** 2))
+        self.assertEqual(rec["total_sf"], 543000)
+        tp2 = rec["second_building"]["truck_path"]
+        self.assertTrue(tp2["designed"])
+        # each way in keeps off the other building and its parking
+        p1, (p2, o2) = d.p, d.second
+        pave1 = next(pp for k, pp in d.o["route_polys"] if k == "truck")
+        pave2 = next(pp for k, pp in o2["route_polys"] if k == "truck")
+        for pave, other in ((pave1, p2), (pave2, p1)):
+            self.assertLess(pave.intersection(other.building).area, 1.0)
+            self.assertLess(pave.intersection(unary_union(other.cars)).area, 1.0)
+        self.assertLess(p2.module.intersection(pave1).area, 1.0)             # the second building stands clear of the first's truck road
+
+
+class TruckTier(Offline):
+    """The ranking's tier for a way in a truck can drive, and the
+    driveway-first layouts behind it (reviews/43), on real angles."""
+
+    angles = False
+
+    def test_a_layout_no_truck_can_enter_gives_way_to_one_it_can(self):
+        # the same sloping 1200 x 1200 ft lot, with the lead-in over the
+        # car field not allowed (the second, dearer try of each design is
+        # refused): the 335,000 SF layout has no way in, and the layout
+        # drawn is the largest fitted with its end road in line with a
+        # driveway that can be built
+        mk = lambda: site(1200, 1200, z=lambda x, y: 900 + 0.015 * x + 0.02 * y)
+        real = sp.truck.design
+        with mock.patch.object(sp.truck, "design", lambda *a, **k: None if k.get("dear") is not None else real(*a, **k)):
+            rec, d = sp.plan_site(mk())
+        full, _ = sp.plan_site(mk())
+        self.assertEqual(full["building"]["sf"], 335000)                     # with the lead-in: the full building
+        self.assertEqual(full["inputs"]["truck_first"]["outcome"], "drivable")
+        tf = rec["inputs"]["truck_first"]
+        self.assertEqual((tf["outcome"], tf["drawn"]), ("another_layout", True))
+        self.assertGreaterEqual(tf["found"], 1)
+        self.assertLessEqual(tf["tries"], sp.TRUCK_FIRST_MAX_TRIES)
+        self.assertLess(rec["building"]["sf"], 335000)
+        self.assertGreater(rec["building"]["sf"], 250000)                    # 286,000 SF: 15% less, for want of nine car stalls
+        self.assertTrue(rec["feasible"])
+        self.assertTrue(rec["access"]["truck_path"]["swept_ok"])
+        self.assertNotIn("car_stalls_taken", rec["access"]["truck_path"])
+        # the end road is in line with the driveway: the way in runs straight on from the street, with no reverse bend
+        tp = rec["access"]["truck_path"]
+        self.assertEqual(tp["reverse_bends"], 0)
+        self.assertGreater(min((b["from_start_ft"] for b in tp["bends"]), default=1e9), 150)
+        # the larger layout is in the layouts compared, marked, and the read-out says why it is not drawn
+        big = [a for a in rec["alternatives"] if a["sf"] == 335000]
+        self.assertTrue(big and all(a["drivable"] is False for a in big))
+        self.assertIs(rec["alternatives"][0]["drivable"], True)
+        self.assertIn("no tractor-trailer can drive", json.dumps(rec["selection"]))
+        words = " ".join(re.findall(r">([^<]+)</text>", sr.render(d, rec)))     # (the cell wraps)
+        self.assertIn("no way in a truck can drive", words)
+
+
 class PondRoomOnlyAdds(Offline):
     """The pass runs after the search and its rescue and only adds layouts
     (reviews/40): with it, a site never ranks worse than without it, and a
@@ -1931,7 +2151,7 @@ class PondRoomOnlyAdds(Offline):
 # ---------------------------------------------------------------------------
 # Static guards
 # ---------------------------------------------------------------------------
-NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py", "siteplan_assess.py")
+NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py", "siteplan_assess.py", "siteplan_truck.py")
 
 
 class Static(unittest.TestCase):
@@ -1959,7 +2179,7 @@ class Static(unittest.TestCase):
         return out
 
     def test_pure_modules_do_not_import_the_network(self):
-        for name in ("siteplan.py", "siteplan_render.py", "siteplan_assess.py"):
+        for name in ("siteplan.py", "siteplan_render.py", "siteplan_assess.py", "siteplan_truck.py"):
             imps = self.module_level_imports(name)
             for bad in ("requests", ".:arcgis", ".:layers", ".:frontage", ".:checks", ".:siteplan_inputs", ".frontage:check_parcel"):
                 self.assertNotIn(bad, imps, name)
