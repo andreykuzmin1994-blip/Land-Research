@@ -56,7 +56,12 @@ sheets pass the sanitiser; run time +1.5 to +4%.
   step's record, and `pond_room.tries` back to the pass's own count.
   The wetland site still turns (11,000 CY less), now in one try.
 - Run times unchanged (#21 24 s, others under 21 s).
-- Full suite: SUITE_RESULT
+- Full suite (`python -m unittest discover -s screener/tests -t .`):
+  1,004 tests OK in 604 s at `edbf31c`. (The run before it had one
+  failure, the author's: the reworded `DOCKS_UPHILL` playbook action
+  was over the 260-character limit `Playbook.test_entries_are_well_formed`
+  sets. Shortened; the suite then ran clean.) CI's `offline-tests` job
+  still allows 5 minutes (`reviews/41`, "Open"): not changed here.
 
 The fixes were not sent to a second independent review: they narrow the
 step (more refusals, never a new acceptance), the model's arithmetic is
