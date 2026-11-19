@@ -30,7 +30,7 @@ On the plans drawn for the 23 review sites (21 with a truck route):
 | | Plans |
 |---|---|
 | Truck route with three reverse bends on legs of 2 to 9 ft and a 160 degree hairpin at the court | 10 |
-| Trucks enter the court with the docks on their right (blind-side backing) | 16 |
+| Trucks enter the court with the docks on their right (blind-side backing), by the end the grid route reached | 16 |
 | No path a WB-67 can steer from the driveway to the court, round what the plan placed | 10 |
 
 The ten are one defect. A truck driveway stands 110 ft or more from a
@@ -51,30 +51,33 @@ property line.
 - **Truck first, then the pond.** The layout at the top of the ranking
   is finished again with its truck road laid out first; the car route,
   ponds and drop yards go round it, and detention is sized for its
-  pavement. In the court the path keeps to a truck lane off the strip in
-  front of the dock doors.
+  pavement. In the court the path comes onto a truck lane off the strip
+  in front of the dock doors, from whichever end is nearer.
 - **The lead-in over the car field.** Where the driveway stands in front
   of the car field, the path takes its corner; the stalls are counted
-  off the rows and the plan says so.
+  off the rows and the plan says so. A hard S-bend as trucks come off
+  the street is a condition, not a note.
 - **The ranking.** A layout no WB-67 can enter ranks below one it can
-  (after the pond that drains, before floor area). Where the top layout
-  has none, layouts with an end road in line with a buildable driveway
-  are added first. Where none judged has one, the ranking stands and
-  the plan carries `TRUCK_PATH_NONE`.
+  (after the pond that drains, before floor area) when that one keeps
+  at least 80% of the floor area and turns nothing new to the street or
+  homes. Where the top layout has no way in, layouts with an end road
+  in line with a buildable driveway are added first. Otherwise the
+  ranking stands and the plan carries `TRUCK_PATH_NONE`.
 - **Sight-side backing.** The best plan's trucks are sent to the end of
   the court from which they back in on the driver's side, where nothing
   else is worse and no second building is lost.
 - **Flags** (with playbook entries): `TRUCK_PATH_NONE`,
-  `TRUCK_SWEPT_PATH`, `PARKING_SHORT_FOR_LEAD_IN` (severity 2);
+  `TRUCK_SWEPT_PATH`, `TRUCK_ENTRANCE_S_BEND`,
+  `PARKING_SHORT_FOR_LEAD_IN` (severity 2);
   `TRUCK_LEAD_IN_OVER_PARKING`, `TRUCK_REVERSE_BEND`,
-  `BLIND_SIDE_BACKING` (information). `SHORT_THROAT` is measured on the
-  path.
+  `BLIND_SIDE_BACKING` (information). `SHORT_THROAT` and
+  `DEAD_END_ACCESS` are measured on the path.
 - **The record and the sheet.** `access.truck_path`, `inputs.truck_side`,
   `inputs.truck_first`, `drivable` on the layouts judged,
   `cars.row_capacity` less the stalls taken. On the sheet: the path's
   centreline as a lane line, its pavement widened to the swept path,
-  "Truck path" and "Truck court entry" in the takeoff, the basis in the
-  footnotes.
+  "Truck path", "Truck lead-in" and "Truck court entry" in the takeoff,
+  the basis in the footnotes.
 - Docs: `screener/README.md`, `screener/SITE_PLANNING.md`.
 
 Two things were tried and dropped on the way, and why:
@@ -107,13 +110,16 @@ Not read from a page: the split of the wheelbase (19.5 ft tractor,
 45.5 ft kingpin to the trailer's axles). With those two the model gives
 44.8 ft at the outer front wheel on a 41 ft centreline (the published
 figure, which fixes the tractor's 19.5 ft) and an inside radius of
-1.3 ft on a 180 degree turn against the published 1.9 ft.
+1.4 to 1.8 ft on a 180 degree turn against the published 1.9 ft (the
+reviewer's exact integration of the same dimensions gives 1.96 ft).
 
-## What was verified (author; the review follows in `02_review.md`)
+## What was verified (author, after the review's fixes; the review is `02_review.md`)
 
 | Check | Result |
 |---|---|
 | Prototype parity | 46 prototype records (23 sites, real angles and the tests' angle patch) byte-identical to the state of `reviews/42`. |
-| The 23 sites, default, real angles | Floor area and trailer stalls unchanged on all 23. All 21 plans with a truck route have a designed path whose swept path is clear. 11 take 2 to 10 car stalls for the lead-in (3 then 2 to 5 short of the count: a new severity-2 condition). 15 enter the court on the driver's side (13 turned there, 2 already), 5 stay blind with the reason, 1 has courts on both sides. The ranking tier changed no plan. |
+| The 23 sites, default, both angle modes (46 records) | Floor area, trailer stalls and feasibility unchanged on all 46; no new severity-1 flag; the ranking tier changed no plan. New severity 2: `TRUCK_ENTRANCE_S_BEND` on 7 records, `PARKING_SHORT_FOR_LEAD_IN` on 5. Gone: `FIRE_SECOND_ACCESS` on 2 (the driveway moved to the sight-side end). |
+| The 23 sites, real angles | 20 plans have a truck route; all 20 have a designed path whose swept path is clear. 10 take 2 to 13 car stalls for the lead-in (3 then short of the count); 5 have the S-bend at the street. 13 come onto the lane on the driver's side (11 turned there, 2 already), 6 stay blind with the reason, 1 has courts on both sides. |
+| Run time | 46 default plans: 231 s before, 251 s after (+9%). |
 | Sheets | #21, #25 and three synthetic sites redrawn and read. |
-| Tests | New module `test_siteplan_truck` (17 tests) and class `Trucks` in `test_siteplan`. Full suite: in `02_review.md`. |
+| Tests | New module `test_siteplan_truck` (21 tests) and classes `Trucks` and `TruckTier` in `test_siteplan` (15 tests). Full suite: in `02_review.md`. |
