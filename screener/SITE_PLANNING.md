@@ -222,34 +222,73 @@ fit.
   lower, the floor set where cut equals fill. The record's
   `grading.stepped_pad` gives the floor and court elevations, the cut,
   fill and earth moved (cubic yards), how far the ground falls from the
-  building to its court, and the court's side: `low` (the ground gives
-  the dock its drop), `level`, or `high` (the ground rises 3 ft or more
-  to the court, `DOCKS_UPHILL_FT`: the court is cut into the hill). A
-  court on the high side is a note, `DOCKS_UPHILL` (information), with
-  what it costs in earthwork against the court on the other side. Each
-  layout compared carries its `earthwork_cy`, printed on the sheet
-  beside its floor area. It is a screening figure on 40 ft samples: no
-  paving slopes, no walls or cut slopes at the pad's edge, no swell or
-  shrink, no rock. The one-plane figures above are unchanged and still
-  what the ranking's relief mark and the drainage check read; the
-  ranking does not count earthwork (the operator's marks: steep ground
-  and relief).
+  building to its court, and the court's side: `low` (the ground falls
+  1 ft or more to the court and gives the dock its drop), `high` (it
+  rises 1 ft or more: the court is cut into the hill), `level`, or
+  `both` for a building with courts on two sides (a cross-dock has one
+  on each side of any slope; `ground_fall_to_courts_ft` lists each). A
+  single court with a rise of 3 ft or more (`DOCKS_UPHILL_FT`) is a
+  note, `DOCKS_UPHILL` (information; `SECOND_DOCKS_UPHILL` on a second
+  building), with what it costs in earthwork against the same footprint
+  with its court on the other side, and, for the plan drawn, why that
+  layout was not taken. Each layout compared carries its `stepped_cy`,
+  printed on the sheet beside its floor area ("EARTH CY";
+  `earthwork_cy` in the takeoff and the pipeline stays the one-plane
+  figure). What the figure is not:
+  - each lidar sample stands for an equal share of the module's area
+    (as the one-plane figure does); no figure where the samples cover
+    less than 80% of the module (`STEPPED_MIN_COVER`, partial lidar);
+  - ground of the module beside a trailer row is graded at the floor,
+    4 ft above the row next to it (up to a tenth of the module; at the
+    court's level the figure moves by up to about 15%);
+  - nothing outside the module: no pond excavation, drop yards or
+    driveways;
+  - no paving slopes, no walls or cut slopes at the pad's edge, no
+    swell or shrink, no rock.
+
+  The one-plane figures above are unchanged and still what the
+  ranking's relief mark and the drainage check read (the sheet's
+  "PAD EL" is that plane; the stepped floor stands a little above it
+  and the court below). The ranking does not count earthwork (the
+  operator's marks: steep ground and relief).
 - **Docks downhill (default behaviour; reviews/42).** After the pass
-  below, when the ground rises from the best plan's building to its
-  court, the same footprint is tried with the court on the other side
-  (the office at either end), checked in full. It replaces the plan
-  only when it passes, its pond drains, it has no fewer trailer stalls
-  and no new severity-2 flag, it turns no docks to the street and no
-  loading to homes that the plan did not, and its stepped pad moves at
-  least 10% and 2,000 CY less (`DOCK_TURN_MIN_SAVING`,
-  `DOCK_TURN_MIN_CY`). `inputs.dock_side` records the tries, whether
-  the plan drawn was turned and the earthwork saved. It applies
-  seldom, and for a reason: where the street is on the low side, a
-  court on the low side lies between the street and the car field,
-  which no car route then reaches without crossing truck pavement, so
-  the docks stay at the back, cut in, as on most such sites (reference
-  site #21: about 10,000 CY more than the other way round). It turned
-  one of the 23 review sites (a wetland site, 11,000 CY less).
+  below, the best plan's footprint (one court) is considered with the
+  court on the other side, the office at the same end first, then the
+  other. A turn is laid out only when its stepped pad moves at least
+  10% and 2,000 CY less (`DOCK_TURN_MIN_SAVING`, `DOCK_TURN_MIN_CY`),
+  the building stays in the buildable area, and it does not newly turn
+  the docks to the street (within 100 ft), put the loading between the
+  building and the street at any distance (`loading_on_street_side`),
+  or turn the loading to homes. Laid out and checked in full, it
+  replaces the plan only when it passes, its pond drains where the
+  plan's does, it has no fewer trailer stalls and no new severity-2
+  flag, and the cars' way in is not much longer (over 1.5 times and
+  200 ft more). It must also cost no second building: the plan it came
+  from is searched for one too, and stands if its second building is
+  larger. At most two layouts are tried, on their own count
+  (`DOCK_TURN_TRIES`; the pass's allowance and record are untouched),
+  in what is left of the pass's time. `inputs.dock_side` records the
+  tries, the `outcome` (`turned`, `not_cheaper`, `refused`,
+  `courts_on_both_sides`, `no_lidar`, `no_time`, `no_plan`), the
+  earthwork saved, and for each turn refused why and what it would
+  have saved. The turned plan is first in the layouts compared, marked
+  `docks_turned`; the plan it came from is the next row with the same
+  footprint.
+
+  It applies seldom, and partly by the planner's own limits. Where the
+  street is on the low side, the court on the low side is on the
+  street side of the building: not taken, by the rule above (a
+  judgement for the operator: on a 1600 x 1000 ft review site the turn
+  would save 39,000 CY with the court 280 ft off the street, the
+  offices and cars behind the building and a car route of 2,300 ft).
+  On tighter sites the same turn also fails its routes, because the
+  module is fitted to the envelope with 10 to 16 ft beside and behind
+  it, no drive round the building's end is modelled, and only the same
+  footprint is tried, never a shorter building: a limit of this
+  planner, not a finding about the site. Reference site #21 keeps its
+  court on the high side (about 10,000 CY more: the other side faces
+  the street and homes). It turned one of the 23 review sites (a
+  wetland site, 11,000 CY less).
 - **Ranking of alternatives.** Plans that pass their own layout checks
   first (`geometry_ok`, below), then plans with a route, then plans that
   meet a draft code minimum of truck spaces where the rules have one
@@ -358,7 +397,8 @@ fit.
   and `skipped_for_time` say when it happened. Away from them, the same
   site gives the same plan. The record's
   `inputs.pond_room` gives the layouts, tries, plans found, whether the
-  plan drawn came from the pass, and whether it was cut short. The
+  plan drawn came from the pass (also when its docks were then turned,
+  `inputs.dock_side`), and whether it was cut short. The
   ranking gives trailer stalls no floor area (operator decision of
   2026-11-17), so a plan the pass adds may have fewer trailer stalls
   than the plan it replaces (`TRAILER_SHORT` says so); between two of

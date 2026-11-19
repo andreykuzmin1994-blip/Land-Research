@@ -942,12 +942,17 @@ How to read a plan:
   the truck court 4 ft below it, cut equal to fill.
   `grading.stepped_pad` in `plans.json` has the floor and court
   elevations, the earth moved and the court's side; the sheet prints
-  them and the earthwork of each layout compared. A court cut into the
-  high side says `DOCKS_UPHILL` (information) with what it costs. Where
-  the street and homes allow and the plan still passes in full, the
-  docks are turned to the low side of the same footprint
-  (`inputs.dock_side`). The ranking does not count earthwork. A
-  screening figure: no paving slopes, walls or rock.
+  them and the stepped earthwork of each layout compared (`stepped_cy`,
+  "EARTH CY"). A court cut into the high side says `DOCKS_UPHILL`
+  (information) with what it costs and why the other side was not
+  taken. The docks are turned to the low side of the same footprint
+  only where that costs nothing else: not toward the street or homes,
+  not between the building and the street, the plan still passing in
+  full with as many trailer stalls, no new condition, no much longer
+  way in for cars, and no second building lost (`inputs.dock_side`
+  says what was tried and why not). The ranking does not count
+  earthwork. A screening figure over the layout's own ground: no
+  paving slopes, walls, rock, pond excavation or driveways.
 - **Drainage** (since 2026-11-18, reviews/41; default behaviour only).
   A pond on ground more than 3 ft above the building pad cannot fill by
   gravity: the plan says `POND_UPHILL` (from 1 ft, `POND_ABOVE_PAD`, for

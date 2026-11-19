@@ -846,7 +846,8 @@ def render(d: Drawing, rec: dict) -> str:
         st = gr.get("stepped_pad")
         if st:
             # the stepped pad a dock building is graded to (default behaviour's record), after the level pad's rows
-            side = {"low": "court on the low side", "high": "court on the HIGH side", "level": "court on level ground"}[st["court_side"]]
+            side = {"low": "court on the low side", "high": "court on the HIGH side", "level": "court on level ground",
+                    "both": "courts on both sides"}.get(st["court_side"], "")
             k = [r[0] for r in rows].index("Earthwork, balanced") + 1
             rows[k:k] = [("Stepped pad", f"floor {_int(st['floor_ft'])}, court {_int(st['court_ft'])} ft; {side}", True),
                          ("Earthwork, stepped", f"{_int(st['moved_cy'])} CY (cut {_int(st['cut_cy'])}, fill {_int(st['fill_cy'])})", False)]
@@ -875,7 +876,7 @@ def render(d: Drawing, rec: dict) -> str:
         hd, cy = heading(COL_X, cy, "LAYOUTS COMPARED (THE PLAN DRAWN IS FIRST)", COL_W)
         col.append(hd)
         rows = []
-        earth = any(x.get("earthwork_cy") is not None for x in alts[:LAYOUTS_SHOWN])
+        earth = any(x.get("stepped_cy") is not None for x in alts[:LAYOUTS_SHOWN])
         for k, x in enumerate(alts[:LAYOUTS_SHOWN]):
             ok = x.get("geometry_ok")
             if ok:
@@ -885,15 +886,16 @@ def render(d: Drawing, rec: dict) -> str:
                     "no route" if x.get("route_problem") else "fails its checks")
                 result = (why, C["bad"], "normal")
             wt = "bold" if k == 0 else "normal"
-            rows.append([(str(x.get("variant")), C["ink"], wt), (_int(x.get("sf")), C["ink"], wt), _int(x.get("doors")),
+            rows.append([(str(x.get("variant")) + (" (court turned downhill)" if x.get("docks_turned") else ""), C["ink"], wt), (_int(x.get("sf")), C["ink"], wt), _int(x.get("doors")),
                          f"{_int(x.get('trailers'))} / {_int(x.get('trailers_target'))}", _int(x.get("sf_per_gross_ac")), result])
             if earth:
                 # the stepped pad's earthwork of each layout (default behaviour's record), to weigh against its floor area
-                rows[-1].insert(5, _int(x.get("earthwork_cy")) if x.get("earthwork_cy") is not None else "")
+                rows[-1].insert(5, _int(x.get("stepped_cy")) if x.get("stepped_cy") is not None else "")
         cols = [("LAYOUT", 300, "start"), ("SF", 64, "end"), ("DOCKS", 50, "end"), ("TRAILERS", 70, "end"), ("SF/AC", 60, "end"),
                 ("LAYOUT CHECKS", COL_W - 544, "start")]
         if earth:
-            cols = [("LAYOUT", 270, "start"), *cols[1:5], ("EARTH CY", 66, "end"), ("  LAYOUT CHECKS", COL_W - 580, "start")]
+            cols = [("LAYOUT", 300, "start"), ("SF", 58, "end"), ("DOCKS", 44, "end"), ("TRAILERS", 62, "end"), ("SF/AC", 52, "end"),
+                    ("EARTH CY", 60, "end"), ("LAYOUT CHECKS", COL_W - 576, "start")]
         t, cy = table(COL_X, cy, cols, rows, size=10)
         col.append(t)
         basis = (rec.get("selection") or {}).get("basis")
@@ -991,6 +993,9 @@ def render(d: Drawing, rec: dict) -> str:
     yy += ((len(legend) + 3) // 4) * 17 + 8
     # the basis of the estimates, then the disclaimer
     basis_lines = [f"Detention: {de.get('basis')}" if de.get("basis") else "", f"Grading: {gr.get('basis')}" if gr.get("basis") else "",
+                   (f"Stepped pad: {gr['stepped_pad'].get('basis')}. PAD EL on the plan and the level-pad rows are the one "
+                    "plane the ponds are measured against; the stepped pad's floor stands a little above it, its court below")
+                   if gr.get("stepped_pad") else "",
                    f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}",
                    (f"Contours: existing ground every {every} ft, traced from the lidar samples on a {d.dem.step:.0f} ft grid and "
                     "smoothed, stopping up to one grid step inside the property line (indicative; not a topographic survey)")

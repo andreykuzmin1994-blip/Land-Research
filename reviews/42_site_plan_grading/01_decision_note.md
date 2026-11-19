@@ -35,29 +35,37 @@ court on the other side:
 | low front 700 x 800 | high (5 ft) | 31,800 CY | 18,500 CY | no car route |
 | 1200 x 1200 | high (4 ft) | 60,900 CY | 50,800 CY | docks to the street |
 
-Where the street is on the low side, a court on the low side lies
-between the street and the car field, and no car route reaches the cars
-without crossing truck pavement: the planner's access checks reject it,
-and an engineer would too. The docks stay at the back, cut in.
+Where the street is on the low side, a court on the low side is on the
+street side of the building. The planner does not take that turn (after
+the review, by rule: `02_review.md`, finding 1). On the two tighter sites
+the turned layout also fails its routes, which is this planner's limit
+(the module is fitted to the envelope, no drive round the building's end
+is modelled, only the same footprint is tried), not a finding about the
+sites. The docks stay at the back, cut in.
 
 ## What changed (default behaviour only)
 
 - **The model** (`stepped_grading`). Per layout, from the lidar samples
   on its module: floor and court elevations (the floor where cut equals
   fill), cut, fill, earth moved, the ground's fall from the building to
-  the court. In the record: `grading.stepped_pad`; `earthwork_cy` on
-  each layout compared. The one-plane figures are unchanged, and still
-  what the ranking and the drainage check read.
+  the court. In the record: `grading.stepped_pad`; `stepped_cy` on each
+  layout compared. The one-plane figures are unchanged, and still what
+  the ranking and the drainage check read.
 - **The note.** `DOCKS_UPHILL` (information, with a playbook entry) when
-  the ground rises 3 ft or more to the court, with the earthwork it
-  costs against the court on the other side.
+  the ground rises 3 ft or more to a building's one court, with the
+  earthwork it costs against the court on the other side and, for the
+  plan drawn, why that side was not taken.
 - **Docks downhill** (after the pass). The best plan's footprint with
-  the court on the other side, checked in full; taken only when it
-  passes, drains, has no fewer stalls and no new severity-2 flag, faces
-  neither street nor homes anew, and moves at least 10% and 2,000 CY
-  less. `inputs.dock_side` records it.
+  the court on the other side. Laid out only when it would move at
+  least 10% and 2,000 CY less and would not newly turn the docks to the
+  street, put the loading between the building and the street, or turn
+  it to homes; taken only when it then passes in full, drains, has no
+  fewer stalls, no new severity-2 flag, no much longer car route, and
+  costs no second building. Its own two tries. `inputs.dock_side`
+  records the outcome and each refusal with what it would have saved.
 - **The sheet.** Rows "Stepped pad" and "Earthwork, stepped" in the
-  takeoff; an "EARTH CY" column in the layouts compared.
+  takeoff; an "EARTH CY" column in the layouts compared; the stepped
+  pad's basis in the footnotes.
 - Docs: `screener/README.md`, `screener/SITE_PLANNING.md`.
 
 Not in this change, and why:
@@ -75,11 +83,11 @@ Not in this change, and why:
   shrink; the building's long side along the contours as a goal of the
   search.
 
-## What was verified (author; the review follows in `02_review.md`)
+## What was verified (author, after the review's fixes; the review is `02_review.md`)
 
 | Check | Result |
 |---|---|
-| Prototype parity | 43 prototype records (23 sites, real angles and the tests' angle patch) byte-identical to the state of `reviews/41`. |
-| The 23 sites, default | No change of floor area, trailer stalls or feasibility on any. One plan turned: a wetland site (700 x 700 ft, real angles), court from the high to the low side, 11,000 CY less. `DOCKS_UPHILL` on 11 of 44 planned records (#21, the 1200 x 1200 site, slope 800 x 900, low front and the steep site in both angle modes, one wetland run). |
-| Sheets | #21 and #25 redrawn and read; both pass the sanitiser. |
-| Tests | New class `Grading` (4 tests): the model on a tilted plane both ways round and on level ground, the record, the note with its cost and the prototype's silence, a plan turned. Full suite: in `02_review.md`. |
+| Prototype parity | 46 prototype records (23 sites, real angles and the tests' angle patch) byte-identical to the state of `reviews/41`. |
+| The 23 sites, default | Against the state of `reviews/41`, and again after the review's fixes against the code reviewed: no change of floor area, trailer stalls, feasibility or flags on any of the 46 records. One plan turned: a wetland site (700 x 700 ft, real angles), court from the high to the low side, 11,000 CY less. `DOCKS_UPHILL` on 11 records (#21, the 1200 x 1200 site, slope 800 x 900, low front and the steep site in both angle modes, one wetland run). Turns refused before being laid out: toward the street on #21, #25 and the 1200 x 1200 site; between the building and the street on slope 800 x 900 and low front; outside the buildable area on one wetland run. |
+| Sheets | #21, #25 and the turned wetland site redrawn and read; all pass the sanitiser. |
+| Tests | Class `Grading` (12 tests; 4 before the review). Full suite: in `02_review.md`. |

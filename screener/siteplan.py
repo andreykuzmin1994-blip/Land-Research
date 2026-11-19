@@ -357,6 +357,17 @@ DOCK_DROP_FT = 4.0
 DOCKS_UPHILL_FT = 3.0
 DOCK_TURN_MIN_SAVING = 0.10
 DOCK_TURN_MIN_CY = 2000.0
+# The turn is tried at most twice (the office at either end), on its own
+# count (not the pond pass's allowance). It never puts the loading on the
+# street side of the building where it was not, and never lengthens the
+# cars' way in beyond DOCK_TURN_CAR_ROUTE x and + DOCK_TURN_CAR_ROUTE_FT.
+DOCK_TURN_TRIES = 2
+DOCK_TURN_CAR_ROUTE = 1.5
+DOCK_TURN_CAR_ROUTE_FT = 200.0
+STREET_SIDE_TOL_FT = 40.0
+# The stepped pad is not figured where the lidar samples cover less than
+# this share of the module (a partial figure would read as a small one).
+STEPPED_MIN_COVER = 0.8
 POND_ROOM_KEEP = 3                # plans the pass adds to the results (the best by the ranking)
 DRAIN_FIRST_SPOTS = 2             # pond-first layouts: the lowest pond spots reserved, every cross-section fitted round each
 POND_ROOM_MAX_TRIES = 90          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
@@ -1602,7 +1613,7 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
     return best[1] if best else None
 
 
-def stepped_grading(p: "Plan", dem: Dem, drop: float = DOCK_DROP_FT) -> dict[str, float] | None:
+def stepped_grading(p: "Plan", dem: Dem, drop: float = DOCK_DROP_FT) -> dict[str, Any] | None:
     """A stepped pad for one layout, from the lidar samples on its module:
     the building, car field and end roads at the floor level, the truck
     courts and trailer rows `drop` ft below it, the floor set where cut
@@ -1610,12 +1621,19 @@ def stepped_grading(p: "Plan", dem: Dem, drop: float = DOCK_DROP_FT) -> dict[str
     (cubic yards; `moved_cy` is their mean, the earth that changes
     place), and how far the ground falls from the building to the courts
     (positive: the courts are on the low side, where the ground gives the
-    dock its drop; negative: they are cut into the high side). None with
-    fewer than four samples on the module, or none on the building or on
-    a court. A screening figure: sample cells of dem.step ft, no slopes
-    on the paving, no walls, no swell or shrink."""
+    dock its drop; negative: they are cut into the high side; `falls` has
+    one figure per court, for a building with courts on two sides). None
+    with fewer than four samples on the module, none on the building or
+    on a court, or samples on less than STEPPED_MIN_COVER of the module.
+    A screening figure: each sample stands for an equal share of the
+    module's area (as the one-plane earthwork does); ground of the module
+    beside a trailer row is graded at the floor; no slopes on the paving,
+    no walls, no swell or shrink; nothing outside the module (the pond's
+    excavation, drop yards, driveways)."""
     mod, low, bld = prep(p.module), prep(unary_union(p.courts + p.rows)), prep(p.building)
+    courts = [prep(c) for c in p.courts]
     zs, lows, zb, zc = [], [], [], []
+    per_court: list[list[float]] = [[] for _ in courts]
     for (x, y), z in dem.coords():
         pt = Point(x, y)
         if not mod.contains(pt):
@@ -1625,16 +1643,22 @@ def stepped_grading(p: "Plan", dem: Dem, drop: float = DOCK_DROP_FT) -> dict[str
         lows.append(is_low)
         if is_low:
             zc.append(z)
+            for k, c in enumerate(courts):
+                if c.contains(pt):
+                    per_court[k].append(z)
+                    break
         elif bld.contains(pt):
             zb.append(z)
-    if len(zs) < 4 or not zc or not zb:
+    if len(zs) < 4 or not zc or not zb or len(zs) * dem.step ** 2 < STEPPED_MIN_COVER * p.module.area:
         return None
     floor = (sum(zs) + drop * sum(lows)) / len(zs)          # cut = fill
-    cell = dem.step ** 2 / 27.0
+    cell = p.module.area / len(zs) / 27.0
     cut = sum(max(z - (floor - drop * k), 0.0) for z, k in zip(zs, lows)) * cell
     fill = sum(max((floor - drop * k) - z, 0.0) for z, k in zip(zs, lows)) * cell
+    zb_mean = sum(zb) / len(zb)
     return {"floor": floor, "court": floor - drop, "cut_cy": cut, "fill_cy": fill, "moved_cy": (cut + fill) / 2,
-            "fall_to_court": sum(zb) / len(zb) - sum(zc) / len(zc)}
+            "fall_to_court": zb_mean - sum(zc) / len(zc), "falls": [zb_mean - sum(c) / len(c) for c in per_court if c],
+            "courts": len(p.courts), "step": dem.step}
 
 
 def court_on_other_side(p: "Plan", prog: "Program", flipu: bool | None = None) -> "Plan":
@@ -1643,6 +1667,64 @@ def court_on_other_side(p: "Plan", prog: "Program", flipu: bool | None = None) -
     fr = p.frame
     return build(p.v, p.L, p.r, Frame(fr.Lmod, fr.depth, fr.pl, fr.origin, not fr.flip, fr.flipu if flipu is None else flipu),
                  prog, draw=False)
+
+
+def loading_on_street_side(p: "Plan", row_line) -> bool:
+    """A truck court between the building and the street, at any distance:
+    its middle is more than STREET_SIDE_TOL_FT nearer the street frontage
+    than the building's (a court beside the building is not)."""
+    if row_line is None:
+        return False
+    d0 = p.building.centroid.distance(row_line)
+    return any(c.centroid.distance(row_line) < d0 - STREET_SIDE_TOL_FT for c in p.courts)
+
+
+def car_route_ft(o: dict[str, Any]) -> float:
+    return sum(ln.length for k, ln in o["routes"] if k == "car")
+
+
+def dock_turn_saves(sg0: dict[str, Any] | None, sg: dict[str, Any] | None) -> bool:
+    """The stepped pad `sg` moves materially less earth than `sg0`: by
+    DOCK_TURN_MIN_SAVING of it and DOCK_TURN_MIN_CY at least."""
+    return (sg0 is not None and sg is not None
+            and sg0["moved_cy"] - sg["moved_cy"] >= max(DOCK_TURN_MIN_CY, DOCK_TURN_MIN_SAVING * sg0["moved_cy"]))
+
+
+def dock_turn_blocked(q0: "Plan", q: "Plan", B0: BaseGeometry, row_line, res_line) -> str | None:
+    """Why the footprint q0 turned (q) is not laid out at all, before any
+    check of its routes and pond; None when it may be tried."""
+    if not B0.buffer(0.5).contains(q.building):
+        return "the building would leave the buildable area"
+    if faces_street(q, row_line) and not faces_street(q0, row_line):
+        return "it would turn the docks to the street"
+    if loading_on_street_side(q, row_line) and not loading_on_street_side(q0, row_line):
+        return "it would put the loading between the building and the street"
+    if loading_faces_homes(q, res_line) and not loading_faces_homes(q0, res_line):
+        return "it would turn the loading to homes"
+    return None
+
+
+def dock_turn_refused(o0: dict[str, Any], o2: dict[str, Any]) -> str | None:
+    """Why the turned layout, finished as o2, does not take the place of
+    the plan (o0); None when it does. It must pass in full, its pond must
+    drain where the plan's does, with no fewer trailer stalls, no new
+    severity-2 flag, no much longer way in for cars, and a stepped pad
+    that moves materially less earth."""
+    sev2 = lambda o: {f for f, sv, _ in o["flags"] if sv == 2}
+    if not o2["ok"]:
+        return "it fails its checks (" + (", ".join(sorted(f for f, sv, _ in o2["flags"] if sv == 1)) or "routes") + ")"
+    if o0.get("drains", True) and not o2.get("drains", True):
+        return "its pond would not drain"
+    if o2["trailers"] < o0["trailers"]:
+        return "it holds fewer trailer stalls"
+    if sev2(o2) - sev2(o0):
+        return "it adds a condition (" + ", ".join(sorted(sev2(o2) - sev2(o0))) + ")"
+    c0, c2 = car_route_ft(o0), car_route_ft(o2)
+    if c2 > max(DOCK_TURN_CAR_ROUTE * c0, c0 + DOCK_TURN_CAR_ROUTE_FT):
+        return "the cars' way in would be much longer"
+    if not dock_turn_saves(o0.get("stepped"), o2.get("stepped")):
+        return "it saves too little earthwork"
+    return None
 
 
 def ponds_over_pad(ponds: list, dem: Dem, pad_z: float | None) -> list[float | None]:
@@ -2180,13 +2262,14 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
                                            "4:1 slopes its footprint grows by roughly 15 to 30%, which is not drawn"))
     # Grading (reviews/42): the stepped pad, and a court on the high side.
     stepped = stepped_grading(p, dem) if fixes else None
-    if stepped is not None and stepped["fall_to_court"] <= -DOCKS_UPHILL_FT:
+    if stepped is not None and len(p.courts) == 1 and stepped["fall_to_court"] <= -DOCKS_UPHILL_FT:
+        # (a building with courts on two sides has one on each side of any slope: its cost is in the stepped earthwork)
         other = stepped_grading(court_on_other_side(p, ctx.prog), dem)
         extra = stepped["moved_cy"] - other["moved_cy"] if other is not None else 0.0
         flags.append(("DOCKS_UPHILL", 3, f"the ground rises about {-stepped['fall_to_court']:.0f} ft from the building to its truck court, "
                                          f"which sits {DOCK_DROP_FT:.0f} ft below the floor: the court is cut into the high side"
-                                         + (f" (about {rnd(extra, 1000):,} CY more earthwork than with the court on the low side)"
-                                            if extra >= 1000 else "")))
+                                         + (f" (about {rnd(extra, 1000):,} CY more earthwork than the same footprint with its "
+                                            "court on the other side, a layout not checked here)" if extra >= 1000 else "")))
     if not pond_ok:
         way_out = ("underground detention (vaults) or a smaller building" if not fixes or ctx.prog.opts.underground
                    else "a smaller building or detention off site (underground detention is not used in this market)")
@@ -2577,7 +2660,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     room = None
     added: list[tuple[Plan, dict[str, Any]]] = []
     turned = turned_from = None                                # the docks-downhill step (reviews/42)
-    dock_side = {"tried": 0, "turned": False, "saved_cy": 0}
+    dock_side: dict[str, Any] = {"tried": 0, "turned": False, "saved_cy": 0, "outcome": None, "refused": []}
     room_skipped = bool(opts.fixes and first is not None and not search.exceeded
                         and search.deadline - search.clock() < POND_ROOM_MIN_LEFT * opts.max_seconds)
     if opts.fixes and first is not None and not search.exceeded and not room_skipped:
@@ -2703,51 +2786,68 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             kept = kept[:POND_ROOM_KEEP - 1] + [with_stalls[0]]     # the read-out's "meets its trailer target" layout
         added = kept
         results += added
-        # Docks downhill (reviews/42). When the ground rises from the best
-        # plan's building to its truck court, the same footprint is tried
-        # with the court on the other side (the office at either end). It
-        # replaces that plan only when it passes in full, its pond drains,
-        # it has no fewer trailer stalls and no new severity-2 flag, it
-        # turns no docks to the street and no loading to homes that the
-        # plan did not, and its stepped pad moves materially less earth.
+        # Docks downhill (reviews/42). The best plan's footprint is tried
+        # with its court on the other side (the office at either end) when
+        # that stepped pad moves materially less earth. It takes the plan's
+        # place only when dock_turn_blocked and dock_turn_refused find
+        # nothing against it, and (below) when it costs no second building.
+        # Its own tries, on what is left of the pass's time.
         base = max(results, key=score)
-        sg0 = base[1].get("stepped")
-        if base[1]["ok"] and sg0 is not None and sg0["fall_to_court"] < 0 and not room.cut_short:
-            q0, o0 = base
-            sev2 = lambda o: {f for f, sv, _ in o["flags"] if sv == 2}
-            cands = []
+        q0, o0 = base
+        sg0 = o0.get("stepped")
+        if not o0["ok"]:
+            dock_side["outcome"] = "no_plan"
+        elif sg0 is None:
+            dock_side["outcome"] = "no_lidar"
+        elif len(q0.courts) != 1:
+            dock_side["outcome"] = "courts_on_both_sides"
+        else:
+            cands, seen_q = [], set()
+            dock_side["outcome"] = "not_cheaper"
             try:
                 for fu in (q0.frame.flipu, not q0.frame.flipu):
                     q = court_on_other_side(q0, prog, fu)
-                    if (not B0.buffer(0.5).contains(q.building)
-                            or (faces_street(q, row_line) and not faces_street(q0, row_line))
-                            or (loading_faces_homes(q, res_line) and not loading_faces_homes(q0, res_line))):
-                        continue
-                    if not room.take():
-                        break
-                    dock_side["tried"] += 1
-                    o2 = finish(q, ctx_room)
-                    sg = o2.get("stepped")
-                    if (o2["ok"] and sg is not None and (o2.get("drains", True) or not o0.get("drains", True))
-                            and o2["trailers"] >= o0["trailers"] and not (sev2(o2) - sev2(o0))
-                            and sg0["moved_cy"] - sg["moved_cy"] >= max(DOCK_TURN_MIN_CY, DOCK_TURN_MIN_SAVING * sg0["moved_cy"])):
-                        cands.append((q, o2))
+                    shape = tuple(round(c, 1) for g in (q.courts + q.cars + q.offices) for c in g.bounds)
+                    sg = stepped_grading(q, dem)
+                    if shape in seen_q or not dock_turn_saves(sg0, sg):
+                        continue                        # the same layout again, or no material saving: nothing to try
+                    seen_q.add(shape)
+                    office = "same end" if fu == q0.frame.flipu else "other end"
+                    would = rnd(sg0["moved_cy"] - sg["moved_cy"], 1000)
+                    why = dock_turn_blocked(q0, q, B0, row_line, res_line)
+                    if why is None and (room.cut_short or dock_side["tried"] >= DOCK_TURN_TRIES):
+                        why = "no time left to lay it out"
+                    if why is None:
+                        dock_side["tried"] += 1
+                        o2 = finish(q, ctx_room)
+                        why = dock_turn_refused(o0, o2)
+                        if why is None:
+                            # (the office's end does not change the stepped earthwork: the first that passes is taken,
+                            # the office where it was before the other end)
+                            cands.append((q, o2))
+                            break
+                    dock_side["refused"].append({"office": office, "why": why, "would_save_cy": would})
             except _BudgetExceeded:
-                room.cut_short = True
+                dock_side["refused"].append({"office": office, "why": "no time left to lay it out", "would_save_cy": would})
             if cands:
-                turned, turned_from = min(cands, key=lambda t: t[1]["stepped"]["moved_cy"]), base
+                turned, turned_from = cands[0], base
                 results.append(turned)
-                added.append(turned)
-                dock_side.update(turned=True, saved_cy=rnd(sg0["moved_cy"] - turned[1]["stepped"]["moved_cy"], 1000))
+                dock_side.update(outcome="turned", turned=True,
+                                 saved_cy=rnd(sg0["moved_cy"] - turned[1]["stepped"]["moved_cy"], 1000))
+            elif dock_side["refused"]:
+                dock_side["outcome"] = "refused"
+    elif opts.fixes:
+        dock_side["outcome"] = "no_time" if room_skipped or search.exceeded else "no_plan"
     results.sort(key=score, reverse=True)
-    if turned is not None and results[0] is turned_from:
+    if turned is not None:
         # the same footprint and floor area: it takes the place of the plan it was turned from
         results.remove(turned)
         results.insert(0, turned)
-    best_p, best_o = results[0]
-    second = None
-    second_cut = False      # the budget ran out in the optional second-building search only
-    if best_o["ok"] and not search.exceeded:
+    def second_for(best_p: Plan, best_o: dict[str, Any]) -> tuple[tuple | None, bool]:
+        """A second building beside the plan (best_p, best_o), and whether
+        the budget ran out while looking (the optional search only)."""
+        if not best_o["ok"] or search.exceeded:
+            return None, False
         try:
             blocked = unary_union([best_p.module.buffer(40)] + [d.buffer(25) for d in best_o["drops"]] + [r.buffer(20) for r in best_o["ponds"]]
                                   + [pp.buffer(15) for _, pp in best_o["route_polys"]])
@@ -2761,13 +2861,39 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 for q in sorted(c2, key=lambda q: -q.sf)[:6]:
                     o2 = finish(q, ctx, others)
                     if o2["ok"]:
-                        second = (q, o2)
-                        break
+                        return (q, o2), False
         except _BudgetExceeded:
             # Building 1 was fully searched before this point (the block
             # runs only when its search finished in time), so its result
             # stands: the cut search is a note, not a blocking flag.
-            second, second_cut = None, True
+            return None, True
+        return None, False
+
+    best_p, best_o = results[0]
+    second, second_cut = second_for(best_p, best_o)
+    if turned is not None and not second_cut:
+        # The turn must cost no floor area in a second building either
+        # (review 42/02, finding 3): the plan it came from is searched
+        # too, and stands if its second building is the larger (or, where
+        # the turned plan has none, if time ran out before that was known).
+        sec_sf = lambda t: t[0].sf if t else 0
+        sec0, cut0 = second_for(*turned_from)
+        if sec_sf(sec0) > sec_sf(second) or (cut0 and second is None):
+            results.remove(turned_from)
+            results.insert(0, turned_from)
+            best_p, best_o, second, second_cut = *turned_from, sec0, cut0
+            dock_side.update(outcome="refused", turned=False, saved_cy=0)
+            dock_side["refused"].append({"office": "either end", "why": "it would cost the second building",
+                                         "would_save_cy": rnd(turned_from[1]["stepped"]["moved_cy"] - turned[1]["stepped"]["moved_cy"], 1000)})
+            turned = None
+        elif cut0:
+            search.exceeded = False     # only this comparison ran out of time: the plan drawn and its second building were searched in full
+            dock_side["second_building_compared"] = False
+    if turned is None and dock_side["refused"]:
+        # the drawn plan's own note says why its court stays on the high side
+        why = "; ".join(dict.fromkeys(r["why"] for r in dock_side["refused"]))
+        best_o["flags"] = [(f, sv, note.replace(", a layout not checked here)", f": not taken, {why})") if f == "DOCKS_UPHILL" else note)
+                           for f, sv, note in best_o["flags"]]
     if rescue_cut:
         late.append(("SMALLER_LAYOUTS_NOT_ALL_TRIED", 2,
                      f"the search stopped after {opts.max_seconds:.0f} s while trying shorter and shallower layouts after the "
@@ -2782,13 +2908,16 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     rec = report(inp, best_p, best_o, second, parcel, P, B, rules, jname, flags, late, fr, hypothetical, res_line, row_line, opts)
     gross_ac = parcel.area / SQFT_PER_AC
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
+    if turned is not None:
+        rec["alternatives"][0]["docks_turned"] = True       # the next row with its footprint is the plan it was turned from
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
     if opts.fixes:
-        rec["inputs"]["dock_side"] = dict(dock_side, turned=dock_side["turned"] and best_p is turned[0])
+        rec["inputs"]["dock_side"] = dock_side
+        src = turned_from[0] if turned is not None else best_p      # a turned plan came from the pass when its plan did
         if room is not None:
             rec["inputs"]["fit_searches"] = rec["inputs"].get("fit_searches", 0) + room.search.fit_calls
         rec["inputs"]["pond_room"] = ({"layouts": room.layouts, "tries": room.tries, "max_tries": room.max_tries, "found": room.found,
-                                       "drawn": any(best_p is q for q, _ in added), "cut_short": room.cut_short, "skipped_for_time": False}
+                                       "drawn": any(src is q for q, _ in added), "cut_short": room.cut_short, "skipped_for_time": False}
                                       if room is not None else {"layouts": 0, "tries": 0, "max_tries": POND_ROOM_MAX_TRIES, "found": 0,
                                                                 "drawn": False, "cut_short": False, "skipped_for_time": room_skipped})
     try:
@@ -2811,17 +2940,22 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     return rec, drawing
 
 
-def _stepped_record(sg: dict[str, float] | None) -> dict[str, Any] | None:
-    """The stepped pad of building 1 for the record (stepped_grading), or None."""
+def _stepped_record(sg: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The stepped pad of building 1 for the record (stepped_grading), or
+    None. `court_side`: where the one court lies on the ground (a rise or
+    fall of 1 ft or more from the building: high or low); `both` for a
+    building with courts on two sides, each court's fall listed."""
     if sg is None:
         return None
-    fall = sg["fall_to_court"]
+    fall, both = sg["fall_to_court"], sg.get("courts", 1) > 1
     return {"floor_ft": round(sg["floor"]), "court_ft": round(sg["court"]), "dock_drop_ft": DOCK_DROP_FT,
             "cut_cy": rnd(sg["cut_cy"], 1000), "fill_cy": rnd(sg["fill_cy"], 1000), "moved_cy": rnd(sg["moved_cy"], 1000),
-            "ground_fall_to_court_ft": round(fall, 1),
-            "court_side": "high" if fall <= -DOCKS_UPHILL_FT else "low" if fall >= 1.0 else "level",
+            "ground_fall_to_court_ft": None if both else round(fall, 1),
+            "ground_fall_to_courts_ft": [round(x, 1) for x in sg.get("falls", [fall])],
+            "court_side": "both" if both else "high" if fall <= -1.0 else "low" if fall >= 1.0 else "level",
             "basis": f"floor at one level, truck courts and trailer rows {DOCK_DROP_FT:.0f} ft below it, floor set where cut equals "
-                     "fill; lidar samples at 40 ft; no paving slopes, walls, swell or shrink"}
+                     f"fill; lidar samples at {sg.get('step', 40.0):.0f} ft over the layout's own ground (module); the rest of that "
+                     "ground at the floor; no paving slopes, walls, swell or shrink; no pond excavation, drop yards or driveways"}
 
 
 def _drainage_record(o: dict[str, Any], second: tuple | None) -> dict[str, Any]:
@@ -2863,7 +2997,7 @@ def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
             "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
             "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1}),
             **({"drains": o["drains"]} if "drains" in o else {}),
-            **({"earthwork_cy": rnd(o["stepped"]["moved_cy"], 1000)} if o.get("stepped") else {})}
+            **({"stepped_cy": rnd(o["stepped"]["moved_cy"], 1000)} if o.get("stepped") else {})}
 
 
 def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], parcel, P, edges, rules: dict[str, Any],
