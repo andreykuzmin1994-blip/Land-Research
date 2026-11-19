@@ -214,6 +214,42 @@ fit.
   detention.
 - **Grading.** One balanced plane over the whole module, from USGS 1 m
   lidar sampled every 40 ft. Relief and the steep share are reported.
+- **The stepped pad (default behaviour; reviews/42).** A dock building
+  is not graded to one plane: the floor is at one level and the truck
+  court 4 ft below it (`DOCK_DROP_FT`, a 48 in dock). `stepped_grading`
+  works that out for each layout from the same lidar samples: building,
+  car field and end roads at the floor, courts and trailer rows 4 ft
+  lower, the floor set where cut equals fill. The record's
+  `grading.stepped_pad` gives the floor and court elevations, the cut,
+  fill and earth moved (cubic yards), how far the ground falls from the
+  building to its court, and the court's side: `low` (the ground gives
+  the dock its drop), `level`, or `high` (the ground rises 3 ft or more
+  to the court, `DOCKS_UPHILL_FT`: the court is cut into the hill). A
+  court on the high side is a note, `DOCKS_UPHILL` (information), with
+  what it costs in earthwork against the court on the other side. Each
+  layout compared carries its `earthwork_cy`, printed on the sheet
+  beside its floor area. It is a screening figure on 40 ft samples: no
+  paving slopes, no walls or cut slopes at the pad's edge, no swell or
+  shrink, no rock. The one-plane figures above are unchanged and still
+  what the ranking's relief mark and the drainage check read; the
+  ranking does not count earthwork (the operator's marks: steep ground
+  and relief).
+- **Docks downhill (default behaviour; reviews/42).** After the pass
+  below, when the ground rises from the best plan's building to its
+  court, the same footprint is tried with the court on the other side
+  (the office at either end), checked in full. It replaces the plan
+  only when it passes, its pond drains, it has no fewer trailer stalls
+  and no new severity-2 flag, it turns no docks to the street and no
+  loading to homes that the plan did not, and its stepped pad moves at
+  least 10% and 2,000 CY less (`DOCK_TURN_MIN_SAVING`,
+  `DOCK_TURN_MIN_CY`). `inputs.dock_side` records the tries, whether
+  the plan drawn was turned and the earthwork saved. It applies
+  seldom, and for a reason: where the street is on the low side, a
+  court on the low side lies between the street and the car field,
+  which no car route then reaches without crossing truck pavement, so
+  the docks stay at the back, cut in, as on most such sites (reference
+  site #21: about 10,000 CY more than the other way round). It turned
+  one of the 23 review sites (a wetland site, 11,000 CY less).
 - **Ranking of alternatives.** Plans that pass their own layout checks
   first (`geometry_ok`, below), then plans with a route, then plans that
   meet a draft code minimum of truck spaces where the rules have one

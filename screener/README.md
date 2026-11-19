@@ -937,6 +937,17 @@ How to read a plan:
 - When the pond or a route blocks every plan the search tried first, it
   also tries shorter lengths and the shallower layouts it left out, so a
   larger parcel does not read worse than a smaller one inside it.
+- **Grading** (since 2026-11-19, reviews/42; default behaviour only).
+  Each layout is also graded as a stepped pad: the floor at one level,
+  the truck court 4 ft below it, cut equal to fill.
+  `grading.stepped_pad` in `plans.json` has the floor and court
+  elevations, the earth moved and the court's side; the sheet prints
+  them and the earthwork of each layout compared. A court cut into the
+  high side says `DOCKS_UPHILL` (information) with what it costs. Where
+  the street and homes allow and the plan still passes in full, the
+  docks are turned to the low side of the same footprint
+  (`inputs.dock_side`). The ranking does not count earthwork. A
+  screening figure: no paving slopes, walls or rock.
 - **Drainage** (since 2026-11-18, reviews/41; default behaviour only).
   A pond on ground more than 3 ft above the building pad cannot fill by
   gravity: the plan says `POND_UPHILL` (from 1 ft, `POND_ABOVE_PAD`, for

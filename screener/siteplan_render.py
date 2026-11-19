@@ -843,6 +843,13 @@ def render(d: Drawing, rec: dict) -> str:
                 ("Heavy / light paving", f"{_int(qn.get('heavy_paving_sf'))} / {_int(qn.get('light_paving_sf'))} SF", False),
                 ("Disturbed area", f"{_num(qn.get('disturbed_ac'))} ac", False),
                 ("SF per net acre", _int(sd.get("sf_per_net_ac")), False)]
+        st = gr.get("stepped_pad")
+        if st:
+            # the stepped pad a dock building is graded to (default behaviour's record), after the level pad's rows
+            side = {"low": "court on the low side", "high": "court on the HIGH side", "level": "court on level ground"}[st["court_side"]]
+            k = [r[0] for r in rows].index("Earthwork, balanced") + 1
+            rows[k:k] = [("Stepped pad", f"floor {_int(st['floor_ft'])}, court {_int(st['court_ft'])} ft; {side}", True),
+                         ("Earthwork, stepped", f"{_int(st['moved_cy'])} CY (cut {_int(st['cut_cy'])}, fill {_int(st['fill_cy'])})", False)]
         if sb:
             rows.insert(1, ("Building 2", f"{sb['sf']:,} SF, {sb['doors']} doors, {sb['trailers']} trailers", True))
         t, y2 = kv(x2, y2 + 2, half, rows)
@@ -868,6 +875,7 @@ def render(d: Drawing, rec: dict) -> str:
         hd, cy = heading(COL_X, cy, "LAYOUTS COMPARED (THE PLAN DRAWN IS FIRST)", COL_W)
         col.append(hd)
         rows = []
+        earth = any(x.get("earthwork_cy") is not None for x in alts[:LAYOUTS_SHOWN])
         for k, x in enumerate(alts[:LAYOUTS_SHOWN]):
             ok = x.get("geometry_ok")
             if ok:
@@ -879,8 +887,14 @@ def render(d: Drawing, rec: dict) -> str:
             wt = "bold" if k == 0 else "normal"
             rows.append([(str(x.get("variant")), C["ink"], wt), (_int(x.get("sf")), C["ink"], wt), _int(x.get("doors")),
                          f"{_int(x.get('trailers'))} / {_int(x.get('trailers_target'))}", _int(x.get("sf_per_gross_ac")), result])
-        t, cy = table(COL_X, cy, [("LAYOUT", 300, "start"), ("SF", 64, "end"), ("DOCKS", 50, "end"), ("TRAILERS", 70, "end"),
-                                   ("SF/AC", 60, "end"), ("LAYOUT CHECKS", COL_W - 544, "start")], rows, size=10)
+            if earth:
+                # the stepped pad's earthwork of each layout (default behaviour's record), to weigh against its floor area
+                rows[-1].insert(5, _int(x.get("earthwork_cy")) if x.get("earthwork_cy") is not None else "")
+        cols = [("LAYOUT", 300, "start"), ("SF", 64, "end"), ("DOCKS", 50, "end"), ("TRAILERS", 70, "end"), ("SF/AC", 60, "end"),
+                ("LAYOUT CHECKS", COL_W - 544, "start")]
+        if earth:
+            cols = [("LAYOUT", 270, "start"), *cols[1:5], ("EARTH CY", 66, "end"), ("  LAYOUT CHECKS", COL_W - 580, "start")]
+        t, cy = table(COL_X, cy, cols, rows, size=10)
         col.append(t)
         basis = (rec.get("selection") or {}).get("basis")
         if basis:

@@ -347,6 +347,16 @@ POND_FALLBACK_RATIOS = tuple(sorted({k for k, _ in POND_FALLBACK_SHAPES}))
 # as a pond dug deeper (its footprint then 15 to 30% larger than drawn:
 # POND_ABOVE_PAD says so from 1 ft).
 POND_UPHILL_TOL_FT = 3.0
+# Grading (reviews/42). A dock building is graded as a stepped pad: the
+# floor at one level, the truck court DOCK_DROP_FT below it (a 48 in dock).
+# Ground that rises DOCKS_UPHILL_FT or more from the building to its court
+# puts the court on the high side (DOCKS_UPHILL). The pass turns the docks
+# to the low side of the same footprint when that saves at least
+# DOCK_TURN_MIN_SAVING of the earthwork and DOCK_TURN_MIN_CY.
+DOCK_DROP_FT = 4.0
+DOCKS_UPHILL_FT = 3.0
+DOCK_TURN_MIN_SAVING = 0.10
+DOCK_TURN_MIN_CY = 2000.0
 POND_ROOM_KEEP = 3                # plans the pass adds to the results (the best by the ranking)
 DRAIN_FIRST_SPOTS = 2             # pond-first layouts: the lowest pond spots reserved, every cross-section fitted round each
 POND_ROOM_MAX_TRIES = 90          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
@@ -1592,6 +1602,49 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
     return best[1] if best else None
 
 
+def stepped_grading(p: "Plan", dem: Dem, drop: float = DOCK_DROP_FT) -> dict[str, float] | None:
+    """A stepped pad for one layout, from the lidar samples on its module:
+    the building, car field and end roads at the floor level, the truck
+    courts and trailer rows `drop` ft below it, the floor set where cut
+    equals fill. Returns the floor and court elevations, the cut and fill
+    (cubic yards; `moved_cy` is their mean, the earth that changes
+    place), and how far the ground falls from the building to the courts
+    (positive: the courts are on the low side, where the ground gives the
+    dock its drop; negative: they are cut into the high side). None with
+    fewer than four samples on the module, or none on the building or on
+    a court. A screening figure: sample cells of dem.step ft, no slopes
+    on the paving, no walls, no swell or shrink."""
+    mod, low, bld = prep(p.module), prep(unary_union(p.courts + p.rows)), prep(p.building)
+    zs, lows, zb, zc = [], [], [], []
+    for (x, y), z in dem.coords():
+        pt = Point(x, y)
+        if not mod.contains(pt):
+            continue
+        is_low = low.contains(pt)
+        zs.append(z)
+        lows.append(is_low)
+        if is_low:
+            zc.append(z)
+        elif bld.contains(pt):
+            zb.append(z)
+    if len(zs) < 4 or not zc or not zb:
+        return None
+    floor = (sum(zs) + drop * sum(lows)) / len(zs)          # cut = fill
+    cell = dem.step ** 2 / 27.0
+    cut = sum(max(z - (floor - drop * k), 0.0) for z, k in zip(zs, lows)) * cell
+    fill = sum(max((floor - drop * k) - z, 0.0) for z, k in zip(zs, lows)) * cell
+    return {"floor": floor, "court": floor - drop, "cut_cy": cut, "fill_cy": fill, "moved_cy": (cut + fill) / 2,
+            "fall_to_court": sum(zb) / len(zb) - sum(zc) / len(zc)}
+
+
+def court_on_other_side(p: "Plan", prog: "Program", flipu: bool | None = None) -> "Plan":
+    """The same layout on the same footprint with its court on the other
+    side of the building (and, with `flipu`, the office at that end)."""
+    fr = p.frame
+    return build(p.v, p.L, p.r, Frame(fr.Lmod, fr.depth, fr.pl, fr.origin, not fr.flip, fr.flipu if flipu is None else flipu),
+                 prog, draw=False)
+
+
 def ponds_over_pad(ponds: list, dem: Dem, pad_z: float | None) -> list[float | None]:
     """For each pond, how far its ground (the mean of the lidar samples on
     its footprint) stands above the pad, in ft; negative when it is below.
@@ -2125,6 +2178,15 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
         flags.append(("POND_ABOVE_PAD", 3, f"the pond's ground is about {pond_over:.0f} ft above the building pad, inside the "
                                            f"{POND_UPHILL_TOL_FT:.0f} ft the planner takes as a deeper pond: dug that much deeper at "
                                            "4:1 slopes its footprint grows by roughly 15 to 30%, which is not drawn"))
+    # Grading (reviews/42): the stepped pad, and a court on the high side.
+    stepped = stepped_grading(p, dem) if fixes else None
+    if stepped is not None and stepped["fall_to_court"] <= -DOCKS_UPHILL_FT:
+        other = stepped_grading(court_on_other_side(p, ctx.prog), dem)
+        extra = stepped["moved_cy"] - other["moved_cy"] if other is not None else 0.0
+        flags.append(("DOCKS_UPHILL", 3, f"the ground rises about {-stepped['fall_to_court']:.0f} ft from the building to its truck court, "
+                                         f"which sits {DOCK_DROP_FT:.0f} ft below the floor: the court is cut into the high side"
+                                         + (f" (about {rnd(extra, 1000):,} CY more earthwork than with the court on the low side)"
+                                            if extra >= 1000 else "")))
     if not pond_ok:
         way_out = ("underground detention (vaults) or a smaller building" if not fixes or ctx.prog.opts.underground
                    else "a smaller building or detention off site (underground detention is not used in this market)")
@@ -2154,6 +2216,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     if fixes:
         o["pond_ratios"] = [k for _, k in placed]
         o["pond_over_pad"], o["pond_over_each"], o["drains"] = pond_over, pond_each, not uphill
+        o["stepped"] = stepped
     o["violations"] = check_plan(p, o, ctx, others)
     if fixes:
         for viol in o["violations"]:
@@ -2513,6 +2576,8 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 rank_sf(q, o, st, rel), -max(0, q.trailers_target - o["trailers"]))
     room = None
     added: list[tuple[Plan, dict[str, Any]]] = []
+    turned = turned_from = None                                # the docks-downhill step (reviews/42)
+    dock_side = {"tried": 0, "turned": False, "saved_cy": 0}
     room_skipped = bool(opts.fixes and first is not None and not search.exceeded
                         and search.deadline - search.clock() < POND_ROOM_MIN_LEFT * opts.max_seconds)
     if opts.fixes and first is not None and not search.exceeded and not room_skipped:
@@ -2638,7 +2703,47 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
             kept = kept[:POND_ROOM_KEEP - 1] + [with_stalls[0]]     # the read-out's "meets its trailer target" layout
         added = kept
         results += added
+        # Docks downhill (reviews/42). When the ground rises from the best
+        # plan's building to its truck court, the same footprint is tried
+        # with the court on the other side (the office at either end). It
+        # replaces that plan only when it passes in full, its pond drains,
+        # it has no fewer trailer stalls and no new severity-2 flag, it
+        # turns no docks to the street and no loading to homes that the
+        # plan did not, and its stepped pad moves materially less earth.
+        base = max(results, key=score)
+        sg0 = base[1].get("stepped")
+        if base[1]["ok"] and sg0 is not None and sg0["fall_to_court"] < 0 and not room.cut_short:
+            q0, o0 = base
+            sev2 = lambda o: {f for f, sv, _ in o["flags"] if sv == 2}
+            cands = []
+            try:
+                for fu in (q0.frame.flipu, not q0.frame.flipu):
+                    q = court_on_other_side(q0, prog, fu)
+                    if (not B0.buffer(0.5).contains(q.building)
+                            or (faces_street(q, row_line) and not faces_street(q0, row_line))
+                            or (loading_faces_homes(q, res_line) and not loading_faces_homes(q0, res_line))):
+                        continue
+                    if not room.take():
+                        break
+                    dock_side["tried"] += 1
+                    o2 = finish(q, ctx_room)
+                    sg = o2.get("stepped")
+                    if (o2["ok"] and sg is not None and (o2.get("drains", True) or not o0.get("drains", True))
+                            and o2["trailers"] >= o0["trailers"] and not (sev2(o2) - sev2(o0))
+                            and sg0["moved_cy"] - sg["moved_cy"] >= max(DOCK_TURN_MIN_CY, DOCK_TURN_MIN_SAVING * sg0["moved_cy"])):
+                        cands.append((q, o2))
+            except _BudgetExceeded:
+                room.cut_short = True
+            if cands:
+                turned, turned_from = min(cands, key=lambda t: t[1]["stepped"]["moved_cy"]), base
+                results.append(turned)
+                added.append(turned)
+                dock_side.update(turned=True, saved_cy=rnd(sg0["moved_cy"] - turned[1]["stepped"]["moved_cy"], 1000))
     results.sort(key=score, reverse=True)
+    if turned is not None and results[0] is turned_from:
+        # the same footprint and floor area: it takes the place of the plan it was turned from
+        results.remove(turned)
+        results.insert(0, turned)
     best_p, best_o = results[0]
     second = None
     second_cut = False      # the budget ran out in the optional second-building search only
@@ -2679,6 +2784,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
     if opts.fixes:
+        rec["inputs"]["dock_side"] = dict(dock_side, turned=dock_side["turned"] and best_p is turned[0])
         if room is not None:
             rec["inputs"]["fit_searches"] = rec["inputs"].get("fit_searches", 0) + room.search.fit_calls
         rec["inputs"]["pond_room"] = ({"layouts": room.layouts, "tries": room.tries, "max_tries": room.max_tries, "found": room.found,
@@ -2703,6 +2809,19 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     drawing = Drawing(inp.title, parcel, P, constraints, trans, cut, steep, front_ft, shown, best_o, second, B=B, edges=edges,
                       dem=dem, context=context)
     return rec, drawing
+
+
+def _stepped_record(sg: dict[str, float] | None) -> dict[str, Any] | None:
+    """The stepped pad of building 1 for the record (stepped_grading), or None."""
+    if sg is None:
+        return None
+    fall = sg["fall_to_court"]
+    return {"floor_ft": round(sg["floor"]), "court_ft": round(sg["court"]), "dock_drop_ft": DOCK_DROP_FT,
+            "cut_cy": rnd(sg["cut_cy"], 1000), "fill_cy": rnd(sg["fill_cy"], 1000), "moved_cy": rnd(sg["moved_cy"], 1000),
+            "ground_fall_to_court_ft": round(fall, 1),
+            "court_side": "high" if fall <= -DOCKS_UPHILL_FT else "low" if fall >= 1.0 else "level",
+            "basis": f"floor at one level, truck courts and trailer rows {DOCK_DROP_FT:.0f} ft below it, floor set where cut equals "
+                     "fill; lidar samples at 40 ft; no paving slopes, walls, swell or shrink"}
 
 
 def _drainage_record(o: dict[str, Any], second: tuple | None) -> dict[str, Any]:
@@ -2743,7 +2862,8 @@ def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
             "relief_ft": round(o["relief"]) if o["relief"] else None, "steep_pct": round(o["steep_module_pct"]),
             "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
             "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1}),
-            **({"drains": o["drains"]} if "drains" in o else {})}
+            **({"drains": o["drains"]} if "drains" in o else {}),
+            **({"earthwork_cy": rnd(o["stepped"]["moved_cy"], 1000)} if o.get("stepped") else {})}
 
 
 def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], parcel, P, edges, rules: dict[str, Any],
@@ -2938,6 +3058,7 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
                     "pad_elev_ft": round(o["pad_elev"]) if o.get("pad_elev") is not None else None,
                     "max_cut_ft": round(o["max_cut"]) if o.get("max_cut") is not None else None,
                     "max_fill_ft": round(o["max_fill"]) if o.get("max_fill") is not None else None,
+                    **({"stepped_pad": _stepped_record(o.get("stepped"))} if fixes else {}),
                     "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"},
         "flags": sevd,
         "plan_checks": o["violations"] + ([dict(v, building=2) for v in second[1]["violations"]] if second else []),

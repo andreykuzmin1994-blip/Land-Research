@@ -1653,6 +1653,107 @@ class Drainage(Offline):
         self.assertEqual(on["inputs"]["pond_room"]["layouts"], 3)        # each starting layout counted once
 
 
+class Grading(Offline):
+    """Grading with the land (reviews/42): the stepped pad a dock building
+    is graded to, the court's side, and the docks turned downhill."""
+
+    angles = False
+
+    @staticmethod
+    def fake(court):
+        from types import SimpleNamespace
+        return SimpleNamespace(module=box(0, 0, 400, 400), building=box(0, 100, 400, 300), courts=[court], rows=[])
+
+    @staticmethod
+    def tilted(rise):
+        # 40 ft samples over 400 x 400 ft; the ground rises `rise` ft per ft northward
+        return sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(10) for j in range(10)},
+                      elev={(i, j): 900.0 + rise * (20 + 40 * j) for i in range(10) for j in range(10)}, state="checked")
+
+    def test_the_stepped_pad(self):
+        south, north = box(0, 0, 400, 100), box(0, 300, 400, 400)
+        low = sp.stepped_grading(self.fake(south), self.tilted(0.05))        # the court on the low (south) side
+        high = sp.stepped_grading(self.fake(north), self.tilted(0.05))       # the same court cut into the high side
+        for g in (low, high):
+            self.assertAlmostEqual(g["floor"] - g["court"], sp.DOCK_DROP_FT)
+            self.assertAlmostEqual(g["cut_cy"], g["fill_cy"], delta=0.001 * g["cut_cy"])       # the floor balances cut and fill
+            self.assertAlmostEqual(g["moved_cy"], (g["cut_cy"] + g["fill_cy"]) / 2)
+        # the building's samples are at y 140-260 (ground 910), the court's at 20-60 or 340-380 (902 or 918)
+        self.assertAlmostEqual(low["fall_to_court"], 8.0, places=6)
+        self.assertAlmostEqual(high["fall_to_court"], -8.0, places=6)
+        self.assertLess(low["moved_cy"], high["moved_cy"])                   # the ground gives the low court its drop
+        # level ground: 20 of the 100 samples are court, so the floor stands 0.8 ft above the ground
+        flat = sp.stepped_grading(self.fake(south), self.tilted(0.0))
+        self.assertAlmostEqual(flat["floor"], 900.8)
+        self.assertAlmostEqual(flat["fall_to_court"], 0.0)
+        self.assertAlmostEqual(flat["cut_cy"], 20 * 1600 * 3.2 / 27)         # the court cut 3.2 ft; the rest filled 0.8 ft
+        self.assertAlmostEqual(flat["fill_cy"], 80 * 1600 * 0.8 / 27)
+        # too little to grade
+        self.assertIsNone(sp.stepped_grading(self.fake(south), sp.Dem()))
+        self.assertIsNone(sp.stepped_grading(self.fake(box(1000, 1000, 1100, 1100)), self.tilted(0.05)))
+
+    def test_the_record_names_the_court_side(self):
+        g = {"floor": 918.4, "court": 914.4, "cut_cy": 33600.0, "fill_cy": 33600.0, "moved_cy": 33600.0, "fall_to_court": -5.9}
+        rec = sp._stepped_record(g)
+        self.assertEqual((rec["floor_ft"], rec["court_ft"], rec["moved_cy"], rec["court_side"]), (918, 914, 34000, "high"))
+        self.assertEqual(sp._stepped_record(dict(g, fall_to_court=2.7))["court_side"], "low")
+        self.assertEqual(sp._stepped_record(dict(g, fall_to_court=-2.9))["court_side"], "level")
+        self.assertIsNone(sp._stepped_record(None))
+
+    def test_docks_on_the_high_side_are_a_note_with_their_cost(self):
+        # the street on the low side: the docks are at the back, cut into
+        # the hill. Turned round, the court would lie between the street
+        # and the cars, which no car route then reaches: tried, not taken.
+        mk = lambda: site(700, 800, z=lambda x, y: 900 + 0.025 * y)
+        rec, d = sp.plan_site(mk())
+        st = rec["grading"]["stepped_pad"]
+        self.assertEqual(st["court_side"], "high")
+        self.assertEqual(st["floor_ft"] - st["court_ft"], 4)
+        note = [f["note"] for f in rec["flags"][3] if f["flag"] == "DOCKS_UPHILL"][0]
+        self.assertIn("CY more earthwork than with the court on the low side", note)
+        self.assertNotIn("DOCKS_UPHILL", names(rec, 2))                      # information: it is a cost, not a condition
+        self.assertEqual((rec["inputs"]["dock_side"]["tried"], rec["inputs"]["dock_side"]["turned"]), (2, False))
+        cond = [c for c in rec["assessment"]["conditions"] if c["flag"] == "DOCKS_UPHILL"][0]
+        self.assertEqual(cond["workstream"], sp.assess.W_GRADING)
+        svg = sr.render(d, rec)
+        self.assertIn("court on the HIGH side", svg)
+        self.assertIn("EARTH CY", svg)
+        self.assertIsNotNone(rec["alternatives"][0]["earthwork_cy"])
+        # the prototype behaviour: no model, no note, no rows
+        proto, dp = sp.plan_site(mk(), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("stepped_pad", proto["grading"])
+        self.assertNotIn("dock_side", proto["inputs"])
+        self.assertNotIn("DOCKS_UPHILL", names(proto))
+        self.assertNotIn("earthwork_cy", proto["alternatives"][0])
+        psvg = sr.render(dp, proto)
+        self.assertNotIn("Stepped pad", psvg)
+        self.assertNotIn("EARTH CY", psvg)
+
+    def test_docks_turn_downhill_where_the_site_allows(self):
+        # a wetland on one side, the ground falling 2% to the west: the
+        # court was on the high side; the same footprint turned has it on
+        # the low side and moves 11,000 CY less, with the same floor area,
+        # stalls and flags
+        wet = wgs(box(500, 300, 700, 700))
+        mk = lambda: site(700, 700, constraints_wgs=[wet], constraints_near_wgs=[wet], z=lambda x, y: 900 - 0.02 * x)
+        on, _ = sp.plan_site(mk())
+        with mock.patch.object(sp, "DOCK_TURN_MIN_CY", 1e12):
+            off, _ = sp.plan_site(mk())
+        self.assertEqual(off["grading"]["stepped_pad"]["court_side"], "high")
+        self.assertIs(off["inputs"]["dock_side"]["turned"], False)
+        self.assertIs(on["inputs"]["dock_side"]["turned"], True)
+        self.assertEqual(on["grading"]["stepped_pad"]["court_side"], "low")
+        self.assertEqual(on["inputs"]["dock_side"]["saved_cy"],
+                         off["grading"]["stepped_pad"]["moved_cy"] - on["grading"]["stepped_pad"]["moved_cy"])
+        self.assertGreaterEqual(on["inputs"]["dock_side"]["saved_cy"], 2000)
+        self.assertEqual((on["building"]["sf"], on["feasible"]), (off["building"]["sf"], off["feasible"]))
+        self.assertGreaterEqual(on["trailers"]["total"], off["trailers"]["total"])
+        self.assertLessEqual(names(on, 2), names(off, 2))                    # no new condition
+        self.assertNotIn("DOCKS_UPHILL", names(on))
+        for flag in ("STREET_FACING_DOCKS", "LOADING_FACES_RES"):
+            self.assertFalse(flag in names(on) and flag not in names(off), flag)
+
+
 class PondRoomOnlyAdds(Offline):
     """The pass runs after the search and its rescue and only adds layouts
     (reviews/40): with it, a site never ranks worse than without it, and a
