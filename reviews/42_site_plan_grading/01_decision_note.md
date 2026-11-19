@@ -80,6 +80,6 @@ Not in this change, and why:
 | Check | Result |
 |---|---|
 | Prototype parity | 43 prototype records (23 sites, real angles and the tests' angle patch) byte-identical to the state of `reviews/41`. |
-| The 23 sites, default | No change of floor area, trailer stalls or feasibility on any. One plan turned: a wetland site (700 x 700 ft, real angles), court from the high to the low side, 11,000 CY less. `DOCKS_UPHILL` on 9 of 44 planned records (#21, the 1200 x 1200 site, slope 800 x 900, low front, the steep site, one wetland run). |
+| The 23 sites, default | No change of floor area, trailer stalls or feasibility on any. One plan turned: a wetland site (700 x 700 ft, real angles), court from the high to the low side, 11,000 CY less. `DOCKS_UPHILL` on 11 of 44 planned records (#21, the 1200 x 1200 site, slope 800 x 900, low front and the steep site in both angle modes, one wetland run). |
 | Sheets | #21 and #25 redrawn and read; both pass the sanitiser. |
 | Tests | New class `Grading` (4 tests): the model on a tilted plane both ways round and on level ground, the record, the note with its cost and the prototype's silence, a plan turned. Full suite: in `02_review.md`. |
