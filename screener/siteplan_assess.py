@@ -168,9 +168,9 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                        "engineer set the pad and pond elevations; a deeper pond takes more room than is drawn.",
                        "a stormwater concept with pad and pond elevations"),
     "DOCKS_UPHILL": (W_GRADING, "diligence", "The truck court is on the high side of the building and must be cut down to dock "
-                     "height. Have the civil engineer price that cut and what the court's cut slope or wall takes; the "
-                     "building turned round is the alternative only where the street, the neighbours and the routes allow it "
-                     "(the note says whether the planner could).", "a grading concept with floor and court elevations"),
+                     "height. Have the civil engineer price that cut and its slope or wall. Turning the building round is an "
+                     "option only where the street, neighbours and routes allow (see the note).",
+                     "a grading concept with floor and court elevations"),
     "POND_SITE_FROM_LIDAR": (W_STORM, "diligence", "Have the civil engineer confirm the pond location, outfall and volume under "
                              "the local ordinance. The size here is a screening estimate.", "a stormwater concept"),
     "HSG_ASSUMED": (W_STORM, "diligence", "The soil group behind the pond size was assumed. Run the soil check for this parcel, "

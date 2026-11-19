@@ -279,7 +279,7 @@ fit.
   street is on the low side, the court on the low side is on the
   street side of the building: not taken, by the rule above (a
   judgement for the operator: on a 1600 x 1000 ft review site the turn
-  would save 39,000 CY with the court 280 ft off the street, the
+  would save about 40,000 CY with the court 280 ft off the street, the
   offices and cars behind the building and a car route of 2,300 ft).
   On tighter sites the same turn also fails its routes, because the
   module is fitted to the envelope with 10 to 16 ft beside and behind
