@@ -490,6 +490,10 @@ def render(d: Drawing, rec: dict) -> str:
             out.append(poly(g, C["trailer"]))
         if pp.ticks:
             out.append(f'<path d="{lpath(unary_union(pp.ticks))}" stroke="#ffffff" stroke-width="1" fill="none" opacity="0.9"/>')
+        if oo.get("car_stalls_taken"):
+            # the trucks' lead-in where it takes the corner of the car field (default behaviour's plan): drawn over the stalls it takes
+            lead = unary_union([rp for kind, rp in oo["route_polys"] if kind == "truck"]).intersection(unary_union(pp.cars))
+            out.append(poly(lead, C["road"]))
         for g in oo["ponds"]:
             # the grassed rim, the top of the bank, the water and its deeper middle
             water = g.buffer(-RIM)
@@ -497,6 +501,11 @@ def render(d: Drawing, rec: dict) -> str:
             out.append(poly(g.buffer(-RIM / 2), "none", C["pond_s"], 0.5, extra='stroke-dasharray="3 3" stroke-opacity="0.6"'))
             out.append(poly(water, C["pond"], C["pond_s"], 1.2))
             out.append(poly(water.buffer(-min(10.0, 0.18 * math.sqrt(max(water.area, 0.0)))), C["pond_deep"], op=0.55))
+    # the trucks' way in as a WB-67 steers it (default behaviour's plan): its centreline, as a lane line
+    truck_lines = [ln for pp, oo in plans if (oo.get("truck_path") or {}).get("designed") for kind, ln in oo["routes"][:1] if kind == "truck"]
+    if truck_lines:
+        out.append(f'<path d="{lpath(unary_union(truck_lines))}" stroke="#ffffff" stroke-width="1.3" stroke-dasharray="10 8" '
+                   f'fill="none" opacity="0.85"/>')
     # contours of the existing ground, over the paving (the grading it
     # implies reads through) and under the buildings
     every: int = 0
@@ -843,6 +852,19 @@ def render(d: Drawing, rec: dict) -> str:
                 ("Heavy / light paving", f"{_int(qn.get('heavy_paving_sf'))} / {_int(qn.get('light_paving_sf'))} SF", False),
                 ("Disturbed area", f"{_num(qn.get('disturbed_ac'))} ac", False),
                 ("SF per net acre", _int(sd.get("sf_per_net_ac")), False)]
+        tp = acc.get("truck_path")
+        if tp:
+            # the trucks' way in (default behaviour's record), after the routes' row
+            if tp.get("designed"):
+                nb = len(tp.get("bends") or [])
+                txt = (f"{tp['vehicle']}: " + (f"{nb} bend{'s' if nb != 1 else ''}, tightest {_int(tp['min_radius_ft'])} ft radius" if nb else "no bends")
+                       + ("; swept path clear" if tp.get("swept_ok") else f"; SWEEPS {_num(tp.get('swept_clip_ft'))} FT OFF ITS PAVEMENT")
+                       + (f"; takes {tp['car_stalls_taken']} car stalls" if tp.get("car_stalls_taken") else ""))
+            else:
+                txt = (f"{tp['vehicle']}: NO PATH IT CAN STEER" if tp.get("reason") == "no path" else "not laid out")
+            back = {"sight": "backs in on the driver's side", "blind": "backs in on the BLIND side"}.get(tp.get("backing"), "")
+            k = [r[0] for r in rows].index("Truck / car route") + 1
+            rows[k:k] = [("Truck path", txt, True)] + ([("Truck court entry", back, False)] if back and tp.get("courts") == 1 else [])
         st = gr.get("stepped_pad")
         if st:
             # the stepped pad a dock building is graded to (default behaviour's record), after the level pad's rows
@@ -879,7 +901,9 @@ def render(d: Drawing, rec: dict) -> str:
         earth = any(x.get("stepped_cy") is not None for x in alts[:LAYOUTS_SHOWN])
         for k, x in enumerate(alts[:LAYOUTS_SHOWN]):
             ok = x.get("geometry_ok")
-            if ok:
+            if ok and x.get("drivable") is False:
+                result = ("passes its checks; no way in a truck can drive", C["warn"] if "warn" in C else C["bad"], "normal")
+            elif ok:
                 result = ("passes its checks", C["good"], "bold")
             else:
                 why = ", ".join(str(f).replace("_", " ").lower() for f in x.get("blocking") or []) or (
@@ -968,6 +992,7 @@ def render(d: Drawing, rec: dict) -> str:
               ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
               ("prop", "property line (county parcel map)"), ("dash", "paving setback line (draft; 25 ft from water)"),
               ("dashdot", "building setback line (draft)"), ("res", "boundary toward residential parcels (county land-use codes)"),
+              *([("lane", "trucks' way in as a WB-67 steers it (centreline; pavement widened to its swept path)")] if truck_lines else []),
               ("dim", "dimension, ft")]
     lw = (W - 2 * M) / 4
     for k, (fill, txt) in enumerate(legend):
@@ -980,6 +1005,9 @@ def render(d: Drawing, rec: dict) -> str:
             foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["res"]}" stroke-dasharray="9 5" stroke-width="3"/>')
         elif fill == "prop":
             foot.append(f'<path d="M{x - 6:.1f},{y - 4:.1f} L{x + 22:.1f},{y - 4:.1f}" stroke="{C["ink"]}" stroke-dasharray="20 4 3 4 3 4" stroke-width="2.2"/>')
+        elif fill == "lane":
+            foot.append(f'<rect x="{x:.1f}" y="{y - 10:.1f}" width="18" height="10" fill="{C["road"]}" stroke="{C["ink"]}" stroke-width="0.6"/>'
+                        f'<path d="M{x + 1:.1f},{y - 5:.1f} L{x + 17:.1f},{y - 5:.1f}" stroke="#ffffff" stroke-dasharray="4 3" stroke-width="1.3"/>')
         elif fill == "contour":
             foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["contour"]}" stroke-dasharray="7 3" '
                         f'stroke-width="1"/>')
@@ -996,6 +1024,11 @@ def render(d: Drawing, rec: dict) -> str:
                    (f"Stepped pad: {gr['stepped_pad'].get('basis')}. PAD EL on the plan and the level-pad rows are the one "
                     "plane the ponds are measured against; the stepped pad's floor stands a little above it, its court below")
                    if gr.get("stepped_pad") else "",
+                   ("Truck path: an AASHTO WB-67 (73.5 ft; 53 ft trailer) driving forward from the street to the truck lane of "
+                    "its court and back out, its steer axle on the line drawn, turning no tighter than 45 ft; the ground its body "
+                    "sweeps is checked against the buildings, parked cars and trailers, ponds and setback lines. One vehicle at "
+                    "walking speed: no backing manoeuvre, no opposing truck in a bend, no grades")
+                   if (acc.get("truck_path") or {}).get("designed") else "",
                    f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}",
                    (f"Contours: existing ground every {every} ft, traced from the lidar samples on a {d.dem.step:.0f} ft grid and "
                     "smoothed, stopping up to one grid step inside the property line (indicative; not a topographic survey)")

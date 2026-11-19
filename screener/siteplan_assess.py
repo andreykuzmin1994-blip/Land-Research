@@ -118,6 +118,24 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                         "the fire marshal's comment on the concept"),
     "SHORT_THROAT": (W_ACCESS, "diligence", "Have the civil engineer check truck stacking between the street and the court; move "
                      "the gate or lengthen the throat.", "a driveway and gate layout with the stacking length"),
+    "TRUCK_PATH_NONE": (W_ACCESS, "before_offer", "No tractor-trailer can drive from the driveway to the truck court as laid out. "
+                        "Have the civil engineer lay out the truck entrance: a driveway in line with the truck road, or a "
+                        "shorter building at that end.", "a truck-turning layout (WB-67) from the street to the docks"),
+    "TRUCK_SWEPT_PATH": (W_ACCESS, "before_offer", "A tractor-trailer's body sweeps off the truck pavement at a bend on its way "
+                         "in. Have the civil engineer widen the bend or move what stands in it.",
+                         "a truck-turning layout (WB-67) from the street to the docks"),
+    "PARKING_SHORT_FOR_LEAD_IN": (W_PROGRAM, "diligence", "The trucks' way in takes car stalls and leaves fewer than required. Have "
+                                  "the civil engineer re-lay the car field (another row or a deeper front yard), or shorten "
+                                  "the building.", "a car-parking layout that meets the count with the truck entrance in place"),
+    "TRUCK_LEAD_IN_OVER_PARKING": (W_ACCESS, "diligence", "The trucks' way in crosses the corner of the car field. Have the civil "
+                                   "engineer re-lay that corner so trucks and parked cars are apart.",
+                                   "a site layout with the truck entrance and car field separated"),
+    "TRUCK_REVERSE_BEND": (W_ACCESS, "diligence", "The trucks' way in has a reverse bend with little straight between. Have the "
+                           "civil engineer straighten it or move the driveway into line with the truck road.",
+                           "a truck-turning layout (WB-67) from the street to the docks"),
+    "BLIND_SIDE_BACKING": (W_ACCESS, "diligence", "Trucks enter the court with the docks on their right and back in on the blind "
+                           "side. Ask the civil engineer whether the driveway can go to the other end so they circulate "
+                           "counter-clockwise.", "a circulation layout with the dock doors on the driver's side"),
     "ACCESS_SHARED": (W_ACCESS, "diligence", "One driveway serves trucks and cars. Ask the road authority whether a second "
                       "driveway can be permitted; if not, design the split inside the throat.",
                       "the road authority's answer on a second driveway"),
@@ -551,6 +569,9 @@ def _reasons(a: dict[str, Any], chosen: dict[str, Any], w: dict[str, Any]) -> li
                    "meets that minimum is drawn first")
     if a.get("drains") is False and chosen.get("drains", True):
         out.append("its pond stands above the pad it would drain, and a layout that drains by gravity is drawn first")
+    if a.get("drivable") is False and chosen.get("drivable", True):
+        out.append("no tractor-trailer can drive from its driveway to its truck court as laid out, and a layout with a way in "
+                   "is drawn first")
     if mine["trailer"] - theirs["trailer"] >= MARK_MIN_SF:
         target, got = a.get("trailers_target") or 0, a.get("trailers") or 0
         out.append((f"it has none of its {target} target trailer stalls" if not got
