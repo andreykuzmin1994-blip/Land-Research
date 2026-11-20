@@ -359,6 +359,8 @@ def render(d: Drawing, rec: dict) -> str:
         """(long side px, short side px, screen angle of the long side) of
         a rectangle built by the planner (its first two edges)."""
         c = list(g.exterior.coords)
+        if len(c) != 5:     # not a rectangle (a pond shaped to the open ground): the box round it
+            c = list(g.minimum_rotated_rectangle.exterior.coords)
         e1 = math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1])
         e2 = math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1])
         if e1 >= e2:
@@ -642,7 +644,7 @@ def render(d: Drawing, rec: dict) -> str:
                 labels.append(label(X(cc.x), Y(cc.y), [("DROP YARD", 9, "bold"), (f"{n_drop} TRAILER STALLS", 9, "normal")], an))
         for g in oo["ponds"]:
             lp, sp_, an = box_axes(g)
-            cc = g.centroid
+            cc = g.centroid if g.contains(g.centroid) else g.representative_point()
             each = oo["v_det"] / max(len(oo["ponds"]), 1)
             if lp >= 80 and sp_ >= 34:
                 pond_lines = [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")]

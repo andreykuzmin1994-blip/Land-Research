@@ -376,6 +376,10 @@ STREET_SIDE_TOL_FT = 40.0
 LAND_MAX_TRIES = 10
 LAND_KEEP = 3
 POND_FREE_OPEN_FT = 30.0
+# A second building with no way in of its own (building 1 stands across
+# the lot) is reached through building 1's truck road and the end of its
+# court, from building 1's truck driveway (SECOND_ACCESS_THROUGH_FIRST).
+SECOND_THROUGH_FIRST = True
 # Design for the truck (reviews/43; default behaviour). The truck route of
 # the plan drawn is laid out again as a path a WB-67 can steer
 # (siteplan_truck) and its swept path checked. In the court the centreline
@@ -3571,7 +3575,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     o2 = finish(q, ctx, others)
                     if o2["ok"]:
                         return (q, o2), False
-                if opts.fixes and best_o["tpt"] is not None:
+                if opts.fixes and SECOND_THROUGH_FIRST and best_o["tpt"] is not None:
                     # Use the land (reviews/44): none has a way in of its
                     # own (building 1 stands across the lot), so the same
                     # candidates reached through building 1's truck road
