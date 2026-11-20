@@ -937,6 +937,15 @@ How to read a plan:
 - When the pond or a route blocks every plan the search tried first, it
   also tries shorter lengths and the shallower layouts it left out, so a
   larger parcel does not read worse than a smaller one inside it.
+- **Use the land** (since 2026-11-20, reviews/44; default behaviour
+  only). The larger layouts the search rejected are finished once more
+  with what an engineer would add: a car drive across the layout's own
+  open ground, a pond shaped to the open ground where no rectangle fits
+  (`POND_SHAPED_TO_SITE`), the truck road laid out first. A second
+  building on land behind the first is reached through the first's truck
+  road and court (`SECOND_ACCESS_THROUGH_FIRST`, a condition). Both only
+  add: never a layout that newly faces the street or homes, never less
+  floor area. `inputs.land_pass` in `plans.json` says what was tried.
 - **Design for the truck** (since 2026-11-19, reviews/43; default
   behaviour only). The plan drawn has a truck route a tractor-trailer
   (AASHTO WB-67) can steer, laid out before its pond: turns of 45 ft

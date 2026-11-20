@@ -289,6 +289,70 @@ fit.
   court on the high side (about 10,000 CY more: the other side faces
   the street and homes). It turned one of the 23 review sites (a
   wetland site, 11,000 CY less).
+- **Use the land (default behaviour; reviews/44).** Measured on the 23
+  review sites, the plans drawn covered 12 to 33% of their sites with
+  building (floor-area ratio), with 12 to 60% of the buildable land left
+  unused. Three things held the yield down, none of them the land:
+  larger layouts the search rejected for want of a car route its rules
+  could not see, larger layouts rejected because no rectangular pond
+  fitted, and land behind the first building with no way in.
+
+  **The pass.** After the search and the pond pass, the layouts the
+  search rejected that are larger than its best plan (any of them where
+  no plan passed) are finished once more, largest first, at most 10
+  (`LAND_MAX_TRIES`), with what an engineer would add before giving the
+  floor area up:
+  - **a car drive over the layout's own open ground.** A cross-dock's
+    car field stands at the building's end, behind the depth of its
+    front court; the yard in front of it belongs to the layout and is
+    open. The search's car route could not cross the layout's own
+    module, so every such layout failed `CAR_ROUTE_NONE`. In the pass
+    cars may cross that open ground, 16 ft off the layout's truck
+    pavement and building;
+  - **a pond shaped to the open ground** (`free_pond`) where no
+    rectangle fits, in the planner's proportions or the pond pass's:
+    the largest open piece that holds the volume (necks and strips
+    under 60 ft left out), cut across its length to just that volume
+    from its lower end, on ground the pad drains to. Its storage is
+    figured from its outline by the same rule as a rectangle's
+    (`pond_capacity_acft`: 6 ft of water, 4:1 banks, a foot of
+    freeboard, a 15 ft rim; the two agree to within half a percent on
+    the planner's own rectangles). The plan says so:
+    `POND_SHAPED_TO_SITE` (information);
+  - **the truck road laid out first** (reviews/43), which also mends a
+    grid route that strayed.
+
+  Only what those can mend is tried (a route or the pond), and never a
+  layout that newly turns docks to the street or loading to homes. At
+  most 3 that pass go on (`LAND_KEEP`); the plan drawn is then the best
+  of all by the usual ranking, so the pass only adds. A cross-dock on a
+  lot it fills from side to side has a court on the street: it is not
+  taken by the pass where the plan before it faced none.
+
+  **A second building behind the first** (`SECOND_THROUGH_FIRST`).
+  Where the first building stands across the lot, the land behind it
+  has no frontage of its own and every second-building candidate failed
+  for access. Those candidates are now tried again reached through the
+  first building's truck road and the end of its court, from its truck
+  driveway: trucks and cars to the second building share that drive.
+  Routes may pass beside building 1; ponds and yards still keep off
+  it. The second building's truck path goes on from where the first's
+  comes onto its truck lane. It is said plainly as conditions:
+  `SECOND_ACCESS_THROUGH_FIRST` and `SECOND_ACCESS_SHARED` (severity 2),
+  and `SECOND_DEAD_END_ACCESS` where the way in is over 750 ft.
+
+  In the record: `inputs.land_pass` (tried, found, drawn); the pond's
+  shape in `detention.basis`; `second_building.truck_path.from`.
+
+  What it is not. One shaped pond per pond the volume calls for: the
+  volume is not split over several small pieces, and the pond is not
+  wrapped round a building. Still two buildings at most: an 80 acre
+  site has land for a third. Parking is not clustered at the office
+  end, and building depths are still the planner's market depths. The
+  ranking gives trailer stalls no floor area (the operator's decision),
+  so a larger layout the pass adds can have fewer: three review sites
+  lose all their trailer stalls for 3 to 40% more floor area, and the
+  read-out names the layout that keeps them.
 - **Design for the truck (default behaviour; reviews/43).** The search
   routes trucks as the shortest line on a 20 ft grid, with nothing that
   asks whether a tractor-trailer can steer it. `siteplan_truck` adds the

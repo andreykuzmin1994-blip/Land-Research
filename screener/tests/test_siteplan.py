@@ -2293,7 +2293,7 @@ class Land(Offline):
         two = box(0, 0, 200, 200).union(box(200, 80, 400, 120)).union(box(400, 0, 600, 200))
         one = sp.free_pond(two, 1.0, dem, None)
         self.assertTrue(one.bounds[2] <= 201 or one.bounds[0] >= 399, one.bounds)
-        self.assertIsNone(sp.free_pond(two, 2.2, dem, None))                 # either square alone holds about 2.0
+        self.assertIsNone(sp.free_pond(two, 3.0, dem, None))                 # either square alone holds about 2.6
 
     def test_a_shaped_pond_keeps_to_the_low_ground_and_the_low_end(self):
         strip = box(0, 0, 760, 160)

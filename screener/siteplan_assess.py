@@ -193,6 +193,12 @@ PLAYBOOK: dict[str, tuple[str, str, str, str]] = {
                      "height. Have the civil engineer price that cut and its slope or wall. Turning the building round is an "
                      "option only where the street, neighbours and routes allow (see the note).",
                      "a grading concept with floor and court elevations"),
+    "POND_SHAPED_TO_SITE": (W_STORM, "diligence", "The pond is shaped to the ground the layout leaves, not a rectangle. Have the "
+                            "civil engineer confirm its volume, its banks and the access to maintain it.",
+                            "a stormwater concept with the pond's grading"),
+    "ACCESS_THROUGH_FIRST": (W_ACCESS, "offer", "The rear building is reached only through the front building's truck road and "
+                             "court. Have the civil engineer lay out a shared drive, and check the fire access it gives.",
+                             "a site layout with the shared drive to the rear building"),
     "POND_SITE_FROM_LIDAR": (W_STORM, "diligence", "Have the civil engineer confirm the pond location, outfall and volume under "
                              "the local ordinance. The size here is a screening estimate.", "a stormwater concept"),
     "HSG_ASSUMED": (W_STORM, "diligence", "The soil group behind the pond size was assumed. Run the soil check for this parcel, "
