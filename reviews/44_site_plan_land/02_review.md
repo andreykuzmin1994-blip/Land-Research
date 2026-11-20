@@ -73,7 +73,10 @@ seeds; no crash with the truck design failing or raising.
   on the two-building sites (10 to 20 s and 9 to 24 s).
 - Full suite (`python -m unittest discover -s screener/tests -t .`):
   1,051 tests OK in 1,093 s on the fixes (1,047 OK in 1,144 s on the
-  merged code; 1,040 in 683 s before this change). CI's `offline-tests`
-  job still allows 5 minutes (`reviews/41`, "Open"): not changed here.
+  merged code; 1,040 in 683 s before this change).
+- CI: the `offline-tests` job's limit is raised from 5 to 45 minutes
+  (`.github/workflows/offline-tests.yml`), on the operator's instruction
+  of 2026-11-20. It had cancelled every run since #50 (`reviews/41`,
+  "Open").
 
 The fixes were not sent to a second independent review.
