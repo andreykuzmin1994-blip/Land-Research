@@ -11,7 +11,9 @@ name: Offline test suite
 # enough that path-filtering it would save nothing.
 #
 # The separate screener/ tool has its own offline suite and requirements
-# (shapely); it runs as its own step so a failure names the suite.
+# (shapely); it runs as its own step so a failure names the suite. That
+# suite plans a few hundred synthetic sites and takes about 20 minutes
+# (reviews/44_site_plan_land/02_review.md), hence the job's time limit.
 
 on:
   push:
@@ -20,7 +22,7 @@ on:
 jobs:
   offline-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 

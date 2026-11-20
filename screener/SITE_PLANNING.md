@@ -313,19 +313,28 @@ fit.
     rectangle fits, in the planner's proportions or the pond pass's:
     the largest open piece that holds the volume (necks and strips
     under 60 ft left out), cut across its length to just that volume
-    from its lower end, on ground the pad drains to. Its storage is
+    from the end whose ground is lower, on ground the pad drains to
+    and on the layout's side of mapped water (the rectangle's own
+    rules). It is one piece with no island in it; it may bend round a
+    corner. Its storage is
     figured from its outline by the same rule as a rectangle's
-    (`pond_capacity_acft`: 6 ft of water, 4:1 banks, a foot of
+    (`pond_capacity_acft`: up to 6 ft of water, 4:1 banks, a foot of
     freeboard, a 15 ft rim; the two agree to within half a percent on
-    the planner's own rectangles). The plan says so:
+    the planner's own rectangles, and the review's own integration
+    agreed to 0.01 ac-ft on the 42 shaped ponds it drew. A strip under
+    86 ft wide has no bottom at 6 ft and holds less). The plan says so:
     `POND_SHAPED_TO_SITE` (information);
   - **the truck road laid out first** (reviews/43), which also mends a
     grid route that strayed.
 
   Only what those can mend is tried (a route or the pond), and never a
-  layout that newly turns docks to the street or loading to homes. At
-  most 3 that pass go on (`LAND_KEEP`); the plan drawn is then the best
-  of all by the usual ranking, so the pass only adds. A cross-dock on a
+  layout that newly turns docks to the street or loading to homes. A
+  larger layout is not taken for a worse plan: not one whose truck road
+  leaves its parking short, cannot be driven or has no stacking room
+  (`LAND_NOT_FOR`), and not one with fewer trailer stalls than the plan
+  before it unless it has 5% more floor area (`LAND_MIN_GAIN`). At most
+  3 that pass go on (`LAND_KEEP`); the plan drawn is then the best of
+  all by the usual ranking, so the pass only adds. A cross-dock on a
   lot it fills from side to side has a court on the street: it is not
   taken by the pass where the plan before it faced none.
 
@@ -333,26 +342,39 @@ fit.
   Where the first building stands across the lot, the land behind it
   has no frontage of its own and every second-building candidate failed
   for access. Those candidates are now tried again reached through the
-  first building's truck road and the end of its court, from its truck
-  driveway: trucks and cars to the second building share that drive.
-  Routes may pass beside building 1; ponds and yards still keep off
-  it. The second building's truck path goes on from where the first's
-  comes onto its truck lane. It is said plainly as conditions:
-  `SECOND_ACCESS_THROUGH_FIRST` and `SECOND_ACCESS_SHARED` (severity 2),
-  and `SECOND_DEAD_END_ACCESS` where the way in is over 750 ft.
+  first building: from its truck driveway, over its end road and the
+  outer part of its court, never the 60 ft strip in front of its dock
+  doors. The second building's truck path goes on from where the first's
+  comes onto its truck lane and is laid out before its pond (so the pond
+  and the detention are sized round the road drawn, and building 1's
+  pavement is not counted twice); a candidate with no path a WB-67 can
+  drive is not taken. Its cars come by a drive of their own from
+  building 1's car driveway where open ground leads there, and
+  otherwise share the trucks' drive. Routes may pass beside building 1;
+  ponds and yards still keep off it. The sheet draws the shared drive
+  over building 1's pavement. It is a condition, with the distances:
+  `SECOND_ACCESS_THROUGH_FIRST` (severity 2), and
+  `SECOND_DEAD_END_ACCESS` where the way in is over 750 ft, which it
+  usually is (955 to 3,447 ft on the review's sites).
 
   In the record: `inputs.land_pass` (tried, found, drawn); the pond's
   shape in `detention.basis`; `second_building.truck_path.from`.
 
   What it is not. One shaped pond per pond the volume calls for: the
-  volume is not split over several small pieces, and the pond is not
-  wrapped round a building. Still two buildings at most: an 80 acre
-  site has land for a third. Parking is not clustered at the office
-  end, and building depths are still the planner's market depths. The
-  ranking gives trailer stalls no floor area (the operator's decision),
-  so a larger layout the pass adds can have fewer: three review sites
-  lose all their trailer stalls for 3 to 40% more floor area, and the
-  read-out names the layout that keeps them.
+  volume is not split over several small pieces. A shaped pond can be a
+  long strip or bend round a corner; nothing checks that a mower or an
+  excavator can reach it. Still two buildings at most: an 80 acre site
+  has land for a third. A second building reached through the first is
+  on a long dead end with trucks and cars sharing a drive through
+  another building's court: a real site would get a drive of its own
+  along one side, at the cost of some of building 1's length, which is
+  not tried. The building is not moved to its setback lines beyond what
+  the fit already does, parking is not clustered at the office end, and
+  building depths are still the planner's market depths. The ranking
+  gives trailer stalls no floor area (the operator's decision), so a
+  larger layout the pass adds can have none when it gains 5% or more:
+  two review sites lose all their trailer stalls for 35 to 40% more
+  floor area, and the read-out names the layout that keeps them.
 - **Design for the truck (default behaviour; reviews/43).** The search
   routes trucks as the shortest line on a 20 ft grid, with nothing that
   asks whether a tractor-trailer can steer it. `siteplan_truck` adds the
