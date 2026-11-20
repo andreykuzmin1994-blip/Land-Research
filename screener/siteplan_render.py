@@ -359,6 +359,8 @@ def render(d: Drawing, rec: dict) -> str:
         """(long side px, short side px, screen angle of the long side) of
         a rectangle built by the planner (its first two edges)."""
         c = list(g.exterior.coords)
+        if len(c) != 5:     # not a rectangle (a pond shaped to the open ground): the box round it
+            c = list(g.minimum_rotated_rectangle.exterior.coords)
         e1 = math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1])
         e2 = math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1])
         if e1 >= e2:
@@ -490,6 +492,10 @@ def render(d: Drawing, rec: dict) -> str:
             out.append(poly(g, C["trailer"]))
         if pp.ticks:
             out.append(f'<path d="{lpath(unary_union(pp.ticks))}" stroke="#ffffff" stroke-width="1" fill="none" opacity="0.9"/>')
+        if oo.get("car_stalls_taken"):
+            # the trucks' lead-in where it takes the corner of the car field (default behaviour's plan): drawn over the stalls it takes
+            lead = unary_union([rp for kind, rp in oo["route_polys"] if kind == "truck"]).intersection(unary_union(pp.cars))
+            out.append(poly(lead, C["road"]))
         for g in oo["ponds"]:
             # the grassed rim, the top of the bank, the water and its deeper middle
             water = g.buffer(-RIM)
@@ -497,6 +503,11 @@ def render(d: Drawing, rec: dict) -> str:
             out.append(poly(g.buffer(-RIM / 2), "none", C["pond_s"], 0.5, extra='stroke-dasharray="3 3" stroke-opacity="0.6"'))
             out.append(poly(water, C["pond"], C["pond_s"], 1.2))
             out.append(poly(water.buffer(-min(10.0, 0.18 * math.sqrt(max(water.area, 0.0)))), C["pond_deep"], op=0.55))
+    # the trucks' way in as a WB-67 steers it (default behaviour's plan): its centreline, as a lane line
+    truck_lines = [ln for pp, oo in plans if (oo.get("truck_path") or {}).get("designed") for kind, ln in oo["routes"][:1] if kind == "truck"]
+    if truck_lines:
+        out.append(f'<path d="{lpath(unary_union(truck_lines))}" stroke="#ffffff" stroke-width="1.3" stroke-dasharray="10 8" '
+                   f'fill="none" opacity="0.85"/>')
     # contours of the existing ground, over the paving (the grading it
     # implies reads through) and under the buildings
     every: int = 0
@@ -581,6 +592,11 @@ def render(d: Drawing, rec: dict) -> str:
             lines = [(name, 10, "bold"), (f"{rnd(pp.sf, 1000):,} SF", 16, "bold")]
             if clear:
                 lines.append((f"{clear} FT CLEAR", 9.5, "normal"))
+            # (the default behaviour's sheet: the record then carries the ponds' ground against the pad)
+            pad_el = ((gr.get("pad_elev_ft") if i == 1 else (sb or {}).get("pad_elev_ft")) if "ponds_over_pad_ft" in de else None)
+            if pad_el is not None and short_px >= 70:
+                # the level pad's elevation, to read against the contours and the pond
+                lines.append((f"PAD EL {pad_el:.0f}", 8.5, "normal"))
             labels.append(label(X(bc.x), Y(bc.y), lines, 0.0 if short_px >= 104 else ang))
         else:
             labels.append(label(X(bc.x), Y(bc.y), [(f"{rnd(pp.sf, 1000):,} SF", 12, "bold")], ang if long_px >= 70 else 0.0))
@@ -628,10 +644,19 @@ def render(d: Drawing, rec: dict) -> str:
                 labels.append(label(X(cc.x), Y(cc.y), [("DROP YARD", 9, "bold"), (f"{n_drop} TRAILER STALLS", 9, "normal")], an))
         for g in oo["ponds"]:
             lp, sp_, an = box_axes(g)
-            cc = g.centroid
+            cc = g.centroid if g.contains(g.centroid) else g.representative_point()
             each = oo["v_det"] / max(len(oo["ponds"]), 1)
             if lp >= 80 and sp_ >= 34:
-                labels.append(label(X(cc.x), Y(cc.y), [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")], an, C["pond_s"]))
+                pond_lines = [("DETENTION POND", 9, "bold"), (f"{each:.1f} AC-FT", 10.5, "bold")]
+                # this pond's own figure: building 1's ponds, then a second building's, in the record's order
+                overs = de.get("ponds_over_pad_ft") or []
+                k_pond = sum(len(o_["ponds"]) for _, o_ in plans[:i - 1]) + oo["ponds"].index(g)
+                over = overs[k_pond] if k_pond < len(overs) else None
+                if over is not None and sp_ >= 60 and lp >= 115:
+                    # where the pond's ground stands against the pad: the paving drains to it only from above
+                    pond_lines.append((f"GROUND {abs(over):.0f} FT {'ABOVE' if over > 0 else 'BELOW'} PAD" if over else "GROUND LEVEL WITH PAD",
+                                       8, "normal"))
+                labels.append(label(X(cc.x), Y(cc.y), pond_lines, an, C["pond_s"]))
             elif lp >= 40:
                 labels.append(label(X(cc.x), Y(cc.y), [("POND", 9, "bold")], an, C["pond_s"]))
     if res_lines:
@@ -829,6 +854,30 @@ def render(d: Drawing, rec: dict) -> str:
                 ("Heavy / light paving", f"{_int(qn.get('heavy_paving_sf'))} / {_int(qn.get('light_paving_sf'))} SF", False),
                 ("Disturbed area", f"{_num(qn.get('disturbed_ac'))} ac", False),
                 ("SF per net acre", _int(sd.get("sf_per_net_ac")), False)]
+        tp = acc.get("truck_path")
+        if tp:
+            # the trucks' way in (default behaviour's record), after the routes' row
+            if tp.get("designed"):
+                nb = len(tp.get("bends") or [])
+                txt = (f"{tp['vehicle']}: SWEEPS {_num(tp.get('swept_clip_ft'))} FT OFF ITS PAVEMENT" if not tp.get("swept_ok")
+                       else f"{tp['vehicle']} clear: " + (f"{nb} bend{'s' if nb != 1 else ''}, min {_int(tp['min_radius_ft'])} ft radius" if nb else "no bends"))
+            else:
+                txt = (f"{tp['vehicle']}: NO PATH IT CAN STEER" if tp.get("reason") == "no path" else "not laid out")
+            back = {"sight": "backs in on the driver's side", "blind": "backs in on the BLIND side"}.get(tp.get("backing"), "")
+            k = [r[0] for r in rows].index("Truck / car route") + 1
+            rows[k:k] = ([("Truck path", txt, True)]
+                         + ([("Truck lead-in", ("S-BEND AT THE STREET; " if tp.get("entrance_s_bend") else "")
+                              + (f"takes {tp['car_stalls_taken']} car stalls" if tp.get("car_stalls_taken") else "off the car field"), False)]
+                            if tp.get("car_stalls_taken") or tp.get("entrance_s_bend") else [])
+                         + ([("Truck court entry", back, False)] if back and tp.get("courts") == 1 else []))
+        st = gr.get("stepped_pad")
+        if st:
+            # the stepped pad a dock building is graded to (default behaviour's record), after the level pad's rows
+            side = {"low": "court on the low side", "high": "court on the HIGH side", "level": "court on level ground",
+                    "both": "courts on both sides"}.get(st["court_side"], "")
+            k = [r[0] for r in rows].index("Earthwork, balanced") + 1
+            rows[k:k] = [("Stepped pad", f"floor {_int(st['floor_ft'])}, court {_int(st['court_ft'])} ft; {side}", True),
+                         ("Earthwork, stepped", f"{_int(st['moved_cy'])} CY (cut {_int(st['cut_cy'])}, fill {_int(st['fill_cy'])})", False)]
         if sb:
             rows.insert(1, ("Building 2", f"{sb['sf']:,} SF, {sb['doors']} doors, {sb['trailers']} trailers", True))
         t, y2 = kv(x2, y2 + 2, half, rows)
@@ -854,19 +903,29 @@ def render(d: Drawing, rec: dict) -> str:
         hd, cy = heading(COL_X, cy, "LAYOUTS COMPARED (THE PLAN DRAWN IS FIRST)", COL_W)
         col.append(hd)
         rows = []
+        earth = any(x.get("stepped_cy") is not None for x in alts[:LAYOUTS_SHOWN])
         for k, x in enumerate(alts[:LAYOUTS_SHOWN]):
             ok = x.get("geometry_ok")
-            if ok:
+            if ok and x.get("drivable") is False:
+                result = ("passes; no way in for a truck", C["warn"], "normal")
+            elif ok:
                 result = ("passes its checks", C["good"], "bold")
             else:
                 why = ", ".join(str(f).replace("_", " ").lower() for f in x.get("blocking") or []) or (
                     "no route" if x.get("route_problem") else "fails its checks")
                 result = (why, C["bad"], "normal")
             wt = "bold" if k == 0 else "normal"
-            rows.append([(str(x.get("variant")), C["ink"], wt), (_int(x.get("sf")), C["ink"], wt), _int(x.get("doors")),
+            rows.append([(str(x.get("variant")) + (" (court turned downhill)" if x.get("docks_turned") else ""), C["ink"], wt), (_int(x.get("sf")), C["ink"], wt), _int(x.get("doors")),
                          f"{_int(x.get('trailers'))} / {_int(x.get('trailers_target'))}", _int(x.get("sf_per_gross_ac")), result])
-        t, cy = table(COL_X, cy, [("LAYOUT", 300, "start"), ("SF", 64, "end"), ("DOCKS", 50, "end"), ("TRAILERS", 70, "end"),
-                                   ("SF/AC", 60, "end"), ("LAYOUT CHECKS", COL_W - 544, "start")], rows, size=10)
+            if earth:
+                # the stepped pad's earthwork of each layout (default behaviour's record), to weigh against its floor area
+                rows[-1].insert(5, _int(x.get("stepped_cy")) if x.get("stepped_cy") is not None else "")
+        cols = [("LAYOUT", 300, "start"), ("SF", 64, "end"), ("DOCKS", 50, "end"), ("TRAILERS", 70, "end"), ("SF/AC", 60, "end"),
+                ("LAYOUT CHECKS", COL_W - 544, "start")]
+        if earth:
+            cols = [("LAYOUT", 300, "start"), ("SF", 58, "end"), ("DOCKS", 44, "end"), ("TRAILERS", 62, "end"), ("SF/AC", 52, "end"),
+                    ("EARTH CY", 60, "end"), ("LAYOUT CHECKS", COL_W - 576, "start")]
+        t, cy = table(COL_X, cy, cols, rows, size=10)
         col.append(t)
         basis = (rec.get("selection") or {}).get("basis")
         if basis:
@@ -938,6 +997,7 @@ def render(d: Drawing, rec: dict) -> str:
               ("url(#sx)", "steeper than 15% (lidar)"), ("url(#cx)", "test cut"),
               ("prop", "property line (county parcel map)"), ("dash", "paving setback line (draft; 25 ft from water)"),
               ("dashdot", "building setback line (draft)"), ("res", "boundary toward residential parcels (county land-use codes)"),
+              *([("lane", "truck path as a WB-67 steers it (centreline)")] if truck_lines else []),
               ("dim", "dimension, ft")]
     lw = (W - 2 * M) / 4
     for k, (fill, txt) in enumerate(legend):
@@ -950,6 +1010,9 @@ def render(d: Drawing, rec: dict) -> str:
             foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["res"]}" stroke-dasharray="9 5" stroke-width="3"/>')
         elif fill == "prop":
             foot.append(f'<path d="M{x - 6:.1f},{y - 4:.1f} L{x + 22:.1f},{y - 4:.1f}" stroke="{C["ink"]}" stroke-dasharray="20 4 3 4 3 4" stroke-width="2.2"/>')
+        elif fill == "lane":
+            foot.append(f'<rect x="{x:.1f}" y="{y - 10:.1f}" width="18" height="10" fill="{C["road"]}" stroke="{C["ink"]}" stroke-width="0.6"/>'
+                        f'<path d="M{x + 1:.1f},{y - 5:.1f} L{x + 17:.1f},{y - 5:.1f}" stroke="#ffffff" stroke-dasharray="4 3" stroke-width="1.3"/>')
         elif fill == "contour":
             foot.append(f'<path d="M{x:.1f},{y - 4:.1f} L{x + 18:.1f},{y - 4:.1f}" stroke="{C["contour"]}" stroke-dasharray="7 3" '
                         f'stroke-width="1"/>')
@@ -963,6 +1026,14 @@ def render(d: Drawing, rec: dict) -> str:
     yy += ((len(legend) + 3) // 4) * 17 + 8
     # the basis of the estimates, then the disclaimer
     basis_lines = [f"Detention: {de.get('basis')}" if de.get("basis") else "", f"Grading: {gr.get('basis')}" if gr.get("basis") else "",
+                   (f"Stepped pad: {gr['stepped_pad'].get('basis')}. PAD EL on the plan and the level-pad rows are the one "
+                    "plane the ponds are measured against; the stepped pad's floor stands a little above it, its court below")
+                   if gr.get("stepped_pad") else "",
+                   ("Truck path: an AASHTO WB-67 (73.5 ft; 53 ft trailer) driving forward from the street to the truck lane of "
+                    "its court and back out, its steer axle on the line drawn, turning no tighter than 45 ft; the ground its body "
+                    "sweeps is checked against the buildings, parked cars and trailers, ponds and setback lines. One vehicle at "
+                    "walking speed: no backing manoeuvre, no opposing truck in a bend, no grades")
+                   if (acc.get("truck_path") or {}).get("designed") else "",
                    f"Takeoff: {qn.get('basis')}" if qn.get("basis") else "", f"Conditions: {a.get('basis')}",
                    (f"Contours: existing ground every {every} ft, traced from the lidar samples on a {d.dem.step:.0f} ft grid and "
                     "smoothed, stopping up to one grid step inside the property line (indicative; not a topographic survey)")

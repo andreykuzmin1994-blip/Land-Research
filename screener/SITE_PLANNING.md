@@ -156,13 +156,45 @@ fit.
   used.
 - **Pond geometry.** 6 ft deep, 4:1 side slopes, length twice the width,
   1 ft freeboard and a 15 ft rim. One pond up to 10 acre-feet, two up to
-  20, three above that. In the default behaviour, when no 2:1 pond fits
-  at the lidar samples, the same volume is tried 20 ft off them, then
-  with the bottom 1.5, 1, 3 and 4 times as long as it is wide
-  (`POND_FALLBACK_RATIOS`; reviews/40); the detention basis then names
-  the proportions used. Not tried for a layout a route already fails.
+  20, three above that. In the room-for-the-pond pass (below), when no
+  2:1 pond fits at the lidar samples, the same volume is tried with the
+  bottom 1.5, 3 and 4 times as long as it is wide, then each (2:1 too)
+  20 ft off the samples (`POND_FALLBACK_SHAPES`; never below 1.5:1, and a
+  design manual's minimum length-to-width was not checked); the
+  detention basis then names the proportions used. Not tried for a
+  layout a route already fails.
 - Ponds go on low lidar ground near the building, on its side of any
   mapped wetland, outside water buffers and transmission corridors.
+- **Drainage (default behaviour; operator request of 2026-11-18,
+  reviews/41).** A pond works only if the paving can drain to it. The
+  pad is one plane at the module's mean ground, so the check is the
+  pond's ground (the mean of the lidar samples on its footprint) against
+  the pad: more than 3 ft above it (`POND_UPHILL_TOL_FT`) and the plan
+  says `POND_UPHILL` (severity 2: a pond on the low side, a much deeper
+  and larger pond, or pumping). Up to 3 ft above is taken as a pond dug
+  that much deeper, and from 1 ft the plan says so (`POND_ABOVE_PAD`,
+  information): at 4:1 slopes the deeper pond's footprint is roughly 15
+  to 30% larger than drawn, more with the fall an inlet needs. A layout
+  whose pond is inside the tolerance is not laid out again to get it
+  lower, and outside the pass a pond is sited as before (low and near
+  the building: a rule that first looked 3 ft below the pad moved one
+  site's pond onto the ground of its second building and helped
+  nowhere, review 41/03). The
+  record carries `detention.ponds_over_pad_ft` (each pond against its
+  own building's pad, building 1's first), `pond_over_pad_ft` (the
+  highest) and `drains_by_gravity` (None where a pond was not measured:
+  no pond, or no lidar under it). The sheet prints the pad elevation on
+  the building and "GROUND n FT BELOW / ABOVE PAD" on each pond. It is
+  a screening check on one level pad: it does not grade the paving,
+  size a pipe or find the outfall. A second building's pond is measured
+  and flagged (`SECOND_POND_UPHILL`), but its choice does not prefer a
+  pond that drains and the pass below is for building 1 only. Reference site #25 falls 4% to the
+  north-west, and the plan drawn before had its pond 9 ft above the pad.
+- **Ranking.** Among layouts that pass, one whose pond drains ranks
+  before a larger one whose pond does not (after the code truck spaces,
+  before floor area): floor area drawn round a pond that cannot fill is
+  not buildable as drawn. The read-out names the larger layout and the
+  reason (`selection.upside`).
 - The impervious area, and so the pond, is worked out again after the
   drop-yard links are drawn, and only placed yards count. The ponds are
   then re-sized to that volume, larger or smaller, so the storage
@@ -182,6 +214,252 @@ fit.
   detention.
 - **Grading.** One balanced plane over the whole module, from USGS 1 m
   lidar sampled every 40 ft. Relief and the steep share are reported.
+- **The stepped pad (default behaviour; reviews/42).** A dock building
+  is not graded to one plane: the floor is at one level and the truck
+  court 4 ft below it (`DOCK_DROP_FT`, a 48 in dock). `stepped_grading`
+  works that out for each layout from the same lidar samples: building,
+  car field and end roads at the floor, courts and trailer rows 4 ft
+  lower, the floor set where cut equals fill. The record's
+  `grading.stepped_pad` gives the floor and court elevations, the cut,
+  fill and earth moved (cubic yards), how far the ground falls from the
+  building to its court, and the court's side: `low` (the ground falls
+  1 ft or more to the court and gives the dock its drop), `high` (it
+  rises 1 ft or more: the court is cut into the hill), `level`, or
+  `both` for a building with courts on two sides (a cross-dock has one
+  on each side of any slope; `ground_fall_to_courts_ft` lists each). A
+  single court with a rise of 3 ft or more (`DOCKS_UPHILL_FT`) is a
+  note, `DOCKS_UPHILL` (information; `SECOND_DOCKS_UPHILL` on a second
+  building), with what it costs in earthwork against the same footprint
+  with its court on the other side, and, for the plan drawn, why that
+  layout was not taken. Each layout compared carries its `stepped_cy`,
+  printed on the sheet beside its floor area ("EARTH CY";
+  `earthwork_cy` in the takeoff and the pipeline stays the one-plane
+  figure). What the figure is not:
+  - each lidar sample stands for an equal share of the module's area
+    (as the one-plane figure does); no figure where the samples cover
+    less than 80% of the module (`STEPPED_MIN_COVER`, partial lidar);
+  - ground of the module beside a trailer row is graded at the floor,
+    4 ft above the row next to it (up to a tenth of the module; at the
+    court's level the figure moves by up to about 15%);
+  - nothing outside the module: no pond excavation, drop yards or
+    driveways;
+  - no paving slopes, no walls or cut slopes at the pad's edge, no
+    swell or shrink, no rock.
+
+  The one-plane figures above are unchanged and still what the
+  ranking's relief mark and the drainage check read (the sheet's
+  "PAD EL" is that plane; the stepped floor stands a little above it
+  and the court below). The ranking does not count earthwork (the
+  operator's marks: steep ground and relief).
+- **Docks downhill (default behaviour; reviews/42).** After the pass
+  below, the best plan's footprint (one court) is considered with the
+  court on the other side, the office at the same end first, then the
+  other. A turn is laid out only when its stepped pad moves at least
+  10% and 2,000 CY less (`DOCK_TURN_MIN_SAVING`, `DOCK_TURN_MIN_CY`),
+  the building stays in the buildable area, and it does not newly turn
+  the docks to the street (within 100 ft), put the loading between the
+  building and the street at any distance (`loading_on_street_side`),
+  or turn the loading to homes. Laid out and checked in full, it
+  replaces the plan only when it passes, its pond drains where the
+  plan's does, it has no fewer trailer stalls and no new severity-2
+  flag, and the cars' way in is not much longer (over 1.5 times and
+  200 ft more). It must also cost no second building: the plan it came
+  from is searched for one too, and stands if its second building is
+  larger. At most two layouts are tried, on their own count
+  (`DOCK_TURN_TRIES`; the pass's allowance and record are untouched),
+  in what is left of the pass's time. `inputs.dock_side` records the
+  tries, the `outcome` (`turned`, `not_cheaper`, `refused`,
+  `courts_on_both_sides`, `no_lidar`, `no_time`, `no_plan`), the
+  earthwork saved, and for each turn refused why and what it would
+  have saved. The turned plan is first in the layouts compared, marked
+  `docks_turned`; the plan it came from is the next row with the same
+  footprint.
+
+  It applies seldom, and partly by the planner's own limits. Where the
+  street is on the low side, the court on the low side is on the
+  street side of the building: not taken, by the rule above (a
+  judgement for the operator: on a 1600 x 1000 ft review site the turn
+  would save about 40,000 CY with the court 280 ft off the street, the
+  offices and cars behind the building and a car route of 2,300 ft).
+  On tighter sites the same turn also fails its routes, because the
+  module is fitted to the envelope with 10 to 16 ft beside and behind
+  it, no drive round the building's end is modelled, and only the same
+  footprint is tried, never a shorter building: a limit of this
+  planner, not a finding about the site. Reference site #21 keeps its
+  court on the high side (about 10,000 CY more: the other side faces
+  the street and homes). It turned one of the 23 review sites (a
+  wetland site, 11,000 CY less).
+- **Use the land (default behaviour; reviews/44).** Measured on the 23
+  review sites, the plans drawn covered 12 to 33% of their sites with
+  building (floor-area ratio), with 12 to 60% of the buildable land left
+  unused. Three things held the yield down, none of them the land:
+  larger layouts the search rejected for want of a car route its rules
+  could not see, larger layouts rejected because no rectangular pond
+  fitted, and land behind the first building with no way in.
+
+  **The pass.** After the search and the pond pass, the layouts the
+  search rejected that are larger than its best plan (any of them where
+  no plan passed) are finished once more, largest first, at most 10
+  (`LAND_MAX_TRIES`), with what an engineer would add before giving the
+  floor area up:
+  - **a car drive over the layout's own open ground.** A cross-dock's
+    car field stands at the building's end, behind the depth of its
+    front court; the yard in front of it belongs to the layout and is
+    open. The search's car route could not cross the layout's own
+    module, so every such layout failed `CAR_ROUTE_NONE`. In the pass
+    cars may cross that open ground, 16 ft off the layout's truck
+    pavement and building;
+  - **a pond shaped to the open ground** (`free_pond`) where no
+    rectangle fits, in the planner's proportions or the pond pass's:
+    the largest open piece that holds the volume (necks and strips
+    under 60 ft left out), cut across its length to just that volume
+    from its lower end, on ground the pad drains to. Its storage is
+    figured from its outline by the same rule as a rectangle's
+    (`pond_capacity_acft`: 6 ft of water, 4:1 banks, a foot of
+    freeboard, a 15 ft rim; the two agree to within half a percent on
+    the planner's own rectangles). The plan says so:
+    `POND_SHAPED_TO_SITE` (information);
+  - **the truck road laid out first** (reviews/43), which also mends a
+    grid route that strayed.
+
+  Only what those can mend is tried (a route or the pond), and never a
+  layout that newly turns docks to the street or loading to homes. At
+  most 3 that pass go on (`LAND_KEEP`); the plan drawn is then the best
+  of all by the usual ranking, so the pass only adds. A cross-dock on a
+  lot it fills from side to side has a court on the street: it is not
+  taken by the pass where the plan before it faced none.
+
+  **A second building behind the first** (`SECOND_THROUGH_FIRST`).
+  Where the first building stands across the lot, the land behind it
+  has no frontage of its own and every second-building candidate failed
+  for access. Those candidates are now tried again reached through the
+  first building's truck road and the end of its court, from its truck
+  driveway: trucks and cars to the second building share that drive.
+  Routes may pass beside building 1; ponds and yards still keep off
+  it. The second building's truck path goes on from where the first's
+  comes onto its truck lane. It is said plainly as conditions:
+  `SECOND_ACCESS_THROUGH_FIRST` and `SECOND_ACCESS_SHARED` (severity 2),
+  and `SECOND_DEAD_END_ACCESS` where the way in is over 750 ft.
+
+  In the record: `inputs.land_pass` (tried, found, drawn); the pond's
+  shape in `detention.basis`; `second_building.truck_path.from`.
+
+  What it is not. One shaped pond per pond the volume calls for: the
+  volume is not split over several small pieces, and the pond is not
+  wrapped round a building. Still two buildings at most: an 80 acre
+  site has land for a third. Parking is not clustered at the office
+  end, and building depths are still the planner's market depths. The
+  ranking gives trailer stalls no floor area (the operator's decision),
+  so a larger layout the pass adds can have fewer: three review sites
+  lose all their trailer stalls for 3 to 40% more floor area, and the
+  read-out names the layout that keeps them.
+- **Design for the truck (default behaviour; reviews/43).** The search
+  routes trucks as the shortest line on a 20 ft grid, with nothing that
+  asks whether a tractor-trailer can steer it. `siteplan_truck` adds the
+  design vehicle and two tools:
+  - the vehicle: an AASHTO WB-67 (73.5 ft; 53 ft trailer; 8.5 ft wide);
+  - `sweep`: the ground its body covers when its steer axle follows a
+    line, each unit trailing the one ahead (on the published 41 ft
+    centreline radius the model gives the published 44.8 ft at the outer
+    front wheel and 1.4 to 1.8 ft inside on a 180 degree turn, against
+    1.9 ft published);
+  - `drive`: a path from the driveway onto the truck lane of the court
+    that turns no tighter than 45 ft (`R_MIN`), by a search over
+    positions and headings with straight moves and arcs of 45 and 90 ft,
+    steered by the distance still to go round what is in the way; ground
+    near an obstacle costs more, so the path keeps clear of corners
+    where there is room. Where the body still cuts a corner the ground
+    round it is made dear and the search run again (up to three times; a
+    line more than a quarter longer is a different way round and is not
+    taken).
+
+  **Truck first, then the pond.** For the layout at the top of the
+  ranking the plan is finished again with its truck road laid out first:
+  from the driveway (square to the street) onto the truck lane of its
+  court (30 ft beyond the court's middle, off the 60 ft strip in front
+  of the dock doors, 100 ft short of each end), from whichever end is
+  nearer, clear of the building, the parked cars and trailers, the
+  setback strips and water. The car route, ponds and drop yards then go
+  round that road, and its pavement (the 40 ft road widened to the swept
+  path, inside the paving envelope but for the driveway's own opening)
+  is what detention is sized for. The swept path is checked going in
+  and coming back out; how far it strays (2 ft at most, or the path is
+  not taken) is the route's measure in the plan's own checks.
+
+  **The lead-in over the car field.** A truck driveway cannot stand
+  nearer a frontage corner than 110 ft (its curb radii, `pick_driveways`),
+  while a building's end road lies 20 ft inside the module's edge. Where
+  the module fills the lot's width, the driveway stands in front of the
+  car field and some 50 ft to one side of the end road. The search's own
+  route there ran sideways along the street in a 10 ft strip. The path
+  takes the corner of the car field instead: the stalls under its
+  pavement, and those it cuts off from the rest of the field, are
+  counted off the rows (`cars.row_capacity`, `car_stalls_taken`) and the
+  plan says so (`TRUCK_LEAD_IN_OVER_PARKING`, information; or
+  `PARKING_SHORT_FOR_LEAD_IN`, severity 2, where fewer stalls are left
+  than required). Such an entrance is often an S-bend: two bends of 60
+  degrees or more to opposite hands at the minimum radius, the first
+  within a truck's length of the street. A WB-67 can make it at walking
+  speed with the entrance to itself; it is not an entrance to build, so
+  it is a condition (`TRUCK_ENTRANCE_S_BEND`, severity 2, before an
+  offer), not a note. Figures for the review sites are in
+  `reviews/43_site_plan_trucks/`.
+
+  **A layout no truck can enter gives way** (`drivable`, a ranking tier
+  after the pond that drains). Only the layouts that reach the top are
+  judged (at most 8, `TRUCK_TIER_MAX`). Where the top layout has no way
+  in, layouts are first added with the module kept out of the 90 ft
+  strip beside each frontage corner, so an end road lines up with a
+  driveway that can be built (`truck_first`; at most 48 fits and
+  checks), never newly facing the street or homes. Each cross-section
+  is tried at its longest fit only, so a shorter fit turned the other
+  way is not found. A layout with a way in is drawn in place of the
+  larger one only when it has at least 80% of its floor area
+  (`TRUCK_TIER_MIN_SHARE`) and turns no docks to the street or loading
+  to homes that the larger one did not; the larger layout stays in the
+  layouts compared, marked, and the read-out says why it is not drawn.
+  Otherwise the ranking stands and the plan drawn carries
+  `TRUCK_PATH_NONE` (severity 2), naming the layout that has a way in.
+  None of the 23 review sites needed this tier once the lead-in was
+  allowed.
+
+  **Sight-side backing.** A driver backs in seeing the trailer's path
+  when the dock doors are on the left as the truck comes onto the truck
+  lane. Where the best plan's trucks come in the other way, the layout
+  is finished once more with its driveway and truck route sent to the
+  sight-side end and the path made to come onto the lane that way; it
+  takes the plan's place only when it passes in full, its pond drains,
+  it has no fewer trailer stalls, no new severity-2 flag, no much
+  longer way in for cars or trucks (over 1.5 times and 200 ft more), no
+  loop (no bend over 135 degrees), and costs no second building.
+  Otherwise `BLIND_SIDE_BACKING` (information) and
+  `inputs.truck_side.why`.
+
+  In the record: `access.truck_path` (the vehicle, length, throat,
+  bends with their radii, reverse bends, how far the swept path strays,
+  pavement against the grid route's, the backing side, stalls taken),
+  `inputs.truck_side`, `inputs.truck_first`, `drivable` on the layouts
+  judged. `SHORT_THROAT` and `DEAD_END_ACCESS` are measured on the
+  path, from the street to the court. A second building's way in is
+  laid out after it is placed, round what stands (its pond is not
+  re-sited). An error in the truck design never costs a plan: the plan
+  is then as the search left it, with the reason in
+  `access.truck_path`.
+
+  What it is not: a turning study. One vehicle, forward, at walking
+  speed; no backing manoeuvre into a door, no opposing truck in a bend,
+  no grades, no gate. The driveway is taken square to the street and
+  the truck straight on it: the turn off the street itself is not
+  modelled, and the throat's length counts the lead-in's bends as
+  stacking room. Headings in 15 degree steps and two radii, so a path
+  can be a little longer or tighter than the best, and a search that
+  gives up after 200,000 poses reads as no path. Only the top layouts
+  are judged: a layout further down may have no way in and not say so.
+  Where a truck road runs beside the paving envelope's edge its
+  pavement is clipped there and can be narrower than 40 ft. Drop-yard
+  links stay the search's own lines. The wheelbase split (19.5 ft
+  tractor, 45.5 ft kingpin to trailer axles) was not read from a page in
+  this work; it reproduces the published turning radii.
 - **Ranking of alternatives.** Plans that pass their own layout checks
   first (`geometry_ok`, below), then plans with a route, then plans that
   meet a draft code minimum of truck spaces where the rules have one
@@ -233,23 +511,72 @@ fit.
   then no longer reads infeasible while a smaller parcel inside it reads
   feasible (the prototype read 700 × 700 ft infeasible next to a
   feasible 600 × 700 ft).
+- **Pond first, building second (default behaviour; reviews/41).** The
+  pass below begins the way a civil engineer does: the two lowest open
+  spots a pond could use (`DRAIN_FIRST_SPOTS`) are reserved in turn, and
+  every cross-section is fitted round the reserved pond, the ones that
+  fit largest on the open parcel first, stopping when no cross-section
+  left is expected to beat what is in hand (the open-parcel fit is
+  nearly always the larger, not always: about 4% of fits round a pond
+  came out longer in the review's runs, #21's among them, so the stop
+  is a rule of thumb that saves tries, not a proof). Each fit is checked in full with its
+  pond sited only on ground the pad drains to. It runs when the best
+  plan's pond does not drain, or when a cross-section fitted the open
+  parcel larger than the best plan. In the pass every pond is sited on
+  ground the pad drains to, and no plan with an uphill pond is added.
+  The pass also starts from layouts that passed with an uphill pond.
+  Reference site #25: 67,000 SF with a pond that could not drain, now
+  70,000 SF with the pond 24 ft below the pad, the largest such layout
+  an exhaustive check found. Reference site #21: 84,000 to 91,000 SF.
+  An L-shaped test site: 170,000 SF with every pond 9 ft above the pad,
+  now 156,000 SF that drains (the 170,000 is named in the read-out).
 - **Room for the pond (default behaviour; operator request of
   2026-11-17, reviews/40).** Each layout is fitted as long as it goes
-  wherever it fits longest, and its pond is placed after. When the pond
-  alone then blocks it, the search no longer only shortens the building
-  where it stands: it reserves each of the 6 lowest open spots a pond
-  could use (`RELOCATE_SPOTS`), fits the same cross-section around it no
-  longer than before, re-sizes the reserved pond for the building that
-  fits and fits again (up to 3 rounds), and checks each fit in full. The
-  largest that passes is kept, and the shorter lengths where the building
-  stood are still tried down to it. At most 48 such checks per site
-  (`RELOCATE_MAX_CHECKS`, a count, so the same site gives the same plan);
-  the record's `inputs.pond_relocation` says how many were used. The
-  docks keep the planner's orientation rule (away from the street and
-  homes). Reference site #21: 68,000 SF before, 84,000 SF now, the
-  largest layout an exhaustive check of every 3° and a 20 ft position
-  grid found. Reference site #25 keeps its plan: the only larger layout
-  turns its truck court to the arterial and loses its trailer stalls.
+  wherever it fits longest, and its pond is placed after; when the pond
+  has no room, the search shortens the building where it stands. After
+  the search and its rescue, a pass that only adds layouts takes the
+  layouts the pond alone blocked (up to 6, largest first, only those
+  that would rank above the best plan so far). Each is tried with the
+  other pond shapes (above), then moved: each of the 6 lowest open spots
+  a pond could use (`RELOCATE_SPOTS`) is reserved in turn, the same
+  cross-section is fitted around it no longer than before, the reserved
+  pond is re-sized for the building that fits and the fit tried again
+  (up to 3 rounds), and each fit is checked in full. The plan drawn is
+  then the best of everything by the usual ranking, so no site ranks
+  worse than without the pass. A layout the pass adds is refused when
+  its truck court or trailer row comes within 100 ft of the street (the
+  `STREET_FACING_DOCKS` test) or within 150 ft of homes
+  (`LOADING_FACES_RES`) and the best plan before the pass did not. Where
+  that plan did, the pass first looks only for layouts that face
+  neither, and takes one that is no smaller than that plan; only
+  failing that does it add layouts that face the street or homes too
+  (reviews/41). So it never turns docks to the street where the plan
+  before did not, and never gives up floor area to turn them away where
+  it did. At most three of its plans go into the results
+  (`POND_ROOM_KEEP`). A layout is also refused when it has no more floor
+  area than the best plan before it and fewer trailer stalls (a 1 ft relief difference alone
+  does not trade the stalls away), unless that plan's pond does not
+  drain and this one's does. The pass has 90 tries per site (`POND_ROOM_MAX_TRIES`: fits and full
+  checks, a count) and half of the search time left after the main
+  search (`POND_ROOM_TIME_SHARE`; the rest stays for the second
+  building, which can therefore have less time than before); cut by the
+  time, it keeps what it found and the plan is not flagged. It does not
+  run at all when less than half the site's budget is left after the
+  search (`POND_ROOM_MIN_LEFT`): a slow site plans exactly as before.
+  Those two limits are wall-clock time, so a site close to either can
+  plan differently on a slower machine; `inputs.pond_room.cut_short`
+  and `skipped_for_time` say when it happened. Away from them, the same
+  site gives the same plan. The record's
+  `inputs.pond_room` gives the layouts, tries, plans found, whether the
+  plan drawn came from the pass (also when its docks were then turned,
+  `inputs.dock_side`), and whether it was cut short. The
+  ranking gives trailer stalls no floor area (operator decision of
+  2026-11-17), so a plan the pass adds may have fewer trailer stalls
+  than the plan it replaces (`TRAILER_SHORT` says so); between two of
+  its own plans of the same floor area, the one with more stalls is
+  kept. Reference site #21: 68,000 SF before the pass existed, 84,000 SF
+  with it (reviews/40), 91,000 SF pond first (reviews/41). Reference
+  site #25: above.
 - The alternatives' `geometry_ok` is the layout's own check (routes,
   pond, plan checks, coverage cap), not the site's feasibility.
 - An assemblage is planned under its best-ranked member's draft rules.
@@ -318,8 +645,9 @@ plan and changes no layout, flag, feasibility or floor area.
   (`selection.with_trailers`). When a larger layout passed its checks
   but ranks lower, it names that one and the mark-downs it carries.
 - **What the surface pond costs.** When a layout passes every layout
-  check but the pond, the search moves it to leave the pond room and
-  shortens it until a pond fits (above). The
+  check but the pond, the search shortens it until a pond fits, and the
+  room-for-the-pond pass tries it moved and with other pond shapes
+  (above). The
   read-out keeps the layout as first tried and reports it
   (`selection.without_pond`) when it is at least 5% larger than the plan
   drawn. What it says depends on the market (decision 7 below): here,

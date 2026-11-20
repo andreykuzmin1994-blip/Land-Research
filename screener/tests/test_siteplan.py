@@ -30,8 +30,9 @@ from unittest import mock
 import requests
 import shapely
 from shapely.geometry import GeometryCollection, LineString, Point, Polygon, box, mapping, shape
+from shapely.ops import unary_union
 
-from screener import arcgis, frontage, layers, sitefit
+from screener import arcgis, frontage, layers, sitefit, viewer
 from screener import siteplan as sp
 from screener import siteplan_inputs as si
 from screener import siteplan_render as sr
@@ -463,7 +464,7 @@ class Plans(Offline):
         control, _ = planned("basic", lambda: site(600, 700))
         self.assertTrue(control["detention"]["fits"])             # without the patch the pond fits
         self.assertIs(control["feasible"], True)
-        with mock.patch.object(sp, "place_sized_pond", nopond):
+        with mock.patch.object(sp, "place_sized_pond", nopond), mock.patch.object(sp, "free_pond", nopond):     # no rectangle, no shaped pond
             rec, _ = sp.plan_site(site(600, 700))
             proto, _ = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
         self.assertIn("POND_DOES_NOT_FIT", names(rec, 1))
@@ -623,11 +624,7 @@ class Plans(Offline):
         def blocking(o):
             t[0] = 1e9                 # _blocking is asked only when the rescue pass is considered
             return real(o)
-        # This site needs the rescue pass only without the room-for-the-pond
-        # search (a 4:1 pond fits it at 151,000 SF on the first pass,
-        # reviews/40): both are switched off here, as this tests the pass.
-        with mock.patch.object(sp, "_blocking", blocking), mock.patch.object(sp, "POND_FALLBACK_RATIOS", ()), \
-                mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
+        with mock.patch.object(sp, "_blocking", blocking):
             rec, _ = sp.plan_site(site(700, 700), sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
         self.assertIn("SMALLER_LAYOUTS_NOT_ALL_TRIED", names(rec, 2))
         self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
@@ -1390,54 +1387,1081 @@ class PondShapes(unittest.TestCase):
         self.assertIn("a 2:1 pond did not fit", txt)
 
 
+_REF: dict = {}
+
+
+def ref_plan(name, behaviour="default", **consts):
+    """One plan of a reference site per test process, with the real search
+    angles and the named planner constants patched (they are deterministic,
+    and #21 takes half a minute)."""
+    k = (name, behaviour, tuple(sorted(consts.items())))
+    if k not in _REF:
+        inp, _ = load_fixture(name)
+        patches = [mock.patch.object(sp, c, v) for c, v in consts.items()]
+        for pt in patches:
+            pt.start()
+        try:
+            _REF[k] = sp.plan_site(inp, sp.PlanOptions(behaviour=behaviour))
+        finally:
+            for pt in patches:
+                pt.stop()
+    return _REF[k]
+
+
 @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
 class PondRoom(Offline):
     angles = False          # the real search angles, as in ReferenceSites
 
-    def test_the_building_moves_to_leave_its_pond_room(self):
+    def test_the_pond_goes_first_and_the_building_round_it(self):
         # reference site #21: the longest fit left the pond no room and the
-        # building used to be shortened where it stood (68,000 SF); the
-        # same layout moved leaves the pond room at 440 ft (reviews/40)
-        inp, _ = load_fixture("rank21")
-        rec, _ = sp.plan_site(inp)
+        # building used to be shortened where it stood (68,000 SF). With the
+        # pond reserved on the low ground first, the same cross-section
+        # holds 480 ft (reviews/40: 84,000 SF moved; reviews/41: 91,000 SF)
+        rec, _ = ref_plan("rank21")
         self.assertIs(rec["feasible"], True)
-        self.assertEqual((rec["building"]["L_ft"], rec["building"]["D_ft"], rec["building"]["sf"]), (440.0, 190, 84000))
+        self.assertEqual((rec["building"]["L_ft"], rec["building"]["D_ft"], rec["building"]["sf"]), (480.0, 190, 91000))
         self.assertEqual(rec["configuration"], "rear-load 190 deep, court only, cars along office wall")
-        self.assertGreaterEqual(rec["inputs"]["pond_relocation"]["moved"], 1)
+        self.assertIs(rec["inputs"]["pond_room"]["drawn"], True)
         self.assertEqual(rec["detention"]["ponds"], 1)
-        # without the move, the old plan
-        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 0):
-            old, _ = sp.plan_site(inp)
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        self.assertLess(rec["detention"]["pond_over_pad_ft"], 0)
+        self.assertNotIn("STREET_FACING_DOCKS", names(rec))
+        # without the pass, the old plan
+        old, _ = ref_plan("rank21", POND_ROOM_MAX_TRIES=0, LAND_MAX_TRIES=0)
         self.assertEqual(old["building"]["sf"], 68000)
-        self.assertEqual(old["inputs"]["pond_relocation"]["checks"], 0)
-
-    def test_a_move_does_not_turn_the_docks_to_the_street(self):
-        # reference site #25: a 72,000 SF layout exists with its truck court
-        # on the arterial and no trailer stalls; the planner keeps its plan
-        inp, _ = load_fixture("rank25")
-        rec, _ = sp.plan_site(inp)
-        self.assertEqual((rec["building"]["sf"], rec["trailers"]["total"]), (67000, 7))
-        self.assertEqual(rec["configuration"], "rear-load 160 deep, court + trailer row, cars along office wall")
+        self.assertEqual(old["inputs"]["pond_room"]["tries"], 0)
 
     def test_the_prototype_behaviour_does_not_move(self):
         inp, exp = load_fixture("rank21")
-        rec, _ = sp.plan_site(inp, sp.PlanOptions(behaviour="prototype"))
+        rec, _ = ref_plan("rank21", "prototype")
         self.assertEqual(rec["building"]["sf"], exp["sf"])
-        self.assertNotIn("pond_relocation", rec["inputs"])
+        self.assertNotIn("pond_room", rec["inputs"])
+        self.assertNotIn("drains_by_gravity", rec["detention"])
+        self.assertNotIn("drains", rec["alternatives"][0])
 
     def test_the_allowance_is_a_count(self):
-        inp, _ = load_fixture("rank21")
-        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 3):
+        inp, _ = load_fixture("rank25")
+        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 5):
             rec, _ = sp.plan_site(inp)
-        self.assertLessEqual(rec["inputs"]["pond_relocation"]["checks"], 3)
-        with mock.patch.object(sp, "RELOCATE_MAX_CHECKS", 3):
             again, _ = sp.plan_site(inp)
+        self.assertLessEqual(rec["inputs"]["pond_room"]["tries"], 5)
         self.assertEqual(json.dumps(rec, sort_keys=True, default=str), json.dumps(again, sort_keys=True, default=str))
+
+    def test_a_slow_site_plans_as_before(self):
+        # under half the budget left after the search: no pass at all
+        inp, _ = load_fixture("rank21")
+        t = [0.0]
+        real = sp.fit_variant
+
+        def slow(*a, **k):
+            t[0] += 2.0                 # each fit "takes" 2 s of a 100 s budget
+            return real(*a, **k)
+        with mock.patch.object(sp, "fit_variant", slow):
+            rec, _ = sp.plan_site(inp, sp.PlanOptions(max_seconds=100.0), clock=lambda: t[0])
+        self.assertEqual(rec["building"]["sf"], 68000)
+        self.assertIs(rec["inputs"]["pond_room"]["skipped_for_time"], True)
+        self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
+
+    def test_a_cut_pass_is_not_a_flag(self):
+        # the pass out of its own time at once: the search's plan, no flag
+        rec, _ = ref_plan("rank21", POND_ROOM_TIME_SHARE=0.0, LAND_MAX_TRIES=0)
+        self.assertIs(rec["inputs"]["pond_room"]["cut_short"], True)
+        self.assertEqual(rec["building"]["sf"], 68000)
+        self.assertIs(rec["feasible"], True)
+        self.assertNotIn("PLAN_BUDGET_EXCEEDED", names(rec))
+        self.assertNotIn("SECOND_BUILDING_NOT_SEARCHED", names(rec))
+
+    def test_no_stalls_traded_for_nothing(self):
+        # review 40/02, re-check finding 1: a 211,000 SF plan with 21/21
+        # stalls was replaced by a moved 211,000 SF plan with none, on a
+        # 1 ft relief difference. A plan the pass adds needs more floor
+        # area, or the same with as many stalls (or a pond that drains
+        # where the plan before it had none: reviews/41).
+        mk = lambda: site(800, 900, z=lambda x, y: 900 + 0.02 * x + 0.03 * y)
+        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sp, "LAND_MAX_TRIES", 0):
+            off, _ = sp.plan_site(mk())
+        on, _ = sp.plan_site(mk())
+        self.assertEqual((off["building"]["sf"], off["trailers"]["total"]), (205000, 21))
+        self.assertIs(off["detention"]["drains_by_gravity"], True)
+        # the pass found the same 211,000 SF with 21 stalls and with none
+        # (2 ft less relief): the one with the stalls is drawn (41/02)
+        self.assertEqual((on["building"]["sf"], on["trailers"]["total"]), (211000, 21))
+        self.assertIs(on["detention"]["drains_by_gravity"], True)
+        self.assertNotIn("STREET_FACING_DOCKS", names(on))
+
+
+class Drainage(Offline):
+    """A pond the paving can drain to (reviews/41): the pond's ground
+    against the pad, the flag, the ranking, the pond-first layouts."""
+
+    angles = False
+
+    def test_pond_over_pad(self):
+        dem = sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(10) for j in range(10)},
+                     elev={(i, j): 900.0 + 2 * i for i in range(10) for j in range(10)}, state="checked")
+        low, high = box(0, 0, 120, 400), box(280, 0, 400, 400)           # ground 900-904 and 914-918
+        self.assertAlmostEqual(sp.pond_over_pad([low], dem, 910.0), -8.0)
+        self.assertAlmostEqual(sp.pond_over_pad([high], dem, 910.0), 6.0)
+        self.assertAlmostEqual(sp.pond_over_pad([low, high], dem, 910.0), 6.0)   # the highest pond decides
+        self.assertIsNone(sp.pond_over_pad([], dem, 910.0))
+        self.assertIsNone(sp.pond_over_pad([low], dem, None))
+        self.assertIsNone(sp.pond_over_pad([box(1000, 1000, 1100, 1100)], dem, 910.0))
+        each = sp.ponds_over_pad([low, box(1000, 1000, 1100, 1100), high], dem, 910.0)
+        self.assertEqual([None if x is None else round(x) for x in each], [-8, None, 6])    # each pond its own figure
+
+    def test_the_record_covers_every_pond(self):
+        # building 1's ponds then a second building's; None where nothing was measured
+        one = {"pond_over_each": [-5.2, -1.0]}
+        rec = sp._drainage_record(one, None)
+        self.assertEqual(rec, {"pond_over_pad_ft": -1, "ponds_over_pad_ft": [-5, -1], "drains_by_gravity": True})
+        two = sp._drainage_record(one, (None, {"pond_over_each": [9.4]}))
+        self.assertEqual((two["pond_over_pad_ft"], two["ponds_over_pad_ft"], two["drains_by_gravity"]), (9, [-5, -1, 9], False))
+        self.assertIsNone(sp._drainage_record({"pond_over_each": [-5.0, None]}, None)["drains_by_gravity"])
+        self.assertIs(sp._drainage_record({"pond_over_each": [9.0, None]}, None)["drains_by_gravity"], False)   # one uphill is enough
+        self.assertIsNone(sp._drainage_record({"pond_over_each": [-5.0], "pond_ok": False}, None)["drains_by_gravity"])  # not all placed
+        self.assertEqual(sp._drainage_record({}, None), {"pond_over_pad_ft": None, "ponds_over_pad_ft": [], "drains_by_gravity": None})
+
+    def test_nothing_measured_is_not_a_pond_that_drains(self):
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(600, 700, dem_state="not_checked"))
+        self.assertIsNone(rec["detention"]["drains_by_gravity"])
+        self.assertIsNone(rec["detention"]["pond_over_pad_ft"])
+        self.assertNotIn("POND_UPHILL", names(rec))
+        self.assertNotIn("FT BELOW PAD", sr.render(d, rec))
+
+    def test_a_pond_is_not_sited_above_the_ceiling(self):
+        dem = sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(12) for j in range(12)},
+                     elev={(i, j): 900.0 + 2 * i for i in range(12) for j in range(12)}, state="checked")
+        high_ground = box(240, 0, 480, 480)                              # samples at 912 and up
+        near = box(0, 0, 100, 480)
+        self.assertIsNotNone(sp.place_sized_pond(high_ground, 200, 140, dem, [0, 90], near, 905.0, None))
+        self.assertIsNone(sp.place_sized_pond(high_ground, 200, 140, dem, [0, 90], near, 905.0, None, max_z=908.0))
+        got = sp.place_sized_pond(box(0, 0, 480, 480), 200, 140, dem, [0, 90], near, 905.0, None, max_z=908.0)
+        self.assertLessEqual(got.centroid.x, 180)                        # on the low side
+
+    @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+    def test_the_pond_goes_where_the_water_leaves(self):
+        # reference site #25 falls about 4% to the north-west. The plan
+        # drawn before had its pond on ground 9 ft ABOVE the pad (the truck
+        # court had the low side). Now the pond is on the low ground and
+        # the building above it, docks away from the street.
+        rec, d = ref_plan("rank25")
+        self.assertEqual(rec["building"]["sf"], 70000)
+        self.assertEqual(rec["configuration"], "rear-load 160 deep, court only, cars along office wall")
+        self.assertIs(rec["feasible"], True)
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        self.assertLess(rec["detention"]["pond_over_pad_ft"], -10)
+        self.assertNotIn("POND_UPHILL", names(rec))
+        self.assertNotIn("STREET_FACING_DOCKS", names(rec))
+        self.assertIs(rec["inputs"]["pond_room"]["drawn"], True)
+        svg = sr.render(d, rec)
+        self.assertIn("FT BELOW PAD", svg)
+        self.assertIn("PAD EL ", svg)
+
+    @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+    def test_a_draining_layout_ranks_before_a_larger_one_that_does_not(self):
+        # the ranking alone (no pass): the 67,000 SF layout with its pond
+        # above the pad is no longer drawn; the read-out names it and why
+        rec, _ = ref_plan("rank25", POND_ROOM_MAX_TRIES=0, LAND_MAX_TRIES=0)
+        self.assertEqual(rec["building"]["sf"], 61000)
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        up = rec["selection"]["upside"]
+        self.assertEqual(up["sf"], 67000)
+        self.assertIn("its pond stands above the pad it would drain", " ".join(up["reasons"]))
+        self.assertIs(rec["alternatives"][0]["drains"], True)
+        self.assertIn(False, [a.get("drains") for a in rec["alternatives"]])
+
+    def test_an_uphill_pond_is_flagged_when_nothing_drains(self):
+        with mock.patch.object(sp, "ponds_over_pad", lambda ponds, dem, pad_z: [9.0] * len(ponds)), \
+                mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(600, 700))
+            proto, _ = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertIn("POND_UPHILL", names(rec, 2))
+        self.assertIs(rec["feasible"], True)                             # a condition to clear, not a blocked plan
+        self.assertIs(rec["detention"]["drains_by_gravity"], False)
+        self.assertEqual(rec["detention"]["pond_over_pad_ft"], 9)
+        cond = [c for c in rec["assessment"]["conditions"] if c["flag"] == "POND_UPHILL"][0]
+        self.assertEqual(cond["workstream"], sp.assess.W_STORM)
+        self.assertIn("low point", cond["action"])
+        self.assertIn("FT ABOVE PAD", sr.render(d, rec))
+        self.assertNotIn("POND_UPHILL", names(proto))                    # the prototype behaviour says nothing
+        self.assertNotIn("drains_by_gravity", proto["detention"])
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            _, dp = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("PAD EL", sr.render(dp, proto))                 # nor does its sheet
+
+    def test_a_pond_a_little_above_the_pad_is_a_note(self):
+        with mock.patch.object(sp, "ponds_over_pad", lambda ponds, dem, pad_z: [2.0] * len(ponds)), \
+                mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertIn("POND_ABOVE_PAD", names(rec, 3))
+        self.assertNotIn("POND_UPHILL", names(rec))
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+
+    @unittest.skipUnless(FIXTURES.is_dir(), "no reference fixtures")
+    def test_the_pass_sites_no_pond_above_the_pad(self):
+        # the 67,000 SF layout of #25 has its pond 9 ft above the pad; given
+        # to the pass's own check (ctx.pond_room) its pond goes on ground
+        # the pad drains to, or it has no pond: never an uphill one
+        inp, _ = load_fixture("rank25")
+        seen = {}
+        real = sp.finish
+
+        def spy(p, ctx, others=None):
+            o = real(p, ctx, others)
+            if o["ok"] and o.get("drains") is False and p.sf == 67200:
+                seen.setdefault("uphill", (p, ctx))
+            return o
+        with mock.patch.object(sp, "finish", spy), mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+            sp.plan_site(inp)
+        p, ctx = seen["uphill"]
+        o = sp.finish(p, sp.dataclass_replace(ctx, pond_room=True, search=sp.Search(1e9)))
+        self.assertFalse(o["pond_ok"] and o["pond_over_pad"] > sp.POND_UPHILL_TOL_FT)
+
+    def test_the_pond_does_not_take_the_second_buildings_ground(self):
+        # review 41/03: a rule that first looked for a pond 3 ft below the
+        # pad moved this site's pond (already 1 ft below, beside the
+        # building) onto the ground of its second building: 543,000 SF in
+        # two buildings became 428,000 SF in one. Outside the pass the pond
+        # is sited as before.
+        two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(1600, 1000, front=two, z=lambda x, y: 930 - 0.00008 * (y - 500) ** 2))
+        self.assertIn("second_building", rec)
+        self.assertEqual(rec["total_sf"], 543000)
+        self.assertEqual(len(rec["detention"]["ponds_over_pad_ft"]), rec["detention"]["ponds"])
+        # the second building's pond reads against its own pad, which the sheet prints too
+        self.assertIn("pad_elev_ft", rec["second_building"])
+        self.assertEqual(sr.render(d, rec).count(">PAD EL "), 4)         # two labels, each over its halo
+
+    def test_docks_face_the_street_only_where_they_did(self):
+        # an L-shaped site whose every layout faced the street, each with its
+        # pond 9 ft above the pad: the first round finds 115,000 SF off the
+        # street, smaller than the plan before the pass (170,000 SF), so the
+        # second round may face the street and finds 156,000 SF that drains
+        mk = lambda: site(shapes=[box(0, 0, 1000, 400), box(0, 400, 450, 1000)], front=LineString([(0, 0), (1000, 0)]),
+                          z=lambda x, y: 930 + 0.01 * x - 0.02 * y)
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+                off, _ = sp.plan_site(mk())
+            on, _ = sp.plan_site(mk())
+        self.assertEqual(off["building"]["sf"], 170000)
+        self.assertIn("POND_UPHILL", names(off, 2))
+        self.assertIn("STREET_FACING_DOCKS", names(off))
+        self.assertEqual(on["building"]["sf"], 156000)
+        self.assertIs(on["detention"]["drains_by_gravity"], True)
+        self.assertIn("STREET_FACING_DOCKS", names(on))
+        self.assertEqual(on["inputs"]["pond_room"]["layouts"], 3)        # each starting layout counted once
+
+
+class Grading(Offline):
+    """Grading with the land (reviews/42): the stepped pad a dock building
+    is graded to, the court's side, and the docks turned downhill."""
+
+    angles = False
+
+    @staticmethod
+    def fake(*courts, rows=(), module=box(0, 0, 400, 400)):
+        from types import SimpleNamespace
+        return SimpleNamespace(module=module, building=box(0, 100, 400, 300), courts=list(courts), rows=list(rows))
+
+    @staticmethod
+    def tilted(rise):
+        # 40 ft samples over 400 x 400 ft; the ground rises `rise` ft per ft northward
+        return sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(10) for j in range(10)},
+                      elev={(i, j): 900.0 + rise * (20 + 40 * j) for i in range(10) for j in range(10)}, state="checked")
+
+    def test_the_stepped_pad(self):
+        south, north = box(0, 0, 400, 100), box(0, 300, 400, 400)
+        low = sp.stepped_grading(self.fake(south), self.tilted(0.05))        # the court on the low (south) side
+        high = sp.stepped_grading(self.fake(north), self.tilted(0.05))       # the same court cut into the high side
+        for g in (low, high):
+            self.assertAlmostEqual(g["floor"] - g["court"], sp.DOCK_DROP_FT)
+            self.assertAlmostEqual(g["cut_cy"], g["fill_cy"], delta=0.001 * g["cut_cy"])       # the floor balances cut and fill
+            self.assertAlmostEqual(g["moved_cy"], (g["cut_cy"] + g["fill_cy"]) / 2)
+        # the building's samples are at y 140-260 (ground 910), the court's at 20-60 or 340-380 (902 or 918)
+        self.assertAlmostEqual(low["fall_to_court"], 8.0, places=6)
+        self.assertAlmostEqual(high["fall_to_court"], -8.0, places=6)
+        self.assertEqual((low["falls"], low["courts"], low["step"]), ([low["fall_to_court"]], 1, 40.0))
+        self.assertLess(low["moved_cy"], high["moved_cy"])                   # the ground gives the low court its drop
+        # level ground: 20 of the 100 samples are court, so the floor stands 0.8 ft above the ground
+        flat = sp.stepped_grading(self.fake(south), self.tilted(0.0))
+        self.assertAlmostEqual(flat["floor"], 900.8)
+        self.assertAlmostEqual(flat["fall_to_court"], 0.0)
+        self.assertAlmostEqual(flat["cut_cy"], 20 * 1600 * 3.2 / 27)         # the court cut 3.2 ft; the rest filled 0.8 ft
+        self.assertAlmostEqual(flat["fill_cy"], 80 * 1600 * 0.8 / 27)
+        # too little to grade
+        self.assertIsNone(sp.stepped_grading(self.fake(south), sp.Dem()))
+        self.assertIsNone(sp.stepped_grading(self.fake(box(1000, 1000, 1100, 1100)), self.tilted(0.05)))
+
+    def test_trailer_rows_are_graded_with_the_court(self):
+        # a trailer row beyond the court: its samples go to the court's level (30 of 100 low, the floor 1.2 ft up)
+        g = sp.stepped_grading(self.fake(box(0, 40, 400, 100), rows=[box(0, 0, 400, 40)]), self.tilted(0.0))
+        self.assertAlmostEqual(g["floor"], 900.0 + 4.0 * 20 / 100)
+        g = sp.stepped_grading(self.fake(box(0, 0, 400, 80), rows=[box(0, 300, 400, 400)]), self.tilted(0.0))
+        self.assertAlmostEqual(g["floor"], 900.0 + 4.0 * 40 / 100)
+
+    def test_each_sample_stands_for_its_share_of_the_module(self):
+        # the same 100 samples on a module a tenth larger: a tenth more earth (as the one-plane figure scales)
+        south = box(0, 0, 400, 100)
+        g = sp.stepped_grading(self.fake(south), self.tilted(0.05))
+        wider = sp.stepped_grading(self.fake(south, module=box(-20, 0, 420, 400)), self.tilted(0.05))
+        self.assertAlmostEqual(wider["moved_cy"], 1.1 * g["moved_cy"])
+        # samples on less than STEPPED_MIN_COVER of the module (partial lidar): no figure, not a small one
+        self.assertIsNone(sp.stepped_grading(self.fake(south, module=box(0, 0, 400, 520)), self.tilted(0.05)))
+        self.assertIsNotNone(sp.stepped_grading(self.fake(south, module=box(0, 0, 400, 480)), self.tilted(0.05)))
+
+    def test_courts_on_both_sides(self):
+        # a cross-dock on a slope has one court on each side of it: the
+        # mean says "level", so the record says "both" and lists each
+        south, north = box(0, 0, 400, 100), box(0, 300, 400, 400)
+        g = sp.stepped_grading(self.fake(south, north), self.tilted(0.05))
+        self.assertEqual([round(x, 6) for x in g["falls"]], [8.0, -8.0])
+        self.assertAlmostEqual(g["fall_to_court"], 0.0)
+        rec = sp._stepped_record(g)
+        self.assertEqual((rec["court_side"], rec["ground_fall_to_court_ft"], rec["ground_fall_to_courts_ft"]), ("both", None, [8.0, -8.0]))
+
+    def test_the_record_names_the_court_side(self):
+        g = {"floor": 918.4, "court": 914.4, "cut_cy": 33600.0, "fill_cy": 33600.0, "moved_cy": 33600.0, "fall_to_court": -5.9,
+             "falls": [-5.9], "courts": 1, "step": 30.0}
+        rec = sp._stepped_record(g)
+        self.assertEqual((rec["floor_ft"], rec["court_ft"], rec["moved_cy"], rec["court_side"]), (918, 914, 34000, "high"))
+        self.assertIn("lidar samples at 30 ft", rec["basis"])
+        self.assertIn("no pond excavation", rec["basis"])
+        self.assertEqual(sp._stepped_record(dict(g, fall_to_court=2.7))["court_side"], "low")
+        # a rise or a fall of a foot is a side; less is level (a 2.9 ft rise is not "level ground")
+        self.assertEqual(sp._stepped_record(dict(g, fall_to_court=-2.9))["court_side"], "high")
+        self.assertEqual(sp._stepped_record(dict(g, fall_to_court=-0.9))["court_side"], "level")
+        self.assertEqual(sp._stepped_record(dict(g, fall_to_court=0.9))["court_side"], "level")
+        self.assertIsNone(sp._stepped_record(None))
+
+    def test_a_turn_must_save_materially(self):
+        sg = lambda cy: {"moved_cy": cy}
+        self.assertTrue(sp.dock_turn_saves(sg(30000), sg(27000)))            # 10% and 2,000 CY
+        self.assertFalse(sp.dock_turn_saves(sg(30000), sg(27001)))           # under 10%
+        self.assertFalse(sp.dock_turn_saves(sg(15000), sg(13001)))           # 13% but under 2,000 CY
+        self.assertTrue(sp.dock_turn_saves(sg(15000), sg(13000)))
+        self.assertFalse(sp.dock_turn_saves(sg(15000), sg(16000)))
+        self.assertFalse(sp.dock_turn_saves(None, sg(1)) or sp.dock_turn_saves(sg(1), None))
+
+    def test_what_refuses_a_turned_layout(self):
+        route = lambda ft: [("car", LineString([(0, 0), (ft, 0)])), ("truck", LineString([(0, 0), (9000, 0)]))]
+        o0 = {"ok": True, "drains": True, "trailers": 20, "flags": [("ZONING_DRAFT", 2, "")], "routes": route(400),
+              "stepped": {"moved_cy": 30000.0}}
+        ok = dict(o0, stepped={"moved_cy": 20000.0})
+        self.assertIsNone(sp.dock_turn_refused(o0, ok))
+        self.assertIsNone(sp.dock_turn_refused(o0, dict(ok, trailers=25, routes=route(600))))
+        self.assertIn("fails its checks (POND_DOES_NOT_FIT)",
+                      sp.dock_turn_refused(o0, dict(ok, ok=False, flags=[("POND_DOES_NOT_FIT", 1, "")])))
+        self.assertIn("pond would not drain", sp.dock_turn_refused(o0, dict(ok, drains=False)))
+        self.assertIsNone(sp.dock_turn_refused(dict(o0, drains=False), dict(ok, drains=False)))      # no worse than the plan
+        self.assertIn("fewer trailer stalls", sp.dock_turn_refused(o0, dict(ok, trailers=19)))
+        self.assertIn("adds a condition (FIRE_SECOND_ACCESS)",
+                      sp.dock_turn_refused(o0, dict(ok, flags=o0["flags"] + [("FIRE_SECOND_ACCESS", 2, "")])))
+        self.assertIsNone(sp.dock_turn_refused(o0, dict(ok, flags=o0["flags"] + [("RELIEF", 3, "")])))    # a note is not a condition
+        self.assertIn("cars' way in", sp.dock_turn_refused(o0, dict(ok, routes=route(601))))        # over 1.5 x and + 200 ft
+        self.assertIsNone(sp.dock_turn_refused(dict(o0, routes=route(100)), dict(ok, routes=route(300))))
+        self.assertIn("cars' way in", sp.dock_turn_refused(dict(o0, routes=route(100)), dict(ok, routes=route(301))))
+        self.assertIn("saves too little", sp.dock_turn_refused(o0, dict(ok, stepped={"moved_cy": 29000.0})))
+        self.assertIn("saves too little", sp.dock_turn_refused(o0, dict(ok, stepped=None)))
+
+    def test_what_stops_a_turn_before_it_is_laid_out(self):
+        from types import SimpleNamespace as NS
+        B0 = box(0, 0, 1000, 1000)
+        street, homes = LineString([(0, 0), (1000, 0)]), LineString([(1000, 0), (1000, 1000)])
+        bld = box(200, 400, 800, 600)
+        rear = NS(building=bld, courts=[box(200, 600, 800, 730)], rows=[])          # the court behind the building
+        front = NS(building=bld, courts=[box(200, 270, 800, 400)], rows=[])         # turned: between the building and the street
+        self.assertIsNone(sp.dock_turn_blocked(rear, rear, B0, street, homes))
+        # 270 ft off the street is not STREET_FACING_DOCKS (100 ft), but it is the street side of the building
+        self.assertFalse(sp.faces_street(front, street))
+        self.assertTrue(sp.loading_on_street_side(front, street))
+        self.assertFalse(sp.loading_on_street_side(rear, street))
+        self.assertFalse(sp.loading_on_street_side(front, None))
+        self.assertIn("between the building and the street", sp.dock_turn_blocked(rear, front, B0, street, homes))
+        self.assertIsNone(sp.dock_turn_blocked(front, front, B0, street, homes))    # it was there already
+        self.assertIsNone(sp.dock_turn_blocked(rear, front, B0, None, homes))       # no street frontage
+        # a court beside the building is not on its street side
+        side = NS(building=box(400, 200, 600, 800), courts=[box(270, 200, 400, 800)], rows=[])
+        self.assertFalse(sp.loading_on_street_side(side, street))
+        near = NS(building=box(200, 150, 800, 350), courts=[box(200, 20, 800, 150)], rows=[])
+        self.assertIn("docks to the street", sp.dock_turn_blocked(rear, near, B0, street, homes))
+        east = NS(building=box(400, 200, 600, 800), courts=[box(600, 200, 730, 800)], rows=[box(880, 200, 940, 800)])
+        self.assertIn("loading to homes", sp.dock_turn_blocked(side, east, B0, street, homes))
+        self.assertIsNone(sp.dock_turn_blocked(side, east, B0, street, None))
+        out = NS(building=box(200, 900, 800, 1100), courts=[box(200, 1100, 800, 1200)], rows=[])
+        self.assertIn("leave the buildable area", sp.dock_turn_blocked(rear, out, B0, street, homes))
+
+    def test_docks_on_the_high_side_are_a_note_with_their_cost(self):
+        # the street on the low side: the docks are at the back, cut into
+        # the hill. Turned round, the loading would lie between the
+        # building and the street: not laid out, and the note says so.
+        mk = lambda: site(700, 800, z=lambda x, y: 900 + 0.025 * y)
+        rec, d = sp.plan_site(mk())
+        st = rec["grading"]["stepped_pad"]
+        self.assertEqual(st["court_side"], "high")
+        self.assertEqual(st["floor_ft"] - st["court_ft"], 4)
+        note = [f["note"] for f in rec["flags"][3] if f["flag"] == "DOCKS_UPHILL"][0]
+        self.assertIn("CY more earthwork than the same footprint with its court on the other side: not taken, "
+                      "it would put the loading between the building and the street", note)
+        self.assertNotIn("DOCKS_UPHILL", names(rec, 2))                      # information: it is a cost, not a condition
+        ds = rec["inputs"]["dock_side"]
+        self.assertEqual((ds["tried"], ds["turned"], ds["outcome"], ds["saved_cy"]), (0, False, "refused", 0))
+        self.assertEqual(len(ds["refused"]), 2)
+        self.assertGreaterEqual(min(r["would_save_cy"] for r in ds["refused"]), 2000)
+        cond = [c for c in rec["assessment"]["conditions"] if c["flag"] == "DOCKS_UPHILL"][0]
+        self.assertEqual(cond["workstream"], sp.assess.W_GRADING)
+        svg = sr.render(d, rec)
+        self.assertIn("court on the HIGH side", svg)
+        self.assertIn("EARTH CY", svg)
+        self.assertIn("Stepped pad: floor at one level", svg)                # the basis of the stepped figure, on the sheet
+        self.assertEqual(rec["alternatives"][0]["stepped_cy"], st["moved_cy"])
+        self.assertNotIn("earthwork_cy", rec["alternatives"][0])             # that name is the one-plane figure's (takeoff, pipeline)
+        # the prototype behaviour: no model, no note, no rows
+        proto, dp = sp.plan_site(mk(), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("stepped_pad", proto["grading"])
+        self.assertNotIn("dock_side", proto["inputs"])
+        self.assertNotIn("DOCKS_UPHILL", names(proto))
+        self.assertNotIn("stepped_cy", proto["alternatives"][0])
+        psvg = sr.render(dp, proto)
+        self.assertNotIn("Stepped pad", psvg)
+        self.assertNotIn("EARTH CY", psvg)
+
+    def test_a_rise_under_three_feet_is_not_flagged(self):
+        # DOCKS_UPHILL from a 3 ft rise (DOCKS_UPHILL_FT): a 1% slope puts the court about 2 ft up
+        rec, _ = sp.plan_site(site(700, 800, z=lambda x, y: 900 + 0.01 * y))
+        st = rec["grading"]["stepped_pad"]
+        self.assertTrue(-3.0 < st["ground_fall_to_court_ft"] <= -1.0, st)
+        self.assertEqual(st["court_side"], "high")
+        self.assertNotIn("DOCKS_UPHILL", names(rec))
+
+    def test_docks_turn_downhill_where_the_site_allows(self):
+        # a wetland on one side, the ground falling 2% to the west: the
+        # court was on the high side; the same footprint turned has it on
+        # the low side and moves 11,000 CY less, with the same floor area,
+        # stalls and flags
+        wet = wgs(box(500, 300, 700, 700))
+        mk = lambda: site(700, 700, constraints_wgs=[wet], constraints_near_wgs=[wet], z=lambda x, y: 900 - 0.02 * x)
+        on, d = sp.plan_site(mk())
+        with mock.patch.object(sp, "DOCK_TURN_MIN_CY", 1e12):
+            off, _ = sp.plan_site(mk())
+        self.assertEqual(off["grading"]["stepped_pad"]["court_side"], "high")
+        self.assertEqual((off["inputs"]["dock_side"]["turned"], off["inputs"]["dock_side"]["outcome"]), (False, "not_cheaper"))
+        ds = on["inputs"]["dock_side"]
+        self.assertEqual((ds["turned"], ds["outcome"], ds["refused"]), (True, "turned", []))
+        self.assertLessEqual(ds["tried"], sp.DOCK_TURN_TRIES)
+        self.assertEqual(on["grading"]["stepped_pad"]["court_side"], "low")
+        # the saving is the difference before rounding (the two rounded figures can differ from it by 1,000)
+        self.assertAlmostEqual(ds["saved_cy"], off["grading"]["stepped_pad"]["moved_cy"] - on["grading"]["stepped_pad"]["moved_cy"],
+                               delta=1000)
+        self.assertGreaterEqual(ds["saved_cy"], 2000)
+        self.assertEqual((on["building"]["sf"], on["feasible"]), (off["building"]["sf"], off["feasible"]))
+        self.assertGreaterEqual(on["trailers"]["total"], off["trailers"]["total"])
+        self.assertLessEqual(names(on, 2), names(off, 2))                    # no new condition
+        self.assertNotIn("DOCKS_UPHILL", names(on))
+        for flag in ("STREET_FACING_DOCKS", "LOADING_FACES_RES"):
+            self.assertFalse(flag in names(on) and flag not in names(off), flag)
+        # the step runs on its own count: the pass's record is the same with and without it
+        self.assertEqual(on["inputs"]["pond_room"], off["inputs"]["pond_room"])
+        # the layouts compared: the turned plan first, marked; the plan it came from next, with its earthwork
+        a0, a1 = on["alternatives"][:2]
+        self.assertIs(a0.get("docks_turned"), True)
+        self.assertNotIn("docks_turned", a1)
+        self.assertEqual((a0["variant"], a0["sf"]), (a1["variant"], a1["sf"]))
+        self.assertEqual(a0["stepped_cy"], on["grading"]["stepped_pad"]["moved_cy"])
+        self.assertEqual(a1["stepped_cy"], off["grading"]["stepped_pad"]["moved_cy"])
+        self.assertNotIn("docks_turned", off["alternatives"][0])
+        self.assertIn("turned downhill)", sr.render(d, on))                 # the row's name says so (wrapped)
+        # the office stays at its end when that turn is taken: one try, not two
+        self.assertEqual(ds["tried"], 1)
+
+    def test_a_turn_never_costs_the_second_building(self):
+        # review 42/02, finding 3. A two-frontage site with 543,000 SF in
+        # two buildings; with every guard on the turn taken away, building
+        # 1 turned leaves no room for the second (428,000 SF): the plan it
+        # came from stands, and the record says why.
+        two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+        mk = lambda: site(1600, 1000, front=two, z=lambda x, y: 930 - 0.00008 * (y - 500) ** 2)
+        real = sp.dock_turn_refused
+        loose = lambda o0, o2: None if o2["ok"] else real(o0, o2)
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]), \
+                mock.patch.object(sp, "dock_turn_blocked", lambda *a: None), mock.patch.object(sp, "dock_turn_refused", loose):
+            rec, _ = sp.plan_site(mk())
+            with mock.patch.object(sp, "SECOND_MIN_SF", 10 ** 9):           # no second building to lose: the turn is taken
+                alone, _ = sp.plan_site(mk())
+        self.assertEqual(rec["total_sf"], 543000)
+        ds = rec["inputs"]["dock_side"]
+        self.assertEqual((ds["turned"], ds["outcome"], ds["saved_cy"]), (False, "refused", 0))
+        self.assertEqual([r["why"] for r in ds["refused"]], ["it would cost the second building"])
+        self.assertNotIn("docks_turned", rec["alternatives"][0])
+        self.assertIs(alone["inputs"]["dock_side"]["turned"], True)
+        self.assertIs(alone["alternatives"][0].get("docks_turned"), True)
+
+
+class Trucks(Offline):
+    """Design for the truck (reviews/43): the plan drawn has a way in a
+    WB-67 can steer, laid out before its pond, with its swept path
+    checked; trucks enter the court on the driver's side where that costs
+    nothing; a layout no truck can enter gives way to one it can."""
+
+    @staticmethod
+    def fake(court, building=box(100, 100, 500, 300)):
+        from types import SimpleNamespace as NS
+        return NS(building=building, courts=[court], rows=[], cars=[])
+
+    def test_where_the_truck_is_going(self):
+        p = self.fake(box(60, 300, 540, 430))                                # the court north of the building
+        west, east = Point(60, 365), Point(540, 365)
+        gw, ge = sp.court_goal(p, west), sp.court_goal(p, east)
+        # the truck lane: along the court, 30 ft beyond its middle, 100 ft short of each end
+        (x0, y0), (x1, y1) = gw["lane"]
+        self.assertEqual(sorted((round(x0, 6), round(x1, 6))), [160.0, 440.0])
+        self.assertAlmostEqual(y0, 365.0 + sp.TRUCK_LANE_FT)
+        self.assertAlmostEqual(y1, 365.0 + sp.TRUCK_LANE_FT)
+        self.assertEqual(gw["lane"], ge["lane"])                             # one lane, whichever end the search's route reached
+        # heading west the building (south) is on the driver's left: that way is the sight side,
+        # and it is the way in from the east end
+        west_way = 1 if x1 < x0 else -1
+        self.assertEqual(gw["sight_way"], west_way)
+        self.assertEqual((gw["entry_way"], ge["entry_way"]), (-west_way, west_way))
+        self.assertEqual((sp.sight_entry(p, west), sp.sight_entry(p, east)), (False, True))
+        # the court on the other side of the building: the other end
+        q = self.fake(box(60, -30, 540, 100))
+        self.assertEqual((sp.sight_entry(q, Point(60, 35)), sp.sight_entry(q, Point(540, 35))), (True, False))
+        # a short court: the lane keeps a third of it clear at each end
+        short = self.fake(box(100, 300, 300, 430), box(100, 100, 300, 300))
+        (sx0, _), (sx1, _) = sp.court_goal(short, Point(100, 365))["lane"]
+        self.assertEqual(sorted((round(sx0, 6), round(sx1, 6))), [170.0, 230.0])
+        # the side trucks back in on: from the designed path where there is one, else from the end the route reached
+        self.assertEqual(sp.backing_of(p, {"truck_entry": west}), "blind")
+        self.assertEqual(sp.backing_of(p, {"truck_entry": east}), "sight")
+        self.assertEqual(sp.backing_of(p, {"truck_entry": west, "truck_path": {"designed": True, "backing": "sight"}}), "sight")
+        self.assertEqual(sp.backing_of(p, {"truck_entry": east, "truck_path": {"designed": False}}), "sight")
+        self.assertIsNone(sp.backing_of(p, {"truck_entry": None}))
+
+    def test_the_dock_zone_is_in_front_of_the_wall_only(self):
+        p = self.fake(box(60, 300, 540, 430))
+        z = sp.dock_zone(p)
+        self.assertLess(z.symmetric_difference(box(100, 300, 500, 300 + sp.DOCK_ZONE_FT)).area, 1e-6)
+        # not round the building's corners, where trucks turn in from the end roads
+        self.assertFalse(z.intersects(box(60, 300, 99, 430)))
+
+    def test_the_strips_beside_the_frontage_corners(self):
+        run = LineString([(0, 0), (600, 0)])
+        strips = sp.driveway_strips([run], 90.0)
+        self.assertEqual(len(strips), 2)
+        (w, wspot), (e, espot) = strips
+        self.assertAlmostEqual(wspot.distance(Point(110, 0)), 0.0)
+        self.assertAlmostEqual(espot.distance(Point(490, 0)), 0.0)
+        self.assertTrue(w.contains(Point(89, 500)) and not w.contains(Point(91, 500)))
+        self.assertTrue(e.contains(Point(511, 500)) and not e.contains(Point(509, 500)))
+        self.assertEqual(sp.driveway_strips([LineString([(0, 0), (200, 0)])], 90.0), [])      # too short for a truck driveway
+
+    def test_what_refuses_the_sight_side_layout(self):
+        p = self.fake(box(60, 300, 540, 430))
+        route = lambda ft, kind="truck": [(kind, LineString([(0, 0), (ft, 0)]))]
+        o0 = {"ok": True, "drains": True, "trailers": 20, "flags": [], "routes": route(400) + route(100, "car"), "truck_entry": Point(60, 365)}
+        ok = dict(o0, truck_entry=Point(540, 365))
+        self.assertIsNone(sp.truck_side_refused(p, o0, ok))
+        self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_entry=Point(60, 365))))
+        self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_entry=None)))
+        # a designed path decides the side, whichever end the search's route reached
+        designed = lambda backing, bends=(): {"designed": True, "backing": backing, "bends": list(bends)}
+        self.assertIsNone(sp.truck_side_refused(p, o0, dict(o0, truck_path=designed("sight"))))
+        self.assertIn("sight-side end", sp.truck_side_refused(p, o0, dict(ok, truck_path=designed("blind"))))
+        self.assertIsNone(sp.truck_side_refused(p, o0, dict(ok, routes=route(600) + route(100, "car"))))
+        self.assertIn("trucks' way in", sp.truck_side_refused(p, o0, dict(ok, routes=route(601) + route(100, "car"))))
+        # no loop round to come in from that end (review 43/02, finding 4)
+        self.assertIsNone(sp.truck_side_refused(p, o0, dict(ok, truck_path=designed("sight", [{"deg": 135}]))))
+        self.assertIn("loop round", sp.truck_side_refused(p, o0, dict(ok, truck_path=designed("sight", [{"deg": 90}, {"deg": 150}]))))
+        self.assertIn("fewer trailer stalls", sp.truck_side_refused(p, o0, dict(ok, trailers=19)))
+        self.assertIn("fails its checks", sp.truck_side_refused(p, o0, dict(ok, ok=False)))
+        self.assertIn("adds a condition", sp.truck_side_refused(p, o0, dict(ok, flags=[("FIRE_SECOND_ACCESS", 2, "")])))
+        # with the truck road laid out for the first time, the conditions that road states itself are not new
+        new = dict(ok, flags=[("SHORT_THROAT", 2, ""), ("PARKING_SHORT_FOR_LEAD_IN", 2, ""), ("TRUCK_ENTRANCE_S_BEND", 2, "")])
+        self.assertIsNone(sp.layout_no_worse(o0, new, truck=True))
+        self.assertIn("adds a condition", sp.layout_no_worse(o0, new))
+        self.assertIn("FIRE_SECOND_ACCESS", sp.layout_no_worse(o0, dict(ok, flags=[("FIRE_SECOND_ACCESS", 2, "")]), truck=True))
+
+    def test_what_a_truck_must_stay_off(self):
+        from types import SimpleNamespace as NS
+        ctx = NS(parcel=box(0, 0, 600, 600), P=box(10, 10, 590, 590), wet_buf=box(500, 500, 600, 600), cut=Polygon())
+        p = NS(building=box(100, 100, 500, 300), cars=[box(100, 20, 500, 100)], rows=[box(150, 430, 450, 485)], courts=[box(60, 300, 540, 430)])
+        o = {"ponds": [box(20, 450, 120, 560)], "drops": [box(300, 500, 400, 580)], "cpt": Point(300, 0), "route_polys": [("car", box(290, 0, 310, 20)), ("truck", box(60, 0, 100, 300))]}
+        kinds = sp.truck_obstacles(p, o, ctx)
+        self.assertEqual(set(kinds), {"the building", "the car parking", "the trailer stalls", "the pond", "the car route",
+                                      "ground where water or the test cut allows no paving", "the paving setback"})
+        self.assertAlmostEqual(kinds["the trailer stalls"].area, 300 * 55 + 100 * 80)      # the row and the drop yard
+        self.assertAlmostEqual(kinds["the pond"].area, 100 * 110)
+        self.assertAlmostEqual(kinds["the car route"].area, 400)             # not the truck's own road
+        self.assertAlmostEqual(kinds["the paving setback"].area, 600 * 600 - 581 * 581, delta=1)     # (the envelope's edge itself is not in it)
+        # with one driveway the car route is no obstacle; another building's plan adds its own
+        self.assertNotIn("the car route", sp.truck_obstacles(p, dict(o, cpt=None), ctx))
+        other = (NS(building=box(100, 400, 200, 440), cars=[], rows=[], courts=[]), {"ponds": [], "drops": [], "cpt": None, "route_polys": []})
+        self.assertAlmostEqual(sp.truck_obstacles(p, o, ctx, other)["the building"].area, 400 * 200 + 100 * 40)
+
+    def test_what_the_record_says_of_a_path(self):
+        from types import SimpleNamespace as NS
+        parcel = box(0, 0, 600, 600)
+        p = NS(building=box(100, 100, 500, 300), cars=[box(100, 20, 500, 100)], rows=[], courts=[box(60, 300, 540, 430)], car_cap=80, cars_required=70)
+        line = LineString([(80, 0), (80, 365), (300, 365)])
+        goal = {"sight_way": 1, "entry_way": 1}
+        kinds = {"the building": p.building, "the car parking": p.cars[0]}
+
+        def rec(got_over=None, pave=None, flags=(), cpt=Point(300, 0), over_cars=False, the_line=line, **got_kw):
+            got = dict({"bends": [], "reverse": 0, "min_radius_ft": None, "clip_ft": 0.0, "clip_at": None, "ok": True, "way": 1}, **got_kw)
+            o = {"flags": list(flags), "routes": [("truck", the_line)], "route_polys": [("truck", pave or the_line.buffer(20))], "cpt": cpt}
+            d = {"got": got if got_over is None else got_over, "goal": goal, "kinds": kinds, "over_cars": over_cars}
+            return sp.truck_record(p, o, d, parcel, 400.0, 16000.0), {f: (sv, note) for f, sv, note in o["flags"]}, o
+        info, fl, _ = rec()
+        self.assertEqual((info["designed"], info["backing"], info["swept_ok"]), (True, "sight", True))
+        self.assertAlmostEqual(info["throat_ft"], 300, delta=5)              # from the street to the court
+        self.assertEqual(fl, {})
+        # the side the path comes onto the lane decides the backing
+        info, fl, _ = rec(way=-1)
+        self.assertEqual(info["backing"], "blind")
+        self.assertEqual(fl["BLIND_SIDE_BACKING"][0], 3)
+        # the grid route's throat and dead-end flags give way to the path's own measure, street to court
+        info, fl, _ = rec(flags=[("SHORT_THROAT", 2, "old"), ("DEAD_END_ACCESS", 2, "old"), ("ZONING_DRAFT", 2, "kept")])
+        self.assertEqual(set(fl), {"ZONING_DRAFT"})
+        short = LineString([(80, 240), (80, 365), (300, 365)])
+        self.assertRegex(rec(the_line=short)[1]["SHORT_THROAT"][1], r"about 6[0-5] ft")
+        far = LineString([(80, -500), (80, 365), (300, 365)])
+        self.assertNotIn("DEAD_END_ACCESS", rec(the_line=far)[1])            # 800 ft, but cars have their own driveway
+        self.assertEqual(rec(the_line=far, cpt=None)[1]["DEAD_END_ACCESS"][0], 2)
+        # a swept path that strays: where, how far, over what
+        info, fl, _ = rec(ok=False, clip_ft=6.4, clip_at=(101, 200))
+        self.assertEqual((info["swept_ok"], info["swept_clips"]), (False, "the building"))
+        self.assertIn("sweeps about 6 ft over the building", fl["TRUCK_SWEPT_PATH"][1])
+        self.assertEqual(fl["TRUCK_SWEPT_PATH"][0], 2)
+        self.assertEqual(rec(ok=False, clip_ft=3.0, clip_at=(-5, 200))[0]["swept_clips"], "the property line")
+        # the lead-in over the car field: the stalls under its pavement and those it cuts off from the rest
+        lead = box(140, 0, 180, 110)                                         # across the field, 40 ft in from its west end
+        info, fl, o = rec(over_cars=True, pave=lead.union(line.buffer(20)))
+        cut_off = (180 + 2 - 100) * 80 / (400 * 80 / 80)                     # the west end and the pavement (with its 2 ft): 82 ft of an 80-stall, 400 ft field
+        self.assertEqual(info["car_stalls_taken"], math.ceil(cut_off))
+        self.assertEqual(o["car_stalls_taken"], info["car_stalls_taken"])
+        self.assertEqual(fl["PARKING_SHORT_FOR_LEAD_IN"][0], 2)              # 63 left of 70 required
+        p.cars_required = 60
+        self.assertEqual(rec(over_cars=True, pave=lead.union(line.buffer(20)))[1]["TRUCK_LEAD_IN_OVER_PARKING"][0], 3)
+        # bends: a reverse bend is a note; a hard S-bend as the truck comes off the street is a condition
+        b = lambda hand, deg, at, R=45.0: {"hand": hand, "deg": deg, "radius_ft": R, "from_start_ft": at}
+        info, fl, _ = rec(bends=[b("left", 45, 200), b("right", 45, 260)], reverse=1)
+        self.assertEqual((fl["TRUCK_REVERSE_BEND"][0], "TRUCK_ENTRANCE_S_BEND" in fl), (3, False))
+        info, fl, _ = rec(bends=[b("right", 90, 0), b("left", 90, 71)], reverse=1)
+        self.assertEqual((fl["TRUCK_ENTRANCE_S_BEND"][0], "TRUCK_REVERSE_BEND" in fl, info["entrance_s_bend"]), (2, False, True))
+        for gentle in ([b("right", 90, 80), b("left", 90, 151)],             # a truck's length in from the street
+                       [b("right", 45, 0), b("left", 90, 40)],               # a slight first bend
+                       [b("right", 90, 0, 90.0), b("left", 90, 150)],        # an easy radius
+                       [b("right", 90, 0), b("right", 90, 71)]):             # the same hand
+            self.assertNotIn("TRUCK_ENTRANCE_S_BEND", rec(bends=gentle, reverse=1)[1])
+        # no path at all: the grid route's own flags stand, and the plan says so
+        o = {"flags": [("SHORT_THROAT", 2, "old")], "routes": [("truck", line)], "route_polys": [], "cpt": None}
+        info = sp.truck_record(p, o, {"got": None, "goal": goal, "kinds": kinds, "over_cars": False}, parcel, 400.0, 16000.0)
+        self.assertEqual((info["designed"], info["reason"], info["backing"]), (False, "no path", "sight"))
+        self.assertEqual([(f, sv) for f, sv, _ in o["flags"]], [("TRUCK_PATH_NONE", 2), ("SHORT_THROAT", 2)])
+
+    def test_the_plan_drawn_has_a_way_in_a_wb67_can_drive(self):
+        # a flat 600 x 700 ft lot: the driveway must stand 110 ft from the
+        # lot corner, in front of the car field and 50 ft to one side of
+        # the building's end road. The search's own route ran sideways
+        # along the street in a 10 ft strip; the path a truck can steer
+        # takes the corner of the car field instead.
+        rec, d = planned("truck_flat", lambda: site(600, 700))
+        tp = rec["access"]["truck_path"]
+        self.assertEqual((tp["designed"], tp["vehicle"], tp["swept_ok"]), (True, "WB-67", True))
+        self.assertLessEqual(tp["swept_clip_ft"], sp.truck.CLIP_TOL_FT)
+        self.assertGreaterEqual(tp["min_radius_ft"], sp.truck.R_MIN)
+        self.assertEqual(rec["access"]["truck_route_ft"], tp["length_ft"])
+        self.assertGreater(tp["throat_ft"], 100)
+        self.assertNotIn("SHORT_THROAT", names(rec))
+        self.assertNotIn("TRUCK_PATH_NONE", names(rec))
+        # the stalls the lead-in takes come off the rows, and the plan says so
+        taken = tp["car_stalls_taken"]
+        self.assertGreater(taken, 0)
+        self.assertEqual(rec["cars"]["row_capacity"], d.p.car_cap - taken)
+        flag = "TRUCK_LEAD_IN_OVER_PARKING" if rec["cars"]["row_capacity"] >= rec["cars"]["required"] else "PARKING_SHORT_FOR_LEAD_IN"
+        self.assertIn(flag, names(rec, 3 if flag.startswith("TRUCK") else 2))
+        self.assertLessEqual(rec["cars"]["provided"], rec["cars"]["row_capacity"])
+        # the path is the plan's truck route: on the site, off the building, its pond clear of its pavement
+        line = next(ln for k, ln in d.o["routes"] if k == "truck")
+        pave = next(pp for k, pp in d.o["route_polys"] if k == "truck")
+        self.assertLess(line.intersection(d.p.building).length, 0.5)
+        self.assertLess(pave.intersection(d.p.building).area, 1.0)
+        self.assertTrue(all(pond.intersection(pave).area < 1.0 for pond in d.o["ponds"]))     # truck first, then the pond
+        self.assertTrue(d.parcel.buffer(1).contains(pave))
+        # ... and inside the paving envelope, but for the driveway's own opening (review 43/02, finding 2)
+        mouth = d.o["tpt"].buffer(sp.DRIVEWAY_MOUTH_FT)
+        self.assertLess(pave.difference(d.P.buffer(0.5)).difference(mouth).area, 1.0)
+        self.assertLessEqual(dict(d.o["route_outside"])["truck"], sp.truck.CLIP_TOL_FT)      # the route's measure: its swept path's stray
+        self.assertEqual(rec["plan_checks"], [])
+        self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "drivable")
+        self.assertIs(rec["alternatives"][0]["drivable"], True)
+        assert_invariant(self, rec)
+        svg = sr.render(d, rec)
+        viewer.sanitise_svg(svg)
+        for text_ in ("Truck path", "WB-67 clear:", "Truck path: an AASHTO WB-67", "truck path as a WB-67 steers it"):
+            self.assertIn(text_, svg, text_)
+
+    def test_the_prototype_plans_as_before(self):
+        proto, dp = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("truck_path", proto["access"])
+        for key in ("truck_side", "truck_first"):
+            self.assertNotIn(key, proto["inputs"])
+        self.assertFalse({"TRUCK_PATH_NONE", "TRUCK_SWEPT_PATH", "BLIND_SIDE_BACKING", "TRUCK_REVERSE_BEND", "TRUCK_LEAD_IN_OVER_PARKING",
+                          "PARKING_SHORT_FOR_LEAD_IN"} & names(proto))
+        self.assertNotIn("drivable", proto["alternatives"][0])
+        self.assertNotIn("truck_path", dp.o)
+        psvg = sr.render(dp, proto)
+        for text_ in ("Truck path", "WB-67", "as a WB-67 steers it"):
+            self.assertNotIn(text_, psvg)
+
+    def test_trucks_enter_on_the_drivers_side_where_it_costs_nothing(self):
+        rec, d = planned("truck_flat", lambda: site(600, 700))
+        side = rec["inputs"]["truck_side"]
+        self.assertIn(side["outcome"], ("sight", "turned_to_sight"))
+        self.assertEqual(rec["access"]["truck_path"]["backing"], "sight")
+        self.assertNotIn("BLIND_SIDE_BACKING", names(rec))
+        self.assertTrue(sp.sight_entry(d.p, d.o["truck_entry"]))
+        # ... and with that step's layout refused, the plan stays as it was and says why
+        with mock.patch.object(sp, "truck_side_refused", lambda p, o0, o2: "the trucks' way in would be much longer"):
+            blind, _ = sp.plan_site(site(600, 700))
+        self.assertEqual(blind["inputs"]["truck_side"], {"outcome": "blind", "why": "the trucks' way in would be much longer"})
+        self.assertEqual(blind["access"]["truck_path"]["backing"], "blind")
+        self.assertIn("BLIND_SIDE_BACKING", names(blind, 3))
+        self.assertEqual((blind["building"]["sf"], blind["trailers"]["total"]), (rec["building"]["sf"], rec["trailers"]["total"]))
+        cond = [c for c in blind["assessment"]["conditions"] if c["flag"] == "BLIND_SIDE_BACKING"][0]
+        self.assertEqual(cond["workstream"], sp.assess.W_ACCESS)
+
+    def test_where_no_layout_has_a_way_in_the_ranking_stands(self):
+        base, _ = planned("truck_flat", lambda: site(600, 700))
+        with mock.patch.object(sp.truck, "design", lambda *a, **k: None):
+            rec, d = sp.plan_site(site(600, 700))
+        self.assertEqual((rec["building"]["sf"], rec["feasible"]), (base["building"]["sf"], base["feasible"]))
+        self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "none_found")
+        self.assertLessEqual(rec["inputs"]["truck_first"]["judged"], sp.TRUCK_TIER_MAX)
+        self.assertFalse(any("drivable" in a for a in rec["alternatives"]))
+        self.assertIn("TRUCK_PATH_NONE", names(rec, 2))                      # a condition, with its next step
+        tp = rec["access"]["truck_path"]
+        self.assertEqual((tp["designed"], tp["reason"]), (False, "no path"))
+        cond = [c for c in rec["assessment"]["conditions"] if c["flag"] == "TRUCK_PATH_NONE"][0]
+        self.assertEqual((cond["workstream"], cond["stage"]), (sp.assess.W_ACCESS, "offer"))
+        self.assertIn("NO PATH IT CAN STEER", sr.render(d, rec))
+
+    def test_a_much_smaller_layout_is_named_not_drawn(self):
+        # review 43/02, finding 9. The same 1200 x 1200 ft lot on the tests'
+        # two angles, the lead-in over the car field refused: the only
+        # layout found with a way in has half the floor area. The plan
+        # drawn stays the 335,000 SF one, with the condition and the
+        # smaller layout named.
+        mk = lambda: site(1200, 1200, z=lambda x, y: 900 + 0.015 * x + 0.02 * y)
+        real = sp.truck.design
+        with mock.patch.object(sp.truck, "design", lambda *a, **k: None if k.get("dear") is not None else real(*a, **k)):
+            rec, _ = sp.plan_site(mk())
+        tf = rec["inputs"]["truck_first"]
+        self.assertEqual(rec["building"]["sf"], 335000)
+        self.assertEqual(tf["outcome"], "much_smaller")
+        self.assertLess(tf["best_with_a_way_in_sf"], sp.TRUCK_TIER_MIN_SHARE * 335000)
+        note = [f["note"] for f in rec["flags"][2] if f["flag"] == "TRUCK_PATH_NONE"][0]
+        self.assertIn(f"the largest layout found with a way in has {tf['best_with_a_way_in_sf']:,} SF (much smaller: not drawn)", note)
+        self.assertFalse(any(a.get("drivable") is False for a in rec["alternatives"]))       # the ranking stands as it was
+
+    def test_no_frontage_no_truck_design(self):
+        rec, _ = planned("truck_nofront", lambda: site(600, 700, front_state="none"))
+        self.assertEqual(rec["inputs"]["truck_first"]["outcome"], "no_frontage")
+        self.assertEqual(rec["inputs"]["truck_first"]["judged"], 0)
+        self.assertEqual(rec["inputs"]["truck_side"]["outcome"], "no_plan")
+        self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "no truck route"})
+        self.assertFalse({"TRUCK_PATH_NONE", "BLIND_SIDE_BACKING"} & names(rec))
+
+    def test_a_design_that_fails_never_costs_the_plan(self):
+        base, _ = planned("truck_flat", lambda: site(600, 700))
+
+        def boom(*a, **k):
+            raise RuntimeError("no such turn")
+        with mock.patch.object(sp, "apply_truck_path", boom), mock.patch.object(sp.truck, "design", lambda *a, **k: None):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertEqual((rec["building"]["sf"], rec["feasible"]), (base["building"]["sf"], base["feasible"]))
+        self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "RuntimeError: no such turn"})
+        # ... nor does an error inside the design itself, wherever it is called from (review 43/02, finding 3)
+        with mock.patch.object(sp.truck, "design", boom):
+            rec, _ = sp.plan_site(site(600, 700))
+        self.assertEqual((rec["building"]["sf"], rec["feasible"], rec["trailers"]["total"]),
+                         (base["building"]["sf"], base["feasible"], base["trailers"]["total"]))
+        self.assertEqual(rec["access"]["truck_path"], {"designed": False, "reason": "RuntimeError: no such turn"})
+        self.assertNotIn("TRUCK_PATH_NONE", names(rec))                      # not laid out is not "no way in"
+
+    def test_a_second_building_has_its_own_way_in(self):
+        two = shapely.MultiLineString([[(0, 0), (1600, 0)], [(0, 1000), (1600, 1000)]])
+        with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+            rec, d = sp.plan_site(site(1600, 1000, front=two, z=lambda x, y: 930 - 0.00008 * (y - 500) ** 2))
+        self.assertEqual(rec["total_sf"], 543000)
+        tp2 = rec["second_building"]["truck_path"]
+        self.assertTrue(tp2["designed"])
+        # each way in keeps off the other building and its parking
+        p1, (p2, o2) = d.p, d.second
+        pave1 = next(pp for k, pp in d.o["route_polys"] if k == "truck")
+        pave2 = next(pp for k, pp in o2["route_polys"] if k == "truck")
+        for pave, other in ((pave1, p2), (pave2, p1)):
+            self.assertLess(pave.intersection(other.building).area, 1.0)
+            self.assertLess(pave.intersection(unary_union(other.cars)).area, 1.0)
+        self.assertLess(p2.module.intersection(pave1).area, 1.0)             # the second building stands clear of the first's truck road
+
+
+class TruckTier(Offline):
+    """The ranking's tier for a way in a truck can drive, and the
+    driveway-first layouts behind it (reviews/43), on real angles."""
+
+    angles = False
+
+    def test_a_layout_no_truck_can_enter_gives_way_to_one_it_can(self):
+        # the same sloping 1200 x 1200 ft lot, with the lead-in over the
+        # car field not allowed (the second, dearer try of each design is
+        # refused): the 335,000 SF layout has no way in, and the layout
+        # drawn is the largest fitted with its end road in line with a
+        # driveway that can be built
+        mk = lambda: site(1200, 1200, z=lambda x, y: 900 + 0.015 * x + 0.02 * y)
+        real = sp.truck.design
+        with mock.patch.object(sp.truck, "design", lambda *a, **k: None if k.get("dear") is not None else real(*a, **k)):
+            rec, d = sp.plan_site(mk())
+        full, _ = sp.plan_site(mk())
+        self.assertEqual(full["building"]["sf"], 335000)                     # with the lead-in: the full building
+        self.assertEqual(full["inputs"]["truck_first"]["outcome"], "drivable")
+        tf = rec["inputs"]["truck_first"]
+        self.assertEqual((tf["outcome"], tf["drawn"]), ("another_layout", True))
+        self.assertGreaterEqual(tf["found"], 1)
+        self.assertLessEqual(tf["tries"], sp.TRUCK_FIRST_MAX_TRIES)
+        self.assertLess(rec["building"]["sf"], 335000)
+        self.assertGreater(rec["building"]["sf"], 250000)                    # 286,000 SF: 15% less, for want of nine car stalls
+        self.assertTrue(rec["feasible"])
+        self.assertTrue(rec["access"]["truck_path"]["swept_ok"])
+        self.assertNotIn("car_stalls_taken", rec["access"]["truck_path"])
+        # the end road is in line with the driveway: the way in runs straight on from the street, with no reverse bend
+        tp = rec["access"]["truck_path"]
+        self.assertEqual(tp["reverse_bends"], 0)
+        self.assertGreater(min((b["from_start_ft"] for b in tp["bends"]), default=1e9), 150)
+        # the larger layout is in the layouts compared, marked, and the read-out says why it is not drawn
+        big = [a for a in rec["alternatives"] if a["sf"] == 335000]
+        self.assertTrue(big and all(a["drivable"] is False for a in big))
+        self.assertIs(rec["alternatives"][0]["drivable"], True)
+        self.assertIn("no tractor-trailer can drive", json.dumps(rec["selection"]))
+        words = " ".join(re.findall(r">([^<]+)</text>", sr.render(d, rec)))     # (the cell wraps)
+        self.assertIn("passes; no way in for a truck", words)
+
+
+class Land(Offline):
+    """Use the land (reviews/44): the larger layouts the search rejected
+    are finished again with a car drive over the layout's own open ground
+    and a pond shaped to the open ground; a second building with no way in
+    of its own is reached through the first."""
+
+    angles = False
+
+    def test_a_shaped_pond_holds_what_its_outline_says(self):
+        # the outline formula gives a rectangle exactly the volume the planner sizes it for
+        for v, ratio in ((1.0, 2.0), (2.9, 2.0), (4.5, 3.0), (6.0, 1.5)):
+            _, Lf, Wf, _ = sp.pond_dims(v, ratio=ratio)
+            self.assertAlmostEqual(sp.pond_capacity_acft(box(0, 0, Lf, Wf)), v, delta=0.005 * v)
+        # more footprint, more storage; a strip too narrow for a bottom holds little, never a negative or invented volume
+        _, Lf, Wf, _ = sp.pond_dims(2.0)
+        self.assertGreater(sp.pond_capacity_acft(box(0, 0, Lf + 40, Wf)), 2.0)
+        thin = sp.pond_capacity_acft(box(0, 0, 400, 60))
+        self.assertTrue(0.0 <= thin < 0.2, thin)
+        self.assertEqual(sp.pond_capacity_acft(Polygon()), 0.0)
+        self.assertEqual(sp.pond_capacity_acft(box(0, 0, 20, 20)), 0.0)
+
+    @staticmethod
+    def ground(z):
+        return sp.Dem(step=40.0, points={(i, j): (20 + 40 * i, 20 + 40 * j) for i in range(20) for j in range(20)},
+                      elev={(i, j): z(20 + 40 * i, 20 + 40 * j) for i in range(20) for j in range(20)}, state="checked")
+
+    def test_a_pond_shaped_to_the_open_ground(self):
+        # an L of open ground no 2:1 pond of this volume fits in (each leg 140 ft wide; the rectangle is 254 x 170)
+        ell = box(0, 0, 600, 140).union(box(0, 0, 140, 600))
+        dem = self.ground(lambda x, y: 900 + 0.01 * x)
+        pond = sp.free_pond(ell, 2.88, dem, None)
+        self.assertIsNotNone(pond)
+        self.assertEqual(pond.geom_type, "Polygon")
+        self.assertLess(pond.difference(ell).area, 1.0)                      # on the open ground only
+        cap = sp.pond_capacity_acft(pond)
+        self.assertTrue(2.88 * 0.999 <= cap <= 2.88 * 1.03, cap)             # just the volume asked for
+        self.assertLess(pond.area, ell.area)
+        # more than the ground holds, or no ground: none
+        self.assertIsNone(sp.free_pond(ell, 20.0, dem, None))
+        self.assertIsNone(sp.free_pond(Polygon(), 1.0, dem, None))
+        # a neck narrower than 60 ft is not pond: two 200 ft squares joined by a 40 ft strip are two pieces
+        two = box(0, 0, 200, 200).union(box(200, 80, 400, 120)).union(box(400, 0, 600, 200))
+        one = sp.free_pond(two, 1.0, dem, None)
+        self.assertTrue(one.bounds[2] <= 201 or one.bounds[0] >= 399, one.bounds)
+        self.assertIsNone(sp.free_pond(two, 3.0, dem, None))                 # either square alone holds about 2.6
+
+    def test_a_shaped_pond_keeps_to_the_low_ground_and_the_low_end(self):
+        strip = box(0, 0, 760, 160)
+        east_low = self.ground(lambda x, y: 920 - 0.02 * x)
+        west_low = self.ground(lambda x, y: 900 + 0.02 * x)
+        e, w = sp.free_pond(strip, 1.5, east_low, None), sp.free_pond(strip, 1.5, west_low, None)
+        self.assertGreater(e.centroid.x, 380)                                # cut from the lower end of the piece
+        self.assertLess(w.centroid.x, 380)
+        # with a ceiling, only ground the lidar shows at or below it (so the pad drains to it)
+        capped = sp.free_pond(strip, 1.5, west_low, 906.0)                   # ground at or below 906: x up to 300
+        self.assertLessEqual(capped.bounds[2], 321)
+        self.assertIsNone(sp.free_pond(strip, 1.5, west_low, 899.0))         # no ground that low
+        self.assertIsNone(sp.free_pond(strip, 1.5, sp.Dem(), 906.0))         # no lidar: no ground known to be low
+
+    def test_a_larger_layout_with_a_pond_shaped_to_the_site(self):
+        # a 650 x 750 ft Fairburn lot: 114,000 SF was the largest layout a
+        # rectangular pond fitted beside; 135,000 SF passes with its pond
+        # shaped to the corner left behind the court
+        mk = lambda: site(650, 750, jur="Fairburn", z=lambda x, y: 900 + 0.02 * x)
+        rec, d = sp.plan_site(mk())
+        with mock.patch.object(sp, "LAND_MAX_TRIES", 0):
+            before, _ = sp.plan_site(mk())
+        self.assertEqual((before["building"]["sf"], before["inputs"]["land_pass"]), (114000, {"tried": 0, "found": 0, "drawn": False}))
+        lp = rec["inputs"]["land_pass"]
+        self.assertEqual((rec["building"]["sf"], lp["drawn"]), (135000, True))
+        self.assertTrue(1 <= lp["found"] <= sp.LAND_KEEP and lp["tried"] <= sp.LAND_MAX_TRIES)
+        self.assertTrue(rec["feasible"])
+        self.assertGreaterEqual(rec["trailers"]["total"], before["trailers"]["total"])
+        self.assertIn("POND_SHAPED_TO_SITE", names(rec, 3))
+        self.assertIn("shaped to the open ground", rec["detention"]["basis"])
+        self.assertIs(rec["detention"]["drains_by_gravity"], True)
+        self.assertEqual(rec["plan_checks"], [])
+        assert_invariant(self, rec)
+        # the pond: one piece, on the site, off the layout and its roads, holding the storage the record states
+        (pond,) = d.o["ponds"]
+        self.assertTrue(d.parcel.buffer(1).contains(pond))
+        self.assertLess(pond.intersection(d.p.module).area, 1.0)
+        self.assertLess(pond.intersection(unary_union([pp for _, pp in d.o["route_polys"]])).area, 1.0)
+        self.assertGreaterEqual(sp.pond_capacity_acft(pond), rec["detention"]["storage_acft"] - 0.06)
+        self.assertNotEqual(len(pond.exterior.coords), 5)                    # not a rectangle
+        # nothing it turned to the street or to homes, and no new blocking flag
+        for flag in ("STREET_FACING_DOCKS", "LOADING_FACES_RES"):
+            self.assertFalse(flag in names(rec) and flag not in names(before), flag)
+        self.assertEqual(names(rec, 1), set())
+        svg = sr.render(d, rec)
+        viewer.sanitise_svg(svg)
+        self.assertIn("DETENTION POND", svg)                                 # a shaped pond is labelled like any other
+        # the prototype behaviour: no pass, the plan as before
+        proto, _ = sp.plan_site(mk(), sp.PlanOptions(behaviour="prototype"))
+        self.assertNotIn("land_pass", proto["inputs"])
+        self.assertNotIn("POND_SHAPED_TO_SITE", names(proto))
+
+    def test_the_pass_only_adds(self):
+        # sites the pass changes and sites it does not: never less floor area, never less feasible
+        for mk in (lambda: site(600, 700), lambda: site(700, 800, z=lambda x, y: 900 + 0.025 * y),
+                   lambda: site(700, 900, neighbours=[({"LUCode": "101"}, wgs(box(0, 900, 700, 1100)))])):
+            with mock.patch.object(sitefit, "_angles", lambda rings: [0.0, 90.0]):
+                rec, _ = sp.plan_site(mk())
+                with mock.patch.object(sp, "LAND_MAX_TRIES", 0):
+                    off, _ = sp.plan_site(mk())
+            self.assertGreaterEqual(rec["building"]["sf"], off["building"]["sf"])
+            self.assertGreaterEqual(rec["feasible"], off["feasible"])
+            self.assertLessEqual(names(rec, 1), names(off, 1))
+            for flag in ("STREET_FACING_DOCKS", "LOADING_FACES_RES"):
+                self.assertFalse(flag in names(rec) and flag not in names(off), flag)
+            if not rec["inputs"]["land_pass"]["drawn"]:
+                self.assertEqual(rec["building"]["sf"], off["building"]["sf"])
+
+    def test_a_second_building_behind_the_first(self):
+        # 33 acres, 1,200 ft square. Building 1 (335,000 SF) stands across
+        # the lot, and 13 acres behind it had no way in. The second
+        # building is reached through building 1's truck road and the end
+        # of its court.
+        mk = lambda: site(1200, 1200, z=lambda x, y: 900 + 0.015 * x + 0.02 * y)
+        rec, d = sp.plan_site(mk())
+        with mock.patch.object(sp, "SECOND_THROUGH_FIRST", False):
+            alone, _ = sp.plan_site(mk())
+        self.assertEqual((alone["total_sf"], "second_building" in alone), (335000, False))
+        self.assertEqual(rec["building"]["sf"], 335000)                      # building 1 as it was
+        self.assertEqual(rec["total_sf"], 450000)
+        sb = rec["second_building"]
+        self.assertEqual((sb["sf"], sb["own_driveways"]), (115000, False))
+        self.assertTrue({"SECOND_ACCESS_THROUGH_FIRST", "SECOND_ACCESS_SHARED"} <= names(rec, 2))       # conditions, said plainly
+        self.assertTrue(rec["feasible"])
+        self.assertEqual(rec["plan_checks"], [])
+        assert_invariant(self, rec)
+        p1, (p2, o2) = d.p, d.second
+        self.assertLess(p2.module.intersection(p1.module).area, 1.0)
+        self.assertLess(p2.module.intersection(unary_union(d.o["ponds"] + d.o["drops"])).area, 1.0)
+        for pond in o2["ponds"]:
+            self.assertLess(pond.intersection(unary_union([p1.module, p2.module] + d.o["ponds"] + d.o["drops"])).area, 1.0)
+        # its routes: from building 1's driveway, over building 1's truck pavement, never over its building or stalls
+        self.assertEqual((o2["tpt"].x, o2["tpt"].y), (d.o["tpt"].x, d.o["tpt"].y))
+        self.assertIsNone(o2["cpt"])
+        solid = unary_union([p1.building] + p1.rows + d.o["ponds"] + d.o["drops"])
+        for kind, ln in o2["routes"]:
+            self.assertLess(ln.intersection(solid).length, 1.0, kind)
+        # its truck path goes on from where building 1's comes onto its lane, and a WB-67 can drive it
+        tp2 = sb["truck_path"]
+        self.assertEqual((tp2["designed"], tp2["swept_ok"], tp2["from"]), (True, True, "building 1's truck court"))
+        line1 = next(ln for k, ln in d.o["routes"] if k == "truck")
+        line2 = next(ln for k, ln in o2["routes"] if k == "truck")
+        self.assertAlmostEqual(Point(line2.coords[0]).distance(Point(line1.coords[-1])), 0.0, places=6)
+        self.assertGreater(tp2["throat_ft"], rec["access"]["truck_path"]["length_ft"])       # measured from the street
+        svg = sr.render(d, rec)
+        viewer.sanitise_svg(svg)
+        self.assertIn("BUILDING 2", svg)
+
+    def test_cars_may_cross_the_layouts_own_open_ground(self):
+        # a cross-dock's car field stands at the building's end, behind the
+        # depth of its front court; the ground in front of it is the
+        # layout's own and open. The search found no car route there
+        # (CAR_ROUTE_NONE); with the pass's rule the same layout has one.
+        seen = []
+        real = sp.finish
+
+        def spy(p, ctx, others=None):
+            o = real(p, ctx, others)
+            if others is None and p.v["type"] != "rear" and "CAR_ROUTE_NONE" in {f for f, sv, _ in o["flags"] if sv == 1} and not seen:
+                seen.append((p, ctx))
+            return o
+        with mock.patch.object(sp, "finish", spy):
+            sp.plan_site(site(1200, 1200, z=lambda x, y: 900 + 0.015 * x + 0.02 * y))
+        self.assertTrue(seen)
+        p, ctx = seen[0]
+        o = real(p, sp.dataclass_replace(ctx, land=True, pond_room=True))
+        self.assertNotIn("CAR_ROUTE_NONE", {f for f, sv, _ in o["flags"]})
+        car = next(ln for k, ln in o["routes"] if k == "car")
+        own_open = p.module.difference(unary_union([p.building] + p.courts + p.roads + p.rows + p.cars))
+        self.assertGreater(car.intersection(own_open).length, 50)            # across the open ground in front of the car field
+        self.assertLess(car.intersection(unary_union([p.building] + p.courts + p.roads + p.rows)).length, 1.0)       # never the truck pavement
+
+
+class PondRoomOnlyAdds(Offline):
+    """The pass runs after the search and its rescue and only adds layouts
+    (reviews/40): with it, a site never ranks worse than without it, and a
+    plan it adds never turns the docks to the street where the plan
+    without it did not. Sites from the review that found the first version
+    losing floor area: an assemblage (179,000 -> 157,000 SF) and a 520 x
+    640 ft site (76,000 -> 68,000 SF)."""
+
+    SITES = {"assem": lambda: site(shapes=[box(0, 0, 400, 700), box(400, 0, 900, 700)], front=LineString([(0, 0), (900, 0)]),
+                                   assembled=True),
+             "520x640": lambda: site(520, 640),
+             "600x700": lambda: site(600, 700),
+             "fairburn": lambda: site(650, 750, jur="Fairburn", z=lambda x, y: 900 + 0.02 * x),
+             "low560": lambda: site(560, 600, z=lambda x, y: 900 - 0.03 * y)}
+
+    def test_never_worse_and_no_new_street_docks(self):
+        for name, mk in self.SITES.items():
+            with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+                off, _ = planned(f"{name}-off", mk)
+            on, _ = planned(f"{name}-on", mk)
+            self.assertEqual(off["feasible"], on["feasible"], name)
+            if on["building"]["sf"] < off["building"]["sf"]:
+                # only for a plan that ranks higher: the code truck spaces
+                # first, or a pond that drains where the other's does not
+                self.assertTrue(on["trailers"]["total"] > off["trailers"]["total"]
+                                or (on["detention"]["drains_by_gravity"] and not off["detention"]["drains_by_gravity"]), name)
+            if "STREET_FACING_DOCKS" not in names(off):
+                self.assertNotIn("STREET_FACING_DOCKS", names(on), name)
+            if not on["inputs"]["pond_room"]["drawn"]:
+                self.assertEqual(on["building"], off["building"], name)
 
 # ---------------------------------------------------------------------------
 # Static guards
 # ---------------------------------------------------------------------------
-NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py", "siteplan_assess.py")
+NEW = ("siteplan.py", "siteplan_inputs.py", "siteplan_render.py", "siteplan_assess.py", "siteplan_truck.py")
 
 
 class Static(unittest.TestCase):
@@ -1465,7 +2489,7 @@ class Static(unittest.TestCase):
         return out
 
     def test_pure_modules_do_not_import_the_network(self):
-        for name in ("siteplan.py", "siteplan_render.py", "siteplan_assess.py"):
+        for name in ("siteplan.py", "siteplan_render.py", "siteplan_assess.py", "siteplan_truck.py"):
             imps = self.module_level_imports(name)
             for bad in ("requests", ".:arcgis", ".:layers", ".:frontage", ".:checks", ".:siteplan_inputs", ".frontage:check_parcel"):
                 self.assertNotIn(bad, imps, name)
@@ -1632,8 +2656,10 @@ class DetentionAndSoils(Offline):
         if rec["detention"]["fits"]:
             n = len(d.o["ponds"])
             self.assertEqual(n, sp.pond_count(v))
-            _, Lf, Wf, _ = sp.pond_dims(v / n)
-            for pond in d.o["ponds"]:
+            # each pond in the shape it was placed in (2:1, or another where
+            # the room-for-the-pond pass placed it; reviews/40)
+            for pond, k in zip(d.o["ponds"], d.o.get("pond_ratios") or [2.0] * n):
+                _, Lf, Wf, _ = sp.pond_dims(v / n, ratio=k)
                 self.assertAlmostEqual(pond.area, Lf * Wf, delta=0.01 * Lf * Wf)
 
     def test_assemblage_rules_are_compared(self):

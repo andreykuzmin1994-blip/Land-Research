@@ -121,7 +121,7 @@ import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as dataclass_replace
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -135,6 +135,7 @@ from shapely.prepared import prep
 
 from . import sitefit
 from . import siteplan_assess as assess
+from . import siteplan_truck as truck
 from .geo import FT_PER_M, LocalProjection
 from .viewer import OwnerGuard, csv_cell, markup_text
 
@@ -327,17 +328,95 @@ BLOCKING_RULE = "no severity-1 flag outside GATE_FLAGS"
 RESCUE_FLAGS = frozenset({"POND_DOES_NOT_FIT", "ROUTE_INFEASIBLE", "CAR_ROUTE_NONE", "ROUTE_OUTSIDE_ENVELOPE",
                           "PLAN_GEOMETRY_CONFLICT"})
 RESCUE_MAX_FITS = 12
-# Default behaviour: a layout blocked only by its pond is moved to leave the
-# pond room before it is shortened (relocate_for_pond, reviews/40). Each
-# move reserves one of the RELOCATE_SPOTS lowest pond spots and is checked
-# in full; RELOCATE_MAX_CHECKS full checks per site at most (a count, so the
-# same site always gives the same plan).
+# Default behaviour: after the search (and its rescue), a pass that only
+# adds layouts (reviews/40). Each layout the pond alone blocked is tried
+# again with other pond shapes, then moved to leave its pond room
+# (relocate_for_pond: one of the RELOCATE_SPOTS lowest pond spots reserved
+# at a time). The plan drawn is the best of everything by the usual
+# ranking, so no site reads worse than without the pass.
 RELOCATE_SPOTS = 6
 RELOCATE_ROUNDS = 3        # re-sizing the reserved pond for the building that fits around it
-# Default behaviour: when no 2:1 pond fits, the same volume is tried at 20 ft
-# offsets from the lidar samples, 2:1 first, then these bottom proportions.
-POND_FALLBACK_RATIOS = (2.0, 1.5, 1.0, 3.0, 4.0)
-RELOCATE_MAX_CHECKS = 48
+# The room-for-the-pond pass: when no 2:1 pond fits, the same volume as
+# (bottom length / width, finer positions): the other proportions at the
+# lidar samples first, then each at 20 ft offsets from them. Not below
+# 1.5:1 (a short flow path; a design manual's minimum length-to-width is
+# for the civil engineer, not checked here).
+POND_FALLBACK_SHAPES = ((1.5, False), (3.0, False), (4.0, False), (2.0, True), (1.5, True), (3.0, True), (4.0, True))
+POND_FALLBACK_RATIOS = tuple(sorted({k for k, _ in POND_FALLBACK_SHAPES}))
+# Drainage (reviews/41): a pond on ground more than this above the pad is
+# uphill of the paving it drains (POND_UPHILL). Up to this much is taken
+# as a pond dug deeper (its footprint then 15 to 30% larger than drawn:
+# POND_ABOVE_PAD says so from 1 ft).
+POND_UPHILL_TOL_FT = 3.0
+# Grading (reviews/42). A dock building is graded as a stepped pad: the
+# floor at one level, the truck court DOCK_DROP_FT below it (a 48 in dock).
+# Ground that rises DOCKS_UPHILL_FT or more from the building to its court
+# puts the court on the high side (DOCKS_UPHILL). The pass turns the docks
+# to the low side of the same footprint when that saves at least
+# DOCK_TURN_MIN_SAVING of the earthwork and DOCK_TURN_MIN_CY.
+DOCK_DROP_FT = 4.0
+DOCKS_UPHILL_FT = 3.0
+DOCK_TURN_MIN_SAVING = 0.10
+DOCK_TURN_MIN_CY = 2000.0
+# The turn is tried at most twice (the office at either end), on its own
+# count (not the pond pass's allowance). It never puts the loading on the
+# street side of the building where it was not, and never lengthens the
+# cars' way in beyond DOCK_TURN_CAR_ROUTE x and + DOCK_TURN_CAR_ROUTE_FT.
+DOCK_TURN_TRIES = 2
+DOCK_TURN_CAR_ROUTE = 1.5
+DOCK_TURN_CAR_ROUTE_FT = 200.0
+STREET_SIDE_TOL_FT = 40.0
+# Use the land (reviews/44; default behaviour). A pass after the search
+# looks again at the layouts it rejected that are larger than the best
+# plan, at most LAND_MAX_TRIES of them, largest first, finished with what
+# an engineer would add: a car drive across the layout's own open ground,
+# a pond shaped to the open ground where no rectangle fits (pieces
+# narrower than 2 x POND_FREE_OPEN_FT are left out), and the truck road
+# laid out first. LAND_KEEP of those that pass go on.
+LAND_MAX_TRIES = 10
+LAND_KEEP = 3
+POND_FREE_OPEN_FT = 30.0
+# A second building with no way in of its own (building 1 stands across
+# the lot) is reached through building 1's truck road and the end of its
+# court, from building 1's truck driveway (SECOND_ACCESS_THROUGH_FIRST).
+SECOND_THROUGH_FIRST = True
+# Design for the truck (reviews/43; default behaviour). The truck route of
+# the plan drawn is laid out again as a path a WB-67 can steer
+# (siteplan_truck) and its swept path checked. In the court the centreline
+# keeps DOCK_ZONE_FT off the dock wall (trailers stand at the doors) and
+# runs TRUCK_LANE_FT beyond the court's middle; the driveway's opening is
+# DRIVEWAY_MOUTH_FT round its point on the street. The best plan's trucks
+# are sent to the end of the court from which they back in on the driver's
+# side (sight side) when that costs nothing else: the trucks' way in no
+# longer than SIGHT_ROUTE x and + SIGHT_ROUTE_FT.
+DOCK_ZONE_FT = 60.0
+TRUCK_LANE_FT = 30.0
+COURT_RUN_IN_FT = 100.0
+DRIVEWAY_MOUTH_FT = 60.0
+THROAT_MIN_FT = 100.0
+DRIVEWAY_END_FT = 110.0             # a truck driveway's centre from a frontage run's end (pick_driveways)
+TRUCK_TIER_MAX = 8                  # layouts whose way in is laid out to settle the ranking
+TRUCK_FIRST_MAX_TRIES = 48          # fits and full checks of the driveway-first step
+SIGHT_ROUTE = 1.5
+SIGHT_ROUTE_FT = 200.0
+SIGHT_MAX_BEND_DEG = 135.0          # ... and no loop: no one bend of more than this
+# An S-bend at the entrance: two bends to opposite hands, each of this
+# many degrees or more at the minimum radius, the first within a truck's
+# length of the street. A truck can make it at walking speed; it is not
+# an entrance an engineer would leave (TRUCK_ENTRANCE_S_BEND, severity 2).
+ENTRANCE_S_DEG = 60.0
+# The drivable tier changes the plan drawn only for a layout with at least
+# this share of the floor area it would give up (a smaller one is named).
+TRUCK_TIER_MIN_SHARE = 0.8
+# The stepped pad is not figured where the lidar samples cover less than
+# this share of the module (a partial figure would read as a small one).
+STEPPED_MIN_COVER = 0.8
+POND_ROOM_KEEP = 3                # plans the pass adds to the results (the best by the ranking)
+DRAIN_FIRST_SPOTS = 2             # pond-first layouts: the lowest pond spots reserved, every cross-section fitted round each
+POND_ROOM_MAX_TRIES = 90          # fits and full checks per site, all layouts together (a count: the same site, the same plan)
+POND_ROOM_MAX_LAYOUTS = 6         # pond-blocked layouts the pass starts from, largest first
+POND_ROOM_TIME_SHARE = 0.5        # of the time left after the search: the rest stays for the second building
+POND_ROOM_MIN_LEFT = 0.5          # the pass runs only with this share of the site's budget still left (a slow site plans as before)
 # Severity-1 flags no other layout of the same site can clear. The default
 # rule makes them block feasibility (decide()), but they stay out of the
 # layout's own check (o["ok"], geometry_ok), the ranking, the rescue pass and
@@ -1152,19 +1231,46 @@ def fit_variant(v, P, B, prog: Program, row_line, res_line, search: Search, leng
     return None
 
 
-class Relocation:
-    """The default search's allowance for moving a building to make room
-    for its pond (operator request of 2026-11-17, reviews/40): a count of
-    layout checks, not seconds, so the same site gives the same plan."""
+class PondRoom:
+    """The room-for-the-pond pass's allowance (reviews/40): a count of
+    tries (each fit around a reserved pond spot and each full check), so
+    the same site gives the same plan, and its own deadline, so the pass
+    never costs building 1 or the second-building search their time."""
 
-    def __init__(self, max_checks: int | None = None):
-        self.max_checks = RELOCATE_MAX_CHECKS if max_checks is None else max_checks
-        self.checks = 0
-        self.moved = 0
+    def __init__(self, search: "Search", max_tries: int | None = None, share: float | None = None):
+        self.max_tries = POND_ROOM_MAX_TRIES if max_tries is None else max_tries
+        self.tries = 0
+        self.layouts = 0
+        self.found = 0
+        self.cut_short = False
+        left = search.deadline - search.clock()
+        own = Search(0.0, search.clock)
+        own.deadline = search.clock() + max(0.0, left - (1.0 - (POND_ROOM_TIME_SHARE if share is None else share)) * left)
+        own.memo = search.memo            # the same fits, memoised once
+        self.search = own
 
     @property
     def spent(self) -> bool:
-        return self.checks >= self.max_checks
+        return self.tries >= self.max_tries
+
+    def take(self) -> bool:
+        """Count one try; False once the allowance is spent."""
+        if self.spent:
+            return False
+        self.tries += 1
+        return True
+
+
+def loading_faces_homes(p: "Plan", res_line) -> bool:
+    """A truck court or trailer row within 150 ft of a residential edge
+    (the planner's LOADING_FACES_RES test)."""
+    return res_line is not None and any(c.distance(res_line) < 150 for c in p.courts + p.rows)
+
+
+def faces_street(p: "Plan", row_line) -> bool:
+    """A truck court or trailer row within 100 ft of the street frontage
+    (the planner's STREET_FACING_DOCKS test)."""
+    return row_line is not None and any(c.distance(row_line) < 100 for c in p.courts + p.rows)
 
 
 def pond_rect(x: float, y: float, angle: float, v_acft: float) -> Polygon:
@@ -1203,51 +1309,93 @@ def pond_spots(ctx: "Ctx", P: BaseGeometry, near_angle: float, v_acft: float) ->
     return out
 
 
-def relocate_for_pond(cur: Plan, o: dict[str, Any], P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
-                      search: "Search", budget: Relocation) -> tuple[Plan, dict[str, Any]] | None:
-    """The same layout, moved to leave room for its pond.
+def drainage_first(fits0: list, v_each: float, near_angle: float, target_sf: float, P: BaseGeometry, B: BaseGeometry,
+                   ctx: "Ctx", row_line, res_line, room: PondRoom, keep: Callable[["Plan"], bool], out: list) -> None:
+    """Pond first, building second (reviews/41): the order a civil engineer
+    works in. The lowest open spots a pond could use (pond_spots, at most
+    DRAIN_FIRST_SPOTS) are reserved in turn, and every cross-section is
+    fitted round the reserved pond, the ones that fit largest on the open
+    parcel first (`fits0`, the search's own fits: an upper bound on what
+    fits round a pond). Each fit larger than `target_sf` (and than what
+    this pass has found) that `keep` takes is checked in full, its pond
+    sited only where the pad drains to it; when the pond then needs more
+    room than was reserved, the spot is reserved again at that size and
+    the fit tried once more. Plans that pass with a pond that drains are
+    appended to `out` as they are found."""
+    order = sorted(fits0, key=lambda q: -q.sf)
+    best_sf = target_sf
+    for x, y, a in pond_spots(ctx, P, near_angle, v_each)[:DRAIN_FIRST_SPOTS]:
+        for q0 in order:
+            if q0.sf <= best_sf:
+                break                           # no later cross-section can beat what is in hand
+            v_try = v_each
+            for _round in range(2):
+                if not room.take():
+                    return
+                hold = pond_rect(x, y, a, v_try).buffer(25)
+                P2, B2 = clean(P.difference(hold)), clean(B.difference(hold))
+                q = fit_variant(q0.v, P2, B2, ctx.prog, row_line, res_line, room.search)
+                if q is None or q.sf <= best_sf or not keep(q):
+                    break
+                if not room.take():
+                    return
+                o2 = finish(q, ctx)
+                if o2["ok"] and o2.get("drains", True):
+                    out.append((q, o2))
+                    room.found += 1
+                    best_sf = q.sf
+                    break
+                v_next = o2["v_det"] / max(pond_count(o2["v_det"]), 1)
+                if o2["pond_ok"] or v_next <= v_try + 0.01:
+                    break                       # not the reserved room that failed it
+                v_try = v_next
+
+
+def relocate_for_pond(cur: "Plan", o: dict[str, Any], P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
+                      room: PondRoom, keep: Callable[["Plan"], bool], out: list) -> None:
+    """The same layout, moved to leave room for its pond; every plan found
+    is appended to `out` as it is found (a cut keeps what was found).
 
     The search fits each layout as long as it goes wherever it fits
     longest, and checks the pond only after; when the pond then has no
-    room it used to shorten the building where it stood, while the same
-    building elsewhere on the parcel left room for it (reference site #21:
-    68,000 SF drawn, 84,000 SF with the pond moved; reviews/40). Here each
-    low spot a pond could use (pond_spots) is reserved in turn, the
-    variant is fitted around it no longer than now (the planner's own fit,
-    fit_variant), and each distinct fit is checked in full (finish). The
-    pond reserved is first sized for the building that failed; a shorter
-    building needs a smaller one, so the spot is reserved again at the
-    size the last fit needs and fitted again, up to RELOCATE_ROUNDS times
-    while that frees room. The largest plan that passes is returned (the
-    first of equals); None when none does or the allowance is spent."""
+    room it shortens the building where it stands, while the same
+    building elsewhere on the parcel may leave room for it (reference site
+    #21: 68,000 SF drawn, 84,000 SF with the pond moved; reviews/40). Here
+    each low spot a pond could use (pond_spots) is reserved in turn, the
+    variant is fitted around it no longer than `cur` (the planner's own
+    fit), and each distinct fit is checked in full (finish). The pond
+    reserved is first sized for `cur`; a shorter building needs a smaller
+    one, so the spot is reserved again at the size the last fit needs and
+    fitted again, up to RELOCATE_ROUNDS times while that frees room. A fit
+    `keep` refuses (one that turns its docks to the street) is not
+    checked."""
     count = max(pond_count(o["v_det"]), 1)
     v_each = o["v_det"] / count
-    best, seen = None, set()
+    seen = set()
     for x, y, a in pond_spots(ctx, P, cur.frame.pl.angle_deg, v_each):
         v_try = v_each
         for _round in range(RELOCATE_ROUNDS):
-            if budget.spent:
-                break
+            if not room.take():
+                return
             hold = pond_rect(x, y, a, v_try).buffer(25)
             P2, B2 = clean(P.difference(hold)), clean(B.difference(hold))
-            q = fit_variant(cur.v, P2, B2, ctx.prog, row_line, res_line, search, length_cap=int(cur.L))
+            q = fit_variant(cur.v, P2, B2, ctx.prog, row_line, res_line, room.search, length_cap=int(cur.L))
             if q is None:
                 break
             key = (q.L, q.r, tuple(round(c, 1) for c in q.module.bounds))
-            if key in seen:
+            if key in seen or not keep(q):
                 break
             seen.add(key)
-            budget.checks += 1
+            if not room.take():
+                return
             o2 = finish(q, ctx)
-            if o2["ok"] and (best is None or q.sf > best[0].sf):
-                best = (q, o2)
+            if o2["ok"]:
+                out.append((q, o2))
+                room.found += 1
             v_next = o2["v_det"] / count
             if v_next >= v_try - 0.01:
                 break
             v_try = v_next
-    if best is not None:
-        budget.moved += 1
-    return best
 
 
 # ---------------------------------------------------------------------------
@@ -1461,14 +1609,77 @@ def checked_route(start, goal, walk, ctx: "Ctx"):
     return rt
 
 
-def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max_pts=700, fine=False):
+def pond_capacity_acft(footprint: BaseGeometry) -> float:
+    """What a pond of any outline holds, ac-ft: the footprint with its rim
+    (RIM), a foot of freeboard, POND_DEPTH of water and POND_Z:1 banks, by
+    the prismoidal formula on the outline set in for the water's top,
+    middle and bottom. Where the outline is too narrow for a bottom the
+    formula gives less than the true figure, never more."""
+    if footprint is None or footprint.is_empty:
+        return 0.0
+    area = lambda h: footprint.buffer(-(RIM + POND_Z * (FREEBOARD + h))).area
+    return POND_DEPTH * (area(POND_DEPTH) + area(0.0) + 4 * area(POND_DEPTH / 2)) / 6 / SQFT_PER_AC
+
+
+def free_pond(region: BaseGeometry, v_acft: float, dem: Dem, max_z: float | None) -> Polygon | None:
+    """A pond shaped to the open ground (reviews/44), for a layout no
+    rectangular pond fits: the largest piece of `region` that holds
+    v_acft (necks and strips narrower than 2 x POND_FREE_OPEN_FT left
+    out), cut across its length to just that volume, from its lower end.
+    With `max_z`, only ground the lidar shows at or below it (so the pad
+    drains to it); None with no such ground, or no piece large enough."""
+    if region is None or region.is_empty:
+        return None
+    pts = [((x, y), z) for (x, y), z in dem.coords()]
+    if max_z is not None:
+        h = dem.step / 2 + 0.5
+        low = [box(x - h, y - h, x + h, y + h) for (x, y), z in pts if z <= max_z]
+        if not low:
+            return None
+        region = region.intersection(unary_union(low))
+    room = region.buffer(-POND_FREE_OPEN_FT).buffer(POND_FREE_OPEN_FT).intersection(region)
+    for g in sorted([q for q in parts(room) if q.geom_type == "Polygon"], key=lambda q: -q.area)[:4]:
+        if pond_capacity_acft(g) < v_acft:
+            break                           # no smaller piece holds it either
+        c = list(g.minimum_rotated_rectangle.exterior.coords)[:4]
+        e1, e2 = (c[1][0] - c[0][0], c[1][1] - c[0][1]), (c[2][0] - c[1][0], c[2][1] - c[1][1])
+        ax = e1 if math.hypot(*e1) >= math.hypot(*e2) else e2
+        m = math.hypot(*ax) or 1.0
+        ax = (ax[0] / m, ax[1] / m)
+        along = [x * ax[0] + y * ax[1] for x, y in g.exterior.coords]
+        a0, a1 = min(along), max(along)
+        # the lower end first: the mean ground of each third of the piece along its length
+        zs = [[z for (x, y), z in pts if g.contains(Point(x, y)) and lo <= x * ax[0] + y * ax[1] <= hi]
+              for lo, hi in ((a0, a0 + (a1 - a0) / 3), (a1 - (a1 - a0) / 3, a1))]
+        from_low = not (zs[0] and zs[1] and sum(zs[1]) / len(zs[1]) < sum(zs[0]) / len(zs[0]))
+        big = 1e5
+
+        def cut(t: float) -> BaseGeometry:
+            """The piece up to t ft along its length from its chosen end."""
+            lo, hi = (a0 - 1.0, a0 + t) if from_low else (a1 - t, a1 + 1.0)
+            band = Polygon([(lo * ax[0] - big * -ax[1], lo * ax[1] - big * ax[0]), (hi * ax[0] - big * -ax[1], hi * ax[1] - big * ax[0]),
+                            (hi * ax[0] + big * -ax[1], hi * ax[1] + big * ax[0]), (lo * ax[0] + big * -ax[1], lo * ax[1] + big * ax[0])])
+            part = g.intersection(band)
+            return max(parts(part), key=lambda q: q.area) if not part.is_empty else Polygon()
+        lo_t, hi_t = 0.0, a1 - a0
+        for _ in range(24):
+            mid = (lo_t + hi_t) / 2
+            lo_t, hi_t = (mid, hi_t) if pond_capacity_acft(cut(mid)) < v_acft else (lo_t, mid)
+        out = cut(hi_t)
+        if out.geom_type == "Polygon" and pond_capacity_acft(out) >= v_acft * 0.999:
+            return out
+    return None
+
+
+def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max_pts=700, fine=False, max_z=None):
     """Best pond rectangle (Lf x Wf) in region: low, close to `near`, on the
     same side of `barrier` (mapped wetlands). Distinct from
     detention.place_pond, which places the screener's fixed pond.
     `fine` also tries each centre moved half a sample step (20 ft) each
     way, at that sample's elevation: a tight piece of ground often holds
-    the pond only between two samples. The positions tried stay at
-    max_pts, the lowest samples' first."""
+    the pond only between two samples (the lowest max_pts samples, nine
+    positions each). `max_z`: no pond centred on ground above it (the
+    drainage-first pass: a pond the paving can drain to)."""
     if region.is_empty:
         return None
     base = box(-Lf / 2, -Wf / 2, Lf / 2, Wf / 2)
@@ -1477,14 +1688,18 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
     inside = prep(region)
     turned = [shapely.affinity.rotate(base, a, origin=(0, 0)) for a in angles]
     pts = [(z, p) for p, z in dem.coords() if inside.contains(Point(p))]
+    if not pts and max_z is not None:
+        return None                 # no measured ground here: nothing to hold against the ceiling
     if not pts:
         minx, miny, maxx, maxy = region.bounds
         pts = [(0.0, (x, y)) for x in range(int(minx), int(maxx), 40) for y in range(int(miny), int(maxy), 40) if inside.contains(Point(x, y))]
     pts.sort(key=lambda t: t[0])
+    if max_z is not None:
+        pts = [t for t in pts if t[0] <= max_z]
     pts = pts[:max_pts]
     if fine:
         h = dem.step / 2
-        pts = [(z, (x + dx, y + dy)) for z, (x, y) in pts for dx in (0.0, -h, h) for dy in (0.0, -h, h)][:max_pts]
+        pts = [(z, (x + dx, y + dy)) for z, (x, y) in pts for dx in (0.0, -h, h) for dy in (0.0, -h, h)]
     best = None
     for z, (x, y) in pts:
         for rb in turned:
@@ -1501,6 +1716,525 @@ def place_sized_pond(region, Lf, Wf, dem: Dem, angles, near, pad_z, barrier, max
                 best = (score, r)
             break
     return best[1] if best else None
+
+
+def stepped_grading(p: "Plan", dem: Dem, drop: float = DOCK_DROP_FT) -> dict[str, Any] | None:
+    """A stepped pad for one layout, from the lidar samples on its module:
+    the building, car field and end roads at the floor level, the truck
+    courts and trailer rows `drop` ft below it, the floor set where cut
+    equals fill. Returns the floor and court elevations, the cut and fill
+    (cubic yards; `moved_cy` is their mean, the earth that changes
+    place), and how far the ground falls from the building to the courts
+    (positive: the courts are on the low side, where the ground gives the
+    dock its drop; negative: they are cut into the high side; `falls` has
+    one figure per court, for a building with courts on two sides). None
+    with fewer than four samples on the module, none on the building or
+    on a court, or samples on less than STEPPED_MIN_COVER of the module.
+    A screening figure: each sample stands for an equal share of the
+    module's area (as the one-plane earthwork does); ground of the module
+    beside a trailer row is graded at the floor; no slopes on the paving,
+    no walls, no swell or shrink; nothing outside the module (the pond's
+    excavation, drop yards, driveways)."""
+    mod, low, bld = prep(p.module), prep(unary_union(p.courts + p.rows)), prep(p.building)
+    courts = [prep(c) for c in p.courts]
+    zs, lows, zb, zc = [], [], [], []
+    per_court: list[list[float]] = [[] for _ in courts]
+    for (x, y), z in dem.coords():
+        pt = Point(x, y)
+        if not mod.contains(pt):
+            continue
+        is_low = low.contains(pt)
+        zs.append(z)
+        lows.append(is_low)
+        if is_low:
+            zc.append(z)
+            for k, c in enumerate(courts):
+                if c.contains(pt):
+                    per_court[k].append(z)
+                    break
+        elif bld.contains(pt):
+            zb.append(z)
+    if len(zs) < 4 or not zc or not zb or len(zs) * dem.step ** 2 < STEPPED_MIN_COVER * p.module.area:
+        return None
+    floor = (sum(zs) + drop * sum(lows)) / len(zs)          # cut = fill
+    cell = p.module.area / len(zs) / 27.0
+    cut = sum(max(z - (floor - drop * k), 0.0) for z, k in zip(zs, lows)) * cell
+    fill = sum(max((floor - drop * k) - z, 0.0) for z, k in zip(zs, lows)) * cell
+    zb_mean = sum(zb) / len(zb)
+    return {"floor": floor, "court": floor - drop, "cut_cy": cut, "fill_cy": fill, "moved_cy": (cut + fill) / 2,
+            "fall_to_court": zb_mean - sum(zc) / len(zc), "falls": [zb_mean - sum(c) / len(c) for c in per_court if c],
+            "courts": len(p.courts), "step": dem.step}
+
+
+def court_on_other_side(p: "Plan", prog: "Program", flipu: bool | None = None) -> "Plan":
+    """The same layout on the same footprint with its court on the other
+    side of the building (and, with `flipu`, the office at that end)."""
+    fr = p.frame
+    return build(p.v, p.L, p.r, Frame(fr.Lmod, fr.depth, fr.pl, fr.origin, not fr.flip, fr.flipu if flipu is None else flipu),
+                 prog, draw=False)
+
+
+def loading_on_street_side(p: "Plan", row_line) -> bool:
+    """A truck court between the building and the street, at any distance:
+    its middle is more than STREET_SIDE_TOL_FT nearer the street frontage
+    than the building's (a court beside the building is not)."""
+    if row_line is None:
+        return False
+    d0 = p.building.centroid.distance(row_line)
+    return any(c.centroid.distance(row_line) < d0 - STREET_SIDE_TOL_FT for c in p.courts)
+
+
+def car_route_ft(o: dict[str, Any]) -> float:
+    return sum(ln.length for k, ln in o["routes"] if k == "car")
+
+
+def dock_turn_saves(sg0: dict[str, Any] | None, sg: dict[str, Any] | None) -> bool:
+    """The stepped pad `sg` moves materially less earth than `sg0`: by
+    DOCK_TURN_MIN_SAVING of it and DOCK_TURN_MIN_CY at least."""
+    return (sg0 is not None and sg is not None
+            and sg0["moved_cy"] - sg["moved_cy"] >= max(DOCK_TURN_MIN_CY, DOCK_TURN_MIN_SAVING * sg0["moved_cy"]))
+
+
+def dock_turn_blocked(q0: "Plan", q: "Plan", B0: BaseGeometry, row_line, res_line) -> str | None:
+    """Why the footprint q0 turned (q) is not laid out at all, before any
+    check of its routes and pond; None when it may be tried."""
+    if not B0.buffer(0.5).contains(q.building):
+        return "the building would leave the buildable area"
+    if faces_street(q, row_line) and not faces_street(q0, row_line):
+        return "it would turn the docks to the street"
+    if loading_on_street_side(q, row_line) and not loading_on_street_side(q0, row_line):
+        return "it would put the loading between the building and the street"
+    if loading_faces_homes(q, res_line) and not loading_faces_homes(q0, res_line):
+        return "it would turn the loading to homes"
+    return None
+
+
+TRUCK_OWN_FLAGS = {"PARKING_SHORT_FOR_LEAD_IN", "TRUCK_ENTRANCE_S_BEND", "SHORT_THROAT", "DEAD_END_ACCESS"}
+
+
+def layout_no_worse(o0: dict[str, Any], o2: dict[str, Any], truck: bool = False) -> str | None:
+    """Why the same footprint finished another way (o2) is worse than the
+    plan (o0); None when it is not. It must pass in full, its pond must
+    drain where the plan's does, with no fewer trailer stalls, no new
+    severity-2 flag and no much longer way in for cars. `truck`: o2 has
+    its truck road laid out and o0 does not, so the conditions that road
+    itself states (measured on the grid route in o0, or not at all) do
+    not count as new."""
+    sev2 = lambda o: {f for f, sv, _ in o["flags"] if sv == 2} - (TRUCK_OWN_FLAGS if truck else set())
+    if not o2["ok"]:
+        return "it fails its checks (" + (", ".join(sorted(f for f, sv, _ in o2["flags"] if sv == 1)) or "routes") + ")"
+    if o0.get("drains", True) and not o2.get("drains", True):
+        return "its pond would not drain"
+    if o2["trailers"] < o0["trailers"]:
+        return "it holds fewer trailer stalls"
+    if sev2(o2) - sev2(o0):
+        return "it adds a condition (" + ", ".join(sorted(sev2(o2) - sev2(o0))) + ")"
+    c0, c2 = car_route_ft(o0), car_route_ft(o2)
+    if c2 > max(DOCK_TURN_CAR_ROUTE * c0, c0 + DOCK_TURN_CAR_ROUTE_FT):
+        return "the cars' way in would be much longer"
+    return None
+
+
+def dock_turn_refused(o0: dict[str, Any], o2: dict[str, Any]) -> str | None:
+    """Why the turned layout, finished as o2, does not take the place of
+    the plan (o0); None when it does. Nothing else may be worse
+    (layout_no_worse), and its stepped pad must move materially less
+    earth."""
+    why = layout_no_worse(o0, o2)
+    if why:
+        return why
+    if not dock_turn_saves(o0.get("stepped"), o2.get("stepped")):
+        return "it saves too little earthwork"
+    return None
+
+
+def ponds_over_pad(ponds: list, dem: Dem, pad_z: float | None) -> list[float | None]:
+    """For each pond, how far its ground (the mean of the lidar samples on
+    its footprint) stands above the pad, in ft; negative when it is below.
+    None for a pond with no sample on it, or with no pad elevation."""
+    out: list[float | None] = []
+    for r in ponds:
+        inside = prep(r)
+        zs = [z for (x, y), z in dem.coords() if inside.contains(Point(x, y))] if pad_z is not None else []
+        out.append(sum(zs) / len(zs) - pad_z if zs else None)
+    return out
+
+
+def pond_over_pad(ponds: list, dem: Dem, pad_z: float | None) -> float | None:
+    """The highest pond's figure of ponds_over_pad; None when none was measured."""
+    measured = [x for x in ponds_over_pad(ponds, dem, pad_z) if x is not None]
+    return max(measured) if measured else None
+
+
+def court_frame(p: "Plan", court) -> tuple[tuple[float, float], tuple[float, float], float]:
+    """A court's long axis (unit vector), the unit vector across it that
+    points away from the building, and its length."""
+    c = list(court.minimum_rotated_rectangle.exterior.coords)[:4]
+    e1, e2 = (c[1][0] - c[0][0], c[1][1] - c[0][1]), (c[2][0] - c[1][0], c[2][1] - c[1][1])
+    ax = e1 if math.hypot(*e1) >= math.hypot(*e2) else e2
+    length = math.hypot(*ax)
+    ax = (ax[0] / length, ax[1] / length)
+    cc, bc = court.centroid, p.building.centroid
+    n = (-ax[1], ax[0])
+    if (cc.x - bc.x) * n[0] + (cc.y - bc.y) * n[1] < 0:
+        n = (-n[0], -n[1])
+    return ax, n, length
+
+
+def dock_zone(p: "Plan") -> BaseGeometry:
+    """The strip of each court in front of its dock wall, DOCK_ZONE_FT
+    deep, where trailers stand at the doors: the building's own width
+    carried out from the wall (not round its corners, where trucks turn
+    in from the end roads)."""
+    out = []
+    for court in p.courts:
+        _, n, _ = court_frame(p, court)
+        moved = shapely.affinity.translate(p.building, n[0] * DOCK_ZONE_FT, n[1] * DOCK_ZONE_FT)
+        out.append(unary_union([p.building, moved]).convex_hull.intersection(court))
+    return unary_union(out) if out else Polygon()
+
+
+def court_goal(p: "Plan", entry) -> dict[str, Any]:
+    """Where a truck that reaches `entry` is going: the court nearest it
+    and that court's truck lane, a segment along the court TRUCK_LANE_FT
+    beyond its middle (away from the dock wall), COURT_RUN_IN_FT short
+    of each end. `sight_way` is the way along the lane (+1 from its first
+    point to its second, -1 back) on which the docks are on the driver's
+    side: the building on the left, so the driver backs in seeing the
+    trailer's path."""
+    court = min(p.courts, key=lambda c: c.distance(entry))
+    ax, n, length = court_frame(p, court)
+    cc = court.centroid
+    half = max(length / 2 - min(COURT_RUN_IN_FT, 0.35 * length), 5.0)
+    mid = (cc.x + n[0] * TRUCK_LANE_FT, cc.y + n[1] * TRUCK_LANE_FT)
+    lane = ((mid[0] - ax[0] * half, mid[1] - ax[1] * half), (mid[0] + ax[0] * half, mid[1] + ax[1] * half))
+    # heading along +ax, the driver's left is (-ax.y, ax.x); the building lies at -n
+    sight_way = 1 if (-ax[1]) * (-n[0]) + ax[0] * (-n[1]) > 0 else -1
+    inward = 1 if (cc.x - entry.x) * ax[0] + (cc.y - entry.y) * ax[1] >= 0 else -1     # the way along the lane from the entry's end
+    return {"court": court, "lane": lane, "sight_way": sight_way, "entry_way": inward, "length": length}
+
+
+def sight_entry(p: "Plan", entry) -> bool:
+    """Whether a truck that comes into the court from the end nearest
+    `entry` has the docks on the driver's side."""
+    g = court_goal(p, entry)
+    return g["entry_way"] == g["sight_way"]
+
+
+def backing_of(p: "Plan", o: dict[str, Any]) -> str | None:
+    """`sight` or `blind`: the side trucks back in on, from the way the
+    designed path comes onto the truck lane, or (no designed path) from
+    the end of the court the search's route reaches. None with no truck
+    route."""
+    tp = o.get("truck_path") or {}
+    if tp.get("designed") and tp.get("backing"):
+        return tp["backing"]
+    if o.get("truck_entry") is None:
+        return None
+    return "sight" if sight_entry(p, o["truck_entry"]) else "blind"
+
+
+def truck_route_ft(o: dict[str, Any]) -> float:
+    return next((ln.length for k, ln in o["routes"] if k == "truck"), 0.0)
+
+
+def truck_side_refused(p: "Plan", o0: dict[str, Any], o2: dict[str, Any]) -> str | None:
+    """Why the plan finished with its trucks sent to the sight-side end of
+    the court (o2) does not take the place of the plan as it was (o0);
+    None when it does. Nothing else may be worse (layout_no_worse), the
+    trucks must now reach that end, and their way in may not be much
+    longer."""
+    why = layout_no_worse(o0, o2)
+    if why:
+        return why
+    if backing_of(p, o2) != "sight":
+        return "no truck route reaches the sight-side end of the court"
+    t0, t2 = truck_route_ft(o0), truck_route_ft(o2)
+    if t2 > max(SIGHT_ROUTE * t0, t0 + SIGHT_ROUTE_FT):
+        return "the trucks' way in would be much longer"
+    if max((b["deg"] for b in (o2.get("truck_path") or {}).get("bends") or []), default=0) > SIGHT_MAX_BEND_DEG:
+        return "the trucks would have to loop round to come in from that end"
+    return None
+
+
+def truck_obstacles(p: "Plan", o: dict[str, Any], ctx: "Ctx", other: tuple | None = None) -> dict[str, BaseGeometry]:
+    """What a truck's body must stay off, by kind, for the swept-path
+    check of a drawn plan: the buildings, the parked cars and trailers,
+    the ponds and drop yards, the car route where cars have their own
+    driveway, the strips where the draft rules allow no paving, and the
+    water buffers and test cut."""
+    def u(gs):
+        gs = [g for g in gs if g is not None and not g.is_empty]
+        return unary_union(gs) if gs else Polygon()
+    plans = [(p, o)] + ([other] if other else [])
+    kinds = {"the building": u([q.building for q, _ in plans]),
+             "the car parking": u([g for q, _ in plans for g in q.cars]),
+             "the trailer stalls": u([g for q, _ in plans for g in q.rows] + [g for _, oo in plans for g in oo["drops"]]),
+             "the pond": u([g for _, oo in plans for g in oo["ponds"]]),
+             "the car route": u([pp for _, oo in plans if oo["cpt"] is not None for k, pp in oo["route_polys"] if k == "car"]),
+             "ground where water or the test cut allows no paving": u([ctx.wet_buf, ctx.cut]).intersection(ctx.parcel),
+             "the paving setback": ctx.parcel.difference(ctx.P.buffer(0.5))}
+    return {k: g for k, g in kinds.items() if not g.is_empty}
+
+
+def truck_design_for(p: "Plan", o: dict[str, Any], ctx: "Ctx", other: tuple | None = None) -> dict[str, Any] | None:
+    """The truck path of one finished layout (reviews/43): a path a WB-67
+    can steer from its driveway to the truck lane of its court, with the
+    ground its body sweeps going in and coming back out checked against
+    what the plan has placed (truck_obstacles; `other`: the other
+    building's plan, for a second building). None when the layout has no
+    truck route to lay out. Otherwise {"got": siteplan_truck.design's
+    result or None, "goal", "kinds", "tpt"}. Computed once per layout
+    (kept on `o`) when there is no other building."""
+    cache = other is None
+    other = other or None
+    if cache and "_truck" in o:
+        return o["_truck"]
+    tpt, entry = o.get("tpt"), o.get("truck_entry")
+    if tpt is None or entry is None or not ctx.runs or not any(k == "truck" for k, _ in o["routes"]):
+        res = None
+    else:
+        parcel = ctx.parcel
+        run = min(ctx.runs, key=lambda ln: ln.distance(tpt))
+        sa = run.project(tpt)
+        a, b = run.interpolate(max(sa - 1.0, 0.0)), run.interpolate(min(sa + 1.0, run.length))
+        tx, ty = b.x - a.x, b.y - a.y
+        m = math.hypot(tx, ty) or 1.0
+        nx, ny = -ty / m, tx / m
+        if not parcel.buffer(1.0).contains(Point(tpt.x + nx * 25.0, tpt.y + ny * 25.0)):
+            nx, ny = -nx, -ny                           # the normal that points into the site
+        goal = court_goal(p, entry)
+        kinds = truck_obstacles(p, o, ctx, other)
+        mouth = tpt.buffer(DRIVEWAY_MOUTH_FT)
+        if "the paving setback" in kinds:               # the driveway crosses the setback strip at its own opening
+            kinds["the paving setback"] = kinds["the paving setback"].difference(mouth)
+        hard = unary_union(list(kinds.values())) if kinds else Polygon()
+        keep_off = unary_union([dock_zone(q) for q, _ in [(p, o)] + ([other] if other else [])])
+        start, heading, lead_ft = (tpt.x + nx * 12.0, tpt.y + ny * 12.0), math.atan2(ny, nx), 0.0
+        if other and o.get("through_first"):
+            # A second building reached through the first (reviews/44): its
+            # way in goes on from where the first's designed path comes
+            # onto its truck lane, not from the street again.
+            line1 = next((ln for k, ln in other[1]["routes"] if k == "truck"), None)
+            if (other[1].get("truck_path") or {}).get("designed") and line1 is not None and len(line1.coords) >= 2:
+                (x0, y0), (x1, y1) = line1.coords[-2], line1.coords[-1]
+                start, heading, lead_ft = (x1, y1), math.atan2(y1 - y0, x1 - x0), line1.length
+                tpt = Point(x1, y1)
+                mouth = tpt.buffer(DRIVEWAY_MOUTH_FT)
+                # (the truck starts on building 1's court: its tail may stand on the dock strip it has just passed)
+        # onto the truck lane either way, or (the sight-side step) only the way that puts the docks on the driver's side
+        way = goal["sight_way"] if ctx.sight_first and len(p.courts) == 1 else 0
+        got = truck.design(start, heading, goal["lane"], parcel, hard, keep_off, mouth, way=way)
+        over_cars = False
+        if (got is None or not got["ok"]) and p.cars:
+            # The lead-in over the corner of the car field: where the
+            # driveway stands in front of the car parking and to one side
+            # of the truck road, the trucks' way in takes the stalls in
+            # its path (counted in truck_record), as an engineer would
+            # re-lay the car field before shortening the building.
+            own = unary_union(p.cars)
+            kinds2 = dict(kinds)
+            rest = kinds2.pop("the car parking").difference(own.buffer(0.5))
+            if not rest.is_empty:
+                kinds2["the car parking"] = rest
+            hard2 = unary_union(list(kinds2.values())) if kinds2 else Polygon()
+            got2 = truck.design(start, heading, goal["lane"], parcel, hard2, keep_off, mouth,
+                                dear=own.buffer(truck.BODY_CLEAR), way=way)
+            # taken when it works, and also when it is the only path there is (its clip is then what the plan reports)
+            if got2 is not None and (got2["ok"] or got is None):
+                got, kinds, over_cars = got2, kinds2, True
+        res = {"got": got, "goal": goal, "kinds": kinds, "tpt": tpt, "over_cars": over_cars, "mouth": mouth, "lead_ft": lead_ft}
+    if cache:
+        o["_truck"] = res
+    return res
+
+
+def truck_line_and_pave(p: "Plan", d: dict[str, Any], ctx: "Ctx") -> tuple[LineString, BaseGeometry]:
+    """The designed way in as the plan carries it: the centreline from the
+    driveway's point on the street, and its pavement: the 40 ft truck
+    road widened to the swept path, inside the paving envelope (and the
+    driveway's own opening through the setback), off everything a
+    truck's body must stay off."""
+    got, kinds, tpt = d["got"], d["kinds"], d["tpt"]
+    line = LineString([(tpt.x, tpt.y)] + list(got["line"].coords))
+    solid = unary_union([g for k, g in kinds.items() if k != "the paving setback"]) if kinds else Polygon()
+    may = unary_union([ctx.P, d["mouth"]]).intersection(ctx.parcel)
+    pave = unary_union([line.buffer(TRUCK_ROAD / 2, cap_style=2), got["swept"].buffer(2.0)]).intersection(may).difference(solid)
+    return line, pave
+
+
+def truck_record(p: "Plan", o: dict[str, Any], d: dict[str, Any], parcel: BaseGeometry, grid_ft: float, grid_pave_sf: float) -> dict[str, Any]:
+    """Write a layout's truck design onto its plan `o`: `o["truck_path"]`
+    for the record and the flags it raises (in place of the grid route's
+    SHORT_THROAT and DEAD_END_ACCESS, which are measured again on the
+    path, from the street to the court). `o["routes"]` already holds the
+    designed line when one exists."""
+    got, goal, kinds = d["got"], d["goal"], d["kinds"]
+    way = got["way"] if got is not None else goal["entry_way"]
+    sight = way == goal["sight_way"]
+    info: dict[str, Any] = {"designed": got is not None, "vehicle": truck.VEHICLE_NAME, "backing": "sight" if sight else "blind",
+                            "courts": len(p.courts), "grid_route_ft": round(grid_ft)}
+    flags = [t for t in o["flags"] if t[0] not in ("SHORT_THROAT", "DEAD_END_ACCESS")]
+    if got is None:
+        info["reason"] = "no path"
+        flags.append(("TRUCK_PATH_NONE", 2, f"no path a {truck.VEHICLE_NAME} can steer ({truck.R_MIN:.0f} ft radius) was found from the driveway "
+                                            "to the truck court on the ground this plan leaves (usually the driveway does not line up "
+                                            "with the truck road and what stands between them leaves no room to turn); the route "
+                                            "drawn is the search's own line"))
+        flags += [t for t in o["flags"] if t[0] in ("SHORT_THROAT", "DEAD_END_ACCESS")]
+    else:
+        line = next(ln for k, ln in o["routes"] if k == "truck")
+        pave = next(pp for k, pp in o["route_polys"] if k == "truck")
+        # the throat: from the street to where the path first enters a truck court
+        courts_u = unary_union(p.courts)
+        throat = next((line.project(Point(c)) for c in shapely.segmentize(line, 5.0).coords if courts_u.contains(Point(c))), line.length)
+        if d.get("lead_ft"):
+            throat += d["lead_ft"]          # from the street, by building 1's own way in
+            info["from"] = "building 1's truck court"
+        info.update({"length_ft": round(line.length), "throat_ft": round(throat), "bends": got["bends"], "reverse_bends": got["reverse"],
+                     "min_radius_ft": got["min_radius_ft"], "swept_clip_ft": round(got["clip_ft"], 1), "swept_ok": got["ok"],
+                     "pavement_sf": rnd(pave.area, 100), "grid_pavement_sf": rnd(grid_pave_sf, 100)})
+        if not got["ok"]:
+            at = Point(got["clip_at"])
+            what = min(kinds, key=lambda k: kinds[k].distance(at)) if kinds else "the property line"
+            if not parcel.buffer(1.0).contains(at):
+                what = "the property line"
+            info["swept_clips"] = what
+            flags.append(("TRUCK_SWEPT_PATH", 2, f"a {truck.VEHICLE_NAME} cannot make the way in as drawn: at a bend about "
+                                                 f"{line.project(at):,.0f} ft from the street its body sweeps about {got['clip_ft']:.0f} ft "
+                                                 f"over {what}"))
+        if d["over_cars"]:
+            # the stalls under the lead-in's pavement, and those it cuts off from the rest of the car field
+            own = unary_union(p.cars)
+            rest = own.difference(pave.buffer(2.0))
+            kept = max((g.area for g in getattr(rest, "geoms", [rest]) if g.geom_type == "Polygon"), default=0.0)
+            taken = math.ceil((own.area - kept) / (own.area / max(p.car_cap, 1)) - 1e-6)
+            left = p.car_cap - taken
+            o["car_stalls_taken"] = taken
+            info["car_stalls_taken"] = taken
+            if left >= p.cars_required:
+                flags.append(("TRUCK_LEAD_IN_OVER_PARKING", 3, f"the driveway stands in front of the car field, to one side of the truck road: "
+                                                               f"the trucks' way in takes the corner of the car field, about {taken} car "
+                                                               f"stalls ({left} left in the rows, {p.cars_required} required)"))
+            else:
+                flags.append(("PARKING_SHORT_FOR_LEAD_IN", 2, f"the trucks' way in from the driveway takes the corner of the car field, about "
+                                                              f"{taken} car stalls: {left} are left of the {p.cars_required} required (another "
+                                                              "car row, or a shorter building)"))
+        bs = got["bends"]
+        s_bend = next((a for a, b in zip(bs, bs[1:]) if a["hand"] != b["hand"] and a["from_start_ft"] < truck.LENGTH_FT
+                       and min(a["deg"], b["deg"]) >= ENTRANCE_S_DEG and max(a["radius_ft"], b["radius_ft"]) <= truck.R_MIN), None)
+        if s_bend is not None:
+            info["entrance_s_bend"] = True
+            flags.append(("TRUCK_ENTRANCE_S_BEND", 2, "the driveway is to one side of the truck road, so trucks turn hard one way and "
+                                                      f"then the other at the {truck.R_MIN:.0f} ft minimum radius as they come off the street: "
+                                                      "passable at walking speed with the whole entrance to themselves, not an entrance "
+                                                      "to build (a driveway in line with the truck road, or a shorter building at that end)"))
+        elif got["reverse"]:
+            flags.append(("TRUCK_REVERSE_BEND", 3, f"{got['reverse']} reverse bend(s) on the trucks' way in with less than "
+                                                   f"{truck.REVERSE_MIN_FT:.0f} ft of straight between (a truck's length): passable at "
+                                                   "walking speed, better straightened"))
+        if throat < THROAT_MIN_FT:
+            flags.append(("SHORT_THROAT", 2, f"truck throat about {throat:.0f} ft from the street to the court (100 ft wanted for stacking)"))
+        if o["cpt"] is None and throat > 750:
+            flags.append(("DEAD_END_ACCESS", 2, f"single access about {throat:,.0f} ft long (over 750 ft needs fire-official approval)"))
+    if len(p.courts) == 1 and not sight:
+        flags.append(("BLIND_SIDE_BACKING", 3, "trucks enter the court with the dock doors on their right, so they back in on the "
+                                               "blind side; the other end of the court is the driver's side"))
+    o["flags"][:] = flags       # in place: finish goes on adding to the same list
+    o["truck_path"] = info
+    return info
+
+
+def apply_truck_path(p: "Plan", o: dict[str, Any], ctx: "Ctx", other: tuple | None = None) -> dict[str, Any]:
+    """The truck path of a plan that was finished without one (the search's
+    own plans; a second building): laid out round what the plan has
+    placed (truck_design_for) and put on `o`, once. The ponds, yards and
+    detention stay as the search placed them. Returns o["truck_path"]."""
+    if "truck_path" in o:
+        return o["truck_path"]
+    d = truck_design_for(p, o, ctx, other)
+    if d is None:
+        o["truck_path"] = {"designed": False, "reason": "no truck route"}
+        return o["truck_path"]
+    old_rt = next(ln for k, ln in o["routes"] if k == "truck")
+    old_pave = next(pp for k, pp in o["route_polys"] if k == "truck")
+    if d["got"] is not None:
+        line, pave = truck_line_and_pave(p, d, ctx)
+        i = next(k for k, t in enumerate(o["routes"]) if t[0] == "truck")
+        j = next(k for k, t in enumerate(o["route_polys"]) if t[0] == "truck")
+        o["routes"][i] = ("truck", line)
+        o["route_polys"][j] = ("truck", pave)
+    return truck_record(p, o, d, ctx.parcel, old_rt.length, old_pave.area)
+
+
+def driveway_strips(runs: list, lead: float) -> list[tuple[BaseGeometry, Any]]:
+    """For each end of each frontage run long enough for a truck driveway:
+    the strip of the plane within `lead` ft of that end, measured along
+    the run, and the nearest spot on the run where a truck driveway can
+    go (DRIVEWAY_END_FT from the end). A module kept out of the strip has
+    its end road in line with that driveway."""
+    out = []
+    for ln in runs:
+        if ln.length < 2 * DRIVEWAY_END_FT:
+            continue
+        for end, nxt, spot in ((ln.coords[0], ln.interpolate(1.0), ln.interpolate(DRIVEWAY_END_FT)),
+                               (ln.coords[-1], ln.interpolate(ln.length - 1.0), ln.interpolate(ln.length - DRIVEWAY_END_FT))):
+            tx, ty = nxt.x - end[0], nxt.y - end[1]
+            m = math.hypot(tx, ty) or 1.0
+            tx, ty = tx / m, ty / m
+            big = 1e5
+            a0, a1 = (end[0] - tx * big, end[1] - ty * big), (end[0] + tx * lead, end[1] + ty * lead)
+            strip = Polygon([(a0[0] - ty * big, a0[1] + tx * big), (a1[0] - ty * big, a1[1] + tx * big),
+                             (a1[0] + ty * big, a1[1] - tx * big), (a0[0] + ty * big, a0[1] - tx * big)])
+            out.append((strip, spot))
+    return out
+
+
+def truck_first(fits0: list, target_sf: float, P: BaseGeometry, B: BaseGeometry, ctx: "Ctx", row_line, res_line,
+                tries: list[int], keep: Callable[["Plan"], bool], out: list) -> None:
+    """Driveway first (reviews/43). A truck driveway cannot stand nearer a
+    frontage corner than DRIVEWAY_END_FT (its curb radii), and a layout
+    whose end road lies nearer the side line than that has no way in a
+    truck can steer. For each end of the frontage, then for all of them
+    at once, the module is kept out of the strip beside that corner, so
+    its end road lines up with a driveway that can be built; every cross-section is fitted to what is
+    left (largest on the open parcel first, stopping when none left can
+    beat what is in hand), finished with its trucks sent to that end, and
+    kept when it passes in full, its pond drains and a WB-67 can drive
+    it. `tries` ([left]) is this step's own count of fits and checks."""
+    order = sorted(fits0, key=lambda q: -q.sf)
+    best_sf = target_sf
+    strips = driveway_strips(ctx.runs, DRIVEWAY_END_FT - TRUCK_ROAD / 2)
+    if len(strips) > 1:
+        # ... and out of every such strip at once: wherever the fit then
+        # stands the module, an end road is in line with a driveway
+        strips.append((unary_union([g for g, _ in strips]), None))
+    for strip, spot in strips:
+        P2, B2 = clean(P.difference(strip)), clean(B.difference(strip))
+        ctx2 = dataclass_replace(ctx, truck_target=spot, truck_design=True)
+        for q0 in order:
+            if q0.sf <= best_sf:
+                break                           # no later cross-section can beat what is in hand
+            if tries[0] <= 0:
+                return
+            tries[0] -= 1
+            q = fit_variant(q0.v, P2, B2, ctx.prog, row_line, res_line, ctx.search)
+            if q is None or q.sf <= best_sf:
+                continue
+            for cand in [q] + q.flips:          # the same fit the other ways round, when this way faces the street or has no way in
+                if not keep(cand):
+                    continue
+                if tries[0] <= 0:
+                    return
+                tries[0] -= 1
+                o2 = finish(cand, ctx2)
+                if o2["ok"] and o2.get("drains", True) and o2.get("truck_ok"):
+                    o2["drivable"] = True
+                    out.append((cand, o2))
+                    best_sf = cand.sf
+                    break
+            if best_sf >= q0.sf:
+                break
 
 
 def throat_zone(pt, parcel, avoid=None):
@@ -1747,6 +2481,12 @@ class Ctx:
     prog: Program
     search: Search
     route_steps: dict = field(default_factory=dict)
+    pond_room: bool = False      # the room-for-the-pond pass (reviews/40): other pond shapes when no 2:1 pond fits
+    sight_first: bool = False    # trucks to the court's sight-side end first (reviews/43)
+    truck_target: Any = None     # the truck driveway sought near this point (driveway first, reviews/43)
+    truck_design: bool = False   # the truck route laid out as a WB-67 steers it, before the pond is sited (reviews/43)
+    land: bool = False           # the use-the-land pass (reviews/44): a car drive over the layout's open ground, ponds shaped to the ground
+    through_first: bool = False  # a second building reached through building 1's truck road and court (reviews/44)
 
 
 @dataclass
@@ -1820,15 +2560,32 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     access_constrained = False
     if runs:
         ttarget = min(p.truck_entries, key=lambda q: q.distance(unary_union(runs)))
+        if ctx.truck_target is not None:        # the end road nearest a driveway that can be built (reviews/43)
+            ttarget = min(p.truck_entries + p.fallback_entries, key=lambda q: q.distance(ctx.truck_target))
+        if ctx.sight_first:     # the driveway toward the court's sight-side end (reviews/43)
+            ttarget = next((q for q in p.truck_entries if sight_entry(p, q)), ttarget)
         tpt, cpt, okrun = pick_driveways(runs, ttarget, p.car_entries[0], sp, taken)
         if not okrun:
             access_constrained = True
             flags.append(("ACCESS_CONSTRAINED", 1, "no frontage run can hold a truck driveway (about 190 ft of curb with 75 ft radii, 110 ft from corners)"))
         if others is not None and tpt is None:
             tpt, cpt, shared = others["tpt"], others["cpt"], True
+    # Use the land (reviews/44): a second building on land behind the first
+    # is reached through the first's own truck road and the end of its
+    # court, from the first's truck driveway. Its trucks and cars share
+    # that drive (one driveway: cpt None).
+    through = bool(fixes and ctx.through_first and others is not None and others.get("truck_ground") is not None
+                   and others["tpt"] is not None)
+    shared_ground = others["truck_ground"] if through else Polygon()
+    if through:
+        tpt, cpt, shared = others["tpt"], None, True
+        flags.append(("ACCESS_THROUGH_FIRST", 2, "reached through building 1's truck road and the end of its truck court: trucks and "
+                                                 "cars to this building share that drive"))
     # routes inside the paving envelope (inset by half width) plus the driveway throats
     base = P.difference(wet_buf).difference(cut)
-    if others is not None:
+    if through:
+        base = base.difference(others["solid"].buffer(8))       # (routes may pass beside building 1; ponds and yards below may not)
+    elif others is not None:
         base = base.difference(others["blocked"])
     entries = unary_union([q.buffer(32) for q in p.truck_entries + p.car_entries + p.fallback_entries]).intersection(parcel.buffer(-2))
     if fixes:   # entry discs stay out of the water buffer and the test cut (R17)
@@ -1837,14 +2594,18 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     route_outside = []
     own_truck = own_truck_area(p, fixes)    # the module's own end roads and court carry trucks too
     walk_t = (base.buffer(-20).union(throat_zone(tpt, parcel, unary_union([wet_buf, cut]))).difference(occupied.buffer(-2))
-              .difference(unary_union(p.cars).buffer(8)).union(entries.difference(unary_union(p.cars))).union(own_truck))
-    rt = None
+              .difference(unary_union(p.cars).buffer(8)).union(entries.difference(unary_union(p.cars))).union(own_truck).union(shared_ground))
+    rt = t_entry = None
     if tpt is not None:
         for group, note in ((p.truck_entries, None), (p.fallback_entries, "trucks reach the court along the building's end road from the office side")):
-            for tgt in sorted(group, key=lambda q: q.distance(tpt)):
+            order = sorted(group, key=lambda q: q.distance(tpt))
+            if ctx.sight_first:
+                order = sorted(order, key=lambda q: not sight_entry(p, q))      # stable: the sight-side end first
+            for tgt in order:
                 ctx.search.check()
                 rt = checked_route(tpt, tgt, walk_t, ctx)
                 if rt is not None:
+                    t_entry = tgt
                     break
             if rt is not None:
                 if note:
@@ -1857,17 +2618,47 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             routes.append(("truck", rt))
             route_polys.append(("truck", rt.buffer(20, cap_style=2).intersection(parcel)))
             if fixes:
-                hard_t = unary_union([occupied.buffer(-2).difference(own_truck.buffer(2)), wet_buf, cut]
-                                     + ([others["blocked"]] if others is not None else []))
+                hard_t = unary_union([occupied.buffer(-2).difference(own_truck.buffer(2)).difference(shared_ground.buffer(8.5)), wet_buf, cut]
+                                     + ([others["solid"] if through else others["blocked"]] if others is not None else []))
                 route_outside.append(("truck", route_stray_ft(rt, walk_t, hard_t, ctx.route_steps.get("joins"))))
             else:
                 route_outside.append(("truck", route_outside_ft(rt, walk_t)))
+    # Truck first, then the pond (reviews/43): the way in as a WB-67 steers
+    # it, laid out round the building and its car and trailer stalls only.
+    # The car route, the ponds and the drop yards below then go round the
+    # truck road as it will be built. (Building 1 only; a second building's
+    # way in is laid out afterwards, round what stands.)
+    t_design = t_grid = t_error = None
+    if fixes and ctx.truck_design and rt is not None and others is None:
+        try:
+            t_design = truck_design_for(p, {"tpt": tpt, "truck_entry": t_entry, "routes": routes, "route_polys": [], "ponds": [], "drops": [],
+                                            "cpt": None}, ctx, other=())
+            if t_design is not None and t_design["got"] is not None and t_design["got"]["ok"]:
+                t_line, t_pave = truck_line_and_pave(p, t_design, ctx)
+                t_grid = (rt.length, route_polys[-1][1].area)
+                rt = t_line
+                # (the route's own measure is now how far its swept path strays: within the tolerance, or it is not taken)
+                routes[-1], route_polys[-1], route_outside[-1] = ("truck", rt), ("truck", t_pave), ("truck", t_design["got"]["clip_ft"])
+        except _BudgetExceeded:
+            raise
+        except Exception as exc:        # noqa: BLE001 - the truck design is an extra: it must never cost a plan
+            t_design = t_grid = None
+            t_error = f"{type(exc).__name__}: {str(exc)[:160]}"
     truck_poly = unary_union([pp for _, pp in route_polys]) if route_polys else Polygon()
     start_c = cpt if cpt is not None else tpt
     if start_c is not None:
         walk_c = (base.buffer(-12).union(throat_zone(start_c, parcel, unary_union([wet_buf, cut]))).difference(occupied.buffer(-2))
                   .difference(unary_union(p.courts + p.roads + p.rows).buffer(4)).union(p.car_entries[0].buffer(32).intersection(parcel.buffer(-2)))
                   .union(unary_union(p.cars).buffer(-4)))
+        if through:
+            walk_c = walk_c.union(shared_ground)
+        open_mod = Polygon()
+        if fixes and ctx.land:
+            # Use the land (reviews/44): cars may cross the layout's own
+            # open ground (the yard in front of a car field at the
+            # building's end), 16 ft off its truck pavement and building.
+            open_mod = p.module.buffer(-2).difference(unary_union([p.building] + p.courts + p.roads + p.rows).buffer(16))
+            walk_c = walk_c.union(open_mod)
         if cpt is not None:
             walk_c = walk_c.difference(truck_poly.buffer(6))
         ctx.search.check()
@@ -1879,10 +2670,11 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             routes.append(("car", rc))
             route_polys.append(("car", rc.buffer(12, cap_style=2).intersection(parcel)))
             if fixes:
-                hard_c = unary_union([occupied.buffer(-2).difference(unary_union(p.cars).buffer(2)),
+                hard_c = unary_union([occupied.buffer(-2).difference(unary_union(p.cars).buffer(2)).difference(open_mod.buffer(2))
+                                      .difference(shared_ground.buffer(8.5)),
                                       unary_union(p.courts + p.roads + p.rows), wet_buf, cut]
                                      + ([truck_poly] if cpt is not None else [])
-                                     + ([others["blocked"]] if others is not None else []))
+                                     + ([others["solid"] if through else others["blocked"]] if others is not None else []))
                 route_outside.append(("car", route_stray_ft(rc, walk_c, hard_c, ctx.route_steps.get("joins"))))
             else:
                 route_outside.append(("car", route_outside_ft(rc, walk_c)))
@@ -1922,31 +2714,38 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     if others is not None:
         region0 = region0.difference(others["blocked"])
     angles = [0, 90, 45, 135, p.frame.pl.angle_deg, p.frame.pl.angle_deg + 90]
-
-    shape_of: dict[int, float] = {}       # id(pond) -> bottom length / width, where not 2
+    # The drainage-first pass (reviews/41) sites ponds only where the pad
+    # can drain to them: on ground no higher than the pad plus what a
+    # deeper pond takes up.
+    max_z = pad_z + POND_UPHILL_TOL_FT if (ctx.pond_room and pad_z is not None) else None
 
     def site_ponds(region, n, Lf_, Wf_, v_each):
+        """[(pond, bottom length / width)]."""
         out = []
         for _k in range(n):
             ctx.search.check()
-            r = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints)
-            if r is None and fixes and not problem:
-                # No 2:1 pond fits at the samples: the same volume at a
-                # finer spacing, then in other proportions (reviews/40).
-                # Not for a layout a route already fails.
-                for k in POND_FALLBACK_RATIOS:
+            r, k_used = place_sized_pond(region, Lf_, Wf_, dem, angles, p.module, pad_z, constraints, max_z=max_z), 2.0
+            if r is None and ctx.pond_room and not problem:
+                # The room-for-the-pond pass only (reviews/40): no 2:1 pond
+                # fits at the samples, so the same volume in other
+                # proportions, then at a finer spacing. Not for a layout a
+                # route already fails.
+                for k, fine in POND_FALLBACK_SHAPES:
                     _, Lk, Wk, _ = pond_dims(v_each, ratio=k)
-                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=True)
+                    r = place_sized_pond(region, Lk, Wk, dem, angles, p.module, pad_z, constraints, fine=fine, max_z=max_z)
                     if r is not None:
-                        if k != 2.0:
-                            shape_of[id(r)] = k
+                        k_used = k
                         break
+            if r is None and ctx.land and not problem:
+                # Use the land (reviews/44): no rectangle fits, so a pond shaped to the open ground (0.0: no proportions)
+                r, k_used = free_pond(region, v_each, dem, max_z), 0.0
             if r is None:
                 break
-            out.append(r)
+            out.append((r, k_used))
             region = region.difference(r.buffer(20))
         return out
-    ponds = site_ponds(region0, npd, Lf, Wf, v / npd)
+    placed = site_ponds(region0, npd, Lf, Wf, v / npd)
+    ponds = [r for r, _ in placed]
     pond_ok = len(ponds) == npd
     # drop yard near the court, counted only with a truck route
     drops, trailers = [], p.court_stalls
@@ -1991,13 +2790,38 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
             region = region0.difference(all_rp.buffer(10))
             for d in drops:
                 region = region.difference(d.buffer(20))
-            ponds2 = site_ponds(region, npd2, Lf2, Wf2, v / npd2)
+            placed2 = site_ponds(region, npd2, Lf2, Wf2, v / npd2)
+            ponds2 = [r for r, _ in placed2]
             if v > v_sized or len(ponds2) == npd2:
-                ponds, npd, v_sized = ponds2, npd2, v
+                ponds, placed, npd, v_sized = ponds2, placed2, npd2, v
                 pond_ok = len(ponds) == npd
             # else: smaller ponds did not fit where the larger ones are
             # (the yard links took the room); keep the larger ponds and
             # report the volume they were sized for (v_sized).
+    # Gravity (reviews/41): the paving drains to the pond only if the pond
+    # is lower. The pad is one plane at the module's mean ground; a pond
+    # on ground well above it cannot fill by gravity as drawn.
+    pond_each = ponds_over_pad(ponds, dem, pad_z)
+    pond_over = max([x for x in pond_each if x is not None], default=None)
+    uphill = pond_ok and pond_over is not None and pond_over > POND_UPHILL_TOL_FT
+    if uphill and fixes:
+        flags.append(("POND_UPHILL", 2, f"the pond stands on ground about {pond_over:.0f} ft above the building pad, so the paving "
+                                        "cannot drain to it by gravity as drawn: a pond on the low side of the site, a much "
+                                        "deeper and larger pond, or pumping"))
+    elif fixes and pond_ok and pond_over is not None and pond_over >= 1.0:
+        flags.append(("POND_ABOVE_PAD", 3, f"the pond's ground is about {pond_over:.0f} ft above the building pad, inside the "
+                                           f"{POND_UPHILL_TOL_FT:.0f} ft the planner takes as a deeper pond: dug that much deeper at "
+                                           "4:1 slopes its footprint grows by roughly 15 to 30%, which is not drawn"))
+    # Grading (reviews/42): the stepped pad, and a court on the high side.
+    stepped = stepped_grading(p, dem) if fixes else None
+    if stepped is not None and len(p.courts) == 1 and stepped["fall_to_court"] <= -DOCKS_UPHILL_FT:
+        # (a building with courts on two sides has one on each side of any slope: its cost is in the stepped earthwork)
+        other = stepped_grading(court_on_other_side(p, ctx.prog), dem)
+        extra = stepped["moved_cy"] - other["moved_cy"] if other is not None else 0.0
+        flags.append(("DOCKS_UPHILL", 3, f"the ground rises about {-stepped['fall_to_court']:.0f} ft from the building to its truck court, "
+                                         f"which sits {DOCK_DROP_FT:.0f} ft below the floor: the court is cut into the high side"
+                                         + (f" (about {rnd(extra, 1000):,} CY more earthwork than the same footprint with its "
+                                            "court on the other side, a layout not checked here)" if extra >= 1000 else "")))
     if not pond_ok:
         way_out = ("underground detention (vaults) or a smaller building" if not fixes or ctx.prog.opts.underground
                    else "a smaller building or detention off site (underground detention is not used in this market)")
@@ -2018,6 +2842,7 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
     # does not fail it: decide() still blocks the site on that flag.
     feasible = pond_ok and not problem and (tpt is not None or not runs or (fixes and access_constrained))
     o = {"ok": feasible, "pond_ok": pond_ok, "route_problem": problem, "tpt": tpt, "cpt": cpt, "shared_access": shared,
+         "truck_entry": t_entry, "pond_room_mode": ctx.pond_room, "land_mode": ctx.land, "through_first": through,
          "routes": routes, "route_polys": route_polys, "route_outside": route_outside, "n_main_routes": n_main_routes,
          "drops": drops, "trailers": trailers, "imp_ac": imp_ac, "v_det": v_sized if fixes else v, "ponds": ponds, "relief": relief,
          "cutfill_cy": cutfill, "steep_module_pct": steep_mod, "dem_points_module": len(mod_pts), "flags": flags,
@@ -2025,7 +2850,18 @@ def finish(p: Plan, ctx: Ctx, others: dict | None = None) -> dict[str, Any]:
          # read-outs for siteplan_assess; no decision reads them
          "pad_elev": pad_elev, "max_cut": max_cut, "max_fill": max_fill, "disturbed_ac": disturbed}
     if fixes:
-        o["pond_ratios"] = [shape_of.get(id(r), 2.0) for r in ponds]
+        o["pond_ratios"] = [k for _, k in placed]
+        if any(k == 0.0 for _, k in placed):
+            flags.append(("POND_SHAPED_TO_SITE", 3, "no rectangular pond fits beside this layout: the pond is shaped to the open ground, "
+                                                    "its storage figured from its outline (6 ft of water, 4:1 banks, 15 ft rim)"))
+        o["pond_over_pad"], o["pond_over_each"], o["drains"] = pond_over, pond_each, not uphill
+        o["stepped"] = stepped
+    if fixes and ctx.truck_design and others is None:
+        o["truck_ok"] = t_grid is not None
+        if t_error:
+            o["truck_error"] = t_error
+        if t_grid is not None:
+            truck_record(p, o, t_design, parcel, *t_grid)
     o["violations"] = check_plan(p, o, ctx, others)
     if fixes:
         for viol in o["violations"]:
@@ -2243,7 +3079,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     small = [q for q in parts(P) if q.area <= MIN_PART_SF]
     ctx = Ctx(parcel, P, B, wet_buf, trans, cut, steep, dem, meta, rules, runs, jname, constraints, fr.road, hsg, prog, search)
     VARIANTS = variants()
-    reloc = Relocation()
     results, excluded = [], Polygon()
     # Layouts that passed every check but the surface pond, at the length
     # first tried (the search goes on to shorten them). Kept for the
@@ -2272,7 +3107,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     break
             def explore(q, Pe=Pe, Be=Be, shorten_routes=False):
                 cur = q
-                floor = None         # the length a moved layout reached: a shorter one where it stands cannot beat it
                 for _i in range(10):
                     o = finish(cur, ctx)
                     if o["ok"]:
@@ -2281,16 +3115,6 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                     if (not o["pond_ok"] and not o["route_problem"] and not o["violations"]
                             and not ({f for f, sv, _ in o["flags"] if sv == 1} - {"POND_DOES_NOT_FIT"} - LENGTH_INDEPENDENT_FLAGS)):
                         pond_limited.append((cur, o))      # a note for the read-out; the search goes on unchanged
-                    sev1 = {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS
-                    if (opts.fixes and floor is None and sev1 == {"POND_DOES_NOT_FIT"} and not o["route_problem"]
-                            and not reloc.spent):
-                        # Blocked by its pond alone: the same building moved
-                        # to leave the pond room. Kept as a result; shorter
-                        # lengths where it stands are still tried down to it.
-                        moved = relocate_for_pond(cur, o, Pe, Be, ctx, row_line, res_line, search, reloc)
-                        if moved is not None:
-                            results.append(moved)
-                            floor = moved[0].L
                     if o["route_problem"] and opts.fixes:
                         # Turn the same fit round before giving it up or
                         # shortening it. The first turn keeps docks away
@@ -2322,7 +3146,7 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                         # meet it, not 40 ft at a time (R4; default only).
                         cap_len = min(cap_len, int(cur.L * o["cover_ratio"]) // 20 * 20)
                     nxt = fit_variant(cur.v, Pe, Be, prog, row_line, res_line, search, length_cap=cap_len)
-                    if nxt is None or (floor is not None and nxt.L <= floor):
+                    if nxt is None:
                         results.append((cur, o))
                         break
                     cur = nxt
@@ -2390,13 +3214,353 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
         # the rules have one) before one that does not, as code car
         # parking is met by every layout; then floor area. The shortfall
         # against the market target comes last: it only settles a tie.
-        return (o["ok"], not o["route_problem"], o["trailers"] >= q.code_trailers, rank_sf(q, o, st, rel),
-                -max(0, q.trailers_target - o["trailers"]))
+        # A pond the paving can drain to by gravity before one it cannot
+        # (reviews/41): floor area drawn round a pond that stands above
+        # the pad is not buildable as drawn.
+        # A way in a WB-67 can drive before a larger layout without one
+        # (reviews/43): judged only for the layouts at the top of the
+        # ranking (`drivable` is set on those; unset counts as yes).
+        return (o["ok"], not o["route_problem"], o["trailers"] >= q.code_trailers, not o["ok"] or o.get("drains", True),
+                not o["ok"] or o.get("drivable", True),
+                rank_sf(q, o, st, rel), -max(0, q.trailers_target - o["trailers"]))
+    room = None
+    added: list[tuple[Plan, dict[str, Any]]] = []
+    turned = turned_from = None                                # the docks-downhill step (reviews/42)
+    dock_side: dict[str, Any] = {"tried": 0, "turned": False, "saved_cy": 0, "outcome": None, "refused": []}
+    truck_first_rec: dict[str, Any] = {"judged": 0, "tries": 0, "found": 0, "drawn": False, "outcome": None}
+    land_rec: dict[str, Any] = {"tried": 0, "found": 0, "drawn": False}
+    land_plans: list[tuple[Plan, dict[str, Any]]] = []
+    lined_up: list[tuple[Plan, dict[str, Any]]] = []
+    room_skipped = bool(opts.fixes and first is not None and not search.exceeded
+                        and search.deadline - search.clock() < POND_ROOM_MIN_LEFT * opts.max_seconds)
+    if opts.fixes and first is not None and not search.exceeded and not room_skipped:
+        # Room for the pond (reviews/40): a pass that only adds layouts. The
+        # layouts the pond alone blocked, largest first, are tried again
+        # with other pond shapes, then moved to leave their pond room. One
+        # that turns its docks to the street or its loading to homes is
+        # taken only when the best plan does so anyway; nor one with no more
+        # floor area that has fewer trailer stalls (a small relief or
+        # steep-ground mark alone does not trade them away). The plan drawn
+        # is then the best of all by the same ranking: never below the
+        # plan without the pass.
+        # Drainage first (reviews/41): the pass also starts from layouts
+        # that passed with their pond above the pad. It sites ponds only on
+        # ground the pad can drain to (ctx.pond_room), lowest spots first,
+        # and adds no plan whose pond is uphill.
+        room = PondRoom(search)
+        best0 = max(results, key=score)
+        b0_drains = best0[1].get("drains", True)
+
+        def gains(t):
+            q, o = t
+            if not o.get("drains", True):
+                return False
+            if not b0_drains:
+                return True                 # a pond that drains, where the best plan's does not
+            return q.sf > best0[0].sf or (q.sf == best0[0].sf and o["trailers"] >= best0[1]["trailers"])
+        ctx_room = dataclass_replace(ctx, pond_room=True, search=room.search)
+        P0, B0 = first[0], first[1]
+
+        def pond_only(o):
+            return ({f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS == {"POND_DOES_NOT_FIT"}
+                    and not o["route_problem"])
+
+        def uphill(o):
+            return o["ok"] and not o.get("drains", True)
+        start, seen_l = [], set()
+        for q, o in sorted(pond_limited + [t for t in results if pond_only(t[1]) or uphill(t[1])], key=lambda t: -t[0].sf):
+            key = (q.v["name"], q.L, q.r, tuple(round(c, 1) for c in q.module.bounds))
+            if key in seen_l:
+                continue
+            # worth a try: it would rank above the best plan so far with its pond placed
+            if ((pond_only(o) and score((q, {**o, "ok": True, "drains": True})) > score(best0))
+                    or (uphill(o) and score((q, {**o, "drains": True})) > score(best0))):
+                seen_l.add(key)
+                start.append((q, o))
+
+        def sweep(keep, best_now, first_round=True):
+            """One round of the pass with the layouts `keep` takes: pond
+            first, then the pond-blocked and uphill layouts. The best plan
+            it found per starting point, of those that gain."""
+            found_by: list[list[tuple[Plan, dict[str, Any]]]] = []
+            try:
+                # Pond first, building second: when the best plan's pond
+                # does not drain, or a larger cross-section fitted the open
+                # parcel than the best plan holds.
+                v0 = best_now[1]["v_det"] / max(pond_count(best_now[1]["v_det"]), 1)
+                target = best_now[0].sf if best_now[1].get("drains", True) else 0
+                if best_now[1]["ok"] and any(q.sf > target for q in first[2]):
+                    mine0: list[tuple[Plan, dict[str, Any]]] = []
+                    found_by.append(mine0)
+                    drainage_first(first[2], v0, best_now[0].frame.pl.angle_deg, target, P0, B0, ctx_room, row_line, res_line,
+                                   room, keep, mine0)
+                for q, o in start[:POND_ROOM_MAX_LAYOUTS]:
+                    if room.spent:
+                        break
+                    room.layouts += first_round         # each starting layout counted once
+                    mine: list[tuple[Plan, dict[str, Any]]] = []
+                    found_by.append(mine)
+                    if keep(q) and room.take():
+                        o2 = finish(q, ctx_room)        # the same layout, its pond on low ground or in another shape
+                        if o2["ok"] and o2.get("drains", True):
+                            mine.append((q, o2))
+                            room.found += 1
+                            continue
+                    relocate_for_pond(q, o, P0, B0, ctx_room, row_line, res_line, room, keep, mine)
+            except _BudgetExceeded:
+                room.cut_short = True                   # what was found stands; building 1's search was complete
+            # Per starting point: its best plan, and its best plan that
+            # meets its trailer target (the others are the same layout a
+            # little moved).
+            out = []
+            for mine in found_by:
+                ok = [t for t in mine if gains(t)]
+                if ok:
+                    top = max(ok, key=score)
+                    out.append(top)
+                    full = [t for t in ok if t[1]["trailers"] >= t[0].trailers_target]
+                    if full and top[1]["trailers"] < top[0].trailers_target:
+                        out.append(max(full, key=score))
+            return out
+
+        # First only layouts with their docks off the street and their
+        # loading away from homes. Layouts that face either are tried
+        # after, and only where the best plan before the pass faced it
+        # already, unless the first round found a plan that faces neither
+        # and is no smaller than that plan. So the pass never turns docks
+        # to the street where the plan before did not, and never gives up
+        # floor area to turn them away where it did.
+        clear_of = lambda q: not faces_street(q, row_line) and not loading_faces_homes(q, res_line)
+        added = sweep(clear_of, best0)
+        best1 = max(results + added, key=score)
+        was_street, was_homes = faces_street(best0[0], row_line), loading_faces_homes(best0[0], res_line)
+        settled = clear_of(best1[0]) and best1[0].sf >= best0[0].sf
+        if (was_street or was_homes) and not settled and not room.spent and not room.cut_short:
+            added += sweep(lambda q: (not clear_of(q) and (was_street or not faces_street(q, row_line))
+                                      and (was_homes or not loading_faces_homes(q, res_line))), best1, first_round=False)
+        # No stalls traded between the pass's own plans (review 41/02,
+        # finding 1): a plan gives way to another of the pass with at
+        # least its floor area and more trailer stalls.
+        # (only to one that itself ranks above the plan before the pass:
+        # otherwise neither would be drawn and the gain lost)
+        added = [t for t in added
+                 if not any(u is not t and u[0].sf >= t[0].sf and u[1]["trailers"] > t[1]["trailers"] and score(u) > score(best0)
+                            for u in added)]
+        # At most three of them go on (the best by the ranking): more
+        # would crowd the layouts compared (the first ten results) out of
+        # the read-out.
+        added = sorted(added, key=score, reverse=True)
+        with_stalls = [t for t in added if t[1]["trailers"] >= t[0].trailers_target]
+        kept = added[:POND_ROOM_KEEP]
+        if with_stalls and not any(t is k for t in with_stalls for k in kept):
+            kept = kept[:POND_ROOM_KEEP - 1] + [with_stalls[0]]     # the read-out's "meets its trailer target" layout
+        added = kept
+        results += added
+        # Use the land (reviews/44). The layouts the search rejected that
+        # are larger than its best plan (any of them, where no plan
+        # passed) are finished once more, largest first, with what an
+        # engineer would add before giving the floor area up: a car drive
+        # across the layout's own open ground, a pond shaped to the open
+        # ground where no rectangle fits, the truck road laid out first.
+        # Only for what those can mend (a route or the pond), never for a
+        # layout that newly faces the street or homes. It only adds plans.
+        try:
+            top_l = max(results, key=score)
+            l_street, l_homes = faces_street(top_l[0], row_line), loading_faces_homes(top_l[0], res_line)
+            floor = top_l[0].sf if top_l[1]["ok"] else 0
+            mendable = {"CAR_ROUTE_NONE", "POND_DOES_NOT_FIT", "ROUTE_OUTSIDE_ENVELOPE", "ROUTE_INFEASIBLE"}
+            land_ctx = dataclass_replace(ctx, pond_room=True, land=True, truck_design=True)
+            seen_land: set[tuple] = set()
+            for q, o in sorted([t for t in results + pond_limited if not t[1]["ok"]], key=lambda t: -t[0].sf):
+                if land_rec["tried"] >= LAND_MAX_TRIES or len(land_plans) >= LAND_KEEP or q.sf <= floor:
+                    break
+                key = (q.v["name"], q.L, q.r, tuple(round(c, 1) for c in q.module.bounds), q.frame.flip, q.frame.flipu)
+                blocking = {f for f, sv, _ in o["flags"] if sv == 1} - LENGTH_INDEPENDENT_FLAGS
+                if key in seen_land or not blocking or not blocking <= mendable:
+                    continue
+                if top_l[1]["ok"] and ((faces_street(q, row_line) and not l_street) or (loading_faces_homes(q, res_line) and not l_homes)):
+                    continue
+                seen_land.add(key)
+                land_rec["tried"] += 1
+                o2 = finish(q, land_ctx)
+                if o2["ok"] and o2.get("drains", True):
+                    if o2.get("truck_ok"):
+                        o2["drivable"] = True
+                    land_plans.append((q, o2))
+            land_rec["found"] = len(land_plans)
+            results += land_plans
+        except _BudgetExceeded:
+            search.exceeded = False     # only this step ran out of time: building 1's search was complete
+            land_rec["cut_short"] = True
+        # Design for the truck (reviews/43). The ranking's top layout must
+        # have a way in a WB-67 can drive. Each layout that reaches the top
+        # has its truck path laid out (at most TRUCK_TIER_MAX); one without
+        # a path gives way to the next. Where the top layout before this
+        # step has none, driveway-first layouts are added first
+        # (truck_first): never one that newly faces the street or homes.
+        def with_truck(t: tuple[Plan, dict[str, Any]]) -> tuple[Plan, dict[str, Any]] | None:
+            """The layout finished again with its truck road laid out
+            first (the pond and yards then go round it); None when no
+            WB-67 can drive it, or when the plan is then worse."""
+            q, o = t
+            if o.get("truck_ok"):
+                return q, o                 # its truck road is laid out already (the use-the-land pass)
+            o2 = finish(q, dataclass_replace(ctx, pond_room=o.get("pond_room_mode", False), land=o.get("land_mode", False), truck_design=True))
+            if o2.get("truck_ok") and not layout_no_worse(o, o2, truck=True):
+                o2["drivable"] = True
+                return q, o2
+            # ... or, where the plan is then worse (its pond no longer
+            # fits), the way in laid out round the plan as it stands
+            try:
+                d = truck_design_for(q, o, ctx)
+                if d is not None and d["got"] is not None and d["got"]["ok"]:
+                    apply_truck_path(q, o, ctx)
+                    o["drivable"] = True
+                    return q, o
+            except _BudgetExceeded:
+                raise
+            except Exception:           # noqa: BLE001 - as in finish: an extra, never a crash
+                pass
+            return None
+
+        def settle() -> tuple[Plan, dict[str, Any]]:
+            while True:
+                top = max(results, key=score)
+                if not top[1]["ok"] or "drivable" in top[1] or truck_first_rec["judged"] >= TRUCK_TIER_MAX:
+                    return top
+                truck_first_rec["judged"] += 1
+                got = with_truck(top)
+                if got is None:
+                    top[1]["drivable"] = False
+                else:
+                    results[next(k for k, t in enumerate(results) if t is top)] = got
+                    for lst in (added, land_plans):     # a plan of a pass stays one of that pass
+                        for k, t in enumerate(lst):
+                            if t is top:
+                                lst[k] = got
+        try:
+            top0 = max(results, key=score)
+            if not ctx.runs:
+                raise LookupError           # no frontage: no driveway, no truck route to lay out
+            top = settle()
+            if top0[1]["ok"] and top0[1].get("drivable") is False:
+                left = [TRUCK_FIRST_MAX_TRIES]
+                t_street, t_homes = faces_street(top0[0], row_line), loading_faces_homes(top0[0], res_line)
+                truck_first(first[2], 0, P0, B0, dataclass_replace(ctx, pond_room=True), row_line, res_line, left,
+                            lambda q: (t_street or not faces_street(q, row_line)) and (t_homes or not loading_faces_homes(q, res_line)),
+                            lined_up)
+                truck_first_rec.update(tries=TRUCK_FIRST_MAX_TRIES - left[0], found=len(lined_up))
+                results += lined_up
+                top = settle()
+            def stands(outcome: str) -> None:
+                """The ranking as it was: the plan drawn is the top layout before this step, and says it has no way in."""
+                for _, o_ in results:
+                    if o_.get("drivable") is False:
+                        del o_["drivable"]
+                truck_first_rec["outcome"] = outcome
+            if top[1]["ok"] and top[1].get("drivable") is not True:
+                stands("none_found")        # none of the layouts judged has a way in
+            elif top0[1].get("drivable") is False:
+                # Another layout has a way in. It is drawn in place of the
+                # larger one only when it keeps most of its floor area and
+                # turns no docks to the street or loading to homes that
+                # the larger one did not (review 43/02, finding 9).
+                truck_first_rec["best_with_a_way_in_sf"] = rnd(top[0].sf, 1000)
+                if top[0].sf < TRUCK_TIER_MIN_SHARE * top0[0].sf:
+                    stands("much_smaller")
+                elif ((faces_street(top[0], row_line) and not faces_street(top0[0], row_line))
+                      or (loading_faces_homes(top[0], res_line) and not loading_faces_homes(top0[0], res_line))):
+                    stands("faces_street_or_homes")
+                else:
+                    truck_first_rec["outcome"] = "another_layout"
+            else:
+                truck_first_rec["outcome"] = "drivable" if top[1].get("drivable") else "not_judged"
+        except LookupError:
+            truck_first_rec["outcome"] = "no_frontage"
+        except _BudgetExceeded:
+            search.exceeded = False     # only this step ran out of time: building 1's search was complete
+            for _, o_ in results:
+                if o_.get("drivable") is False:
+                    del o_["drivable"]
+            truck_first_rec["outcome"] = "no_time"
+        # Docks downhill (reviews/42). The best plan's footprint is tried
+        # with its court on the other side (the office at either end) when
+        # that stepped pad moves materially less earth. It takes the plan's
+        # place only when dock_turn_blocked and dock_turn_refused find
+        # nothing against it, and (below) when it costs no second building.
+        # Its own tries, on what is left of the pass's time.
+        base = max(results, key=score)
+        q0, o0 = base
+        sg0 = o0.get("stepped")
+        if not o0["ok"]:
+            dock_side["outcome"] = "no_plan"
+        elif sg0 is None:
+            dock_side["outcome"] = "no_lidar"
+        elif len(q0.courts) != 1:
+            dock_side["outcome"] = "courts_on_both_sides"
+        else:
+            cands, seen_q = [], set()
+            dock_side["outcome"] = "not_cheaper"
+            try:
+                for fu in (q0.frame.flipu, not q0.frame.flipu):
+                    q = court_on_other_side(q0, prog, fu)
+                    shape = tuple(round(c, 1) for g in (q.courts + q.cars + q.offices) for c in g.bounds)
+                    sg = stepped_grading(q, dem)
+                    if shape in seen_q or not dock_turn_saves(sg0, sg):
+                        continue                        # the same layout again, or no material saving: nothing to try
+                    seen_q.add(shape)
+                    office = "same end" if fu == q0.frame.flipu else "other end"
+                    would = rnd(sg0["moved_cy"] - sg["moved_cy"], 1000)
+                    why = dock_turn_blocked(q0, q, B0, row_line, res_line)
+                    if why is None and (room.cut_short or dock_side["tried"] >= DOCK_TURN_TRIES):
+                        why = "no time left to lay it out"
+                    if why is None:
+                        dock_side["tried"] += 1
+                        o2 = finish(q, dataclass_replace(ctx_room, truck_design=bool(o0.get("drivable")), land=o0.get("land_mode", False)))
+                        why = dock_turn_refused(o0, o2)
+                        if why is None and o0.get("drivable") and not o2.get("truck_ok"):
+                            why = "a truck could not drive its way in"
+                        if why is None:
+                            if o0.get("drivable"):
+                                o2["drivable"] = True
+                            # (the office's end does not change the stepped earthwork: the first that passes is taken,
+                            # the office where it was before the other end)
+                            cands.append((q, o2))
+                            break
+                    dock_side["refused"].append({"office": office, "why": why, "would_save_cy": would})
+            except _BudgetExceeded:
+                dock_side["refused"].append({"office": office, "why": "no time left to lay it out", "would_save_cy": would})
+            if cands:
+                turned, turned_from = cands[0], base
+                results.append(turned)
+                dock_side.update(outcome="turned", turned=True,
+                                 saved_cy=rnd(sg0["moved_cy"] - turned[1]["stepped"]["moved_cy"], 1000))
+            elif dock_side["refused"]:
+                dock_side["outcome"] = "refused"
+    elif opts.fixes:
+        dock_side["outcome"] = "no_time" if room_skipped or search.exceeded else "no_plan"
     results.sort(key=score, reverse=True)
-    best_p, best_o = results[0]
-    second = None
-    second_cut = False      # the budget ran out in the optional second-building search only
-    if best_o["ok"] and not search.exceeded:
+    if turned is not None:
+        # the same footprint and floor area: it takes the place of the plan it was turned from
+        results.remove(turned)
+        results.insert(0, turned)
+    def ready(q: Plan, o: dict[str, Any], other: tuple | None = None) -> None:
+        """Design for the truck (reviews/43): the layout's truck route as
+        a path a WB-67 can steer, with its swept path checked, put on the
+        plan once. Like the read-out, it must never cost a plan."""
+        if not opts.fixes or not o["ok"] or "truck_path" in o:
+            return
+        try:
+            apply_truck_path(q, o, ctx, other)
+        except Exception as exc:        # noqa: BLE001
+            o["truck_path"] = {"designed": False, "reason": f"{type(exc).__name__}: {str(exc)[:160]}"}
+
+    def second_for(best_p: Plan, best_o: dict[str, Any]) -> tuple[tuple | None, bool]:
+        """A second building beside the plan (best_p, best_o), and whether
+        the budget ran out while looking (the optional search only)."""
+        if not best_o["ok"] or search.exceeded:
+            return None, False
+        ready(best_p, best_o)       # the second building goes round building 1's truck road as a truck drives it
         try:
             blocked = unary_union([best_p.module.buffer(40)] + [d.buffer(25) for d in best_o["drops"]] + [r.buffer(20) for r in best_o["ponds"]]
                                   + [pp.buffer(15) for _, pp in best_o["route_polys"]])
@@ -2410,13 +3574,99 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                 for q in sorted(c2, key=lambda q: -q.sf)[:6]:
                     o2 = finish(q, ctx, others)
                     if o2["ok"]:
-                        second = (q, o2)
-                        break
+                        return (q, o2), False
+                if opts.fixes and SECOND_THROUGH_FIRST and best_o["tpt"] is not None:
+                    # Use the land (reviews/44): none has a way in of its
+                    # own (building 1 stands across the lot), so the same
+                    # candidates reached through building 1's truck road
+                    # and the end of its court, their ponds shaped to the
+                    # open ground where no rectangle fits.
+                    t_pave = [pp for k, pp in best_o["route_polys"][:1] if k == "truck"]
+                    others["truck_ground"] = unary_union(best_p.roads + best_p.courts + t_pave).buffer(0.5, join_style=2).buffer(-6.5, join_style=2)
+                    # (building 1's truck road may cross the corner of its own car field: that ground is road, not parking)
+                    others["solid"] = unary_union(best_o["drops"] + best_o["ponds"] + [pp for k, pp in best_o["route_polys"] if k == "car"]
+                                                  + [best_p.building] + best_p.cars + best_p.rows).difference(unary_union(t_pave).buffer(1.0))
+                    ctx_back = dataclass_replace(ctx, pond_room=True, land=True, through_first=True)
+                    for q in sorted(c2, key=lambda q: -q.sf)[:6]:
+                        o2 = finish(q, ctx_back, others)
+                        if o2["ok"] and o2.get("drains", True):
+                            return (q, o2), False
         except _BudgetExceeded:
             # Building 1 was fully searched before this point (the block
             # runs only when its search finished in time), so its result
             # stands: the cut search is a note, not a blocking flag.
-            second, second_cut = None, True
+            return None, True
+        return None, False
+
+    best_p, best_o = results[0]
+    # Sight-side entry (reviews/43). Where the best plan's trucks enter its
+    # court with the dock doors on their right, the same layout is finished
+    # once more with its driveway and truck route sent to the other end of
+    # the court. It takes the plan's place only when nothing else is worse
+    # (truck_side_refused) and, below, when it costs no second building.
+    truck_side: dict[str, Any] = {"outcome": None, "why": None}
+    changes: list[tuple[str, tuple]] = [("turn", turned_from)] if turned is not None else []
+    if opts.fixes:
+        if not best_o["ok"] or best_o.get("truck_entry") is None:
+            truck_side["outcome"] = "no_plan"
+        elif len(best_p.courts) != 1:
+            truck_side["outcome"] = "courts_on_both_sides"
+        elif backing_of(best_p, best_o) == "sight":
+            truck_side["outcome"] = "sight"
+        elif search.exceeded:
+            truck_side.update(outcome="blind", why="no time left to lay it out")
+        else:
+            try:
+                o_s = finish(best_p, dataclass_replace(ctx, sight_first=True, pond_room=best_o.get("pond_room_mode", False),
+                                                       land=best_o.get("land_mode", False), truck_design=True))
+                why = truck_side_refused(best_p, best_o, o_s)
+                if why is None and best_o.get("drivable") and not o_s.get("truck_ok"):
+                    why = "a truck could not drive its way in"
+                if why is None and o_s.get("truck_ok"):
+                    o_s["drivable"] = True
+            except _BudgetExceeded:
+                search.exceeded = False     # only this optional step ran out of time: the plan itself was searched in full
+                o_s, why = None, "no time left to lay it out"
+            if why is None:
+                changes.append(("sight", (best_p, best_o)))
+                results[0] = (best_p, o_s)
+                best_o = o_s
+                truck_side["outcome"] = "turned_to_sight"
+            else:
+                truck_side.update(outcome="blind", why=why)
+    second, second_cut = second_for(best_p, best_o)
+    # A change to the best plan must cost no floor area in a second
+    # building either (review 42/02, finding 3): the plan it was changed
+    # from is searched too, most recent change first, and stands if its
+    # second building is the larger (or, where the changed plan has none,
+    # if time ran out before that was known).
+    sec_sf = lambda t: t[0].sf if t else 0
+    while changes and not second_cut:
+        kind, before = changes.pop()
+        sec0, cut0 = second_for(*before)
+        if sec_sf(sec0) > sec_sf(second) or (cut0 and second is None):
+            if kind == "sight":
+                results[0] = before
+                truck_side.update(outcome="blind", why="it would cost the second building")
+            else:
+                results.remove(before)
+                results.insert(0, before)
+                dock_side.update(outcome="refused", turned=False, saved_cy=0)
+                dock_side["refused"].append({"office": "either end", "why": "it would cost the second building",
+                                             "would_save_cy": rnd(before[1]["stepped"]["moved_cy"] - turned[1]["stepped"]["moved_cy"], 1000)})
+                turned = None
+                if truck_side["outcome"] == "turned_to_sight":
+                    truck_side.update(outcome="not_tried", why="it was laid out for the turned plan, which was not kept")
+            best_p, best_o, second, second_cut = *before, sec0, cut0
+        elif cut0:
+            search.exceeded = False     # only this comparison ran out of time: the plan drawn and its second building were searched in full
+            (truck_side if kind == "sight" else dock_side)["second_building_compared"] = False
+            break
+    if turned is None and dock_side["refused"]:
+        # the drawn plan's own note says why its court stays on the high side
+        why = "; ".join(dict.fromkeys(r["why"] for r in dock_side["refused"]))
+        best_o["flags"] = [(f, sv, note.replace(", a layout not checked here)", f": not taken, {why})") if f == "DOCKS_UPHILL" else note)
+                           for f, sv, note in best_o["flags"]]
     if rescue_cut:
         late.append(("SMALLER_LAYOUTS_NOT_ALL_TRIED", 2,
                      f"the search stopped after {opts.max_seconds:.0f} s while trying shorter and shallower layouts after the "
@@ -2428,12 +3678,34 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
                      "building 1 is complete, a second building may still fit (re-run with a larger --max-seconds-per-site)"))
     elif search.exceeded:
         late.append(budget_flag)
+    ready(best_p, best_o)
+    if second is not None:
+        ready(second[0], second[1], (best_p, best_o))
+    if truck_first_rec.get("outcome") in ("much_smaller", "faces_street_or_homes"):
+        # the plan drawn has no way in; the layout that has one was not drawn, and the note says which and why
+        why = ("much smaller" if truck_first_rec["outcome"] == "much_smaller" else "one that turns its docks to the street or its loading to homes")
+        best_o["flags"][:] = [(f, sv, note + (f"; the largest layout found with a way in has {truck_first_rec['best_with_a_way_in_sf']:,} SF "
+                                               f"({why}: not drawn)" if f == "TRUCK_PATH_NONE" else "")) for f, sv, note in best_o["flags"]]
     rec = report(inp, best_p, best_o, second, parcel, P, B, rules, jname, flags, late, fr, hypothetical, res_line, row_line, opts)
     gross_ac = parcel.area / SQFT_PER_AC
     rec["alternatives"] = [_alternative(q, o, gross_ac) for q, o in results[:10]]
+    if turned is not None:
+        rec["alternatives"][0]["docks_turned"] = True       # the next row with its footprint is the plan it was turned from
     rec["inputs"] = _inputs_block(inp, parcel, P, B, constraints, trans, cut, steep, fr, edges, seam_sf, small, search, ctx)
     if opts.fixes:
-        rec["inputs"]["pond_relocation"] = {"checks": reloc.checks, "moved": reloc.moved, "max_checks": reloc.max_checks}
+        rec["inputs"]["dock_side"] = dock_side
+        rec["inputs"]["truck_side"] = truck_side
+        truck_first_rec["drawn"] = any(best_p is q for q, _ in lined_up)
+        rec["inputs"]["truck_first"] = truck_first_rec
+        land_rec["drawn"] = any(best_p is q for q, _ in land_plans)
+        rec["inputs"]["land_pass"] = land_rec
+        src = turned_from[0] if turned is not None else best_p      # a turned plan came from the pass when its plan did
+        if room is not None:
+            rec["inputs"]["fit_searches"] = rec["inputs"].get("fit_searches", 0) + room.search.fit_calls
+        rec["inputs"]["pond_room"] = ({"layouts": room.layouts, "tries": room.tries, "max_tries": room.max_tries, "found": room.found,
+                                       "drawn": any(src is q for q, _ in added), "cut_short": room.cut_short, "skipped_for_time": False}
+                                      if room is not None else {"layouts": 0, "tries": 0, "max_tries": POND_ROOM_MAX_TRIES, "found": 0,
+                                                                "drawn": False, "cut_short": False, "skipped_for_time": room_skipped})
     try:
         _read_out(rec, [(best_p, best_o)] + ([second] if second else []), parcel, P, edges, rules, res_line, fr,
                   [_alternative(q, o, gross_ac) for q, o in pond_limited], opts)
@@ -2454,12 +3726,51 @@ def plan_site(inp: SiteInputs, opts: PlanOptions = PlanOptions(), clock: Callabl
     return rec, drawing
 
 
+def _stepped_record(sg: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The stepped pad of building 1 for the record (stepped_grading), or
+    None. `court_side`: where the one court lies on the ground (a rise or
+    fall of 1 ft or more from the building: high or low); `both` for a
+    building with courts on two sides, each court's fall listed."""
+    if sg is None:
+        return None
+    fall, both = sg["fall_to_court"], sg.get("courts", 1) > 1
+    return {"floor_ft": round(sg["floor"]), "court_ft": round(sg["court"]), "dock_drop_ft": DOCK_DROP_FT,
+            "cut_cy": rnd(sg["cut_cy"], 1000), "fill_cy": rnd(sg["fill_cy"], 1000), "moved_cy": rnd(sg["moved_cy"], 1000),
+            "ground_fall_to_court_ft": None if both else round(fall, 1),
+            "ground_fall_to_courts_ft": [round(x, 1) for x in sg.get("falls", [fall])],
+            "court_side": "both" if both else "high" if fall <= -1.0 else "low" if fall >= 1.0 else "level",
+            "basis": f"floor at one level, truck courts and trailer rows {DOCK_DROP_FT:.0f} ft below it, floor set where cut equals "
+                     f"fill; lidar samples at {sg.get('step', 40.0):.0f} ft over the layout's own ground (module); the rest of that "
+                     "ground at the floor; no paving slopes, walls, swell or shrink; no pond excavation, drop yards or driveways"}
+
+
+def _drainage_record(o: dict[str, Any], second: tuple | None) -> dict[str, Any]:
+    """The ponds' ground against their pads, building 1's then a second
+    building's (each against its own pad): every pond's figure, the
+    highest, and whether all drain. None where nothing was measured (no
+    pond, no lidar under it): not a pond that drains."""
+    each = list(o.get("pond_over_each") or []) + (list(second[1].get("pond_over_each") or []) if second else [])
+    measured = [x for x in each if x is not None]
+    placed = o.get("pond_ok", True) and (second[1].get("pond_ok", True) if second else True)
+    if measured and max(measured) > POND_UPHILL_TOL_FT:
+        drains: bool | None = False                 # one pond above its pad is enough
+    else:
+        drains = True if (measured and len(measured) == len(each) and placed) else None
+    return {"pond_over_pad_ft": round(max(measured)) if measured else None,
+            "ponds_over_pad_ft": [round(x) if x is not None else None for x in each],
+            "drains_by_gravity": drains}
+
+
 def _pond_shape_text(o: dict[str, Any], second: tuple | None) -> str:
     """'L=2W', or the proportions used where a 2:1 pond did not fit."""
     ratios = list(o.get("pond_ratios") or []) + (list(second[1].get("pond_ratios") or []) if second else [])
-    if all(k == 2.0 for k in ratios):
+    other = sorted({k for k in ratios if k not in (2.0, 0.0)})
+    free = " or shaped to the open ground (storage from its outline)" if 0.0 in ratios else ""
+    if not other and not free:
         return "L=2W"
-    return "L=2W where it fits, else " + ", ".join(f"L={k:g}W" for k in ratios if k != 2.0) + " (a 2:1 pond did not fit)"
+    if not other:
+        return "L=2W where it fits, else shaped to the open ground (storage from its outline; no rectangle fitted)"
+    return "L=2W where it fits, else " + ", ".join(f"L={k:g}W" for k in other) + free + " (a 2:1 pond did not fit)"
 
 
 def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
@@ -2473,7 +3784,10 @@ def _alternative(q: Plan, o: dict[str, Any], gross_ac: float) -> dict[str, Any]:
             "detention_acft": round(o["v_det"], 1), "pond_fits": o["pond_ok"],
             "relief_ft": round(o["relief"]) if o["relief"] else None, "steep_pct": round(o["steep_module_pct"]),
             "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
-            "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1})}
+            "blocking": sorted({f for f, sv, _ in o["flags"] if sv == 1}),
+            **({"drains": o["drains"]} if "drains" in o else {}),
+            **({"stepped_cy": rnd(o["stepped"]["moved_cy"], 1000)} if o.get("stepped") else {}),
+            **({"drivable": o["drivable"]} if "drivable" in o else {})}
 
 
 def _read_out(rec: dict[str, Any], layouts: list[tuple[Plan, dict[str, Any]]], parcel, P, edges, rules: dict[str, Any],
@@ -2641,7 +3955,8 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
         flags.append(("NOT_FEASIBLE_REASON", 1, "the plan failed a check without a named flag"))
     counted = feasible is True and not (fixes and gated)
     sevd = _sev(flags)
-    cars_prov = max(min(p.car_cap, math.ceil(p.cars_required / 5) * 5), p.cars_required) if p.car_cap >= p.cars_required else p.car_cap
+    car_cap = p.car_cap - (o.get("car_stalls_taken", 0) if fixes else 0)       # less the stalls the trucks' lead-in takes (reviews/43)
+    cars_prov = max(min(car_cap, math.ceil(p.cars_required / 5) * 5), p.cars_required) if car_cap >= p.cars_required else car_cap
     v_total = o["v_det"] + (second[1]["v_det"] if second else 0)
     imp_total = o["imp_ac"] + (second[1]["imp_ac"] if second else 0)
     rec = _base_record(inp, jname, rules, opts)
@@ -2652,21 +3967,24 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
         "total_sf": rnd(total, 1000) if counted else 0, "total_sf_if_access": rnd(total, 1000),
         "doors": p.doors,
         "trailers": {"court_rows": p.court_stalls, "drop_yards": o["trailers"] - p.court_stalls, "total": o["trailers"], "target": p.trailers_target},
-        "cars": {"provided": cars_prov, "row_capacity": p.car_cap, "required": p.cars_required, "basis": p.cars_rule, "ada": ada_count(cars_prov),
+        "cars": {"provided": cars_prov, "row_capacity": car_cap, "required": p.cars_required, "basis": p.cars_rule, "ada": ada_count(cars_prov),
                  "per_1000_sf": round(cars_prov / p.sf * 1000, 2), "stall": f"{rules['stall_w']} x 18 ft"},
         "coverage": {"gross_ac": round(gross, 1), "sf_per_gross_ac": rnd(sfa, 100), "gross_far": round(total / (gross * SQFT_PER_AC), 2),
                      "impervious_ac": round(imp_total, 1), "impervious_pct": round(imp_total / gross * 100), "paving_envelope_ac": round(P.area / SQFT_PER_AC, 1)},
         "detention": {"storage_acft": round(v_total, 1), "ponds": len(o["ponds"]) + (len(second[1]["ponds"]) if second else 0),
                       "fits": o["pond_ok"] if fixes else o["ok"],
+                      **(_drainage_record(o, second) if fixes else {}),
                       "basis": f"1.15 x (k_imp x impervious + k_perv x disturbed pervious), HSG {_hsg_basis(meta, fixes, inp.assembled)}; 6 ft deep, 4:1 slopes, {_pond_shape_text(o, second)}, 1 ft freeboard, 15 ft rim; screening only (+/-30%)"},
         "access": {"truck_driveway": o["tpt"] is not None, "car_driveway": o["cpt"] is not None, "frontage_ft": fr.feet, "road": fr.road,
                    "frontage_state": fr.state,
-                   "truck_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "truck")), "car_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "car"))},
+                   "truck_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "truck")), "car_route_ft": round(sum(ln.length for k, ln in o["routes"] if k == "car")),
+                   **({"truck_path": o["truck_path"]} if fixes and "truck_path" in o else {})},
         "grading": {"relief_ft": round(o["relief"]) if o["relief"] else None, "cut_fill_cy": rnd(o["cutfill_cy"], 1000) if o["cutfill_cy"] else None,
                     "steep_share_pct": round(o["steep_module_pct"]), "dem_points": o["dem_points_module"],
                     "pad_elev_ft": round(o["pad_elev"]) if o.get("pad_elev") is not None else None,
                     "max_cut_ft": round(o["max_cut"]) if o.get("max_cut") is not None else None,
                     "max_fill_ft": round(o["max_fill"]) if o.get("max_fill") is not None else None,
+                    **({"stepped_pad": _stepped_record(o.get("stepped"))} if fixes else {}),
                     "basis": "one balanced plane over the building, courts and parking (lidar sampled at 40 ft); no terraces"},
         "flags": sevd,
         "plan_checks": o["violations"] + ([dict(v, building=2) for v in second[1]["violations"]] if second else []),
@@ -2675,9 +3993,12 @@ def report(inp, p, o, second, parcel, P, B, rules, jname, flags0, late, fr, hypo
         q, o2 = second
         rec["second_building"] = {"configuration": q.v["name"], "L_ft": q.L, "D_ft": q.v["D"], "sf": rnd(q.sf, 1000), "doors": q.doors,
                                   "trailers": o2["trailers"], "trailers_target": q.trailers_target, "cars_capacity": q.car_cap, "cars_required": q.cars_required,
-                                  "own_driveways": not o2["shared_access"], "route_ft": round(sum(ln.length for k, ln in o2["routes"] if k == "truck"))}
+                                  "own_driveways": not o2["shared_access"], "route_ft": round(sum(ln.length for k, ln in o2["routes"] if k == "truck")),
+                                  **({"pad_elev_ft": round(o2["pad_elev"])} if fixes and o2.get("pad_elev") is not None else {}),
+                                  **({"truck_path": o2["truck_path"]} if fixes and "truck_path" in o2 else {})}
         rec["totals_both_buildings"] = {"doors": p.doors + q.doors, "trailers": o["trailers"] + o2["trailers"],
-                                        "trailers_target": p.trailers_target + q.trailers_target, "cars_capacity": p.car_cap + q.car_cap}
+                                        "trailers_target": p.trailers_target + q.trailers_target,
+                                        "cars_capacity": p.car_cap + q.car_cap - ((o.get("car_stalls_taken", 0) + o2.get("car_stalls_taken", 0)) if fixes else 0)}
     return rec
 
 

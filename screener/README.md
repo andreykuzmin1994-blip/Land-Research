@@ -937,12 +937,73 @@ How to read a plan:
 - When the pond or a route blocks every plan the search tried first, it
   also tries shorter lengths and the shallower layouts it left out, so a
   larger parcel does not read worse than a smaller one inside it.
-- When the pond alone blocks a layout, the search first moves the
-  building to leave the pond room (the lowest open spots, at most 48
-  full checks per site), then shortens it; where no 2:1 pond fits, it
-  also tries other pond proportions (since 2026-11-17, reviews/40;
-  default behaviour only). Reference site #21 went from 68,000 to 84,000
-  SF. `inputs.pond_relocation` in `plans.json` counts the checks.
+- **Use the land** (since 2026-11-20, reviews/44; default behaviour
+  only). The larger layouts the search rejected are finished once more
+  with what an engineer would add: a car drive across the layout's own
+  open ground, a pond shaped to the open ground where no rectangle fits
+  (`POND_SHAPED_TO_SITE`), the truck road laid out first. A second
+  building on land behind the first is reached through the first's truck
+  road and court (`SECOND_ACCESS_THROUGH_FIRST`, a condition). Both only
+  add: never a layout that newly faces the street or homes, never less
+  floor area. `inputs.land_pass` in `plans.json` says what was tried.
+- **Design for the truck** (since 2026-11-19, reviews/43; default
+  behaviour only). The plan drawn has a truck route a tractor-trailer
+  (AASHTO WB-67) can steer, laid out before its pond: turns of 45 ft
+  radius or more, its swept path checked against the building, parked
+  cars and trailers, ponds and setback lines, the pavement widened to
+  that path. Where the driveway must stand in front of the car field,
+  the lead-in takes the corner of it and the stalls are counted off
+  (`TRUCK_LEAD_IN_OVER_PARKING`, or `PARKING_SHORT_FOR_LEAD_IN` when too
+  few are left); a hard S-bend as trucks come off the street is a
+  condition (`TRUCK_ENTRANCE_S_BEND`). Trucks are sent to the end of the court from which they
+  back in on the driver's side where that costs nothing else
+  (`BLIND_SIDE_BACKING` otherwise). A layout no truck can enter ranks
+  below one it can that keeps at least 80% of its floor area; otherwise
+  the plan says `TRUCK_PATH_NONE`.
+  `access.truck_path` in `plans.json` has the path's figures. A
+  screening check: one vehicle, forward, no backing manoeuvre.
+- **Grading** (since 2026-11-19, reviews/42; default behaviour only).
+  Each layout is also graded as a stepped pad: the floor at one level,
+  the truck court 4 ft below it, cut equal to fill.
+  `grading.stepped_pad` in `plans.json` has the floor and court
+  elevations, the earth moved and the court's side; the sheet prints
+  them and the stepped earthwork of each layout compared (`stepped_cy`,
+  "EARTH CY"). A court cut into the high side says `DOCKS_UPHILL`
+  (information) with what it costs and why the other side was not
+  taken. The docks are turned to the low side of the same footprint
+  only where that costs nothing else: not toward the street or homes,
+  not between the building and the street, the plan still passing in
+  full with as many trailer stalls, no new condition, no much longer
+  way in for cars, and no second building lost (`inputs.dock_side`
+  says what was tried and why not). The ranking does not count
+  earthwork. A screening figure over the layout's own ground: no
+  paving slopes, walls, rock, pond excavation or driveways.
+- **Drainage** (since 2026-11-18, reviews/41; default behaviour only).
+  A pond on ground more than 3 ft above the building pad cannot fill by
+  gravity: the plan says `POND_UPHILL` (from 1 ft, `POND_ABOVE_PAD`, for
+  information: a deeper pond takes more room than is drawn), and a layout whose pond drains
+  ranks before a larger one whose pond does not. The pass below starts
+  pond first: the lowest pond spots are reserved and every cross-section
+  is fitted round them. The sheet prints the pad elevation and how far
+  the pond's ground is below (or above) the pad;
+  `detention.ponds_over_pad_ft` (each pond), `pond_over_pad_ft` and
+  `drains_by_gravity` (empty where nothing was measured) are in
+  `plans.json`. One level pad only: no paving grades, pipes or outfall. Reference site #25 went from a 67,000 SF plan whose pond
+  stood 9 ft above the pad to 70,000 SF with the pond 24 ft below it.
+- After the search, a pass takes the layouts the pond alone blocked and
+  tries them with other pond proportions and moved to leave the pond
+  room (since 2026-11-17, reviews/40; default behaviour only). It only
+  adds layouts: the plan drawn is the best of all by the usual ranking.
+  It refuses a layout that turns its docks to the street or its
+  loading to homes where the plan before the pass did not, or that has
+  no more floor area and fewer trailer stalls. It has 90 tries and half
+  the remaining time, keeps what it
+  found when cut, and is skipped when less than half the site's budget
+  is left (time limits: a site near them can plan differently on a
+  slower machine; `inputs.pond_room` says so).
+  Reference site #21 went from 68,000 to 91,000 SF. A plan it adds may
+  have fewer trailer stalls (the ranking gives them no floor area).
+  `inputs.pond_room` in `plans.json` says what it did.
 - **The planner does not check whether a parcel is built.** Run the built
   check first and plan only parcels it reads as `raw_land` or
   `partly_usable`; the viewer shows both side by side.
