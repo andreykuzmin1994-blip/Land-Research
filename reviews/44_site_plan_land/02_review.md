@@ -71,6 +71,9 @@ seeds; no crash with the truck design failing or raising.
   and #25 are unchanged at real angles (91,000 and 70,000 SF).
 - Run time: 46 default plans 251 s before, 362 s after (+44%); most of it
   on the two-building sites (10 to 20 s and 9 to 24 s).
-- Full suite: SUITE_RESULT
+- Full suite (`python -m unittest discover -s screener/tests -t .`):
+  1,051 tests OK in 1,093 s on the fixes (1,047 OK in 1,144 s on the
+  merged code; 1,040 in 683 s before this change). CI's `offline-tests`
+  job still allows 5 minutes (`reviews/41`, "Open"): not changed here.
 
 The fixes were not sent to a second independent review.
