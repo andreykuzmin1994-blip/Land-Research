@@ -2376,7 +2376,14 @@ class Land(Offline):
         self.assertEqual(rec["total_sf"], 450000)
         sb = rec["second_building"]
         self.assertEqual((sb["sf"], sb["own_driveways"]), (115000, False))
-        self.assertTrue({"SECOND_ACCESS_THROUGH_FIRST", "SECOND_ACCESS_SHARED"} <= names(rec, 2))       # conditions, said plainly
+        self.assertIn("SECOND_ACCESS_THROUGH_FIRST", names(rec, 2))          # a condition, said plainly
+        note = [f["note"] for f in rec["flags"][2] if f["flag"] == "SECOND_ACCESS_THROUGH_FIRST"][0]
+        self.assertRegex(note, r"its trucks run about [\d,]+ ft over building 1's truck road and court")
+        self.assertRegex(note, r"its cars share that drive for about [\d,]+ ft")
+        self.assertNotIn("SECOND_ACCESS_SHARED", names(rec))                 # (that flag's "split inside the throat" is not what happens)
+        # the pass and the second building turned nothing to the street: building 1 is still the rear-load plan
+        self.assertNotIn("STREET_FACING_DOCKS", names(rec))
+        self.assertIn("rear-load", rec["configuration"])
         self.assertTrue(rec["feasible"])
         self.assertEqual(rec["plan_checks"], [])
         assert_invariant(self, rec)
@@ -2388,9 +2395,19 @@ class Land(Offline):
         # its routes: from building 1's driveway, over building 1's truck pavement, never over its building or stalls
         self.assertEqual((o2["tpt"].x, o2["tpt"].y), (d.o["tpt"].x, d.o["tpt"].y))
         self.assertIsNone(o2["cpt"])
-        solid = unary_union([p1.building] + p1.rows + d.o["ponds"] + d.o["drops"])
+        # ... nor through the strip in front of its dock doors, nor over its parked cars (but where
+        # building 1's own truck road already crosses the corner of its car field), and so for their pavement
+        road1 = next(pp for k, pp in d.o["route_polys"] if k == "truck")
+        solid = unary_union([p1.building] + p1.rows + d.o["ponds"] + d.o["drops"] + [sp.dock_zone(p1)]
+                            + [c.difference(road1.buffer(2)) for c in p1.cars])
         for kind, ln in o2["routes"]:
             self.assertLess(ln.intersection(solid).length, 1.0, kind)
+        for kind, pave in o2["route_polys"][:2]:
+            self.assertLess(pave.intersection(unary_union([p1.building, p2.building] + d.o["ponds"] + d.o["drops"] + o2["ponds"])).area, 1.0, kind)
+        self.assertGreater(sb["car_route_ft"], 0)
+        # its pond and detention are sized round the truck road drawn, and building 1's pavement is not counted twice
+        self.assertIs(o2["truck_ok"], True)
+        self.assertLess(o2["imp_ac"] * sp.SQFT_PER_AC, p2.module.area + sum(pp.area for _, pp in o2["route_polys"]) + 1)
         # its truck path goes on from where building 1's comes onto its lane, and a WB-67 can drive it
         tp2 = sb["truck_path"]
         self.assertEqual((tp2["designed"], tp2["swept_ok"], tp2["from"]), (True, True, "building 1's truck court"))
@@ -2401,6 +2418,64 @@ class Land(Offline):
         svg = sr.render(d, rec)
         viewer.sanitise_svg(svg)
         self.assertIn("BUILDING 2", svg)
+
+    def test_a_shaped_pond_stays_on_the_layouts_side_of_water(self):
+        # review 44/02, finding 1: the rectangle's rule, for a shaped pond too
+        strip = box(0, 0, 400, 150).union(box(0, 300, 400, 450))             # open ground either side of a ditch
+        ditch = box(0, 200, 400, 250)
+        dem = self.ground(lambda x, y: 900.0)
+        south = box(0, -300, 400, -50)                                       # the layout stands south of both
+        north_only = box(0, 300, 400, 450)
+        self.assertIsNotNone(sp.free_pond(north_only, 1.0, dem, None))       # the ground holds it
+        self.assertIsNone(sp.free_pond(north_only, 1.0, dem, None, south, ditch))        # but it is across the water
+        got = sp.free_pond(strip, 1.0, dem, None, south, ditch)
+        self.assertLessEqual(got.bounds[3], 151)                             # the piece on the layout's side
+        self.assertIsNotNone(sp.free_pond(north_only, 1.0, dem, None, south, Polygon()))
+        # in a plan: a wetland band across a 750 x 850 ft lot. The layout the pass would add needed its pond beyond the band.
+        band = wgs(box(0, 640, 750, 680))
+        rec, d = sp.plan_site(site(750, 850, constraints_wgs=[band], constraints_near_wgs=[band]))
+        self.assertEqual(rec["building"]["sf"], 114000)
+        for pond in d.o["ponds"]:
+            link = LineString(sp.nearest_points(pond, d.p.module))
+            self.assertFalse(link.crosses(d.constraints))
+
+    def test_a_shaped_pond_is_one_piece_with_no_island(self):
+        dem = self.ground(lambda x, y: 900.0)
+        ring = box(0, 0, 500, 500).difference(box(200, 200, 300, 300))       # open ground round a 100 ft block
+        pond = sp.free_pond(ring, 4.0, dem, None)
+        self.assertTrue(pond is None or not pond.interiors)
+        # a large piece of a poor shape does not hide a smaller piece that holds the volume
+        poor = unary_union([box(0, 0, 3000, 64), box(0, 500, 260, 760)])     # a long 64 ft strip (2.3 ac-ft in all) and a 260 ft square
+        got = sp.free_pond(poor, 2.5, dem, None)
+        self.assertIsNotNone(got)
+        self.assertGreaterEqual(got.bounds[1], 499)
+
+    def test_the_pass_takes_a_larger_layout_not_a_worse_plan(self):
+        # review 44/02, finding 5. A tight 560 x 600 ft lot: the pass found
+        # 72,000 SF with no trailer stalls where the plan had 70,000 SF and
+        # 7. Under 5% more floor area does not buy the stalls.
+        mk = lambda: site(560, 600, z=lambda x, y: 900 - 0.03 * y)
+        rec, _ = sp.plan_site(mk())
+        self.assertEqual((rec["building"]["sf"], rec["trailers"]["total"]), (70000, 7))
+        self.assertIs(rec["inputs"]["land_pass"]["drawn"], False)
+        with mock.patch.object(sp, "LAND_MIN_GAIN", 0.0):
+            loose, _ = sp.plan_site(mk())
+        self.assertEqual((loose["building"]["sf"], loose["trailers"]["total"]), (72000, 0))
+        # nor a layout whose truck road leaves its parking short, cannot be driven, or has no stacking room
+        self.assertEqual(sp.LAND_NOT_FOR, {"PARKING_SHORT_FOR_LEAD_IN", "TRUCK_SWEPT_PATH", "TRUCK_PATH_NONE", "SHORT_THROAT"})
+        for mk2 in (lambda: site(600, 700), lambda: site(650, 750, jur="Fairburn", z=lambda x, y: 900 + 0.02 * x)):
+            rec, _ = sp.plan_site(mk2())
+            if rec["inputs"]["land_pass"]["drawn"]:
+                self.assertFalse(sp.LAND_NOT_FOR & names(rec, 2))
+                self.assertIs(rec["access"]["truck_path"]["swept_ok"], True)
+
+    def test_a_plan_of_the_pass_whose_docks_were_then_turned_is_still_the_passes(self):
+        # review 44/02, finding 6
+        water = wgs(box(0, 200, 110, 800))
+        rec, _ = sp.plan_site(site(700, 800, constraints_wgs=[water], constraints_near_wgs=[water], z=lambda x, y: 900 - 0.015 * x))
+        if not (rec["inputs"]["dock_side"]["turned"] and "POND_SHAPED_TO_SITE" in names(rec)):
+            self.skipTest("this site no longer turns a plan of the pass")
+        self.assertIs(rec["inputs"]["land_pass"]["drawn"], True)
 
     def test_cars_may_cross_the_layouts_own_open_ground(self):
         # a cross-dock's car field stands at the building's end, behind the

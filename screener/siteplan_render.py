@@ -503,6 +503,11 @@ def render(d: Drawing, rec: dict) -> str:
             out.append(poly(g.buffer(-RIM / 2), "none", C["pond_s"], 0.5, extra='stroke-dasharray="3 3" stroke-opacity="0.6"'))
             out.append(poly(water, C["pond"], C["pond_s"], 1.2))
             out.append(poly(water.buffer(-min(10.0, 0.18 * math.sqrt(max(water.area, 0.0)))), C["pond_deep"], op=0.55))
+    if second and second[1].get("through_first"):
+        # a second building reached through the first: its car drive where it runs over building 1's truck pavement
+        # (painted over by the court otherwise, so the drive would seem to start in the middle of it)
+        shared = unary_union([rp for kind, rp in second[1]["route_polys"] if kind == "car"]).intersection(unary_union(p.roads + p.courts))
+        out.append(poly(shared, C["car"], op=0.8))
     # the trucks' way in as a WB-67 steers it (default behaviour's plan): its centreline, as a lane line
     truck_lines = [ln for pp, oo in plans if (oo.get("truck_path") or {}).get("designed") for kind, ln in oo["routes"][:1] if kind == "truck"]
     if truck_lines:
