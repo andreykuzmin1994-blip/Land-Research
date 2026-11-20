@@ -405,7 +405,8 @@ class PlannedSite(ts.Offline):
 
         def nopond(*a_, **k):
             return None
-        with ts.mock.patch.object(sp, "place_sized_pond", nopond), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+        with ts.mock.patch.object(sp, "place_sized_pond", nopond), ts.mock.patch.object(sp, "free_pond", nopond), \
+                ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
             rec, _ = sp.plan_site(ts.site(600, 700), proto)
         self.assertIs(rec["feasible"], False)
         self.assertEqual(rec["assessment"]["status"], "blocked")
@@ -462,7 +463,8 @@ class PlannedSite(ts.Offline):
     def test_pond_limited_layout_is_reported_not_counted(self):
         def nopond(*a, **k):
             return None
-        with ts.mock.patch.object(sp, "place_sized_pond", nopond), ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
+        with ts.mock.patch.object(sp, "place_sized_pond", nopond), ts.mock.patch.object(sp, "free_pond", nopond), \
+                ts.mock.patch.object(ts.sitefit, "_angles", lambda rings: [0.0, 90.0]):
             rec, _ = sp.plan_site(ts.site(600, 700))
         self.assertIs(rec["feasible"], False)
         self.assertEqual(rec["assessment"]["status"], "blocked")
@@ -767,7 +769,7 @@ class ReferenceSite(ts.Offline):
         # (The search's own plan, 68,000 SF: the pond-first pass of
         # reviews/41 now reaches 91,000 SF on this site, within 5% of what
         # the pond held back, and the read-out then has no pond line.)
-        rec, d = ts.ref_plan("rank21", POND_ROOM_MAX_TRIES=0)
+        rec, d = ts.ref_plan("rank21", POND_ROOM_MAX_TRIES=0, LAND_MAX_TRIES=0)
         now, _ = ts.ref_plan("rank21")
         self.assertIsNone(now["selection"]["without_pond"])
         self.assertTrue(now["selection"]["with_trailers"]["trailers"] >= 1)

@@ -464,7 +464,7 @@ class Plans(Offline):
         control, _ = planned("basic", lambda: site(600, 700))
         self.assertTrue(control["detention"]["fits"])             # without the patch the pond fits
         self.assertIs(control["feasible"], True)
-        with mock.patch.object(sp, "place_sized_pond", nopond):
+        with mock.patch.object(sp, "place_sized_pond", nopond), mock.patch.object(sp, "free_pond", nopond):     # no rectangle, no shaped pond
             rec, _ = sp.plan_site(site(600, 700))
             proto, _ = sp.plan_site(site(600, 700), sp.PlanOptions(behaviour="prototype"))
         self.assertIn("POND_DOES_NOT_FIT", names(rec, 1))
@@ -1427,7 +1427,7 @@ class PondRoom(Offline):
         self.assertLess(rec["detention"]["pond_over_pad_ft"], 0)
         self.assertNotIn("STREET_FACING_DOCKS", names(rec))
         # without the pass, the old plan
-        old, _ = ref_plan("rank21", POND_ROOM_MAX_TRIES=0)
+        old, _ = ref_plan("rank21", POND_ROOM_MAX_TRIES=0, LAND_MAX_TRIES=0)
         self.assertEqual(old["building"]["sf"], 68000)
         self.assertEqual(old["inputs"]["pond_room"]["tries"], 0)
 
@@ -1464,7 +1464,7 @@ class PondRoom(Offline):
 
     def test_a_cut_pass_is_not_a_flag(self):
         # the pass out of its own time at once: the search's plan, no flag
-        rec, _ = ref_plan("rank21", POND_ROOM_TIME_SHARE=0.0)
+        rec, _ = ref_plan("rank21", POND_ROOM_TIME_SHARE=0.0, LAND_MAX_TRIES=0)
         self.assertIs(rec["inputs"]["pond_room"]["cut_short"], True)
         self.assertEqual(rec["building"]["sf"], 68000)
         self.assertIs(rec["feasible"], True)
@@ -1478,7 +1478,7 @@ class PondRoom(Offline):
         # area, or the same with as many stalls (or a pond that drains
         # where the plan before it had none: reviews/41).
         mk = lambda: site(800, 900, z=lambda x, y: 900 + 0.02 * x + 0.03 * y)
-        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0):
+        with mock.patch.object(sp, "POND_ROOM_MAX_TRIES", 0), mock.patch.object(sp, "LAND_MAX_TRIES", 0):
             off, _ = sp.plan_site(mk())
         on, _ = sp.plan_site(mk())
         self.assertEqual((off["building"]["sf"], off["trailers"]["total"]), (205000, 21))
@@ -1562,7 +1562,7 @@ class Drainage(Offline):
     def test_a_draining_layout_ranks_before_a_larger_one_that_does_not(self):
         # the ranking alone (no pass): the 67,000 SF layout with its pond
         # above the pad is no longer drawn; the read-out names it and why
-        rec, _ = ref_plan("rank25", POND_ROOM_MAX_TRIES=0)
+        rec, _ = ref_plan("rank25", POND_ROOM_MAX_TRIES=0, LAND_MAX_TRIES=0)
         self.assertEqual(rec["building"]["sf"], 61000)
         self.assertIs(rec["detention"]["drains_by_gravity"], True)
         up = rec["selection"]["upside"]
